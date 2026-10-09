@@ -19,6 +19,10 @@ module Hwaro::Core::Build::Phases::Render
   IMG_TAG_RE  = /<img\b[^>]*>/
   IMG_SRC_RE  = /\ssrc\s*=\s*("([^"]*)"|'([^']*)')/
   IMG_SIZE_RE = /\s(?:width|height)\s*=/i
+  # An actual `srcset` attribute (or a lazy-loader's `data-srcset`) — not
+  # alt/title text that merely says "srcset". A `data-srcset` image is the
+  # lazy-loader's to size; a real `srcset` beside it would load eagerly.
+  IMG_SRCSET_RE = /[\s\-]srcset\s*=/i
 
   private def apply_responsive_images(html : String, page : Models::Page, config : Models::Config) : String
     dimensions = config.image_processing.dimensions
@@ -32,14 +36,16 @@ module Hwaro::Core::Build::Phases::Render
     return html if resize_map.empty? && !dimensions
 
     html.gsub(IMG_TAG_RE) do |tag|
-      next tag if tag.includes?("srcset") && !dimensions
+      has_srcset = tag.matches?(IMG_SRCSET_RE)
+      next tag if has_srcset && !dimensions
       m = tag.match(IMG_SRC_RE)
       next tag unless m
-      src = m[2]? || m[3]? || ""
-      next tag if src.empty?
-      # Markdown HTML-escapes `&` in a URL; the resize map and the filesystem
-      # use the literal name.
-      src = HTML.unescape(src)
+      # The lookup key is the FILE the attribute names: entities decoded as a
+      # browser would, and the `?query` / `#fragment` cut off before the
+      # percent-decode (a literal `?` in a filename arrives as `%3F`).
+      src = HTML.unescape(m[2]? || m[3]? || "")
+      src = src[0, src.index(/[?#]/) || src.size]
+      next tag if src.empty? || src.includes?('\0')
       next tag if src.starts_with?("http://") || src.starts_with?("https://") ||
                   src.starts_with?("//") || src.starts_with?("data:")
 
@@ -54,6 +60,7 @@ module Hwaro::Core::Build::Phases::Render
       # Markdown emits percent-encoded URLs (spaces/unicode), but the resize map
       # is keyed by the decoded filesystem path — decode before the lookup.
       key = URI.decode(key)
+      next tag if key.includes?('\0') # a `%00`: not a file, never measurable
       # prefix_root_relative_links runs before this pass and may already have
       # rewritten a root-relative src with the subpath, but the resize map is
       # keyed by bare root-relative paths — strip the base_path back off so the
@@ -63,7 +70,14 @@ module Hwaro::Core::Build::Phases::Render
 
       additions = ""
       widths = resize_map[key]?
-      if widths && !widths.empty? && !tag.includes?("srcset")
+      if Content::Hooks::ImageHooks.processing_active?
+        # The variant set (clamped to the source's width) and the srcset
+        # printed from it follow the image's bytes, so a cached page or a
+        # serve session must re-render when it is replaced; an image that
+        # does not exist yet is watched at its static/ location.
+        Content::Hooks::ImageHooks.watch_render_source(key).try { |source| Content::Processors::TemplateEngine.record_file_read(source) }
+      end
+      if widths && !widths.empty? && !has_srcset
         # Prefix each candidate with the subpath (base_path) so responsive
         # images resolve on subpath deployments; the resize map stores bare
         # root-relative paths. Mirrors the resize_image() template helper.

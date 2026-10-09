@@ -81,6 +81,7 @@ dimensions = true   # does not need enabled = true
 3. Aspect ratio is always preserved
 4. If the target width is larger than the source, the original is copied as-is (no upscaling)
 5. Each source image is decoded only once, then resized to all widths (efficient)
+6. A JPEG's EXIF orientation is applied: variants are cut from the upright picture, and the `width`/`height` stamped by `dimensions = true` are the displayed size (swapped for a photo taken in portrait)
 
 ## Output Naming
 
@@ -93,6 +94,8 @@ static/hwaro.png
   -> public/hwaro_1024w.png
   -> public/hwaro_1280w.png
 ```
+
+A file you publish yourself under one of these names (for example an authored `static/hwaro_320w.png`) is never overwritten: that width is skipped and left out of the `srcset`.
 
 ## Using in Templates
 
@@ -187,7 +190,7 @@ For images with transparency (PNG logos, icons), `dominant_color` is weighted by
 `anchor` is one of `center` (default), `top`, `bottom`, `left`, `right`, `top_left`, `top_right`, `bottom_left`, `bottom_right`.
 
 - `fill` and `crop` need both `width` and `height`. A missing size, or an unknown `op` or `anchor`, is a template error.
-- These variants are written the first time a page renders and reused while they are newer than the source. They do not need `enabled = true` or any `widths`. With `--skip-image-processing` the original URL is returned.
+- These variants are written the first time a page renders and reused on warm builds while the source and `quality` are unchanged (the record is kept in `.hwaro/`). They do not need `enabled = true` or any `widths`. With `--skip-image-processing` the original URL is returned.
 - The file name carries the size, op and anchor, e.g. `hero_400x300_fill_center.jpg`, next to the original.
 - `width`/`height` in the result are the written file's size. `lqip` and `dominant_color` are empty for these variants.
 - Only JPEG, PNG and BMP sources can be cropped. Other formats return the original URL.

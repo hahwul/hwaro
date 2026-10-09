@@ -31,6 +31,7 @@ private def with_image_hook_state(&)
   begin
     yield
   ensure
+    Hwaro::Content::Hooks::ImageHooks.set_processing_state(false)
     Hwaro::Content::Hooks::ImageHooks.set_resize_map(prior_resize)
     Hwaro::Content::Hooks::ImageHooks.set_lqip_map(prior_lqip)
   end
@@ -132,6 +133,33 @@ describe Hwaro::Content::Hooks::ImageHooks do
       end
     end
 
+    it "keeps a ?query or #fragment out of the lookup and on the returned url" do
+      with_image_hook_state do
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map({"/img/p.png" => {100 => "/img/p_100w.png"}})
+        env = {"base_url" => "https://example.com"}
+        render_crinja(%({{ resize_image(path="/img/p.png?v=1", width=100).url }}), env).strip
+          .should eq("https://example.com/img/p_100w.png?v=1")
+        render_crinja(%({{ resize_image(path="/img/p.png#top", width=100).url }}), env).strip
+          .should eq("https://example.com/img/p_100w.png#top")
+        # No variant: the original URL comes back unchanged, not %3F-encoded.
+        render_crinja(%({{ resize_image(path="/img/none.png?v=1", width=100).url }}), env).strip
+          .should eq("https://example.com/img/none.png?v=1")
+        render_crinja(%({{ resize_image(path="/img/none.png?v=1#a", width=100, height=50, op="fill").url }}), env).strip
+          .should eq("https://example.com/img/none.png?v=1#a")
+      end
+    end
+
+    it "collapses . and .. segments of the path" do
+      with_image_hook_state do
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map({"/img/p.png" => {100 => "/img/p_100w.png"}})
+        env = {"base_url" => "https://example.com"}
+        render_crinja(%({{ resize_image(path="/img/x/../p.png", width=100).url }}), env).strip
+          .should eq("https://example.com/img/p_100w.png")
+        render_crinja(%({{ resize_image(path="/./img/none.png", width=100).url }}), env).strip
+          .should eq("https://example.com/img/none.png")
+      end
+    end
+
     it "falls back to the requested width when no variant exists" do
       with_image_hook_state do
         Hwaro::Content::Hooks::ImageHooks.set_resize_map({} of String => Hash(Int32, String))
@@ -224,7 +252,9 @@ describe Hwaro::Content::Hooks::ImageHooks do
           Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx
         )
         result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
-        Hwaro::Content::Hooks::ImageHooks.resize_map.should eq(sentinel_map)
+        # Nothing is processed, so the previous run's variants are dropped
+        # rather than left for resize_image() to hand out (serve).
+        Hwaro::Content::Hooks::ImageHooks.resize_map.should be_empty
       end
     end
 
@@ -233,6 +263,8 @@ describe Hwaro::Content::Hooks::ImageHooks do
         Hwaro::Content::Hooks::ImageHooks.set_resize_map(sentinel_map.dup)
 
         config = Hwaro::Models::Config.new
+        Hwaro::Content::Hooks::ImageHooks.set_lqip_map({"sentinel.png" => {"lqip" => "x"}})
+        Hwaro::Content::Hooks::ImageHooks.set_processing_state(true, {"sentinel.png" => "static/sentinel.png"})
         config.image_processing.enabled = false
         config.image_processing.widths = [320]
 
@@ -244,7 +276,10 @@ describe Hwaro::Content::Hooks::ImageHooks do
         Hwaro::Content::Hooks::ImageHooks.new.register_hooks(manager)
         manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
 
-        Hwaro::Content::Hooks::ImageHooks.resize_map.should eq(sentinel_map)
+        Hwaro::Content::Hooks::ImageHooks.resize_map.should be_empty
+        Hwaro::Content::Hooks::ImageHooks.lqip_map.should be_empty
+        Hwaro::Content::Hooks::ImageHooks.source_map.should be_empty
+        Hwaro::Content::Hooks::ImageHooks.processing_active?.should be_false
       end
     end
 
@@ -264,7 +299,35 @@ describe Hwaro::Content::Hooks::ImageHooks do
         Hwaro::Content::Hooks::ImageHooks.new.register_hooks(manager)
         manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
 
-        Hwaro::Content::Hooks::ImageHooks.resize_map.should eq(sentinel_map)
+        Hwaro::Content::Hooks::ImageHooks.resize_map.should be_empty
+      end
+    end
+
+    it "drops the previous run's variants when no image is left to process" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          with_image_hook_state do
+            Hwaro::Content::Hooks::ImageHooks.set_resize_map(sentinel_map.dup)
+            Hwaro::Content::Hooks::ImageHooks.set_lqip_map({"sentinel.png" => {"lqip" => "x"}})
+
+            config = Hwaro::Models::Config.new
+            config.image_processing.enabled = true
+            config.image_processing.widths = [320]
+
+            options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
+            ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+            ctx.config = config
+
+            manager = Hwaro::Core::Lifecycle::Manager.new
+            Hwaro::Content::Hooks::ImageHooks.new.register_hooks(manager)
+            manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
+
+            Hwaro::Content::Hooks::ImageHooks.resize_map.should be_empty
+            Hwaro::Content::Hooks::ImageHooks.lqip_map.should be_empty
+            render_crinja(%({{ resize_image(path="/sentinel.png", width=1).url }}), {"base_url" => "https://example.com"}).strip
+              .should eq("https://example.com/sentinel.png")
+          end
+        end
       end
     end
 
@@ -292,6 +355,37 @@ describe Hwaro::Content::Hooks::ImageHooks do
   # exist. These tests cover the pure predicate; end-to-end reuse is
   # exercised by `process_images` via the path through this helper.
   describe ".reusable_widths" do
+    it "reuses stamped variants only for the same source version and encode settings" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          hooks = Hwaro::Content::Hooks::ImageHooks
+          stamps = Hwaro::Content::Hooks::ImageVariantStamps
+          File.write("photo.jpg", "src")
+          File.touch("photo.jpg", Time.utc - 1.hour)
+          Dir.mkdir_p("out")
+          variant = File.join("out", "photo_320w.jpg")
+          File.write(variant, "320")
+          settings = hooks.encode_settings(85, 0, 20)
+
+          # No stamp: not proven fresh (a cache from before stamps existed).
+          hooks.reusable_widths("photo.jpg", "out", [320], nil, settings).should be_nil
+          hooks.reusable_widths("photo.jpg", "out", [320]).should_not be_nil
+
+          stamps.record(variant, stamps.fingerprint("photo.jpg", settings).not_nil!)
+          hooks.reusable_widths("photo.jpg", "out", [320], nil, settings).should_not be_nil
+
+          # A different quality is a different variant.
+          hooks.reusable_widths("photo.jpg", "out", [320], nil, hooks.encode_settings(5, 0, 20)).should be_nil
+
+          # A replaced source whose mtime moved BACKWARDS (still older than
+          # the variant) is a different source version.
+          File.write("photo.jpg", "other")
+          File.touch("photo.jpg", Time.utc - 2.hours)
+          hooks.reusable_widths("photo.jpg", "out", [320], nil, settings).should be_nil
+        end
+      end
+    end
+
     it "returns a width => filename map when all destinations are fresh" do
       Dir.mktmpdir do |dir|
         source = File.join(dir, "photo.jpg")
@@ -547,6 +641,17 @@ private def png_body(w : Int32, h : Int32) : String
   end
 end
 
+# Raw bytes of a noisy w×h JPEG (noise keeps the size sensitive to quality).
+private def jpg_body(w : Int32, h : Int32, seed : Int32) : String
+  Dir.mktmpdir do |dir|
+    path = File.join(dir, "x.jpg")
+    rng = Random.new(seed)
+    px = Bytes.new(w * h * 3) { rng.rand(256).to_u8 }
+    LibStb.stbi_write_jpg(path, w, h, 3, px.to_unsafe.as(Void*), 90)
+    File.read(path)
+  end
+end
+
 private def png_size(path : String) : {Int32, Int32}?
   Hwaro::Content::Processors::ImageProcessor.dimensions(path)
 end
@@ -592,6 +697,97 @@ private def rebuild_cached : Nil
 end
 
 describe "ImageHooks render-time lookups (review fixes)" do
+  it "resolves no source for a url carrying a NUL byte instead of raising" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        Dir.mkdir_p("static")
+        File.write("static/a.png", png_body(2, 2))
+        config = Hwaro::Models::Config.new
+        Hwaro::Content::Hooks::ImageHooks.resolve_source("/a.png", config).should eq("static/a.png")
+        Hwaro::Content::Hooks::ImageHooks.resolve_source("/a\0.png", config).should be_nil
+      end
+    end
+  end
+
+  it "writes a fill variant of a ../ path at its canonical place, with no stray directory" do
+    build_site(
+      %(title = "t"\nbase_url = "https://example.com"\n),
+      content_files: {"about.md" => "+++\ntitle = \"About\"\n+++\nabout\n"},
+      template_files: {
+        "page.html" => %({% set v = resize_image(path="/sub/../img/a.png?v=3", width=10, height=10, op="fill") %}V={{ v.url }}),
+        "section.html" => "{{ content }}", "index.html" => "{{ content }}",
+      },
+      static_files: {"img/a.png" => png_body(12, 30)},
+    ) do
+      File.read("public/about/index.html").should contain("V=https://example.com/img/a_10x10_fill_center.png?v=3")
+      png_size("public/img/a_10x10_fill_center.png").should eq({10, 10})
+      Dir.exists?("public/sub").should be_false
+    end
+  end
+
+  it "regenerates warm variants after a quality change or a source swapped for an older-mtime file" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        config = ->(quality : Int32) {
+          File.write("config.toml", %(title = "t"\nbase_url = "https://example.com"\n[image_processing]\nenabled = true\nwidths = [40]\nquality = #{quality}\n))
+        }
+        config.call(95)
+        Dir.mkdir_p("content")
+        Dir.mkdir_p("templates")
+        Dir.mkdir_p("static")
+        File.write("content/index.md", "+++\ntitle = \"Home\"\n+++\nhi\n")
+        tpl = %({% set v = resize_image(path="/p.jpg", width=30, height=20, op="fill") %}{{ v.url }}{{ content }})
+        %w[index page section].each { |name| File.write("templates/#{name}.html", tpl) }
+        File.write("static/p.jpg", jpg_body(120, 80, 1))
+        File.touch("static/p.jpg", Time.utc - 1.hour)
+
+        rebuild_cached
+        wide = File.size("public/p_40w.jpg")
+        fill = File.size("public/p_30x20_fill_center.jpg")
+
+        config.call(5)
+        rebuild_cached
+        File.size("public/p_40w.jpg").should be < wide
+        File.size("public/p_30x20_fill_center.jpg").should be < fill
+
+        # Same quality again: nothing is rewritten.
+        before = {File.read("public/p_40w.jpg"), File.info("public/p_40w.jpg").modification_time}
+        rebuild_cached
+        {File.read("public/p_40w.jpg"), File.info("public/p_40w.jpg").modification_time}.should eq(before)
+
+        # rsync -a / tar -x / a restored revision: new bytes, OLDER mtime.
+        File.write("static/p.jpg", jpg_body(120, 80, 2))
+        File.touch("static/p.jpg", Time.utc - 2.hours)
+        rebuild_cached
+        File.read("public/p_40w.jpg").should_not eq(before[0])
+      end
+    end
+  end
+
+  it "never overwrites a published file that sits on a width variant's name" do
+    build_site(
+      %(title = "t"\nbase_url = "https://example.com"\n[image_processing]\nenabled = true\nwidths = [20, 40]\n),
+      content_files: {"index.md" => "+++\ntitle = \"Home\"\n+++\n![h](/hero.png)\n"},
+      template_files: {"page.html" => "{{ content }}", "section.html" => "{{ content }}", "index.html" => "{{ content }}"},
+      static_files: {"hero.png" => png_body(100, 50), "hero_20w.png" => png_body(60, 30)},
+      cache: true,
+    ) do
+      check = -> {
+        png_size("public/hero_20w.png").should eq({60, 30})
+        png_size("public/hero_40w.png").should eq({40, 20})
+        html = File.read("public/index.html")
+        html.should contain("hero_40w.png 40w")
+        html.should_not contain("hero_20w.png 20w")
+      }
+      check.call
+      # Warm builds reuse the variant set without regenerating the authored name.
+      2.times do
+        rebuild_cached
+        check.call
+      end
+    end
+  end
+
   it "never publishes a fill variant of a withheld (draft) bundle's image" do
     build_site(
       %(title = "t"\nbase_url = "https://example.com"\n[content.files]\nallow_extensions = ["png"]\n),
