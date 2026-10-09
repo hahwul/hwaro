@@ -1518,6 +1518,17 @@ describe Hwaro::Models::Config do
       config.build.output_dir.should be_nil
     end
 
+    it "keeps a [build] output_dir whose name merely starts with .." do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [build]
+        output_dir = "..public"
+        TOML
+
+      config.build.output_dir.should eq("..public")
+    end
+
     it "keeps an absolute [build] output_dir" do
       config = load_config(<<-TOML)
         title = "Test"
@@ -2291,6 +2302,46 @@ describe Hwaro::Models::Config do
   # ---------------------------------------------------------------------------
 
   describe "deployment configuration" do
+    # Docs list include/exclude as string globs; an array used to fall through
+    # `as_s?` to "no filter" with no diagnostic, deploying excluded files.
+    it "warns when a deployment target's include / exclude / stripIndexHTML has the wrong type" do
+      config = nil
+      log = with_captured_log do
+        config = load_config(<<-TOML)
+          title = "Test"
+
+          [[deployment.targets]]
+          name = "local"
+          path = "/tmp/out"
+          include = ["**/*.html"]
+          exclude = ["private/**"]
+          stripIndexHTML = "yes"
+          TOML
+      end
+
+      log.should contain("[[deployment.targets]] local: 'include' must be a string glob")
+      log.should contain("[[deployment.targets]] local: 'exclude' must be a string glob")
+      log.should contain("[[deployment.targets]] local: 'stripIndexHTML' must be a boolean")
+      config.not_nil!.deployment.targets[0].exclude.should be_nil
+    end
+
+    it "does not warn for well-typed deployment target options" do
+      log = with_captured_log do
+        load_config(<<-TOML)
+          title = "Test"
+
+          [[deployment.targets]]
+          name = "local"
+          path = "/tmp/out"
+          include = "**/*.html"
+          exclude = "private/**"
+          stripIndexHTML = true
+          TOML
+      end
+
+      log.should_not contain("must be a")
+    end
+
     it "loads deployment targets from config.toml" do
       config = load_config(<<-TOML)
         title = "Test"

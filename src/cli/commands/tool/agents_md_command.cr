@@ -101,6 +101,16 @@ module Hwaro
               end
               existed = File.exists?(filename)
               existing = existed ? File.read(filename) : nil
+              # Marker detection and the merge are regex-based and raise on
+              # invalid UTF-8; refuse (nothing written, nothing lost) instead
+              # of crashing with an unclassified error.
+              if existing && !existing.valid_encoding?
+                raise Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_IO,
+                  message: "Existing AGENTS.md is not valid UTF-8; refusing to regenerate it.",
+                  hint: "Fix the file's encoding or remove it, then re-run 'hwaro tool agents-md --write'.",
+                )
+              end
               # Only promise preservation when the merge can actually deliver
               # it: an existing file without the marker heading gets a full
               # overwrite, and the prompt must say so instead of reassuring.

@@ -251,7 +251,7 @@ module Hwaro
           return
         end
 
-        if Path[trimmed].normalize.to_s.starts_with?("..")
+        if Utils::PathUtils.escapes_parent?(trimmed)
           Logger.warn "Ignoring [build] output_dir #{trimmed.inspect}: it points outside the project. Using the default."
           return
         end

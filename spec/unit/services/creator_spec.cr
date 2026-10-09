@@ -1624,6 +1624,37 @@ describe Hwaro::Services::Creator do
       Hwaro::Services::Creator.titleize("---").should eq("---")
     end
   end
+
+  describe "default titles" do
+    ml_config = %(title = "x"\ndefault_language = "en"\n[languages.en]\nlanguage_name = "English"\n[languages.ko]\nlanguage_name = "Korean"\n)
+
+    it "drops a declared language suffix and uses the directory name for index files" do
+      config = load_config(ml_config)
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          %w[posts/hello-world.ko.md posts/zed/index.md posts/yak/_index.md posts/yak/index.ko.md].each do |p|
+            Hwaro::Services::Creator.new.run(Hwaro::Config::Options::NewOptions.new(path: p), config)
+          end
+          File.read("content/posts/hello-world.ko.md").should contain(%(title = "Hello World"))
+          File.read("content/posts/zed/index.md").should contain(%(title = "Zed"))
+          File.read("content/posts/yak/_index.md").should contain(%(title = "Yak"))
+          File.read("content/posts/yak/index.ko.md").should contain(%(title = "Yak"))
+        end
+      end
+    end
+
+    it "keeps an undeclared dotted suffix and the root index title" do
+      config = load_config(ml_config)
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          Hwaro::Services::Creator.new.run(Hwaro::Config::Options::NewOptions.new(path: "posts/setup.mac.md"), config)
+          Hwaro::Services::Creator.new.run(Hwaro::Config::Options::NewOptions.new(path: "index.md"), config)
+          File.read("content/posts/setup.mac.md").should contain(%(title = "Setup.mac"))
+          File.read("content/index.md").should contain(%(title = "Index"))
+        end
+      end
+    end
+  end
 end
 
 describe Hwaro::Services::Creator, "translation suffix" do

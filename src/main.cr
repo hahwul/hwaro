@@ -69,7 +69,9 @@ end
 
 fun main(argc : Int32, argv : UInt8**) : Int32
   command = Pointer(UInt8).null
-  memory_limited = !LibC.getenv("HWARO_MEMORYLIMIT").null?
+  # An empty HWARO_MEMORYLIMIT is "unset" (BuildCommand ignores it too).
+  limit_env = LibC.getenv("HWARO_MEMORYLIMIT")
+  memory_limited = !limit_env.null? && limit_env.value != 0_u8
   i = 1
   while i < argc
     arg = argv[i]

@@ -203,7 +203,7 @@ module Hwaro
       # `fix_config`). Returns nil on TOML parse
       # failure; callers already downstream of `check_config` have seen
       # the classified error so silent-nil here avoids double-reporting.
-      # The rescue is narrowed to `TOML::ParseException` so any other
+      # The rescue is narrowed to parse-failure classes so any other
       # unexpected error propagates rather than being silently swallowed.
       #
       # Environment placeholders are substituted first, as `Config.load`
@@ -215,7 +215,10 @@ module Hwaro
       private def parse_config_toml(raw_text : String) : TOML::Table?
         substituted, _missing = Utils::EnvSubstitutor.substitute_toml(raw_text)
         TOML.parse(substituted)
-      rescue ex : TOML::ParseException
+      rescue ex : TOML::ParseException | InvalidByteSequenceError | ArgumentError
+        # Invalid UTF-8 surfaces as InvalidByteSequenceError from the lexer
+        # (ArgumentError from the env-placeholder regex); both mean "not
+        # parseable", like Config.load's catch-all.
         Logger.debug "Doctor: TOML parse error in #{@config_path}: #{ex.message}"
         nil
       end

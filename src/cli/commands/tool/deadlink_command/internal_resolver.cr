@@ -648,6 +648,10 @@ module Hwaro
             names.includes?(segments.first)
           end
 
+          # nil only when there is no config.toml. A config that fails to load
+          # is a HWARO_E_CONFIG error (as in every other command): falling
+          # back to defaults dropped taxonomies/base_path/languages and
+          # reported /tags/ etc. as dead links.
           private def load_config(project_root : String = ".") : Models::Config?
             config_path = File.join(project_root, "config.toml")
             return unless File.exists?(config_path)
@@ -655,8 +659,6 @@ module Hwaro
             Dir.cd(project_root) do
               Models::Config.load
             end
-          rescue Exception
-            nil
           end
         end
       end

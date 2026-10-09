@@ -17,6 +17,28 @@ end
 
 describe Hwaro::CLI::Commands::ServeCommand do
   describe "#parse_options" do
+    it "rejects stray positional arguments instead of serving the current directory" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      err = expect_raises(Hwaro::HwaroError) { cmd.test_parse_options(["mysite", "extra"]) }
+      err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      err.message.to_s.should contain("'mysite', 'extra'")
+      err.hint.to_s.should contain("-i/--input")
+      expect_raises(Hwaro::HwaroError) { cmd.test_parse_options(["-p", "3000", "--", "dir"]) }
+    end
+
+    it "treats empty HWARO_MEMORYLIMIT / HWARO_ENV as unset" do
+      ENV["HWARO_MEMORYLIMIT"] = ""
+      ENV["HWARO_ENV"] = ""
+      begin
+        _, options = Hwaro::CLI::Commands::ServeCommand.new.test_parse_options([] of String)
+        options.memory_limit.should be_nil
+        options.env.should be_nil
+      ensure
+        ENV.delete("HWARO_MEMORYLIMIT")
+        ENV.delete("HWARO_ENV")
+      end
+    end
+
     it "defaults error_overlay to true" do
       cmd = Hwaro::CLI::Commands::ServeCommand.new
       _, options = cmd.test_parse_options([] of String)

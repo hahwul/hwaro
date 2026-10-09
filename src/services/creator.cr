@@ -264,7 +264,7 @@ module Hwaro
           if full_path
             base_dir = File.dirname(full_path)
             if title.empty?
-              title = Creator.titleize(page_name(full_path))
+              title = default_title(full_path)
             end
           else
             base_dir = File.join("content", section)
@@ -317,12 +317,10 @@ module Hwaro
             # `hwaro new drafts/foo.md` still lands at `content/drafts/foo.md`
             # (and is_draft picks that up via the path-based heuristic below).
 
-            # Extract title from filename if not provided
-            if title.empty?
-              title = Creator.titleize(page_name(path))
-            end
-
             full_path = path.starts_with?("content/") ? path : File.join("content", path)
+
+            # Extract title from filename if not provided
+            title = default_title(full_path) if title.empty?
             base_dir = File.dirname(full_path)
           elsif is_no_bundle_flat && path
             normalized = path.starts_with?("content/") ? path : File.join("content", path)
@@ -623,6 +621,20 @@ module Hwaro
       # name titles, bundle directories and URLs are built from.
       private def page_name(path : String) : String
         page_stem(path).rchop(language_ext(path))
+      end
+
+      # The title `hwaro new` derives for *full_path* (under `content/`):
+      # the page name (see `page_name`), and for a bundle / section index
+      # (`index` / `_index`) the containing directory's name. An index
+      # directly under `content/` has no directory name to use and keeps
+      # the stem.
+      private def default_title(full_path : String) : String
+        name = page_name(full_path)
+        dir = File.dirname(full_path)
+        if (name == "index" || name == "_index") && dir != CONTENT_DIR && dir != "."
+          name = File.basename(dir)
+        end
+        Creator.titleize(name)
       end
 
       # An existing page file other than `full_path` that renders to the

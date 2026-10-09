@@ -144,6 +144,28 @@ describe Hwaro::Services::Doctor do
     end
   end
 
+  describe "config.toml with invalid UTF-8" do
+    # parse_config_toml only rescued TOML::ParseException, so the lexer's
+    # InvalidByteSequenceError escaped as an unclassified `Error:` (exit 1)
+    # instead of fix_config's HWARO_E_CONFIG refusal.
+    it "refuses --fix with a classified HWARO_E_CONFIG error" do
+      Dir.mktmpdir do |dir|
+        config_path = File.join(dir, "config.toml")
+        File.open(config_path, "w") do |f|
+          f << %(title = "S"\nbase_url = "https://example.com"\n# c )
+          f.write(Bytes[0xff, 0xfe])
+          f << "\n"
+        end
+        before = File.read(config_path)
+
+        doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+        err = expect_raises(Hwaro::HwaroError) { doctor.fix_config }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        File.read(config_path).should eq(before)
+      end
+    end
+  end
+
   describe "unclassified content parse errors" do
     # A file whose parse raises a non-HwaroError (invalid UTF-8 makes the
     # frontmatter regex raise ArgumentError) was silently dropped by

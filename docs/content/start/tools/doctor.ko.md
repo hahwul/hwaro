@@ -37,6 +37,7 @@ hwaro doctor --json
 | 플래그 | 설명 |
 |------|-------------|
 | -c, --content-dir DIR | 검사할 콘텐츠 디렉터리 (기본값: content) |
+| -e, --env ENV | `build --env ENV`가 읽는 설정 그대로 검사 (`config.ENV.toml`을 병합, 기본값은 `HWARO_ENV`). `--fix`는 여전히 `config.toml`만 수정 |
 | --fix | 실제 수정 수행 — 값 정규화 (base_url 끝 슬래시, sitemap priority 등) |
 | --approve | 권장 선택 설정 섹션을 승인하고 추가 |
 | --full | `--fix`와 `--approve`를 모두 수행 |

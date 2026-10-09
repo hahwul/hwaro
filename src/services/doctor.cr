@@ -92,8 +92,11 @@ module Hwaro
       @config_path : String
       @templates_dir : String
       @static_dir : String
+      # `--env` / HWARO_ENV: the config.<env>.toml overlay `check_config`
+      # merges, so doctor validates what `build --env X` will load.
+      @env : String?
 
-      def initialize(@content_dir : String = "content", @config_path : String = "config.toml", @templates_dir : String = "templates", @static_dir : String = "static")
+      def initialize(@content_dir : String = "content", @config_path : String = "config.toml", @templates_dir : String = "templates", @static_dir : String = "static", @env : String? = nil)
       end
 
       def run : Array(Issue)

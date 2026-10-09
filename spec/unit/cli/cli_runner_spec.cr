@@ -144,6 +144,33 @@ describe Hwaro::CLI::Runner do
       parsed["error"]["code"].as_s.should eq(Hwaro::Errors::HWARO_E_USAGE)
       parsed["error"]["message"].as_s.should contain("unknown command")
     end
+
+    # `-j` is the documented short form of `--json`; parse-time usage errors
+    # (raised before any command called enable_json_mode!) must honour it.
+    it "emits the JSON payload for -j on parse-time usage errors" do
+      bin = hwaro_binary
+      next unless File.exists?(bin) && File::Info.executable?(bin)
+
+      [["boguscmd", "-j"], ["build", "-j", "--bogus"], ["tool", "nope", "-j"], ["doctor", "-j", "--bogus"]].each do |argv|
+        stdout_sink = IO::Memory.new
+        status = Process.run(bin, argv, output: stdout_sink, error: IO::Memory.new)
+        status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
+        parsed = JSON.parse(stdout_sink.to_s)
+        parsed["status"].as_s.should eq("error")
+        parsed["error"]["code"].as_s.should eq(Hwaro::Errors::HWARO_E_USAGE)
+      end
+    end
+
+    it "keeps text output when neither --json nor -j is given" do
+      bin = hwaro_binary
+      next unless File.exists?(bin) && File::Info.executable?(bin)
+
+      stdout_sink = IO::Memory.new
+      stderr_sink = IO::Memory.new
+      Process.run(bin, ["build", "--bogus"], output: stdout_sink, error: stderr_sink)
+      stdout_sink.to_s.should be_empty
+      stderr_sink.to_s.should contain("Error [HWARO_E_USAGE]")
+    end
   end
 
   describe ".print_help" do
@@ -255,6 +282,15 @@ describe Hwaro::CLI::Runner do
         end
       end
     end
+  end
+end
+
+describe "Hwaro::CLI::Runner.json_flag?" do
+  it "accepts --json and -j before the -- separator only" do
+    Hwaro::CLI::Runner.json_flag?(["build", "--json"]).should be_true
+    Hwaro::CLI::Runner.json_flag?(["build", "-j"]).should be_true
+    Hwaro::CLI::Runner.json_flag?(["init", "--", "-j"]).should be_false
+    Hwaro::CLI::Runner.json_flag?(["build"]).should be_false
   end
 end
 

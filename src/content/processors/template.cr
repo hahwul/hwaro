@@ -499,7 +499,7 @@ module Hwaro
         def self.bundle_image_url(env : Crinja, path : String) : String?
           return if path.empty? || path.starts_with?('/')
           own = Path.posix(path).normalize.to_s
-          return if own.starts_with?("..")
+          return if Utils::PathUtils.escapes_parent?(own)
           page = env.resolve("page")
           return unless page.mapping?
           url = page["url"].to_s

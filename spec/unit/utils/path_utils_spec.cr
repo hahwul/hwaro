@@ -446,4 +446,16 @@ describe Hwaro::Utils::PathUtils do
       Hwaro::Utils::PathUtils.glob_match?("", "a").should be_false
     end
   end
+
+  describe ".escapes_parent?" do
+    it "is true only when the first segment is exactly .." do
+      Hwaro::Utils::PathUtils.escapes_parent?("..").should be_true
+      Hwaro::Utils::PathUtils.escapes_parent?("../x").should be_true
+      Hwaro::Utils::PathUtils.escapes_parent?("..public").should be_false
+      Hwaro::Utils::PathUtils.escapes_parent?("..x/y").should be_false
+      Hwaro::Utils::PathUtils.escapes_parent?("a/../..").should be_true
+      Hwaro::Utils::PathUtils.escapes_parent?("public").should be_false
+      Hwaro::Utils::PathUtils.escapes_parent?("/abs/path").should be_false
+    end
+  end
 end

@@ -22,6 +22,41 @@ describe Hwaro::CLI::Commands::Tool::UnusedAssetsCommand do
   end
 
   describe "#run" do
+    # A typo'd --content-dir used to scan nothing: every static file read as
+    # unused and `--delete --force` removed files the content still uses.
+    it "fails for an explicit --content-dir that does not exist" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          Dir.mkdir("static")
+          File.write("static/a.png", "x")
+          err = expect_raises(Hwaro::HwaroError) do
+            with_captured_log { Hwaro::CLI::Commands::Tool::UnusedAssetsCommand.new.run(["--content-dir", "contnt", "--delete", "--force"]) }
+          end
+          err.code.should eq(Hwaro::Errors::HWARO_E_CONTENT)
+          File.exists?("static/a.png").should be_true
+        end
+      end
+    end
+
+    it "fails for an explicit --static-dir that does not exist" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          err = expect_raises(Hwaro::HwaroError) do
+            with_captured_log { Hwaro::CLI::Commands::Tool::UnusedAssetsCommand.new.run(["-s", "nope"]) }
+          end
+          err.code.should eq(Hwaro::Errors::HWARO_E_IO)
+        end
+      end
+    end
+
+    it "still accepts the default directories being absent" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          with_captured_log { Hwaro::CLI::Commands::Tool::UnusedAssetsCommand.new.run([] of String) }
+        end
+      end
+    end
+
     it "reports when there are no unused assets" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")

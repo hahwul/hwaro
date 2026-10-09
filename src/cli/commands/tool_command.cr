@@ -122,7 +122,7 @@ module Hwaro
         # `Error [HWARO_E_USAGE]: …` line (and the help hint) come from the
         # Runner's shared `emit_hwaro_error` path.
         def self.report_unknown_subcommand(subcommand : String, args : Array(String) = [] of String)
-          json_mode = args.includes?("--json")
+          json_mode = Runner.json_flag?(args)
           unless json_mode
             candidates = ToolCommand.subcommands.map(&.name)
             if suggestion = Utils::CommandSuggester.suggest(subcommand, candidates)

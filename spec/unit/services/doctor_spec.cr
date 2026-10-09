@@ -124,6 +124,12 @@ describe Hwaro::Services::Doctor do
         issues.any?(&.message.includes?("search.format")).should be_false
       end
 
+      # The build and the UI guard downcase the format before use.
+      it "does not warn on a valid search format written in another case" do
+        issues = run_doctor(base_config("\n[search]\nenabled = true\nformat = \"Fuse_JSON\"\n"))
+        issues.any?(&.message.includes?("search.format")).should be_false
+      end
+
       it "reports error on invalid config TOML" do
         issues = run_doctor("invalid = [toml\n")
         issues.any? { |i| i.level == :error && i.message.includes?("parse") }.should be_true

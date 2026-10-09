@@ -3,6 +3,16 @@ require "../../../../src/cli/commands/deploy_command"
 
 describe Hwaro::CLI::Commands::DeployCommand do
   describe "#parse_options" do
+    it "treats an empty HWARO_ENV as unset" do
+      ENV["HWARO_ENV"] = ""
+      begin
+        options, _, _ = Hwaro::CLI::Commands::DeployCommand.new.parse_options([] of String)
+        options.env.should be_nil
+      ensure
+        ENV.delete("HWARO_ENV")
+      end
+    end
+
     it "returns default options" do
       cmd = Hwaro::CLI::Commands::DeployCommand.new
       options, list_targets, json_output = cmd.parse_options([] of String)

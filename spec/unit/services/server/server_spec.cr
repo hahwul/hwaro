@@ -120,6 +120,12 @@ describe Hwaro::Services::Server do
       server.test_sanitize_output_dir("../foo").should eq("public")
     end
 
+    it "keeps a directory whose name merely starts with .." do
+      server = Hwaro::Services::Server.new
+      server.test_sanitize_output_dir("..public").should eq("..public")
+      server.test_sanitize_output_dir("../..public").should eq("public")
+    end
+
     # `hwaro build -o /srv/site` and `[build] output_dir = "/srv/site"` both
     # write there, so rejecting an absolute path here would have serve building
     # into that directory while serving an empty `public/` — every request a

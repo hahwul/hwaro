@@ -93,7 +93,7 @@ module Hwaro::Core::Build::Phases::Finalize
         root = File.expand_path(output_dir, cwd)
         collect_page_output_paths(page, output_dir).each do |path|
           relative = Path[File.expand_path(path, cwd)].relative_to(root).to_s
-          claim_generated_output(File.join(output_dir, relative)) unless relative.starts_with?("..")
+          claim_generated_output(File.join(output_dir, relative)) unless Utils::PathUtils.escapes_parent?(relative)
         end
         next
       end

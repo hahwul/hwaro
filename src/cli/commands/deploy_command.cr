@@ -146,7 +146,7 @@ module Hwaro
           max_deletes = nil.as(Int32?)
           list_targets = false
           json_output = false
-          env_name = ENV["HWARO_ENV"]? || nil
+          env_name = ENV["HWARO_ENV"]?.presence
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro deploy [options] [target ...]"

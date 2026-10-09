@@ -29,6 +29,7 @@ module Hwaro
           # Flags defined here are used both for OptionParser and completion generation
           FLAGS = [
             CONTENT_DIR_FLAG,
+            ENV_FLAG,
             FlagInfo.new(short: nil, long: "--fix", description: "Perform real fixes (normalize values like base_url trailing slash, sitemap priority, etc.)"),
             FlagInfo.new(short: nil, long: "--approve", description: "Approve and add recommended optional config sections (use with --fix or alone)"),
             FlagInfo.new(short: nil, long: "--full", description: "Equivalent to --fix --approve (real fixes + all recommended sections)"),
@@ -61,6 +62,7 @@ module Hwaro
           def run(args : Array(String), invocation : String = "hwaro tool doctor")
             content_dir = "content"
             config_path = "config.toml"
+            env_name = ENV["HWARO_ENV"]?.presence
             json_output = false
             fix_mode = false
             approve_mode = false
@@ -72,6 +74,7 @@ module Hwaro
             OptionParser.parse(args) do |parser|
               parser.banner = "Usage: #{invocation} [options]"
               CLI.register_flag(parser, CONTENT_DIR_FLAG) { |v| content_dir = v }
+              CLI.register_flag(parser, ENV_FLAG) { |v| env_name = v }
               parser.on("--fix", "Perform real fixes (normalize values like base_url trailing slash, sitemap priority, etc.)") { fix_mode = true }
               parser.on("--approve", "Approve and add recommended optional config sections") { approve_mode = true }
               parser.on("--full", "Perform real fixes and approve all recommended sections (equivalent to --fix --approve)") { full_mode = true }
@@ -114,7 +117,7 @@ module Hwaro
             # error payload instead of human text on a machine-read stream.
             Runner.enable_json_mode! if json_output
 
-            doctor = Services::Doctor.new(content_dir: content_dir, config_path: config_path)
+            doctor = Services::Doctor.new(content_dir: content_dir, config_path: config_path, env: env_name)
 
             if dry_run_mode && !fix_mode && !approve_mode && !full_mode
               Logger.warn "--dry-run has no effect without --fix, --approve, or --full"
