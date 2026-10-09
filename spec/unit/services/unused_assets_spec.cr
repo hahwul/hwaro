@@ -62,7 +62,7 @@ describe Hwaro::Services::UnusedAssets do
       # The directory prefix of every glob is literal: `[client]/` or `a{b,c}/`
       # used to match nothing, so doctor/unused-assets saw an empty project.
       Dir.mktmpdir do |tmp|
-        dir = File.join(tmp, "[client] a{b,c}")
+        dir = File.join(tmp, glob_literal_names(["[client] a{b,c}", "[client] a"]).first)
         content_dir = File.join(dir, "content")
         static_dir = File.join(dir, "static")
         FileUtils.mkdir_p(content_dir)

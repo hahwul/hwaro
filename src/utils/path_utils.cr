@@ -401,28 +401,23 @@ module Hwaro
         path
       end
 
-      # `Dir.glob` pattern syntax. Crystal's glob reads `\` as an escape on
-      # every platform (patterns always use `/`), but a Windows path may still
-      # carry `\` separators, so the backslash itself is only escaped off
-      # Windows.
-      {% if flag?(:win32) %}
-        GLOB_META = {'*', '?', '[', ']', '{', '}', ','}
-      {% else %}
-        GLOB_META = {'*', '?', '[', ']', '{', '}', ',', '\\'}
-      {% end %}
-
-      # `path` with glob metacharacters backslash-escaped, so a content-derived
+      # `path` with glob metacharacters escaped, so a content-derived
       # directory can prefix a glob pattern
       # (`Dir.glob(File.join(glob_escape(dir), "**", "*"))`) and match
       # literally: unescaped, `posts/[WIP] Hello` or `a{b,c}` matched nothing.
+      #
+      # POSIX: backslash escapes. Windows has no escape character (`\` is a
+      # separator there), so `*`, `?` and `[` become one-character classes
+      # (`[[]`); braces cannot be escaped at all (brace expansion only honours
+      # `\`), so a `{a,b}` directory still matches nothing there.
       def glob_escape(path : String) : String
-        return path unless path.each_char.any? { |c| GLOB_META.includes?(c) }
-        String.build do |io|
-          path.each_char do |c|
-            io << '\\' if GLOB_META.includes?(c)
-            io << c
-          end
-        end
+        {% if flag?(:win32) %}
+          return path unless path.each_char.any?(&.in?('*', '?', '['))
+          path.gsub(/[*?\[]/) { |char| "[#{char}]" }
+        {% else %}
+          return path unless path.each_char.any?(&.in?('*', '?', '[', ']', '{', '}', ',', '\\'))
+          path.gsub(/[*?\[\]{},\\]/) { |char| "\\#{char}" }
+        {% end %}
       end
 
       # File.match? that treats a malformed glob as non-matching instead of

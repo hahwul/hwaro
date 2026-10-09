@@ -584,7 +584,7 @@ describe Hwaro::Models::Page do
 
     it "collects a bundle's own assets when its directory name has glob metacharacters" do
       Dir.mktmpdir do |dir|
-        names = storable_file_names(["[draft] x", "a{b,c}", "a?b", "a*b", "plain"])
+        names = glob_literal_names(["[draft] x", "a{b,c}", "a?b", "a*b", "plain"])
         names.each do |name|
           FileUtils.mkdir_p(File.join(dir, "posts", name))
           File.write(File.join(dir, "posts", name, "index.md"), "# T")
@@ -622,7 +622,7 @@ describe Hwaro::Models::Page do
 
     it "collects assets from a bundle directory whose name holds glob metacharacters" do
       Dir.mktmpdir do |dir|
-        storable_file_names(["[wip]", "a{b,c}", "q?x", "star*", "back\\slash"]).each do |name|
+        glob_literal_names(["[wip]", "a{b,c}", "q?x", "star*", "back\\slash"]).each do |name|
           bundle = File.join(dir, name)
           FileUtils.mkdir_p(File.join(bundle, "sub"))
           File.write(File.join(bundle, "index.md"), "# Test")

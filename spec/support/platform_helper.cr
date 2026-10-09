@@ -24,3 +24,14 @@ def storable_file_names(names : Array(String)) : Array(String)
     names
   {% end %}
 end
+
+# The `storable_file_names` a `PathUtils.glob_escape`d directory matches
+# literally: on Windows that leaves out braces too (Crystal's brace expansion
+# honours no escape there).
+def glob_literal_names(names : Array(String)) : Array(String)
+  {% if flag?(:windows) %}
+    storable_file_names(names).reject(&.matches?(/[{},]/))
+  {% else %}
+    names
+  {% end %}
+end
