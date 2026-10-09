@@ -17,6 +17,7 @@
 require "markd"
 require "tartrazine"
 require "../../ext/tartrazine_mt_fix"
+require "../../ext/tartrazine_bygroups_none_fix"
 require "digest/md5"
 require "./markdown_extensions"
 require "./heading_ids"

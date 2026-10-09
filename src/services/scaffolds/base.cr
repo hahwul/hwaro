@@ -1322,10 +1322,11 @@ module Hwaro
                 return d.innerHTML;
               }
 
+              // Match on the raw text and escape each piece afterwards: running the
+              // query over already-escaped HTML split entities (`&amp;`) with a
+              // <mark> and could never match a query containing & < >.
               function highlightMatch(text, query) {
                 if (!query) return escapeHtml(text);
-                // Match the RAW text and escape each piece, so a query like
-                // `&` or `amp` cannot land inside an HTML entity.
                 var lower = text.toLowerCase(), q = query.toLowerCase();
                 // Lowercasing can change the length (e.g. `İ`), which would shift every offset.
                 if (lower.length !== text.length) return escapeHtml(text);

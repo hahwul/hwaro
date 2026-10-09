@@ -200,6 +200,8 @@ hwaro new my-post.md --section blog --draft --tags "go,web" --date 2026-03-22
 
 `hwaro new`는 `content/` 안에서 확인할 수 없는 경로(디렉터리 밖으로 이어지는 심볼릭 링크 포함)를 거부합니다.
 
+다국어 사이트에서는 번역 접미사를 인식합니다. `hwaro new posts/hello.ko.md`는 페이지 제목을 "Hello"로 하고, `--bundle`과 함께 쓰면 `hello` 번들의 번역인 `posts/hello/index.ko.md`를 만듭니다.
+
 **아키타입:**
 
 아키타입은 새 콘텐츠의 기본 프론트 매터를 정의하는 `archetypes/` 디렉터리의 템플릿 파일입니다:

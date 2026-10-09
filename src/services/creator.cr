@@ -14,6 +14,10 @@ require "../utils/text_utils"
 module Hwaro
   module Services
     class Creator
+      # Language codes a `<name>.<lang>.md` translation suffix may carry — the
+      # site's declared ones, as the build reads them (see `page_name`).
+      @language_codes = Set(String).new
+
       CONTENT_DIR    = "content"
       ARCHETYPES_DIR = "archetypes"
 
@@ -95,10 +99,12 @@ module Hwaro
       # plus CJK / Unicode letters, which static hosts serve without
       # percent-encoding surprises.
       def self.url_safe_path?(path : String) : Bool
+        prev = PATH_SEP
         path.each_char do |char|
-          next if char == PATH_SEP
-          next if url_safe_char?(char)
-          return false
+          unless char == PATH_SEP || url_safe_char?(char, prev)
+            return false
+          end
+          prev = char
         end
         true
       end
@@ -137,7 +143,13 @@ module Hwaro
       # Creator's title-only fallback and the interactive `new` wizard's
       # recommended-path suggestion.
       def self.slugify(title : String) : String
-        title.downcase.gsub(/[^\p{L}\p{N}]+/, "-").strip("-")
+        unless title.ascii_only?
+          # Emoji variation selectors / keycap enclosure are not word marks.
+          title = title.unicode_normalize(:nfc).gsub(/[\x{FE00}-\x{FE0F}\x{E0100}-\x{E01EF}\x{20E3}]/, "-")
+        end
+        # Marks belong to the word they follow; one with no letter/digit before
+        # it (the emoji variation selector after "❤") is a separator.
+        title.downcase.gsub(/(?<![\p{L}\p{N}\p{M}])\p{M}+/, "-").gsub(/[^\p{L}\p{M}\p{N}]+/, "-").strip("-")
       end
 
       # Derive a display title from a filename stem (`my-first-post` ->
@@ -167,8 +179,9 @@ module Hwaro
         return segment if segment.empty?
         result = String.build(segment.bytesize) do |io|
           last_was_hyphen = false
+          prev = PATH_SEP
           segment.each_char do |char|
-            if url_safe_char?(char)
+            if url_safe_char?(char, prev)
               io << char unless char == '-' && last_was_hyphen
               # A literal `-` is URL-safe, but it still opens a hyphen run:
               # without this the run-collapse only saw the hyphens it
@@ -185,6 +198,7 @@ module Hwaro
                 last_was_hyphen = true
               end
             end
+            prev = char
           end
         end.strip('-')
           # Drop hyphens that landed next to a dot — e.g. punctuation right
@@ -202,16 +216,19 @@ module Hwaro
         result
       end
 
-      private def self.url_safe_char?(char : Char) : Bool
+      # `prev` is the character before `char`: a combining mark (Thai/Indic
+      # vowel signs, virama) is part of the word only when it follows one.
+      private def self.url_safe_char?(char : Char, prev : Char = PATH_SEP) : Bool
         return true if char.ascii_letter? || char.ascii_number?
         return true if char == '-' || char == '_' || char == '.' || char == '~'
         return true if Utils::TextUtils.cjk_char?(char)
         return true if !char.ascii? && char.letter?
-        false
+        Utils::TextUtils.word_mark?(char) && (prev.alphanumeric? || Utils::TextUtils.word_mark?(prev))
       end
 
       def run(options : Config::Options::NewOptions, config : Models::Config? = nil)
         path = options.path
+        @language_codes = language_codes(config)
         # Strip so a whitespace-only `--title "   "` falls back to deriving
         # the title from the filename instead of scaffolding `title = "   "`.
         title = (options.title || "").strip
@@ -247,7 +264,7 @@ module Hwaro
           if full_path
             base_dir = File.dirname(full_path)
             if title.empty?
-              title = Creator.titleize(page_stem(full_path))
+              title = Creator.titleize(page_name(full_path))
             end
           else
             base_dir = File.join("content", section)
@@ -302,7 +319,7 @@ module Hwaro
 
             # Extract title from filename if not provided
             if title.empty?
-              title = Creator.titleize(page_stem(path))
+              title = Creator.titleize(page_name(path))
             end
 
             full_path = path.starts_with?("content/") ? path : File.join("content", path)
@@ -312,8 +329,7 @@ module Hwaro
             full_path = "#{normalized}.md"
             base_dir = File.dirname(full_path)
             if title.empty?
-              filename_without_ext = File.basename(full_path, ".md")
-              title = Creator.titleize(filename_without_ext)
+              title = Creator.titleize(page_name(full_path))
             end
           else
             base_dir = path || "content/drafts"
@@ -448,7 +464,7 @@ module Hwaro
                         bundle_path_for(full_path)
                       end
           if bundle_collides_with_sibling?(candidate)
-            sibling = candidate.rchop("/index.md") + ".md"
+            sibling = bundle_sibling_path(candidate)
             raise Hwaro::HwaroError.new(
               code: Hwaro::Errors::HWARO_E_IO,
               message: "Cannot create bundle at #{candidate}: single-file sibling already exists.",
@@ -564,11 +580,13 @@ module Hwaro
       # index. Wrapping either into `<name>/index.md` would be nonsense
       # (`posts/_index/index.md` creates a phantom section).
       private def bundle_path?(path : String) : Bool
-        {"index", "_index"}.includes?(page_stem(path))
+        {"index", "_index"}.includes?(page_name(path))
       end
 
+      # `posts/bund.ko.md` → `posts/bund/index.ko.md`: the translation of the
+      # `bund` bundle, not a bundle named `bund.ko`.
       private def bundle_path_for(path : String) : String
-        File.join(File.dirname(path), page_stem(path), "index#{File.extname(path)}")
+        File.join(File.dirname(path), page_name(path), "index#{language_ext(path)}#{File.extname(path)}")
       end
 
       private def page_path?(path : String) : Bool
@@ -579,15 +597,44 @@ module Hwaro
         File.basename(path, File.extname(path))
       end
 
+      # The site's declared language codes (default included) when it is
+      # multilingual, else none: only then does the build read `.<lang>` as a
+      # translation rather than part of the name (`v1.2.md`, `setup.mac.md`).
+      private def language_codes(config : Models::Config?) : Set(String)
+        codes = Set(String).new
+        if config && config.multilingual?
+          codes.concat(config.languages.keys)
+          codes << config.default_language unless config.default_language.empty?
+        end
+        codes
+      end
+
+      # The language code of a `<name>.<lang>.md` translation, or nil.
+      private def page_language(path : String) : String?
+        Utils::PathUtils.language_suffix(page_stem(path)) { |code| @language_codes.includes?(code) }
+      end
+
+      # `.ko` for `hello.ko.md`, "" otherwise.
+      private def language_ext(path : String) : String
+        (lang = page_language(path)) ? ".#{lang}" : ""
+      end
+
+      # The file's name without extension or translation suffix: the page
+      # name titles, bundle directories and URLs are built from.
+      private def page_name(path : String) : String
+        page_stem(path).rchop(language_ext(path))
+      end
+
       # An existing page file other than `full_path` that renders to the
       # same URL, if any.
       private def url_sibling(full_path : String) : String?
-        stem = page_stem(full_path)
+        stem = page_name(full_path)
+        lang = language_ext(full_path)
         dir = File.dirname(full_path)
         page_dir = bundle_path?(full_path) ? dir : File.join(dir, stem)
         Core::Build::Phases::ReadContent::PAGE_EXTENSIONS.each do |ext|
-          candidates = [File.join(page_dir, "index#{ext}"), File.join(page_dir, "_index#{ext}")]
-          candidates << "#{page_dir}#{ext}" unless page_dir == CONTENT_DIR
+          candidates = [File.join(page_dir, "index#{lang}#{ext}"), File.join(page_dir, "_index#{lang}#{ext}")]
+          candidates << "#{page_dir}#{lang}#{ext}" unless page_dir == CONTENT_DIR
           candidates.each do |candidate|
             return candidate if candidate != full_path && File.file?(candidate)
           end
@@ -600,8 +647,13 @@ module Hwaro
       # render to the same URL, so we refuse rather than silently create
       # a duplicate.
       private def bundle_collides_with_sibling?(full_path : String) : Bool
-        sibling_md = full_path.rchop("/index.md") + ".md"
-        File.exists?(sibling_md) && File.file?(sibling_md)
+        sibling_md = bundle_sibling_path(full_path)
+        sibling_md != full_path && File.file?(sibling_md)
+      end
+
+      # `<dir>/<name>/index[.<lang>].md` → `<dir>/<name>[.<lang>].md`.
+      private def bundle_sibling_path(bundle_file : String) : String
+        bundle_file.sub(/\/index((?:\.[^.\/]+)?)\.md\z/) { "#{$1}.md" }
       end
 
       # Reconcile `-s section` with a path argument that already carries
@@ -713,17 +765,20 @@ module Hwaro
         # `description = "{{ description }}"` line still produces valid output.
         safe_description = escape_string(description || "")
         tags_str = tags.empty? ? "[]" : "[#{tags.map { |t| "\"#{escape_string(t)}\"" }.join(", ")}]"
-        content = archetype_content
-          .gsub("{{ title }}", safe_title)
-          .gsub("{{title}}", safe_title)
-          .gsub("{{ date }}", safe_date)
-          .gsub("{{date}}", safe_date)
-          .gsub("{{ description }}", safe_description)
-          .gsub("{{description}}", safe_description)
-          .gsub("{{ draft }}", is_draft.to_s)
-          .gsub("{{draft}}", is_draft.to_s)
-          .gsub("{{ tags }}", tags_str)
-          .gsub("{{tags}}", tags_str)
+        values = {
+          "title"       => safe_title,
+          "date"        => safe_date,
+          "description" => safe_description,
+          "draft"       => is_draft.to_s,
+          "tags"        => tags_str,
+        }
+        # One pass over the archetype: chained `.gsub`s rescanned text an
+        # earlier one had just inserted, so a title like "Using {{ tags }}"
+        # was expanded again (injecting a raw array into a quoted string).
+        # Only `{{ name }}` and `{{name}}` are placeholders.
+        content = archetype_content.gsub(/\{\{(?: (title|date|description|draft|tags) |(title|date|description|draft|tags))\}\}/) do |_, match|
+          values[match[1]? || match[2]]
+        end
 
         content
       end

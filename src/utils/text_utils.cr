@@ -327,8 +327,12 @@ module Hwaro
       def slugify(text : String) : String
         # Single-pass: directly emit hyphens for separators, collapsing runs.
         # Avoids intermediate String allocation + regex gsub.
+        # NFC first: macOS file names and copy-paste often carry NFD text, and
+        # "cafe\u0301" must land on the same slug as "café".
+        text = text.unicode_normalize(:nfc) unless text.ascii_only?
         String.build(text.bytesize) do |io|
           last_was_sep = true # suppress leading hyphen
+          prev = ' '
           # Separator test is `whitespace?`, not `ascii_whitespace?`: the
           # ideographic space U+3000 is the ordinary word separator in CJK
           # titles, and an `&nbsp;` in a title decodes to U+00A0. Neither is
@@ -343,11 +347,15 @@ module Hwaro
                 io << '-'
                 last_was_sep = true
               end
-            elsif cjk_char?(char) || unicode_letter?(char)
+            elsif cjk_char?(char) || unicode_letter?(char) || (word_mark?(char) && (prev.alphanumeric? || word_mark?(prev)))
+              # Combining marks (vowel signs, virama, tone marks) are part of
+              # the word they follow. One after a dropped character has
+              # nothing to attach to.
               io << char.downcase
               last_was_sep = false
             end
             # All other characters (punctuation, symbols) are dropped
+            prev = char
           end
         end.rstrip('-')
       end
@@ -808,6 +816,14 @@ module Hwaro
             end
           end
         end
+      end
+
+      # A combining mark that is part of a word (vowel signs, virama, tone and
+      # accent marks). Emoji presentation machinery is not: variation
+      # selectors and the keycap enclosure stay out of slugs, so "1️⃣ Step"
+      # and "ℹ️ Info" slugify as "1-step" and "ℹ-info" as before.
+      def word_mark?(char : Char) : Bool
+        char.mark? && !(0xFE00..0xFE0F).includes?(char.ord) && !(0xE0100..0xE01EF).includes?(char.ord) && char.ord != 0x20E3
       end
 
       # Check if a character is in a CJK Unicode range

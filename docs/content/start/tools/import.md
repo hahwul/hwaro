@@ -97,6 +97,13 @@ appear in the counts but have no row.
 - Hugo: `layout` becomes `template`. hwaro keys Hugo has no meaning for (`toc`, `template`, `page_template`, `image`, `updated`, …) are kept as they are, and every other page param (top-level custom keys and the `[params]` table) goes to `[extra]`, where templates read it as `page.extra.<key>`. An `[extra]` table, as `tool export hugo` writes it, is merged into `[extra]` as well.
 - Jekyll: `last_modified_at` becomes `updated`, and the `image: {path: …}` form becomes `image`. Every other front matter key (what Jekyll templates read as `page.<key>`) goes to `[extra]`.
 - Obsidian: `%%comments%%` (inline or spanning lines) are removed, since Obsidian never shows them. `%%` inside code is kept.
+- A note whose name or title has no letters or digits (an emoji-only Notion page, say) is written under a name derived from the original text rather than skipped. A source that cannot be given any filename is skipped with a warning that says so.
+- A blank `title:` counts as no title: Obsidian falls back to the file name, Astro and Eleventy to a title derived from it, Notion to the page's first heading. An unquoted date title (`title: 2024-05-01`) is kept as written.
+- Links between pages point at the file each target was actually written to, including the `-1` copy of a same-titled page (Notion page links, Obsidian `[[wikilinks]]`). Obsidian `[[Note\|alias]]` links, as required inside tables, resolve like `[[Note|alias]]`, and `#tags` or `[[links]]` inside HTML tags and math are left alone.
+- Jekyll and Hexo: a post without a `title` gets one from its file name, and a date-prefixed file name is slugified like any other (`2024-01-01-Hello World.md` becomes `hello-world`).
+- Hugo: a translation (`about.ko.md`, `index.ko.md`) keeps its language suffix when it has a `slug`, and a translated bundle follows the default-language bundle's directory. Assets beside `index.<lang>.md` and `_index.md` are copied too. Astro bundles that hold assets are written as bundles (`blog/<name>/index.md`) with their files.
+- Notion: only emoji callouts (`> 💡 text`) are flattened; ordinary quotes, fenced code and inline code are left as written.
+- WordPress: `<script>` and `<style>` are dropped with their contents, and `<iframe>`, `<video>` and `<audio>` embeds are kept as HTML with only their `src` (and numeric size).
 
 ## Example Output
 

@@ -69,8 +69,8 @@ module Hwaro
 
           if yaml
             # Title
-            if title = yaml["title"]?
-              fields["title"] = yaml_string(title)
+            if (title = yaml["title"]?) && (title_text = yaml_title(title))
+              fields["title"] = title_text
             end
 
             # Date (pubDate is Astro's convention). `first_present`, not
@@ -169,17 +169,45 @@ module Hwaro
           # directory — a literal "index" slug collides across every bundle
           # in the section, silently dropping all but the first.
           base = File.basename(file_path, File.extname(file_path))
+          source_dir = File.dirname(file_path)
+          bundle = false
           if base == "index"
-            parent = File.basename(File.dirname(file_path))
-            base = parent unless File.same?(File.dirname(file_path), content_dir)
+            parent = File.basename(source_dir)
+            base = parent unless File.same?(source_dir, content_dir)
+            bundle = !File.same?(source_dir, content_dir) && !File.same?(source_dir, File.join(content_dir, section))
           end
-          slug = Utils::TextUtils.slugify(base)
+          slug = file_slug(base)
 
           frontmatter = generate_frontmatter(fields)
           body = strip_redundant_title_h1(body, fields["title"]?.as?(String))
-          written = write_content_file(output_dir, section, slug, frontmatter, body.strip, verbose, force)
+
+          # A bundle with co-located files (`cover.png` beside `index.md`) is
+          # written as a bundle too: flattening it to `<dir>.md` would leave
+          # its relative `./cover.png` references pointing at nothing, and
+          # the images would never be copied. Asset-less bundles stay flat.
+          if bundle && bundle_assets?(source_dir)
+            dir_slug = slug
+            n = 1
+            while (index_path = resolve_content_path(output_dir, "#{section}/#{dir_slug}", "index", quiet: true)) && destination_claimed?(index_path)
+              dir_slug = "#{slug}-#{n}"
+              n += 1
+            end
+            written, dest_path = write_content_file_to(output_dir, "#{section}/#{dir_slug}", "index", frontmatter, body.strip, verbose, force)
+            copy_bundle_assets(source_dir, File.dirname(dest_path), output_dir, verbose, force) if dest_path
+          else
+            written = write_content_file(output_dir, section, slug, frontmatter, body.strip, verbose, force)
+          end
           return :skipped unless written
           has_mdx_components ? :imported_wrapped : :imported
+        end
+
+        # True when `dir` holds files besides its content pages — the
+        # resources `copy_bundle_assets` would carry along.
+        private def bundle_assets?(dir : String) : Bool
+          Dir.children(dir).any? do |entry|
+            path = File.join(dir, entry)
+            File.file?(path) && !File.symlink?(path) && !entry.ends_with?(".md") && !entry.ends_with?(".markdown") && !entry.ends_with?(".mdx")
+          end
         end
 
         # Drop MDX's top-level ESM `import` statements. Only lines outside

@@ -193,6 +193,8 @@ stay predictable. Pass a `<path>` (and any flags) to skip the prompts entirely.
 
 `hwaro new` rejects destinations that cannot be resolved within `content/`, including paths through symlinks outside it.
 
+In a multilingual site, a translation suffix is understood: `hwaro new posts/hello.ko.md` titles the page "Hello", and with `--bundle` it creates `posts/hello/index.ko.md`, the translation of the `hello` bundle.
+
 **Archetypes:**
 
 Archetypes are template files in `archetypes/` directory that define default front matter for new content:

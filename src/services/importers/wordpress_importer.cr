@@ -220,7 +220,7 @@ module Hwaro
           # (`sanitize_title`); decode so the filename matches what servers
           # and browsers will show for the URL. Traversal is neutralized at
           # the write_content_file sink.
-          slug = post_name.empty? ? Utils::TextUtils.slugify(title) : URI.decode(post_name)
+          slug = post_name.empty? ? file_slug(title) : URI.decode(post_name)
           return :skipped if slug.empty?
 
           # Determine section
