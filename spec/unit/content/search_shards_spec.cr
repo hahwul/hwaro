@@ -264,7 +264,7 @@ describe "Hwaro::Content::Search shards" do
       Dir.mktmpdir do |odir|
         Hwaro::Content::Search.generate(pages, config, odir)
         shards = read_manifest(odir)["shards"].as_a
-        shards.map(&.["id"].as_s).should eq(["_index"])
+        shards.map(&.["id"].as_s).should eq(["index"])
         shards.first["count"].as_i.should eq(1)
         File.read(File.join(odir, "search", "_index.json")).should contain("INDEXSECTION")
         shards.first["section"].as_s.should eq("index")

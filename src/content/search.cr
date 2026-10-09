@@ -199,16 +199,13 @@ module Hwaro
         lang = page.language || config.default_language
         lang = "_default" if lang.empty?
         top = page.section.split('/', remove_empty: true).first? || ""
-        # `search/index.json` is the manifest; a shard of that name would be
-        # overwritten by it (and listed as itself).
-        shard_top = top == "index" ? "_index" : top
         case config.search.shards
         when "language"
           {id: lang, language: lang, section: nil}
         when "section-language"
           {id: "#{lang}/#{top.empty? ? ROOT_SHARD_ID : top}", language: lang, section: top}
         else # "section"
-          {id: top.empty? ? ROOT_SHARD_ID : shard_top, language: nil, section: top}
+          {id: top.empty? ? ROOT_SHARD_ID : top, language: nil, section: top}
         end
       end
 

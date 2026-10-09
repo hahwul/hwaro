@@ -370,7 +370,7 @@ content_max_length = 500    # 선택: 각 항목의 content 길이 제한
 | `"language"` | 언어마다 하나(다국어 사이트); 기본 언어는 자신의 코드 사용 | `en`, `ko` |
 | `"section-language"` | 언어, 그다음 섹션 | `en/blog`, `ko/blog`, `ko/_root` |
 
-중첩 섹션은 최상위 섹션으로 합쳐집니다. `blog/news/post.md`는 `blog` 샤드에 들어갑니다. 이름이 `index`인 섹션은 `search/index.json`이 매니페스트이므로 `_index` 샤드로 저장됩니다. 기존 인덱스의 포함 규칙(`fields`, `exclude`, `in_search_index = false`, 초안, `render = false`, 언어별 `build_search_index`, `tokenize_cjk`)은 그대로 적용됩니다.
+중첩 섹션은 최상위 섹션으로 합쳐집니다. `blog/news/post.md`는 `blog` 샤드에 들어갑니다. 기존 인덱스의 포함 규칙(`fields`, `exclude`, `in_search_index = false`, 초안, `render = false`, 언어별 `build_search_index`, `tokenize_cjk`)은 그대로 적용됩니다.
 
 ### 생성 파일
 

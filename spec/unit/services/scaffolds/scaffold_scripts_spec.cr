@@ -10,7 +10,7 @@ describe "scaffold scripts" do
 
     it "matches on the raw text and escapes pieces afterwards" do
       search_js.should_not contain("escapeHtml(text).replace(re")
-      search_js.should contain("re.exec(text)")
+      search_js.should contain("lower.indexOf(q, pos)")
     end
 
     it "keeps entities intact and still highlights queries containing & < >" do
