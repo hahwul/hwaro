@@ -59,13 +59,19 @@ check: ameba
     crystal tool format --check
     bin/ameba
 
+# Linux only: `-rdynamic` exports every symbol, and GNU ld reads the `@file:line`
+# Crystal puts in closure names as a symbol VERSION, one per closure. The spec
+# binary passed ld's 32767-version limit (33k) and died at load with "symbol
+# lookup error ... version <garbage>"; nothing needs its dynamic exports.
+spec_link_flags := if os() == "linux" { "--link-flags=-Wl,--no-export-dynamic" } else { "" }
+
 # Always ONE `crystal spec` process per cache dir: two concurrent runs sharing
 # ~/.cache/crystal clobber each other's spec binary (see AGENTS.md).
 #
 # Run all tests.
 [group('development')]
 test:
-    crystal spec
+    crystal spec {{ spec_link_flags }}
 
 # Per-target compiler caches for the two recipes below.
 #
@@ -94,7 +100,7 @@ test-file TARGET:
     target="{{ TARGET }}"
     export CRYSTAL_CACHE_DIR="${CRYSTAL_CACHE_DIR:-${TMPDIR:-/tmp}/hwaro-spec-cache/$(printf '%s' "${target%%:*}" | tr -c 'A-Za-z0-9' '-')}"
     mkdir -p "$CRYSTAL_CACHE_DIR"
-    crystal spec "$target"
+    crystal spec {{ spec_link_flags }} "$target"
 
 #     just test-dir spec/unit/assets/sass
 #
@@ -107,7 +113,7 @@ test-dir DIR:
     dir="{{ DIR }}"
     export CRYSTAL_CACHE_DIR="${CRYSTAL_CACHE_DIR:-${TMPDIR:-/tmp}/hwaro-spec-cache/$(printf '%s' "$dir" | tr -c 'A-Za-z0-9' '-')}"
     mkdir -p "$CRYSTAL_CACHE_DIR"
-    crystal spec "$dir"
+    crystal spec {{ spec_link_flags }} "$dir"
 
 # Functional specs spawn bin/hwaro: a stale binary makes them test old code.
 [private]

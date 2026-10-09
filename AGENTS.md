@@ -29,6 +29,9 @@ just dev                # serve the docs site (bin/hwaro serve -i docs)
   alongside each other, and a re-run of the same target reuses the last
   compile (~2× faster). `just clean` removes them; export
   `CRYSTAL_CACHE_DIR` yourself to override.
+- On Linux a bare `crystal spec` dies at load ("symbol lookup error … version
+  <garbage>"): pass `--link-flags=-Wl,--no-export-dynamic`, as the `just`
+  recipes and CI do (the justfile's `spec_link_flags` says why).
 - `spec/functional/**` spawns `bin/hwaro`; rebuild it (`shards build`) before
   trusting a functional run, or the specs test the old binary (the serve
   specs mark themselves pending when it is missing).
