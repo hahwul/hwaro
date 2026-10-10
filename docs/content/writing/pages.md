@@ -273,6 +273,8 @@ This is the summary shown in listings.
 The full article continues here...
 ```
 
+The summary renders like the body: shortcodes, Markdown extensions and render hooks apply. A marker placed inside a block shortcode's body (`{% note() %}` … `{% end %}`) ends the summary inside that block, and the summary closes the block at that point.
+
 ### Automatic summaries
 
 A page with neither a marker nor a `description` gets an automatic summary: the first 70 words of its rendered body, wrapped in a single `<p>` and followed by an ellipsis (`…`) when text was cut. The excerpt is built from the rendered HTML, so shortcodes are expanded and code blocks, headings, images and figures are skipped, so it reads as prose.
