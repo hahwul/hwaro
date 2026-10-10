@@ -248,6 +248,34 @@ describe "Builder#run_incremental section edits" do
   end
 end
 
+describe "Builder#run_incremental moved link targets" do
+  it "re-renders the marker summary of a page linking to a re-slugged page" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content/posts")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}")
+        File.write("templates/section.html", "{% for p in section.pages %}[{{ p.summary }}]{% endfor %}")
+        File.write("content/posts/_index.md", "+++\ntitle = \"Posts\"\n+++\n")
+        File.write("content/posts/b.md", "+++\ntitle = \"B\"\n+++\nB\n")
+        File.write("content/posts/c.md", "+++\ntitle = \"C\"\n+++\nSee [B](@/posts/b.md).\n\n<!-- more -->\n\nRest.\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/posts/b.md"], options)
+        File.read("public/posts/index.html").should contain(%(href="/posts/b/"))
+
+        File.write("content/posts/b.md", "+++\ntitle = \"B\"\nslug = \"bee\"\n+++\nB\n")
+        builder.run_incremental(["content/posts/b.md"], options)
+        File.read("public/posts/index.html").should contain(%(href="/posts/bee/"))
+      end
+    end
+  end
+end
+
 describe "Builder#run_incremental collision loser" do
   it "unpublishes the bundle files of a page that just lost its URL" do
     Dir.mktmpdir do |dir|

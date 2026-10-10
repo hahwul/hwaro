@@ -219,6 +219,11 @@ module Hwaro
           # Rebuild lookup index (page data may have changed)
           site.build_lookup_index
 
+          # Pages linking to a page this edit moved. Their `<!-- more -->`
+          # summary prints the link too, in every listing and feed.
+          linkers = linkers_of_moved_pages(site, page_urls)
+          render_page_summaries(linkers, site, templates, highlight, link_targets: all_pages) unless linkers.empty?
+
           # Re-link the global reading order; `renav_pages` is every page whose
           # prev/next pointer actually changed (a section weight/sort/reverse edit
           # reorders a whole block, not just the edited page's neighbors).
@@ -264,7 +269,7 @@ module Hwaro
           pages_to_render = relationship_render_set(site, pages_map, reparsed, changed_pages,
             relinked_counterparts, renav_pages, affected_series, related_pages_updated, excluded_paths)
           backlinks_moved_pages(site, templates, backlink_digests).each { |p| pages_to_render << p }
-          linkers_of_moved_pages(site, page_urls).each { |p| pages_to_render << p }
+          linkers.each { |p| pages_to_render << p }
 
           # Pages that render a listing derived from the GLOBAL page/section
           # set — the homepage's "latest posts", a paginated archive, a nav
