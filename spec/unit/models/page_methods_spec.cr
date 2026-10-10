@@ -708,6 +708,29 @@ describe Hwaro::Models::Page do
       end
     end
 
+    # Regression: `disallow_paths`/`disallow_extensions` without an
+    # `allow_extensions` list were ignored for bundles, publishing the very
+    # files they exclude.
+    it "applies the deny rules when no allowlist is set" do
+      Dir.mktmpdir do |dir|
+        bundle = File.join(dir, "post")
+        FileUtils.mkdir_p(File.join(bundle, "private"))
+        File.write(File.join(bundle, "index.md"), "# Post")
+        File.write(File.join(bundle, "ok.txt"), "ok")
+        File.write(File.join(bundle, "art.psd"), "x")
+        File.write(File.join(bundle, "private", "notes.txt"), "x")
+
+        page = Hwaro::Models::Page.new("post/index.md")
+        page.is_index = true
+
+        content_files = Hwaro::Models::ContentFilesConfig.new
+        content_files.disallow_extensions = Hwaro::Models::ContentFilesConfig.normalize_extensions(["psd"])
+        content_files.disallow_paths = ["post/private/**"]
+
+        page.collect_assets(dir, content_files).should eq(["post/ok.txt"])
+      end
+    end
+
     # Regression: `content/index.md` is the homepage, not a bundle spanning the
     # whole site. Treating it as one republished every non-markdown file
     # anywhere under content/ into the output root — including files no

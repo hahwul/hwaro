@@ -404,8 +404,8 @@ module Hwaro
       # root `_index.md` turns the whole `content/` tree into one recursive
       # bundle and republishes arbitrary non-markdown files (e.g.
       # `content/public/robots.txt`) to the output regardless of
-      # `allow_extensions`. When `[content.files]` is not configured, every
-      # non-markdown file is collected (unchanged behavior).
+      # `allow_extensions`. Without an allowlist every non-markdown file the
+      # deny rules leave is collected.
       #
       # Two structural limits keep the recursion inside the bundle it belongs
       # to (both hold regardless of `[content.files]`, which many hand-written
@@ -441,14 +441,17 @@ module Hwaro
           next if nested_bundle?(page_dir, file, content_dir, bundle_dirs)
 
           relative = Path[file].relative_to(content_dir).to_s
-          # Honor [content.files] allow/disallow rules when configured so the
-          # bundle path can't bypass the user's publishing allowlist. Like the
-          # raw lane (ReadContent#publishes_content_file?), `.json`/`.xml`
-          # need no allowlist entry — dropping them here left a slugged
-          # bundle's `data.json` at its source path only, 404ing from the page.
-          if content_files && content_files.enabled?
+          # Honor [content.files] so the bundle path can't bypass the user's
+          # publishing rules. The deny rules (`disallow_extensions` /
+          # `disallow_paths`) always apply, like they do to raw JSON/XML; the
+          # allowlist only when set. Like the raw lane
+          # (ReadContent#publishes_content_file?), `.json`/`.xml` need no
+          # allowlist entry — dropping them here left a slugged bundle's
+          # `data.json` at its source path only, 404ing from the page.
+          if content_files
+            next if content_files.denied?(relative)
             ext = File.extname(relative).downcase
-            next unless (ext == ".json" || ext == ".xml") ? !content_files.denied?(relative) : content_files.publish?(relative)
+            next if content_files.enabled? && ext != ".json" && ext != ".xml" && !content_files.publish?(relative)
           end
 
           relative

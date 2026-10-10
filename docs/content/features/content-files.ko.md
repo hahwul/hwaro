@@ -99,7 +99,7 @@ disallow_paths = ["drafts/**", "**/_*", "private/**"]
 | `**/_*` | 밑줄로 시작하는 모든 파일 |
 | `private/**` | `content/private/` 아래 모든 파일 |
 
-경로는 `content/` 디렉터리 기준 상대 경로로 매칭됩니다.
+경로는 `content/` 디렉터리 기준 상대 경로로 매칭됩니다. 거부 규칙(`disallow_extensions`, `disallow_paths`)은 `allow_extensions` 설정 여부와 관계없이 페이지 번들 안의 파일에도 적용됩니다.
 
 ## 콘텐츠 파일 참조
 

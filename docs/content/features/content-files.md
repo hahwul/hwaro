@@ -99,7 +99,7 @@ disallow_paths = ["drafts/**", "**/_*", "private/**"]
 | `**/_*` | Any file starting with underscore |
 | `private/**` | All files under `content/private/` |
 
-Paths are matched relative to the `content/` directory.
+Paths are matched relative to the `content/` directory. The deny rules (`disallow_extensions` and `disallow_paths`) also keep files out of page bundles, with or without `allow_extensions`.
 
 ## Referencing Content Files
 
