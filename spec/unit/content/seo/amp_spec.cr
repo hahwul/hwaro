@@ -212,6 +212,16 @@ describe Hwaro::Content::Seo::Amp do
       result.should contain(%(width="560"))
     end
 
+    # Regression: theme image hints `decoding`/`fetchpriority` are not
+    # allowed on amp-img and failed validation.
+    it "drops decoding and fetchpriority from amp-img" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      html = %(<html><head></head><body><img src="/h.png" width="8" height="4" alt="h" decoding="async" fetchpriority="high"></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, Hwaro::Models::Config.new)
+      result.should contain(%(<amp-img src="/h.png" width="8" height="4" alt="h" layout="responsive">))
+    end
+
     # Scoped to the converted tag's attribute string, so `loading=` appearing
     # inside <style amp-custom> or JSON-LD text is left alone.
     it "does not strip loading= from stylesheet or ld+json text" do

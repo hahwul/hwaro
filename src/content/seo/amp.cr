@@ -174,8 +174,10 @@ module Hwaro
         # carrying an image or an embed failed validation on a DISALLOWED_ATTR
         # the author never wrote. Scoped to the converted tag's attribute
         # string (not a document-wide gsub) so a `loading=` appearing inside
-        # `<style amp-custom>` or JSON-LD text is untouched.
-        AMP_DISALLOWED_ATTR_RE = /\s+loading\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+)/i
+        # `<style amp-custom>` or JSON-LD text is untouched. `decoding` and
+        # `fetchpriority` are the image hints themes write on hero/card
+        # images; amp-img rejects both the same way.
+        AMP_DISALLOWED_ATTR_RE = /\s+(?:loading|decoding|fetchpriority)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+)/i
 
         private def self.strip_non_amp_attributes(attrs : String) : String
           attrs.gsub(AMP_DISALLOWED_ATTR_RE, "")
