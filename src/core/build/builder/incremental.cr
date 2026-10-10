@@ -468,6 +468,10 @@ module Hwaro
             end
             site.sections.each do |s|
               pages_to_render << s if s.section == sec || s.section.starts_with?(prefix)
+              # Its parent lists it, or its pages once `transparent`. The
+              # parents are its ancestors (`affected_sections`) — except the
+              # root index, which is no page's ancestor.
+              pages_to_render << s if s.section.empty?
             end
           end
 

@@ -215,6 +215,39 @@ describe "Builder#run_incremental drafting a bundle" do
   end
 end
 
+describe "Builder#run_incremental section edits" do
+  it "re-renders the root listing when a top-level section turns transparent" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content/posts")
+        FileUtils.mkdir_p("content/other")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}")
+        File.write("templates/section.html", "{% for p in section.pages %}{{ p.title }},{% endfor %}")
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/posts/_index.md", "+++\ntitle = \"Posts\"\n+++\n")
+        File.write("content/posts/a.md", "+++\ntitle = \"A\"\ndate = 2024-01-01\n+++\n")
+        # Another section, so the root index is not a neighbour of posts/a.
+        File.write("content/other/_index.md", "+++\ntitle = \"Other\"\n+++\n")
+        File.write("content/other/o.md", "+++\ntitle = \"O\"\ndate = 2023-01-01\n+++\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/posts/_index.md"], options)
+        File.read("public/index.html").should contain("Posts,")
+
+        File.write("content/posts/_index.md", "+++\ntitle = \"Posts\"\ntransparent = true\n+++\n")
+        builder.run_incremental(["content/posts/_index.md"], options)
+        File.read("public/index.html").should contain("A,")
+        File.read("public/index.html").should_not contain("Posts,")
+      end
+    end
+  end
+end
+
 describe "Builder#run_incremental collision loser" do
   it "unpublishes the bundle files of a page that just lost its URL" do
     Dir.mktmpdir do |dir|
