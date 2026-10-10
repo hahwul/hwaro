@@ -358,4 +358,17 @@ describe Hwaro::Services::Doctor do
       end
     end
   end
+
+  describe "front-matter typo warning" do
+    it "does not flag keys the config declares, like the build" do
+      Dir.mktmpdir do |dir|
+        parity_site(dir, "[[taxonomies]]\nname = \"tag\"\n\n[[content.schema]]\nsections = [\"**\"]\n[content.schema.fields.author]\ntype = \"string\"\n")
+        write_file(dir, "content/a.md", "+++\ntitle = \"A\"\nauthor = \"me\"\ntag = [\"x\"]\ntitel = \"t\"\n+++\nx")
+        log = with_captured_log { parity_doctor(dir).run }
+        log.should_not contain("'author'")
+        log.should_not contain("'tag'")
+        log.should contain("unknown front-matter key 'titel'")
+      end
+    end
+  end
 end
