@@ -137,3 +137,52 @@ describe "Builder#run_incremental listing fan-out" do
     end
   end
 end
+
+describe "Builder#run_incremental version roots" do
+  it "refreshes page.version.url when a translated version root stops rendering" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", <<-TOML)
+          title = "T"
+          base_url = "http://localhost"
+          default_language = "en"
+          [languages.en]
+          language_name = "English"
+          [languages.ko]
+          language_name = "Korean"
+          [[versions.list]]
+          name = "v2"
+          path = "docs/v2"
+          latest = true
+          [[versions.list]]
+          name = "v1"
+          path = "docs/v1"
+          TOML
+        FileUtils.mkdir_p("content/docs/v2")
+        FileUtils.mkdir_p("content/docs/v1/guide")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.version.url }}")
+        File.write("templates/section.html", "{{ page.version.url }}")
+        File.write("content/docs/v2/_index.md", "+++\ntitle = \"v2\"\n+++\n")
+        File.write("content/docs/v1/_index.md", "+++\ntitle = \"v1\"\n+++\n")
+        File.write("content/docs/v1/_index.ko.md", "+++\ntitle = \"v1 ko\"\n+++\n")
+        File.write("content/docs/v1/guide/_index.ko.md", "+++\ntitle = \"g\"\n+++\n")
+        File.write("content/docs/v1/guide/deep.ko.md", "+++\ntitle = \"deep\"\n+++\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/docs/v1/_index.ko.md"], options)
+        File.read("public/ko/docs/v1/guide/deep/index.html").should eq("/ko/docs/v1/")
+
+        # The Korean root is no longer written, so every Korean v1 page
+        # points at the default language's root, as a cold build does.
+        File.write("content/docs/v1/_index.ko.md", "+++\ntitle = \"v1 ko\"\nrender = false\n+++\n")
+        builder.run_incremental(["content/docs/v1/_index.ko.md"], options)
+        File.read("public/ko/docs/v1/guide/deep/index.html").should eq("/docs/v1/")
+        File.read("public/ko/docs/v1/guide/index.html").should eq("/docs/v1/")
+      end
+    end
+  end
+end

@@ -528,12 +528,18 @@ module Hwaro
           # version's root — which appears when an authored parent index
           # (`docs/_index.md`) is drafted, and must re-render the root or the
           # stub a cold build writes is missing until a full rebuild.
-          before = pages.map { |page| {page.translations.dup, page.version_links.dup, page.aliases.dup} }
+          # `page.version.url` too: it reads the version roots `link!`
+          # re-derives, so a translated root turning `render = false` moves it
+          # to the default language's root on every page of that language.
+          version_url = ->(page : Models::Page) do
+            page.version.try { |v| Content::Versions.root_url(config, v, Content::Versions.lang_prefix(page, config)) }
+          end
+          before = pages.map { |page| {page.translations.dup, page.version_links.dup, page.aliases.dup, version_url.call(page)} }
           Content::Multilingual.link_translations!(pages, config)
           Content::Versions.link!(pages, config)
           moved = [] of Models::Page
           pages.each_with_index do |page, i|
-            moved << page if {page.translations, page.version_links, page.aliases} != before[i]
+            moved << page if {page.translations, page.version_links, page.aliases, version_url.call(page)} != before[i]
           end
           moved
         end
