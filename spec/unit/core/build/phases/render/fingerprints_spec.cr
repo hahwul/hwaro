@@ -144,6 +144,19 @@ describe "warm --cache: pages rendering other pages" do
     end
   end
 
+  it "re-renders a wikilink to a heading whose custom id changed" do
+    with_relations_site do
+      File.write("config.toml", File.read("config.toml") + "\n[markdown]\nwikilinks = true\n")
+      File.write("content/wl.md", "+++\ntitle = \"WL\"\ntemplate = \"plain\"\n+++\nSee [[about#Intro]].")
+      File.write("content/about.md", "+++\ntitle = \"About\"\ntemplate = \"about\"\n+++\n## Intro {#old-id}\n")
+      relations_cached_build
+      File.read("public/wl/index.html").should contain(%(href="/about/#old-id"))
+      File.write("content/about.md", "+++\ntitle = \"About\"\ntemplate = \"about\"\n+++\n## Intro {#new-id}\n")
+      relations_cached_build
+      File.read("public/wl/index.html").should contain(%(href="/about/#new-id"))
+    end
+  end
+
   it "re-renders a page whose shortcode lists the page set" do
     with_relations_site do
       File.read("public/sc/index.html").should_not contain("[Post d]")

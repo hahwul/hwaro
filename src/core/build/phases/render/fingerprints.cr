@@ -924,7 +924,13 @@ module Hwaro::Core::Build::Phases::Render
         resolved = if link.image?
                      index.resolve_file(link.target, page) || ""
                    else
-                     index.resolve(link.target, page).try { |t| "#{t.path} #{t.url}" } ||
+                     # `#heading` links to the target's custom `{#id}` when
+                     # it declares one (Wikilinks#fragment), so that id is
+                     # part of what the link renders.
+                     index.resolve(link.target, page).try { |t|
+                       id = link.heading.try { |h| Content::Processors::Includes.heading_id(t.raw_content, h) }
+                       "#{t.path} #{t.url}##{id}"
+                     } ||
                        (index.resolve_file(link.target, page) if link.file?) || ""
                    end
         values << "#{link.embed ? '!' : ' '}#{link.target}=#{resolved}"
