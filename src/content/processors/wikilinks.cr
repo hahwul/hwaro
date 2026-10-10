@@ -390,7 +390,7 @@ module Hwaro
         # A line matched on its own, never joined to a chunk: an ATX heading,
         # a setext underline or thematic break. Table rows are too (see
         # `walk`), each row being its own block.
-        STANDALONE_LINE_RE = /\A(?: {0,3}>[ \t]?)*(?: {0,3}\#{1,6}(?:[ \t]|\r?\n?\z)| {0,3}(?:=+|-+|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,})[ \t]*\r?\n?\z)/
+        STANDALONE_LINE_RE = /\A(?: {0,3}>[ \t]?)*+(?: {0,3}\#{1,6}(?:[ \t]|\r?\n?\z)| {0,3}(?:=+|-+|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,})[ \t]*\r?\n?\z)/
         # One blockquote marker, as TableParser strips it for a quoted table.
         QUOTE_PREFIX_RE = /\A {0,3}> ?/
         # A footnote definition starts a new block, as a list item does. Same

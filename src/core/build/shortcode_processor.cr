@@ -27,7 +27,14 @@ module Hwaro
         # the argument list was mis-split.
         SHORTCODE_ARGS_REGEX  = /(\w+)\s*=\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([^,\s]+))/
         MAX_SHORTCODE_NESTING = 5
-        BLOCK_OPEN_RE         = /\{\%\s*([a-zA-Z_][\w\-]*)\s*(?:\((.*?)\)|((?:\w+\s*=\s*(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^,%\s]+)\s*,?\s*)*))\s*\%\}/
+        # Each value parses one way only — a quoted value when its closing
+        # quote is followed by a separator or the next `key=`, otherwise an
+        # unquoted run (so `title='Don't'` still opens the block) — and the
+        # separators are possessive. With either free to split differently,
+        # a failing tag (ten quoted args and a stray word, or a URL with a
+        # long query string and a `%`) backtracked exponentially into
+        # PCRE2's match limit, and the Regex::Error aborted the build.
+        BLOCK_OPEN_RE = /\{\%\s*([a-zA-Z_][\w\-]*)\s*(?:\((.*?)\)|((?:\w+\s*=\s*(?>"(?:[^"\\]|\\.)*"(?=[\s,%]|\w+\s*=)|'(?:[^'\\]|\\.)*'(?=[\s,%]|\w+\s*=)|[^,%\s]++)\s*+,?\s*+)*))\s*\%\}/
         # Support both bare {% end %} and named {% endNAME %}.
         BLOCK_CLOSE_RE = /\{\%\s*end(?:\s+[a-zA-Z_][\w\-]*)?\s*\%\}/i
         # Broader close matcher for the outer fence loop's block pairing: it
@@ -330,7 +337,7 @@ module Hwaro
 
         # Token format for masked inline code spans. NUL bytes cannot appear
         # in markdown source, so the token can never collide with real text.
-        INLINE_CODE_MASK_RE = /\x00HWARO-INLINE-CODE-(\d+)\x00/
+        INLINE_CODE_MASK_RE = /\x00HWARO-INLINE-CODE-(\d{1,9})\x00/
 
         private def mask_inline_code(content : String) : {String, Array(String)}
           spans = [] of String
