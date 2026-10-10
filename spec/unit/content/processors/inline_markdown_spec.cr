@@ -185,3 +185,10 @@ describe "Hwaro::Content::Processors::InlineMarkdown.render entity references" d
     out.should eq(%(a &copy; &#124; &nbsp; <code>&amp;copy;</code> &amp;amp; <a href="javascript&amp;#58;alert(1)">x</a> <a href="/p?a=1&amp;b=2">y</a> Tom &amp; Jerry))
   end
 end
+
+describe "Hwaro::Content::Processors::InlineMarkdown.render autolinks" do
+  it "renders <scheme:...> autolinks like a paragraph does" do
+    out = Hwaro::Content::Processors::InlineMarkdown.render("see <https://x.com/a_b_c?q=1&r=2> and <javascript:alert(1)> and a < b > c")
+    out.should eq(%(see <a href="https://x.com/a_b_c?q=1&amp;r=2">https://x.com/a_b_c?q=1&amp;r=2</a> and &lt;javascript:alert(1)&gt; and a &lt; b &gt; c))
+  end
+end

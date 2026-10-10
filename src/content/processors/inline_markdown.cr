@@ -141,6 +141,8 @@ module Hwaro
         MATHSPAN_TOKEN_RE        = /\x00MATHSPAN(\d{1,9})\x00/
         CODESPAN_TOKEN_RE        = /\x00CODESPAN(\d{1,9})\x00/
         LINK_TAG_TOKEN_RE        = /\x00IMTAG(\d{1,9})\x00/
+        # A CommonMark URI autolink (`<https://…>`) as `HTML.escape` left it.
+        AUTOLINK_RE = /&lt;([a-zA-Z][a-zA-Z0-9+.\-]{1,31}:(?:[^\s&]|&(?!lt;|gt;))*+)&gt;/
         # An entity or numeric character reference as `HTML.escape` left it.
         ESCAPED_ENTITY_RE = /&amp;(#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[a-zA-Z][a-zA-Z0-9]{1,31});/
 
@@ -224,6 +226,18 @@ module Hwaro
               %(<a href="#{url}"#{title_attribute(title, placeholders, escapes)}>#{link_text}</a>)
             else
               "[#{link_text}](#{escape_placeholder_tokens(rest, placeholders)})"
+            end
+          end
+
+          # `<scheme:…>` autolinks, as in a paragraph. The whole anchor rides
+          # out the emphasis passes as an escape token, so a `_`/`*` in the
+          # URL text stays literal.
+          if result.includes?("&lt;")
+            result = result.gsub(AUTOLINK_RE) do |match|
+              url = restore_escapes($1, escapes)
+              next match unless safe_url?(url)
+              escapes << %(<a href="#{url}">#{url}</a>)
+              "\x00ESC#{escapes.size - 1}\x00"
             end
           end
 
