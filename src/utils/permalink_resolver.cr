@@ -194,7 +194,10 @@ module Hwaro
         if custom_path
           url = "#{lang_prefix}/#{custom_path.lchop("/")}"
           url += "/" unless url.ends_with?("/")
-          return {url, nil}
+          # `path = "a//b"` (or a `slug` with a leading `/`) is written to
+          # `a/b/index.html` — the output writer drops empty segments — so
+          # the URL must say `/a/b/` too, not `/a//b/` (page.url, sitemap).
+          return {url.squeeze('/'), nil}
         end
 
         error = nil
@@ -206,7 +209,7 @@ module Hwaro
             slug: slug, date: date, title: title,
           )
           if path
-            return {path.empty? ? "#{lang_prefix}/" : "#{lang_prefix}/#{path}/", nil}
+            return {(path.empty? ? "#{lang_prefix}/" : "#{lang_prefix}/#{path}/").squeeze('/'), nil}
           end
           # Date token, no date: report and fall back to the un-remapped
           # directory URL (the pattern target has no directory to remap to).
@@ -230,7 +233,7 @@ module Hwaro
                   "#{lang_prefix}/#{effective_dir}/#{leaf}/"
                 end
               end
-        {url, error}
+        {url.squeeze('/'), error}
       end
 
       # A leaf bundle (`<dir>/index.md`) is a single page whose URL segment is
