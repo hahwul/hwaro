@@ -736,6 +736,12 @@ describe Hwaro::Utils::CssMinifier do
       result.should contain("margin:0")
     end
 
+    it "preserves descendant combinator before pseudo-class in an @scope prelude" do
+      css = "@scope (.card :hover) to (.slot :first-child) { img { x : y } }"
+      Hwaro::Utils::CssMinifier.minify(css)
+        .should eq("@scope (.card :hover) to (.slot :first-child){img{x:y}}")
+    end
+
     it "still tightens declaration colons inside nested at-rule blocks" do
       css = "@media screen { .x { color : red ; font-size : 2px ; } }"
       result = Hwaro::Utils::CssMinifier.minify(css)
