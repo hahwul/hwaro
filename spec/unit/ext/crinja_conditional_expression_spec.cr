@@ -29,4 +29,11 @@ describe "Crinja conditional expression" do
     render_cond("{% for i in l | sort if i > 1 %}{{ i }}{% endfor %}").should eq("23")
     render_cond("{% for i in (l if true else []) if i > 1 %}{{ 'odd' if i % 2 else 'even' }} {% endfor %}").should eq("odd even ")
   end
+
+  it "does not pull an inline if into a test argument written without parentheses" do
+    render_cond(%({{ 4 is divisibleby 2 if false else "no" }})).should eq("no")
+    render_cond(%({{ 4 is eq 4 if false else "no" }})).should eq("no")
+    render_cond(%({{ 4 is divisibleby 2 if true else "no" }})).should eq("true")
+    render_cond(%({{ 4 is defined }}|{{ "x" if true else "y" }})).should eq("true|x")
+  end
 end
