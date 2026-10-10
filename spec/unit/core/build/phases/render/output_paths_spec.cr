@@ -64,6 +64,36 @@ describe "Render output paths: authored vs generated collisions" do
     end
   end
 
+  it "keeps a pagination page over an alias stub naming it, cold and on --cache" do
+    rebuild = -> {
+      builder = Hwaro::Core::Build::Builder.new
+      Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+      builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false))
+    }
+    log = with_captured_log do
+      build_site(
+        "title = \"T\"\nbase_url = \"http://localhost\"\n\n[pagination]\nenabled = true\nper_page = 1\n",
+        content_files: {
+          "blog/_index.md" => "+++\ntitle = \"Blog\"\n+++\n",
+          "blog/p1.md"     => "+++\ntitle = \"P1\"\n+++\nP1",
+          "blog/p2.md"     => "+++\ntitle = \"P2\"\naliases = [\"/blog/page/2/\"]\n+++\nP2",
+        },
+        template_files: {
+          "page.html"    => "{{ content }}",
+          "section.html" => "PAGER={{ paginator.current_index }}",
+        },
+        cache: true,
+      ) do
+        File.read("public/blog/page/2/index.html").should contain("PAGER=2")
+        # A warm build that re-renders only the aliasing page.
+        File.write("content/blog/p2.md", "+++\ntitle = \"P2\"\naliases = [\"/blog/page/2/\"]\n+++\nP2 edited")
+        rebuild.call
+        File.read("public/blog/page/2/index.html").should contain("PAGER=2")
+      end
+    end
+    log.should contain("collides with a pagination page of 'blog/_index.md'")
+  end
+
   it "fails with a classified I/O error when a page's slug shadows sitemap.xml" do
     err = expect_raises(Hwaro::HwaroError) do
       build_site(

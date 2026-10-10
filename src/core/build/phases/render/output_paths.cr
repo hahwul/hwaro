@@ -149,6 +149,16 @@ module Hwaro::Core::Build::Phases::Render
           next
         end
 
+        # A section's `/page/N/` pager pages are its own content, written by
+        # its render, so they beat a redirect stub too. Without the claim the
+        # winner was write order: the pager page on a cold build, the stub on
+        # a `--cache` build that re-rendered only the aliasing page.
+        if owner = pager_page_owner(norm, writers)
+          Logger.warn "Duplicate alias output path '#{norm}' — alias on '#{page.path}' collides with a pagination page of '#{owner}' and is not written"
+          winners[norm] = owner
+          next
+        end
+
         # A redirect stub is a published file too, so it goes through the same
         # file/fold identity check a page URL does.
         if file_key = Utils::PathUtils.output_file_key(norm)
@@ -178,6 +188,24 @@ module Hwaro::Core::Build::Phases::Render
     end
 
     winners
+  end
+
+  # The section whose render writes the pager page `url`
+  # (`<section url><paginate_path>/<N>/`, N ≥ 2), or nil.
+  private def pager_page_owner(url : String, writers : Array(Models::Page)) : String?
+    return unless (site = @site) && (templates = @templates)
+    writers.each do |section|
+      next unless section.is_a?(Models::Section)
+      base = "#{section.url.rstrip('/')}/#{section.paginate_path}/"
+      next unless url.starts_with?(base) && (match = url[base.size..].match(/\A([1-9]\d*)\/\z/))
+      number = match[1].to_i? || next
+      next unless number >= 2 && paginated_section?(section, determine_template(section, templates, site))
+      # The page list render_section_with_pagination paginates.
+      section_name = Path[section.path].dirname
+      section_name = "" if section_name == "."
+      pages = site.pages_for_section(section_name, section.language).reject(&.output_suppressed)
+      return section.path if number <= Content::Pagination::Paginator.new(site.config).paginate(section, pages).paginated_pages.size
+    end
   end
 
   # The page whose own HTML lands on `output_path` (inside `output_dir`),
