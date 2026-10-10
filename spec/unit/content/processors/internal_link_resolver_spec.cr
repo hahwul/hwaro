@@ -1,4 +1,5 @@
 require "../../../spec_helper"
+require "../../../support/build_helper"
 
 private def make_page(path : String, url : String) : Hwaro::Models::Page
   page = Hwaro::Models::Page.new(path)
@@ -385,5 +386,34 @@ describe "Hwaro::Content::Processors::InternalLinkResolver.page_for" do
     exact = Hwaro::Models::Page.new(nfc)
     resolver.page_for({nfd => page, nfc => exact}, nfc).should be(exact)
     resolver.page_for({nfd => page}, "posts/missing.md").should be_nil
+  end
+end
+
+describe "`@/` links to a default-language page with an explicit suffix" do
+  it "resolves `@/about.md` to `about.en.md`, as get_page does" do
+    config = <<-TOML
+      title = "T"
+      base_url = "http://localhost"
+      default_language = "en"
+      [languages.en]
+      language_name = "English"
+      [languages.ko]
+      language_name = "Korean"
+      TOML
+    build_site(config,
+      content_files: {
+        "about.en.md" => "+++\ntitle = \"About\"\n+++\nabout",
+        "post.md"     => "+++\ntitle = \"Post\"\n+++\nsee [about](@/about.md)",
+      },
+      template_files: {"page.html" => "{{ content }}"}) do |dir|
+      File.read(File.join(dir, "public/post/index.html")).should contain(%(href="/about/"))
+    end
+  end
+
+  it "leaves the suffix part of the name on a single-language site" do
+    page = Hwaro::Models::Page.new("about.en.md")
+    map = {"about.en.md" => page}
+    Hwaro::Content::Processors::InternalLinkResolver.add_default_language_aliases(map, Hwaro::Models::Config.new)
+    map.keys.should eq(["about.en.md"])
   end
 end

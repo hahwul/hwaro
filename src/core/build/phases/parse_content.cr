@@ -110,7 +110,7 @@ module Hwaro::Core::Build::Phases::ParseContent
       pbp = (pages_by_path ||= begin
         map = {} of String => Models::Page
         link_targets.each { |p| map[p.path] ||= p }
-        map
+        Content::Processors::InternalLinkResolver.add_default_language_aliases(map, site.config)
       end)
       if site.config.links.broken_internal == "error"
         # Strict mode must see summary links too: a `render: false` page
@@ -146,7 +146,7 @@ module Hwaro::Core::Build::Phases::ParseContent
       pbp = (pages_by_path ||= begin
         map = {} of String => Models::Page
         link_targets.each { |p| map[p.path] ||= p }
-        map
+        Content::Processors::InternalLinkResolver.add_default_language_aliases(map, site.config)
       end)
       if site.config.links.broken_internal == "error"
         misses = [] of {String, String}

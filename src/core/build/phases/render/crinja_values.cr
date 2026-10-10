@@ -305,6 +305,6 @@ module Hwaro::Core::Build::Phases::Render
     map = {} of String => Models::Page
     site.pages.each { |p| map[p.path] ||= p }
     site.sections.each { |s| map[s.path] ||= s }
-    map
+    Content::Processors::InternalLinkResolver.add_default_language_aliases(map, site.config)
   end
 end
