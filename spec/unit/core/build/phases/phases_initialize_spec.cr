@@ -12,6 +12,10 @@ module Hwaro::Core::Build
       copy_static_files(output_dir, verbose, incremental)
     end
 
+    def test_copy_static_pairs(pairs : Array({String, String, Time}))
+      copy_static_pairs(pairs)
+    end
+
     def test_load_templates : Hash(String, String)
       load_templates
     end
@@ -147,6 +151,16 @@ describe Hwaro::Core::Build::Phases::Initialize do
           ensure
             File.chmod("static/locked.css", 0o644)
           end
+        end
+      end
+    end
+
+    it "skips a static file deleted after the scan instead of failing" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("public")
+          Hwaro::Core::Build::Builder.new.test_copy_static_pairs([{"static/gone.swp", "public/gone.swp", Time.utc}])
+          File.exists?("public/gone.swp").should be_false
         end
       end
     end

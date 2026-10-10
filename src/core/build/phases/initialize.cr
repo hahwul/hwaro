@@ -558,6 +558,12 @@ module Hwaro::Core::Build::Phases::Initialize
         Logger.debug "Could not stamp mtime on #{dest}: #{ex.message}"
       end
     rescue ex
+      # A source deleted since the scan (an editor's swap file under serve)
+      # is simply gone; only a file that is still there must not be lost.
+      if ex.is_a?(File::NotFoundError) && !File.exists?(src)
+        Logger.warn "Static file vanished before it was copied: #{src}"
+        next
+      end
       Logger.error "Copy failed #{src} -> #{dest}: #{ex.message}"
       failure_mutex.synchronize { failure ||= ex }
     end
