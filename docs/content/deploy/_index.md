@@ -36,7 +36,7 @@ Everything in `static/` is copied into `public/` and deployed, including hidden 
 Hwaro includes `hwaro deploy` for deploying to configured targets:
 
 ```bash
-hwaro deploy              # Deploy to the first configured target
+hwaro deploy              # Deploy to [deployment] target, else the first configured target
 hwaro deploy s3           # Deploy to a specific target by name
 hwaro deploy s3 backup    # Deploy to multiple targets
 hwaro deploy --dry-run    # Preview changes
