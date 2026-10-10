@@ -454,7 +454,7 @@ content/
     └── _index.md
 ```
 
-Hwaro will copy all non-markdown files from the page bundle directory to the output directory, maintaining the relative path.
+Hwaro will copy all non-markdown files from the page bundle directory to the output directory, maintaining the relative path. When [`[content.files]`](/features/content-files/) is configured (the `hwaro init` scaffolds set an image allowlist), only the files its rules allow are copied.
 
 In your markdown, you can link to these assets using relative paths:
 
@@ -466,7 +466,7 @@ In your markdown, you can link to these assets using relative paths:
 
 ### Accessing Assets in Templates
 
-You can access the list of colocated assets in your templates using `page.assets`. This returns an array of relative paths to the files.
+You can access the list of colocated assets in your templates using `page.assets`. This returns an array of paths relative to `content/` (`blog/my-trip/photo.jpg`).
 
 ```jinja
 {% for asset in page.assets %}
