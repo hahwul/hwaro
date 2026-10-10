@@ -2,6 +2,7 @@ require "crinja"
 require "../models/page"
 require "../models/section"
 require "../models/config"
+require "./multilingual"
 
 # Versioned documentation (`[versions]` + `[[versions.list]]`).
 #
@@ -49,7 +50,7 @@ module Hwaro
           claimed << page.url
           version = page.version
           next unless version
-          rel = version.relative_path(page.path)
+          rel = counterpart_path(version, page, config)
           next unless rel
           by_key[{version.name, page.language, rel}] ||= page
           roots[{version.name, page.language}] ||= page if page.is_a?(Models::Section) && page.section == version.path
@@ -58,7 +59,7 @@ module Hwaro
         pages.each do |page|
           version = page.version
           next unless version
-          rel = version.relative_path(page.path)
+          rel = counterpart_path(version, page, config)
           next unless rel
 
           prefix = lang_prefix(page, config)
@@ -84,6 +85,15 @@ module Hwaro
           next if claimed.includes?(parent) || page.aliases.includes?(parent)
           page.aliases << parent
         end
+      end
+
+      # The page's path inside its version, without its language suffix
+      # (`install.en.md` → `install.md`): the language is already part of
+      # the counterpart key, and the default language's suffix is optional,
+      # so `v1/install.md` and `v2/install.en.md` are the same page.
+      private def counterpart_path(version : Models::VersionConfig, page : Models::Page, config : Models::Config) : String?
+        rel = version.relative_path(page.path)
+        rel && config.multilingual? ? Multilingual.translation_key(rel, config) : rel
       end
 
       # `/docs/v2/` → `/docs/`, `/ko/v2/` → `/ko/`; nil when the URL was
