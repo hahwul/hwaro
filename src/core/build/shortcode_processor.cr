@@ -326,7 +326,8 @@ module Hwaro
           # landed in different chunks and both leaked as literal text.
           # Tokens are restored on the shortcode body/args right before
           # rendering and on the final text before returning.
-          masked, spans = mask_inline_code(content)
+          spans = [] of String
+          masked, spans = mask_inline_code(mask_body_fences(content, spans), spans)
           # `{% raw %}` regions get the same treatment, for the same reason:
           # they are the construct an author uses to SHOW shortcode syntax
           # outside a code fence (see `mask_raw_blocks`).
@@ -339,14 +340,41 @@ module Hwaro
         # in markdown source, so the token can never collide with real text.
         INLINE_CODE_MASK_RE = /\x00HWARO-INLINE-CODE-(\d{1,9})\x00/
 
-        private def mask_inline_code(content : String) : {String, Array(String)}
-          spans = [] of String
+        private def mask_inline_code(content : String, spans : Array(String) = [] of String) : {String, Array(String)}
           return {content, spans} unless content.includes?('`')
           masked = content.gsub(INLINE_CODE_RE) do |span|
             spans << span
             "\x00HWARO-INLINE-CODE-#{spans.size - 1}\x00"
           end
           {masked, spans}
+        end
+
+        # Fenced code inside a block-shortcode body. The chunk walk only
+        # splits at fences OUTSIDE bodies, so a body's ``` example reached the
+        # block parser as live text: a `{% alert %}…{% end %}` shown in a
+        # note's fence paired as a nested block and expanded, and its
+        # placeholder shipped HTML-escaped inside `<pre><code>`. Same rule as
+        # the include pass (`expand_include_lines`): a tracker fed only body
+        # lines decides what is fenced. Runs before inline-code masking, whose
+        # spans may start inside a fence line and hide it from the tracker;
+        # lines ride the shared span array with their newline left outside.
+        private def mask_body_fences(content : String, spans : Array(String)) : String
+          return content unless content.includes?("```") || content.includes?("~~~")
+          body_lines = block_body_lines(content)
+          return content if body_lines.empty?
+          tracker = Content::Processors::FenceTracker.new(raw_html_code: false)
+          String.build(content.bytesize) do |io|
+            content.each_line(chomp: false).with_index do |line, i|
+              unless (body_lines[i]? || false) && tracker.fence_line?(line)
+                io << line
+                next
+              end
+              newline = line.ends_with?('\n')
+              spans << (newline ? line.byte_slice(0, line.bytesize - 1) : line)
+              io << "\x00HWARO-INLINE-CODE-" << spans.size - 1 << "\x00"
+              io << '\n' if newline
+            end
+          end
         end
 
         private def unmask_inline_code(text : String, spans : Array(String)) : String
