@@ -217,14 +217,17 @@ module Hwaro
       private def self.load_og(config : Config)
         return unless s = config.raw["og"]?.try(&.as_h?)
 
-        config.og.default_image = s["default_image"]?.try(&.as_s?)
-        config.og.twitter_card = s["twitter_card"]?.try(&.as_s?) || config.og.twitter_card
-        config.og.twitter_site = s["twitter_site"]?.try(&.as_s?)
-        config.og.twitter_creator = s["twitter_creator"]?.try(&.as_s?)
+        # A blank value (`default_image = "${OG_IMAGE:-}"` with the variable
+        # unset) means "unset": it was emitted as is, so every page claimed
+        # the site root as its og:image and shipped `content=""` tags.
+        config.og.default_image = s["default_image"]?.try(&.as_s?).presence
+        config.og.twitter_card = s["twitter_card"]?.try(&.as_s?).presence || config.og.twitter_card
+        config.og.twitter_site = s["twitter_site"]?.try(&.as_s?).presence
+        config.og.twitter_creator = s["twitter_creator"]?.try(&.as_s?).presence
         # Facebook app ids are numeric; an unquoted id (or unquoted
         # `${FB_APP_ID}`) is an integer and used to be dropped silently.
-        config.og.fb_app_id = s["fb_app_id"]?.try { |v| v.as_s? || v.as_i64?.try(&.to_s) }
-        config.og.og_type = s["type"]?.try(&.as_s?) || config.og.og_type
+        config.og.fb_app_id = s["fb_app_id"]?.try { |v| v.as_s?.presence || v.as_i64?.try(&.to_s) }
+        config.og.og_type = s["type"]?.try(&.as_s?).presence || config.og.og_type
 
         if ai = s["auto_image"]?.try(&.as_h?)
           config.og.auto_image.enabled = bool_value(ai["enabled"]?, config.og.auto_image.enabled)

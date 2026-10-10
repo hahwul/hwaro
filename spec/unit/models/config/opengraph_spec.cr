@@ -1024,3 +1024,18 @@ describe Hwaro::Models::SitemapConfig do
     end
   end
 end
+
+# A blank `[og]` value (an unset `${OG_IMAGE:-}`) was kept as "", so every
+# page shipped `og:image` pointing at the site root and empty
+# `twitter:site`/`fb:app_id` tags. Blank means unset.
+describe "[og] blank values" do
+  it "treats blank strings as unset" do
+    config = load_config(%([og]\ndefault_image = ""\ntwitter_card = ""\ntwitter_site = " "\ntwitter_creator = ""\nfb_app_id = ""\ntype = ""\n))
+    config.og.default_image.should be_nil
+    config.og.twitter_card.should eq("summary_large_image")
+    config.og.twitter_site.should be_nil
+    config.og.twitter_creator.should be_nil
+    config.og.fb_app_id.should be_nil
+    config.og.og_type.should eq("article")
+  end
+end
