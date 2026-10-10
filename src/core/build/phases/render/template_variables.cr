@@ -285,7 +285,14 @@ module Hwaro::Core::Build::Phases::Render
       # for every subsection.
       # Weight-then-path, the order the prev/next chain walks subsections in
       # (compare_sections_by_weight); discovery order is glob order.
+      # Each entry is the full Section object `get_section` returns (pages,
+      # path, name, its own subsections, …), as documented: the four-key
+      # stub left `sub.pages` empty in a nested nav.
+      full_sections = (global_vars ||= build_global_vars(site))["__sections_by_key__"]?.try(&.raw)
       subsections_array = page.subsections.sort { |a, b| compare_sections_by_weight(a, b) }.map do |sub|
+        if full_sections.is_a?(Hash) && (full = full_sections[sub.path]?)
+          next full.as(Crinja::Value)
+        end
         Crinja::Value.new({
           "title"       => Crinja::Value.new(sub.title),
           "description" => Crinja::Value.new(sub.description || ""),
