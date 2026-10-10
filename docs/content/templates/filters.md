@@ -213,6 +213,7 @@ Tests evaluate conditions in `{% if %}` statements.
 | matching | Regex match | `{% if asset is matching("[.](jpg\|png)$") %}` |
 | empty | Is empty | `{% if page.description is empty %}` |
 | present | Is not empty | `{% if page.title is present %}` |
+| eq, ne, lt, le, gt, ge | Compare with a value (also `==`, `!=`, `<`, `<=`, `>`, `>=`, `equalto`, `lessthan`, `greaterthan`) | `{{ posts \| selectattr("extra.year", ">=", 2020) \| list }}` |
 
 ### Test Examples
 

@@ -213,6 +213,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 | matching | 정규식 일치 | `{% if asset is matching("[.](jpg\|png)$") %}` |
 | empty | 비어 있음 | `{% if page.description is empty %}` |
 | present | 비어 있지 않음 | `{% if page.title is present %}` |
+| eq, ne, lt, le, gt, ge | 값과 비교(`==`, `!=`, `<`, `<=`, `>`, `>=`, `equalto`, `lessthan`, `greaterthan`도 사용 가능) | `{{ posts \| selectattr("extra.year", ">=", 2020) \| list }}` |
 
 ### 테스트 예시
 

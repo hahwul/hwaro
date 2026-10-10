@@ -87,9 +87,10 @@ describe "registration order" do
       urlize where wordcount wordwrap xml_escape xmlattr
     ])
     env.tests.keys.sort!.should eq(%w[
-      callable containing defined divisibleby empty endswith equalto escaped
-      even greaterthan in iterable lessthan lower mapping matching nil none
-      number odd present sameas sequence startswith string undefined upper
+      != < <= == > >= callable containing defined divisibleby empty endswith
+      eq equalto escaped even ge greaterthan gt in iterable le lessthan lower
+      lt mapping matching ne nil none number odd present sameas sequence
+      startswith string undefined upper
     ])
     env.functions.keys.sort!.should eq(%w[
       asset asset_integrity asset_url cycler debug dict env get_menu get_page get_section
