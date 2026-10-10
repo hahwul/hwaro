@@ -252,6 +252,22 @@ describe Hwaro::Content::Seo::JsonLd do
       result.should contain("jdoe")
     end
 
+    # Regression: a bare `date = 2026-03-05` (local midnight) was emitted with
+    # the build machine's UTC offset, so the instant changed with the host.
+    it "writes a date-only value as a date, independent of the host zone" do
+      config = Hwaro::Models::Config.new
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Hello"
+      page.url = "/hello/"
+      page.date = Time.local(2026, 3, 5)
+      page.updated = Time.local(2026, 3, 6, 0, 0, 0, location: Time::Location.fixed(9 * 3600))
+
+      data = JSON.parse(Hwaro::Content::Seo::JsonLd.article(page, config)[/\{.*\}/m])
+      data["datePublished"].as_s.should eq("2026-03-05")
+      # An authored offset is a real instant and keeps its timestamp.
+      data["dateModified"].as_s.should eq("2026-03-06T00:00:00+09:00")
+    end
+
     # Regression: the JSON-LD url carried a raw space / non-ASCII path while
     # canonical and og:url were percent-encoded — an invalid URL.
     it "percent-encodes page and breadcrumb URLs like the canonical URL" do
