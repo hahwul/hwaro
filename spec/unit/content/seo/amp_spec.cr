@@ -316,6 +316,28 @@ describe Hwaro::Content::Seo::Amp do
       result.should contain(amp_ext)
     end
 
+    # Regression: the simple scaffold's inline CSS uses @view-transition and
+    # @starting-style; folded into <style amp-custom> they are CSS syntax
+    # errors that fail every AMP page.
+    it "drops at-rules AMP disallows from folded theme CSS" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      css = "/* @starting-style in a comment; */ a{content:\"@x {\"}\n" \
+            "@view-transition { navigation: auto; }\n@import url(x.css);\n" \
+            "@media (prefers-reduced-motion: no-preference) { .m{opacity:1} @starting-style { .m{opacity:0} } }\n" \
+            "@font-face{font-family:F;src:url(f.woff2)} @keyframes k{from{opacity:0}to{opacity:1}} b{c:d} @layer x"
+      html = "<html><head><style>#{css}</style></head><body>x</body></html>"
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, Hwaro::Models::Config.new)
+      custom = result[/<style amp-custom>([\s\S]*?)<\/style>/, 1]
+      custom.should_not contain("@view-transition")
+      custom.should_not contain("@import")
+      custom.should_not contain("@starting-style {")
+      custom.should contain("/* @starting-style in a comment; */ a{content:\"@x {\"}")
+      custom.should contain("@media (prefers-reduced-motion: no-preference) { .m{opacity:1}  }")
+      custom.should contain("@font-face{font-family:F;src:url(f.woff2)} @keyframes k{from{opacity:0}to{opacity:1}} b{c:d}")
+      custom.should_not contain("@layer")
+    end
+
     # Regression: the codepen shortcode / CodePen embed snippet (height only,
     # allowfullscreen="true", frameborder="no") became an invalid amp-iframe.
     it "converts a height-only embed iframe into a valid amp-iframe" do

@@ -191,6 +191,66 @@ module Hwaro
             .gsub(/(\s)frameborder\s*=\s*(["']?)(no|yes)\2(?=[\s>]|\z)/i) { %(#{$1}frameborder="#{$3.downcase == "no" ? 0 : 1}") }
         end
 
+        # At-rules AMP accepts inside `<style amp-custom>`. Anything else
+        # (`@view-transition`, `@starting-style`, `@layer`, `@import`, …) is a
+        # CSS syntax error that fails the whole page.
+        AMP_CSS_AT_RULES = {"font-face", "keyframes", "-webkit-keyframes", "-moz-keyframes",
+                            "-o-keyframes", "-ms-keyframes", "media", "supports", "page"}
+
+        # Drop every at-rule (statement or block, at any nesting depth) whose
+        # name AMP disallows. Comments and quoted strings are copied verbatim
+        # so an `@name` inside them is never mistaken for a rule.
+        private def self.strip_disallowed_at_rules(css : String) : String
+          return css unless css.includes?('@')
+          String.build(css.bytesize) do |io|
+            reader = Char::Reader.new(css)
+            while reader.has_next?
+              c = reader.current_char
+              if c == '/' && reader.peek_next_char == '*'
+                start = reader.pos
+                close = css.byte_index("*/", start + 2)
+                stop = close ? close + 2 : css.bytesize
+                io << css.byte_slice(start, stop - start)
+                reader.pos = stop
+              elsif c == '"' || c == '\''
+                start = reader.pos
+                reader.next_char
+                while reader.has_next? && reader.current_char != c
+                  reader.next_char if reader.current_char == '\\'
+                  reader.next_char if reader.has_next?
+                end
+                reader.next_char if reader.has_next?
+                io << css.byte_slice(start, reader.pos - start)
+              elsif c == '@' && (name = css.byte_slice(reader.pos + 1).match(/\A[-\w]+/).try(&.[0])) &&
+                    !AMP_CSS_AT_RULES.includes?(name.downcase)
+                reader = skip_at_rule(reader)
+              else
+                io << c
+                reader.next_char
+              end
+            end
+          end
+        end
+
+        # `reader` advanced past the at-rule it sits on: up to the `;` ending
+        # a statement, or past the `}` closing its block. (Char::Reader is a
+        # struct, so the advanced copy is returned.)
+        private def self.skip_at_rule(reader : Char::Reader) : Char::Reader
+          depth = 0
+          while reader.has_next?
+            c = reader.current_char
+            reader.next_char
+            case c
+            when '{' then depth += 1
+            when '}'
+              depth -= 1
+              break if depth <= 0
+            when ';' then break if depth == 0
+            end
+          end
+          reader
+        end
+
         # Convert standard HTML to AMP-compliant HTML
         def self.convert_to_amp(html : String, page : Models::Page, config : Models::Config) : String
           # The mirror lives one prefix deeper than the page it was rendered
@@ -349,7 +409,7 @@ module Hwaro
               ""
             end
             # `!important` is disallowed inside amp-custom.
-            extracted_css = theme_css.join("\n").gsub(/\s*!important/i, "")
+            extracted_css = strip_disallowed_at_rules(theme_css.join("\n").gsub(/\s*!important/i, ""))
 
             amp_boilerplate = <<-HTML
               <style amp-boilerplate>body{-webkit-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-moz-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-ms-animation:-amp-start 8s steps(1,end) 0s 1 normal both;animation:-amp-start 8s steps(1,end) 0s 1 normal both}@-webkit-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-moz-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-ms-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-o-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}</style><noscript><style amp-boilerplate>body{-webkit-animation:none;-moz-animation:none;-ms-animation:none;animation:none}</style></noscript>
