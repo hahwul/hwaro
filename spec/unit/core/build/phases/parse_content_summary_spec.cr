@@ -106,6 +106,19 @@ describe "summary pass diagnostics" do
   end
 end
 
+describe "marker summary inside a raw HTML block" do
+  it "closes the elements the marker leaves open" do
+    summary = summary_of("<details>\n<summary>Click</summary>\n\n<div class=\"x\">\n\nHidden <span>a<br>b.\n\n<!-- more -->\n\nMore.</span>\n\n</div>\n</details>\n")
+    summary.should contain("Hidden")
+    summary.should end_with("b.</p>\n</div>\n</details>\n")
+  end
+
+  it "leaves a balanced summary untouched" do
+    summary_of("<details>\n<summary>S</summary>\n\nIn.\n\n</details>\n\n<!-- x <div> -->\n\nText.\n\n<!-- more -->\n\nRest.\n")
+      .should end_with("<p>Text.</p>\n")
+  end
+end
+
 private def summary_png(w : Int32, h : Int32) : String
   Dir.mktmpdir do |dir|
     path = File.join(dir, "x.png")

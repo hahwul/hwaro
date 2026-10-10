@@ -145,7 +145,7 @@ module Hwaro::Core::Build::Phases::ParseContent
         html = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, site.config.base_url, site.config.base_path)
         html = apply_responsive_images(html, page, site.config) if images_ready
 
-        page.summary_html = html
+        page.summary_html = close_open_elements(html)
         recomputed_paths << page.path
       rescue ex
         # A broken shortcode in a summary must not abort the whole parse
@@ -176,7 +176,7 @@ module Hwaro::Core::Build::Phases::ParseContent
         end
         fallback = Content::Processors::InternalLinkResolver.prefix_root_relative_links(fallback, site.config.base_url, site.config.base_path)
         fallback = apply_responsive_images(fallback, page, site.config) if images_ready
-        page.summary_html = fallback
+        page.summary_html = close_open_elements(fallback)
         recomputed_paths << page.path
       end
     end
@@ -309,6 +309,33 @@ module Hwaro::Core::Build::Phases::ParseContent
   rescue ex
     Logger.warn "Automatic summary skipped for #{page.path}: #{ex.message}"
     had || false # nil when the raise preceded the assignment above
+  end
+
+  # Comments and script/style bodies are skipped; group 3 is a tag name.
+  SUMMARY_TAG_RE     = /<!--.*?-->|<(script|style)\b.*?<\/\1\s*>|<(\/?)([a-zA-Z][\w-]*)[^>]*>/im
+  VOID_HTML_ELEMENTS = Set{"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
+
+  # A marker inside a raw HTML block (`<details>` … `<!-- more -->` …
+  # `</details>`) ends the summary inside that element: close what is still
+  # open, as complete_summary_chunk does for a block shortcode, or the
+  # unclosed tag swallows whatever a listing prints after the summary.
+  private def close_open_elements(html : String) : String
+    open = [] of String
+    html.scan(SUMMARY_TAG_RE) do |m|
+      next unless name = m[3]?
+      next if m[0].ends_with?("/>")
+      name = name.downcase
+      if m[2].empty?
+        open << name unless VOID_HTML_ELEMENTS.includes?(name)
+      elsif at = open.rindex(name)
+        open.truncate(0, at)
+      end
+    end
+    return html if open.empty?
+    String.build do |io|
+      io << html
+      open.reverse_each { |name| io << "</" << name << ">\n" }
+    end
   end
 
   SUMMARY_LINK_DEFINITION_RE     = /\A {0,3}\[(?!\^)[^\]\n]+\]:[ \t]*\S/

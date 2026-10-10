@@ -273,7 +273,7 @@ This is the summary shown in listings.
 The full article continues here...
 ```
 
-The summary renders like the body: shortcodes, Markdown extensions and render hooks apply. A marker placed inside a block shortcode's body (`{% note() %}` … `{% end %}`) ends the summary inside that block, and the summary closes the block at that point.
+The summary renders like the body: shortcodes, Markdown extensions and render hooks apply. A marker placed inside a block shortcode's body (`{% note() %}` … `{% end %}`) ends the summary inside that block, and the summary closes the block at that point. The same goes for raw HTML: a marker inside `<details>` … `</details>` (or any element left open) ends the summary there, and the summary closes the open elements, so a listing that prints it is not swallowed by an unclosed tag.
 
 ### Automatic summaries
 
