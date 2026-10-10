@@ -178,11 +178,15 @@ module Hwaro
           project_root = Utils::PathUtils.find_project_root(content_dir)
           Dir.glob(File.join(Utils::PathUtils.glob_escape(content_dir), "**", "*.md")) do |file|
             next if File.symlink?(file) && !Utils::PathUtils.resolves_within?(file, project_root)
-            files << file
+            # Directories named `x.md` and FIFOs (whose `File.read` blocks
+            # forever) are skipped, as the build and the other tools do.
+            files << file if ContentWalk.readable_file?(file)
           end
           Dir.glob(File.join(Utils::PathUtils.glob_escape(content_dir), "**", "*.markdown")) do |file|
             next if File.symlink?(file) && !Utils::PathUtils.resolves_within?(file, project_root)
-            files << file
+            # Directories named `x.md` and FIFOs (whose `File.read` blocks
+            # forever) are skipped, as the build and the other tools do.
+            files << file if ContentWalk.readable_file?(file)
           end
           files.sort
         end

@@ -40,7 +40,8 @@ module Hwaro
 
           entries = [] of {Array(String), String, String}
           Dir.glob("data/**/*.{yml,yaml,json,toml}") do |path|
-            next if File.directory?(path)
+            # Skips directories and FIFOs (a FIFO would block `File.read`).
+            next unless Services::ContentWalk.readable_file?(path)
             rel = Path[path].relative_to("data")
             parts = rel.parts
             stem = Path[parts.last].stem

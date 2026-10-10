@@ -687,6 +687,10 @@ module Hwaro::Core::Build::Phases::Initialize
   # serve, the watcher's removed-file detection follows up with a full
   # rebuild once the filesystem settles.
   private def read_template_source(path : String) : String?
+    # A FIFO (or a directory named `x.html`) matching the glob would block
+    # or fail `File.read`; it is not a template. A path that is missing
+    # right now falls through to the retry loop below (mid-save window).
+    return if (info = (File.info?(path) rescue nil)) && !info.file?
     attempts = 0
     loop do
       source = Utils::TextUtils.strip_bom(File.read(path))
@@ -850,8 +854,10 @@ module Hwaro::Core::Build::Phases::Initialize
     # `build --cache` ships stale translations while `serve` (which watches
     # i18n/) rebuilds correctly.
     Dir.glob("data/**/*.{#{DATA_DIGEST_EXTENSIONS}}", "i18n/**/*.{#{DATA_DIGEST_EXTENSIONS}}") do |path|
-      next if File.directory?(path)
-      paths << path
+      # Regular files only: a FIFO would block `File.read` below forever.
+      # `readable_file?` is not used because the loaders warn about the same
+      # dangling links, and this digest runs only under `--cache`.
+      paths << path if (File.info?(path).try(&.file?) rescue false)
     end
     return "" if paths.empty?
 
@@ -859,8 +865,16 @@ module Hwaro::Core::Build::Phases::Initialize
     paths.sort!.each do |path|
       # Length-prefixed (see DigestUtils) so adjacent path/content pairs
       # can't collide across boundaries.
+      # An unreadable file is skipped with a warning by the data and i18n
+      # loaders; leave it out of the digest the same way instead of aborting
+      # `build --cache`. It re-enters the digest once it becomes readable.
+      content = begin
+        File.read(path)
+      rescue IO::Error
+        next
+      end
       Utils::DigestUtils.update_length_prefixed(digest, path)
-      Utils::DigestUtils.update_length_prefixed(digest, File.read(path))
+      Utils::DigestUtils.update_length_prefixed(digest, content)
     end
     digest.final.hexstring
   end

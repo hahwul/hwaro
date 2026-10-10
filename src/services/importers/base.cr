@@ -136,7 +136,8 @@ module Hwaro
                 @outside_source_skips += 1
                 next
               end
-              files << full_path
+              # A FIFO would block the importer's `File.read` forever.
+              files << full_path if ContentWalk.readable_file?(full_path)
             end
           end
         end

@@ -291,6 +291,18 @@ module Hwaro
         sass.enabled && relative_path.ends_with?(".scss")
       end
 
+      # `File.exists?` admits a directory or an unreadable file, and the raw
+      # `File::Error` then reached the runner as a bare "Error: ..." line.
+      private def self.read_config_file(path : String) : String
+        File.read(path)
+      rescue ex : IO::Error
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_CONFIG,
+          message: "Cannot read #{path}: #{ex.message}",
+          hint: "Make sure #{path} is a readable file.",
+        )
+      end
+
       def self.load(config_path : String = "config.toml", env : String? = nil) : Config
         config = new
 
@@ -303,7 +315,7 @@ module Hwaro
         end
 
         # Read file content and substitute environment variables before TOML parsing
-        raw_content = File.read(config_path)
+        raw_content = read_config_file(config_path)
         substituted_content = Utils::EnvSubstitutor.substitute_with_warnings(raw_content, config_path)
         config.raw = parse_toml(substituted_content, config_path)
         # Checked per file, before the merge, so a typo in the environment
@@ -321,7 +333,7 @@ module Hwaro
         if env_name = env
           env_path = config_path.sub(/\.toml$/, ".#{env_name}.toml")
           if File.exists?(env_path)
-            env_content = File.read(env_path)
+            env_content = read_config_file(env_path)
             env_substituted = Utils::EnvSubstitutor.substitute_with_warnings(env_content, env_path)
             env_raw = parse_toml(env_substituted, env_path)
             reject_null_bytes!(env_raw, env_path)
