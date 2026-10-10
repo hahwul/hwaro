@@ -535,7 +535,7 @@ module Hwaro
           return unless config.amp.section_enabled?(page.section)
           prefix = effective_prefix(config)
           return unless prefix
-          amp_output_path(page, output_dir, prefix)
+          output_path_for(page, output_dir).try { |path| mirror_path(path, output_dir, prefix) }
         end
 
         # The file the render phase wrote for `page`, or nil when it wrote
@@ -547,10 +547,6 @@ module Hwaro
           segments, refused = Utils::PathUtils.split_safe_segments(page.url.lchop("/"))
           return if refused
           File.join(output_dir, segments.join("/"), "index.html")
-        end
-
-        private def self.amp_output_path(page : Models::Page, output_dir : String, prefix : String) : String?
-          output_path_for(page, output_dir).try { |path| mirror_path(path, output_dir, prefix) }
         end
       end
     end

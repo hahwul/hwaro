@@ -69,6 +69,20 @@ module Hwaro::Core::Build::Phases::ParseContent
   # hook has filled the resize map: `<img>` then get no srcset/dimensions
   # (rerender_image_summaries redoes those pages). `rerender` keeps the
   # warnings an earlier pass of this build already printed.
+  # The link tail of a summary: `@/` links (strict mode must see summary links
+  # too: a `render: false` page never reaches the body render pass, yet its
+  # summary ships inside every listing that embeds `{{ p.summary }}`), then
+  # relative links rooted at the page — listings and other pages print the
+  # summary too, so a bundle's `![](photo.jpg)` must not resolve against
+  # THEIR URL.
+  private def finish_summary_html(html : String, page : Models::Page, site : Models::Site, pages_by_path : Hash(String, Models::Page), images_ready : Bool) : String
+    html = resolve_internal_links(html, pages_by_path, page, site)
+    html = Content::Processors::InternalLinkResolver.absolutize_links(html, page.url, document_relative_only: true)
+    html = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, site.config.base_url, site.config.base_path)
+    html = apply_responsive_images(html, page, site.config) if images_ready
+    close_open_elements(html)
+  end
+
   private def render_page_summaries(
     pages : Array(Models::Page),
     site : Models::Site,
@@ -81,6 +95,16 @@ module Hwaro::Core::Build::Phases::ParseContent
   )
     md_config = site.config.markdown
     pages_by_path : Hash(String, Models::Page)? = nil
+    # Built once, on the first summary that needs it.
+    link_map = -> do
+      map = pages_by_path
+      unless map
+        map = {} of String => Models::Page
+        link_targets.each { |p| map[p.path] ||= p }
+        pages_by_path = map = Content::Processors::InternalLinkResolver.add_default_language_aliases(map, site.config)
+      end
+      map
+    end
     # Pages whose summary_html this pass (re)assigns. The shortcode-context
     # build below caches the page's own Crinja value BEFORE the assignment,
     # so without invalidation every `{{ p.summary }}` in a listing would
@@ -125,34 +149,7 @@ module Hwaro::Core::Build::Phases::ParseContent
         html, _ = Processor::Markdown.render(processed, use_highlight, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config, hooks: hooks)
         html = replace_shortcode_placeholders(html, shortcode_results)
 
-        pbp = (pages_by_path ||= begin
-          map = {} of String => Models::Page
-          link_targets.each { |p| map[p.path] ||= p }
-          Content::Processors::InternalLinkResolver.add_default_language_aliases(map, site.config)
-        end)
-        if site.config.links.broken_internal == "error"
-          # Strict mode must see summary links too: a `render: false` page
-          # never reaches the body render pass, yet its summary ships inside
-          # every listing that embeds `{{ p.summary }}`. Entries use the same
-          # "path → @/target (reason)" shape as the body pass, so pages that
-          # DO render report each link once (raise_… sort-uniqs).
-          misses = [] of {String, String}
-          html = Content::Processors::InternalLinkResolver.resolve(html, pbp, page.path, site.config.base_url, misses: misses)
-          unless misses.empty?
-            @broken_links_mutex.synchronize do
-              misses.each { |target, reason| @broken_internal_links << "#{page.path} → @/#{target} (#{reason})" }
-            end
-          end
-        else
-          html = Content::Processors::InternalLinkResolver.resolve(html, pbp, page.path, site.config.base_url)
-        end
-        # Listings and other pages print the summary too: a bundle's
-        # `![](photo.jpg)` must not resolve against THEIR URL.
-        html = Content::Processors::InternalLinkResolver.absolutize_links(html, page.url, document_relative_only: true)
-        html = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, site.config.base_url, site.config.base_path)
-        html = apply_responsive_images(html, page, site.config) if images_ready
-
-        page.summary_html = close_open_elements(html)
+        page.summary_html = finish_summary_html(html, page, site, link_map.call, images_ready)
         recomputed_paths << page.path
       rescue ex
         # A broken shortcode in a summary must not abort the whole parse
@@ -165,26 +162,7 @@ module Hwaro::Core::Build::Phases::ParseContent
           Logger.warn "Summary render failed for #{page.path} — falling back to plain Markdown: #{ex.message}"
         end
         fallback, _ = Processor::Markdown.render(rewrite_wikilinks(summary_md.to_s, page, site), use_highlight, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config)
-        pbp = (pages_by_path ||= begin
-          map = {} of String => Models::Page
-          link_targets.each { |p| map[p.path] ||= p }
-          Content::Processors::InternalLinkResolver.add_default_language_aliases(map, site.config)
-        end)
-        if site.config.links.broken_internal == "error"
-          misses = [] of {String, String}
-          fallback = Content::Processors::InternalLinkResolver.resolve(fallback, pbp, page.path, site.config.base_url, misses: misses)
-          unless misses.empty?
-            @broken_links_mutex.synchronize do
-              misses.each { |target, reason| @broken_internal_links << "#{page.path} → @/#{target} (#{reason})" }
-            end
-          end
-        else
-          fallback = Content::Processors::InternalLinkResolver.resolve(fallback, pbp, page.path, site.config.base_url)
-        end
-        fallback = Content::Processors::InternalLinkResolver.absolutize_links(fallback, page.url, document_relative_only: true)
-        fallback = Content::Processors::InternalLinkResolver.prefix_root_relative_links(fallback, site.config.base_url, site.config.base_path)
-        fallback = apply_responsive_images(fallback, page, site.config) if images_ready
-        page.summary_html = close_open_elements(fallback)
+        page.summary_html = finish_summary_html(fallback, page, site, link_map.call, images_ready)
         recomputed_paths << page.path
       end
     end

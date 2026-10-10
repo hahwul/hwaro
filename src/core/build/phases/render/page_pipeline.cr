@@ -116,6 +116,23 @@ module Hwaro::Core::Build::Phases::Render
   # skips: the search index and the feeds read `page.content`, and their
   # markdown-only fallback (no shortcodes, no link resolution, no base_path)
   # shipped raw `{% shortcode %}` markup into search.json / rss.xml.
+  # Resolve `html`'s `@/` links. Strict mode (broken_internal = "error")
+  # collects misses locally, then folds them into the builder-wide list under
+  # the mutex (render workers run concurrently); the aggregated error is
+  # raised AFTER the fan-out so one bad link doesn't hide the others.
+  private def resolve_internal_links(html : String, pages_by_path : Hash(String, Models::Page), page : Models::Page, site : Models::Site) : String
+    base_url = site.config.base_url
+    return Content::Processors::InternalLinkResolver.resolve(html, pages_by_path, page.path, base_url) unless site.config.links.broken_internal == "error"
+    misses = [] of {String, String}
+    html = Content::Processors::InternalLinkResolver.resolve(html, pages_by_path, page.path, base_url, misses: misses)
+    unless misses.empty?
+      @broken_links_mutex.synchronize do
+        misses.each { |target, reason| @broken_internal_links << "#{page.path} → @/#{target} (#{reason})" }
+      end
+    end
+    html
+  end
+
   private def render_page_content(
     page : Models::Page,
     site : Models::Site,
@@ -194,22 +211,7 @@ module Hwaro::Core::Build::Phases::Render
       # Resolve internal @/ links to actual page URLs
       if pages_by_path = @pages_by_path
         collect_anchor_links(page, html_content, pages_by_path) unless site.config.links.broken_anchors == "ignore"
-        if site.config.links.broken_internal == "error"
-          # Strict mode: collect unresolved links in a local array, then fold
-          # them into the builder-wide accumulator under the mutex (render
-          # workers run this concurrently under -Dpreview_mt). The aggregated
-          # error is raised AFTER the fan-out so one bad link doesn't hide
-          # the others.
-          misses = [] of {String, String}
-          html_content = Content::Processors::InternalLinkResolver.resolve(html_content, pages_by_path, page.path, site.config.base_url, misses: misses)
-          unless misses.empty?
-            @broken_links_mutex.synchronize do
-              misses.each { |target, reason| @broken_internal_links << "#{page.path} → @/#{target} (#{reason})" }
-            end
-          end
-        else
-          html_content = Content::Processors::InternalLinkResolver.resolve(html_content, pages_by_path, page.path, site.config.base_url)
-        end
+        html_content = resolve_internal_links(html_content, pages_by_path, page, site)
       end
 
       # Prefix plain root-relative content links (e.g. `[Posts](/posts/)`) with the

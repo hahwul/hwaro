@@ -1011,7 +1011,6 @@ module Hwaro
         # Prune what an earlier pass that raised after its re-parse left
         # unsettled (see `@unsettled_page_outputs`) — less `except`, the
         # paths the caller has just settled itself — and empty the set.
-
         private def settle_page_outputs(output_dir : String, except : Array(String) = [] of String) : Nil
           return if @unsettled_page_outputs.empty?
           leftover = @unsettled_page_outputs.to_a - except

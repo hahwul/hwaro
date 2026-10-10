@@ -11,15 +11,7 @@ Crinja.filter({
   direction = arguments["reverse"].truthy? ? -1 : 1
   index = arguments["by"].to_s == "value" ? 1 : 0
 
-  target.to_a.sort do |a, b|
-    x, y = a[index], b[index]
-    order = if !case_sensitive && x.string? && y.string?
-              x.as_s.compare(y.as_s, true)
-            else
-              (x <=> y) || raise ArgumentError.new("Comparison of #{x} and #{y} failed")
-            end
-    order * direction
-  end
+  target.to_a.sort { |a, b| Crinja::Filter.__compare(a[index], b[index], case_sensitive) * direction }
 end
 
 # `urlencode` follows Python's `quote`: a string keeps `/` (and `~`), so

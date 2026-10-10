@@ -399,7 +399,6 @@ module Hwaro
       # block).
       private def block_token?(token : String) : Bool
         return true if token.starts_with?(PRESERVE_PREFIX_BLOCK)
-        return false if token.starts_with?(PRESERVE_PREFIX_INLINE) || hidden_token?(token)
         if m = REGEX_TAG_NAME.match(token)
           BLOCK_TAGS.includes?(m[1].downcase)
         else

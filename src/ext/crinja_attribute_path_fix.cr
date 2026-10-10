@@ -23,6 +23,13 @@ module Crinja::Filter
     end
   end
 
+  # The `sort` / `dictsort` key comparison: strings case-insensitively unless
+  # asked otherwise, anything else by `<=>`.
+  def self.__compare(a : Value, b : Value, case_sensitive : Bool) : Int32
+    return a.as_s.compare(b.as_s, true) if !case_sensitive && a.string? && b.string?
+    (a <=> b) || raise ArgumentError.new("Comparison of #{a} and #{b} failed")
+  end
+
   def self.__sort(array : Array(Value), paths : Array(Value)?, case_sensitive : Bool, direction : Int32) : Array(Value)
     # Upstream resolved keys only while comparing, so a single item never
     # touched its attribute (and never raised on it).
@@ -40,12 +47,7 @@ module Crinja::Filter
     keyed.sort do |(a_key, _), (b_key, _)|
       order = 0
       a_key.each_with_index do |a, i|
-        b = b_key[i]
-        order = if !case_sensitive && a.string? && b.string?
-                  a.as_s.compare(b.as_s, true)
-                else
-                  (a <=> b) || raise ArgumentError.new("Comparison of #{a} and #{b} failed")
-                end
+        order = __compare(a, b_key[i], case_sensitive)
         break unless order == 0
       end
       order * direction

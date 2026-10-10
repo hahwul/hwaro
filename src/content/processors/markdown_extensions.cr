@@ -261,7 +261,7 @@ module Hwaro
 
         # Marks every open tag and engine comment of `html`, which must be
         # entirely hwaro-generated (any author text in it already escaped).
-        def trust(html : String, trusted : Bool = true) : String
+        def trust(html : String, trusted : Bool) : String
           return html unless trusted
           html.gsub(TRUST_RE) { |m| m == "<!--HWARO-" ? "<!--HWARO-#{TRUSTED_MARK}" : "#{m} #{TRUSTED_MARK}" }
         end
