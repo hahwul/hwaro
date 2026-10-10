@@ -186,6 +186,26 @@ describe Hwaro::Utils::HtmlMinifier do
       end
     end
 
+    describe "hidden elements (script, style, noscript)" do
+      # They render nothing, so the whitespace beside one still separates
+      # the inline content around it.
+      it "keeps the space between inline siblings around a script" do
+        Hwaro::Utils::HtmlMinifier.minify("<p><span>a</span>\n<script>x()</script>\n<span>b</span></p>")
+          .should eq("<p><span>a</span> <script>x()</script> <span>b</span></p>")
+      end
+
+      it "keeps the space before a noscript between inline siblings" do
+        Hwaro::Utils::HtmlMinifier.minify("<p><b>a</b> <noscript><i>n</i></noscript><b>c</b></p>")
+          .should eq("<p><b>a</b> <noscript><i>n</i></noscript><b>c</b></p>")
+      end
+
+      it "still strips whitespace between hidden and block neighbours" do
+        html = "<head>\n  <meta charset=\"utf-8\">\n  <style>a{}</style>\n  <script src=\"a.js\"></script>\n  <script src=\"b.js\"></script>\n</head>\n<body>\n<script>x()</script>\n<div>y</div>\n</body>"
+        Hwaro::Utils::HtmlMinifier.minify(html)
+          .should eq("<head><meta charset=\"utf-8\"><style>a{}</style><script src=\"a.js\"></script><script src=\"b.js\"></script></head><body><script>x()</script><div>y</div></body>")
+      end
+    end
+
     describe "protected blocks (whitespace-sensitive elements)" do
       it "preserves content inside <pre><code> unchanged" do
         html = "<pre><code>  line1\n    line2\n  line3</code></pre>"
