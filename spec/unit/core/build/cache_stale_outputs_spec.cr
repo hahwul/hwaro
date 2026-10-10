@@ -733,6 +733,23 @@ describe "warm --cache builds" do
     end
   end
 
+  it "removes the term feed of a removed term under a custom [feeds] filename" do
+    with_cached_site do
+      base = File.read("config.toml")
+      # `filename` names the main feed only; a term feed keeps rss.xml.
+      File.write("config.toml", base.sub("name = \"tags\"", "name = \"tags\"\nfeed = true") +
+                                "\n[feeds]\nenabled = true\nfilename = \"feed.xml\"\n")
+      cached_build
+      File.exists?("public/feed.xml").should be_true
+      File.exists?("public/tags/gone-tag/rss.xml").should be_true
+
+      File.delete("content/posts/gone.md")
+      cached_build
+      File.exists?("public/tags/gone-tag/rss.xml").should be_false
+      File.exists?("public/tags/keep-tag/rss.xml").should be_true
+    end
+  end
+
   it "removes llms files once they are disabled" do
     with_cached_site do
       base = File.read("config.toml")

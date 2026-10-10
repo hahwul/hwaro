@@ -544,9 +544,11 @@ module Hwaro
         feed_title = "#{site.config.title} - #{taxonomy.name.capitalize}: #{term}"
         # Same reason as the term page: nothing else records that this feed is
         # still wanted, so a removed term left `tags/<slug>/rss.xml` behind.
-        # `process_feed` derives the name the same way.
+        # Like section and language feeds, a term feed always takes the
+        # default name for `[feeds] type` — `[feeds] filename` names only the
+        # main feed — so this is the "" that `process_feed` gets below.
         builder.try(&.claim_generated_output(
-          File.join(feed_output_dir, Content::Seo::Feeds.safe_feed_filename(site.config.feeds.filename, site.config.feeds.type))
+          File.join(feed_output_dir, Content::Seo::Feeds.safe_feed_filename("", site.config.feeds.type))
         ))
 
         # No caller-side sort/limit: process_feed itself sorts date-desc
