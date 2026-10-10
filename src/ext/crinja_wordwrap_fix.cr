@@ -23,7 +23,7 @@ end
 module Crinja::Util
   # textwrap.TextWrapper#_wrap_chunks with drop_whitespace=True.
   def self.__wrap_line(text : String, width : Int32, break_long_words : Bool) : Array(String)
-    chunks = text.split(/(\s+)/).reject!(&.empty?).reverse!
+    chunks = text.split(/([\t\n\v\f\r ]+)/).reject!(&.empty?).reverse!
     lines = [] of String
 
     until chunks.empty?

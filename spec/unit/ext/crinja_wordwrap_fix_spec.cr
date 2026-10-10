@@ -23,4 +23,9 @@ describe "Crinja `wordwrap` filter" do
   it "rejects a width below 1 instead of hanging" do
     expect_raises(Crinja::Error, /width must be > 0/) { render_wrap("{{ 'x' | wordwrap(0) }}") }
   end
+
+  it "does not break at a non-breaking space" do
+    # Jinja2 keeps the NBSP inside the word, which is too long and gets cut.
+    render_wrap("{{ 'aaa\u00a0bbb' | wordwrap(4) }}").should eq("aaa\u00a0\nbbb")
+  end
 end
