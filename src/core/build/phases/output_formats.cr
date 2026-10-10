@@ -192,7 +192,9 @@ module Hwaro::Core::Build::Phases::OutputFormats
 
     formats.map do |fmt|
       mime = FORMAT_MIME[fmt]? || "application/octet-stream"
-      href = "#{base}#{url_path}index.#{fmt}"
+      # Percent-encoded like the canonical link and the sitemap, so a page
+      # at `/f g/` or `/über/` advertises a valid URL.
+      href = Utils::TextUtils.encode_url_path("#{base}#{url_path}index.#{fmt}")
       %(<link rel="alternate" type="#{mime}" href="#{HTML.escape(href)}">)
     end.join("\n  ")
   end
