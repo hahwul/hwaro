@@ -366,6 +366,11 @@ describe Hwaro::Utils::JsMinifier do
       result.should contain("width / height")
     end
 
+    it "reads a slash after a postfix ++/-- as division" do
+      js = "var r = i++ / 2; var s = `a\n// keep\nb`;\nvar t = j-- / 2 + \"a/b // c\";"
+      Hwaro::Utils::JsMinifier.minify(js).should eq(js)
+    end
+
     # =========================================================================
     # Real-world JS patterns
     # =========================================================================
