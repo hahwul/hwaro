@@ -568,7 +568,14 @@ module Hwaro
              time.second == 0 && time.nanosecond == 0
             Time.utc(time.year, time.month, time.day)
           else
-            time.to_utc
+            begin
+              time.to_utc
+            rescue ArgumentError
+              # The UTC instant of `0001-01-01T00:00:00+23:59` (or of a late
+              # 9999 date west of UTC) is outside Time's range; `to_utc`
+              # raised and took the whole build down. Clamp to the edge.
+              time.year <= 1 ? Time.utc(1, 1, 1) : Time.utc(9999, 12, 31, 23, 59, 59)
+            end
           end
         end
 

@@ -161,6 +161,11 @@ module Hwaro
       # strip it (JSON and TOML both reject a leading BOM outright), while
       # `load_data()` deliberately never has — see its call site.
       def parse_data_string(content : String, format : String) : Crinja::Value?
+        # The JSON and CSV parsers accept invalid UTF-8 inside strings, and the
+        # first regex any consumer then runs on such a value (TOML escaping
+        # for `[[content.generate]]`, a template filter) raised "UTF-8 error:
+        # illegal byte" and aborted the build. Scrub once, for every source.
+        content = content.scrub unless content.valid_encoding?
         case format
         when "json"        then from_json(JSON.parse(content))
         when "toml"        then from_toml(TOML.parse(content))

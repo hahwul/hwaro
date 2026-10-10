@@ -37,7 +37,7 @@ module Hwaro
       private WS_STRUCTURAL = /[ \t\r\n\f]*([{};,])[ \t\r\n\f]*/
       private WS_COLON      = /[ \t\r\n\f]*:[ \t\r\n\f]*/
       private PAREN_GROUP   = /\(([^)]*)\)/
-      private RESTORE_TOKEN = /\x00PRESERVE_(\d+)\x00/
+      private RESTORE_TOKEN = /\x00PRESERVE_(\d{1,9})\x00/
 
       # Perform conservative CSS minification
       def minify(css : String) : String

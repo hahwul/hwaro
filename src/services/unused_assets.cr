@@ -307,6 +307,8 @@ module Hwaro
       # `.svg`/`.txt`, which are often machine-generated. Skip the file with a
       # warning instead — the same degradation `check-links` performs.
       private def readable_scan_source(file : String) : String?
+        # A FIFO matching the glob would block `File.read` forever.
+        return unless ContentWalk.readable_file?(file)
         text = File.read(file)
         # Force the decode failure here, where it can be attributed to a file,
         # rather than later inside a regex over the whole corpus.

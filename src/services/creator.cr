@@ -706,7 +706,7 @@ module Hwaro
             )
           end
           archetype_path = File.join(ARCHETYPES_DIR, "#{explicit_archetype}.md")
-          if File.exists?(archetype_path)
+          if File.file?(archetype_path)
             Logger.debug "Using archetype: #{archetype_path}"
             return File.read(archetype_path)
           else
@@ -733,7 +733,7 @@ module Hwaro
             archetype_name = parts[0...i].join("/")
             archetype_path = File.join(ARCHETYPES_DIR, "#{archetype_name}.md")
 
-            if File.exists?(archetype_path)
+            if File.file?(archetype_path)
               Logger.debug "Using archetype: #{archetype_path}"
               return File.read(archetype_path)
             end
@@ -742,13 +742,23 @@ module Hwaro
 
         # 3. Try default archetype
         default_archetype = File.join(ARCHETYPES_DIR, "default.md")
-        if File.exists?(default_archetype)
+        if File.file?(default_archetype)
           Logger.debug "Using default archetype: #{default_archetype}"
           return File.read(default_archetype)
         end
 
         # 4. No archetype found
         nil
+      rescue ex : IO::Error
+        # `File.file?` keeps directories and FIFOs out, but an archetype can
+        # still be unreadable (permissions, a dangling target raced away).
+        # Surface it as a classified error naming the file instead of the
+        # runner's bare "Error: Error opening file ...".
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_IO,
+          message: "Cannot read archetype: #{ex.message}",
+          hint: "Check the file permissions under #{ARCHETYPES_DIR}/.",
+        )
       end
 
       # Tell the author once, per invocation, that the archetype — not

@@ -20,8 +20,8 @@ module Hwaro
         # reaches KaTeX verbatim instead of being rewritten here.
         STRIKETHROUGH_RE      = InlineMarkdown::INLINE_STRIKETHROUGH_RE
         STRIKETHROUGH_CODE_RE = /`[^`]+`/
-        LINK_DEST_TOKEN_RE    = /\x00LD(\d+)\x00/
-        HTML_TAG_TOKEN_RE     = /\x00HT(\d+)\x00/
+        LINK_DEST_TOKEN_RE    = /\x00LD(\d{1,9})\x00/
+        HTML_TAG_TOKEN_RE     = /\x00HT(\d{1,9})\x00/
 
         # The label of `![label](…)` / `![label][ref]`, brackets excluded:
         # it becomes the `alt` attribute (plain text), so no extension may

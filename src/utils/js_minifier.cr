@@ -48,7 +48,7 @@ module Hwaro
         # so an adversarial literal `\x00JSPLn\x00` sequence in the source (NUL
         # is not valid JS) can't raise IndexError — emit it unchanged instead.
         return cleaned if protected_spans.empty?
-        cleaned.gsub(/\x00JSPL(\d+)\x00/) do
+        cleaned.gsub(/\x00JSPL(\d{1,9})\x00/) do
           # to_i? guards against a counterfeit token whose index overflows
           # Int32 — return $0 unchanged rather than raising ArgumentError.
           idx = $1.to_i?

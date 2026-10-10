@@ -544,6 +544,17 @@ module Hwaro
           nil
         end
 
+        # `fm_string?` for a value that becomes part of the page's URL and
+        # output path. A NUL (a valid TOML/JSON `\u0000` escape) makes every
+        # `File`/`Path` call on that path raise, which aborted the build from
+        # whichever output generator touched it first (AMP).
+        private def fm_url_string?(fm : TOML::Table | YAML::Any | JSON::Any, key : String, file_path : String = "") : String?
+          str = fm_string?(fm, key, file_path)
+          return str unless str && str.includes?('\0')
+          Logger.warn "#{file_path}: `#{key}` contains a NUL byte — ignored." unless file_path.empty?
+          nil
+        end
+
         # Shared helper: extract a string array from a front matter value.
         # Uses compact_map(&.as_s?) instead of map(&.as_s) to safely skip
         # non-string elements rather than raising at runtime.
@@ -636,8 +647,8 @@ module Hwaro
             date:           date,
             updated:        updated,
             render:         fm_bool(fm, "render", true, file_path),
-            slug:           fm_string?(fm, "slug", file_path),
-            custom_path:    fm_string?(fm, "path", file_path),
+            slug:           fm_url_string?(fm, "slug", file_path),
+            custom_path:    fm_url_string?(fm, "path", file_path),
             aliases:        fm_string_array(fm, "aliases", file_path),
             transparent:    fm_bool(fm, "transparent", false, file_path),
             generate_feeds: fm_bool(fm, "generate_feeds", false, file_path),

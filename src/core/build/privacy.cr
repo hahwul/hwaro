@@ -675,7 +675,10 @@ module Hwaro
 
         private def read_index : Hash(String, IndexEntry)
           return {} of String => IndexEntry unless File.file?(index_path)
+          # `Time.unix` raises past year 9999; a hand-edited or corrupt
+          # `fetched_at` is just a stale entry, not a render failure.
           Hash(String, IndexEntry).from_json(File.read(index_path))
+            .select! { |_, entry| (0_i64..253_402_300_799_i64).includes?(entry.fetched_at) }
         rescue JSON::ParseException | JSON::SerializableError | IO::Error
           {} of String => IndexEntry
         end

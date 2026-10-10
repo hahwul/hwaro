@@ -141,7 +141,7 @@ module Hwaro
       private REGEX_INTERTOKEN_WS  = /(<\/?[A-Za-z][\w-]*[^>]*>|\x00HW_HTML_P[BI]_\d+\x00)([ \t\r\n\f]+)(?=(<\/?[A-Za-z][\w-]*[^>]*>|\x00HW_HTML_P[BI]_\d+\x00))/
       private REGEX_TAG_NAME       = /^<\/?([A-Za-z][\w-]*)/
       private REGEX_BLANK_LINES    = /\n{2,}/
-      private REGEX_PRESERVE_TOKEN = /\x00HW_HTML_P[BI]_(\d+)\x00/
+      private REGEX_PRESERVE_TOKEN = /\x00HW_HTML_P[BI]_(\d{1,9})\x00/
 
       # Minify the given HTML.
       #
@@ -277,6 +277,10 @@ module Hwaro
           # Spaces/tabs seen but not yet written. Kept as bytes, not as an
           # offset: a dropped comment can sit between two runs.
           pending = IO::Memory.new
+          # Once a comment body starting at some offset has no `-->`, no later
+          # one does either; remembering that keeps a run of unterminated
+          # `<!--` linear instead of rescanning to the end for each.
+          unterminated_from = n
           i = 0
           while i < n
             b = bytes[i]
@@ -292,7 +296,8 @@ module Hwaro
               next
             end
             if b == '<'.ord && i + 3 < n && bytes[i + 1] == '!'.ord && bytes[i + 2] == '-'.ord && bytes[i + 3] == '-'.ord
-              close = comment_end(bytes, i + 4, n)
+              close = i + 4 >= unterminated_from ? -1 : comment_end(bytes, i + 4, n)
+              unterminated_from = i + 4 if close < 0 && i + 4 < unterminated_from
               if close >= 0 && !kept_comment?(bytes, i + 4, close - 3)
                 i = close # dropped; pending whitespace stays pending
                 next

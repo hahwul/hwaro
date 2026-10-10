@@ -29,7 +29,7 @@ module Hwaro
 
         # Placeholder emitted by transform_outside_code_spans for a stashed
         # code span; the capture is the span's index.
-        CODE_SPAN_TOKEN_RE = /\x00CS(\d+)\x00/
+        CODE_SPAN_TOKEN_RE = /\x00CS(\d{1,9})\x00/
         # CommonMark "type 6" HTML-block start condition (common block tags,
         # including the <table>/<dl>/<div> markup hwaro itself generates).
         # A line opening one of these starts a raw-HTML block that runs to
@@ -42,7 +42,7 @@ module Hwaro
         # `protect_math`.
         record MathSpan, display : Bool, body : String, source : String = ""
 
-        MATH_PLACEHOLDER_RE = /\x00MATH(\d+)\x00/
+        MATH_PLACEHOLDER_RE = /\x00MATH(\d{1,9})\x00/
         # A line whose sole content is one math placeholder — the standalone
         # display-math case, where the emitted <div> starts at line start and
         # is a real CommonMark HTML block. Leading blockquote markers are
