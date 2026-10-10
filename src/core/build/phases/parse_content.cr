@@ -107,7 +107,9 @@ module Hwaro::Core::Build::Phases::ParseContent
                     end
         processed = rewrite_wikilinks(processed, page, site)
 
-        html, _ = Processor::Markdown.render(processed, use_highlight, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config)
+        # The body's render hooks too: the summary is the body's opening HTML.
+        hooks = Content::Processors::RenderHooks.registry.try { |reg| build_hook_render_context(reg, page, site, nil, nil) }
+        html, _ = Processor::Markdown.render(processed, use_highlight, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config, hooks: hooks)
         html = replace_shortcode_placeholders(html, shortcode_results)
 
         pbp = (pages_by_path ||= begin

@@ -45,6 +45,20 @@ describe "marker summary context" do
   end
 end
 
+describe "marker summary and render hooks" do
+  it "renders links through the body's render-link hook" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {"post.md" => "+++\ntitle = \"P\"\n+++\nSee [x](https://example.com).\n\n<!-- more -->\n\nRest.\n"},
+      template_files: {"page.html" => "SUM=[{{ page.summary }}]END", "section.html" => "{{ content }}",
+                       "hooks/render-link.html" => %(<a class="hooked" href="{{ destination }}">{{ text }}</a>)},
+    ) do |dir|
+      summary = File.read(File.join(dir, "public", "post", "index.html"))[/SUM=\[(.*?)\]END/m, 1]
+      summary.should contain(%(<a class="hooked" href="https://example.com">x</a>))
+    end
+  end
+end
+
 describe "marker summary inside a block shortcode" do
   it "closes the block where the summary ends" do
     summary = ""
