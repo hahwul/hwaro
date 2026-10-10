@@ -1,5 +1,6 @@
 require "../../../../spec_helper"
 require "../../../../../src/core/build/builder"
+require "../../../../../src/content/hooks"
 
 describe "Builder#run_incremental output collisions" do
   it "republishes a bundle's assets once the collision that suppressed it is gone" do
@@ -236,6 +237,36 @@ describe "Builder#run_incremental drafting a bundle" do
         builder.run_incremental(["content/notes/p/index.md"], options)
         File.exists?("public/notes/p/data.json").should be_false
         File.exists?("public/notes/p/feed.xml").should be_false
+      end
+    end
+  end
+end
+
+describe "Builder#run_incremental image bundles" do
+  it "moves a bundle's resized variants with its slug" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[image_processing]\nenabled = true\nwidths = [16]\n))
+        FileUtils.mkdir_p("content/notes/p")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("content/notes/p/index.md", "+++\ntitle = \"P\"\n+++\n![i](pic.png)\n")
+        pixels = Bytes.new(32 * 32 * 3, 128_u8)
+        LibStb.stbi_write_png("content/notes/p/pic.png", 32, 32, 3, pixels.to_unsafe.as(Void*), 32 * 3)
+
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hook| builder.register(hook) }
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/notes/p/index.md"], options)
+        File.exists?("public/notes/p/pic_16w.png").should be_true
+
+        File.write("content/notes/p/index.md", "+++\ntitle = \"P\"\nslug = \"sl\"\n+++\n![i](pic.png)\n")
+        builder.run_incremental(["content/notes/p/index.md"], options)
+        File.exists?("public/notes/sl/pic_16w.png").should be_true
+        File.read("public/notes/sl/index.html").should contain("/notes/sl/pic_16w.png")
+        File.exists?("public/notes/p/pic_16w.png").should be_false
       end
     end
   end

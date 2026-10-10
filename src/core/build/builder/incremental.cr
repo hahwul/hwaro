@@ -172,7 +172,7 @@ module Hwaro
           # would otherwise still show the drafted page in tag clouds and
           # term counts until the next full build.
           excluded_pages = apply_publication_exclusions!(changed_pages, options)
-          return run(options) if excluded_section?(excluded_pages)
+          return run(options) if excluded_section?(excluded_pages) || bundle_variants_move?(changed_pages, excluded_pages, page_urls)
           excluded_paths = excluded_pages.map(&.path).to_set
 
           # Date-token permalink errors deferred by the lenient parse (see
@@ -375,7 +375,7 @@ module Hwaro
           # feeds, and on disk — because only the content-only strategy
           # applied the filters.
           excluded_pages = apply_publication_exclusions!(changed_pages, options)
-          return run(options) if excluded_section?(excluded_pages)
+          return run(options) if excluded_section?(excluded_pages) || bundle_variants_move?(changed_pages, excluded_pages, page_urls)
           excluded_paths = excluded_pages.map(&.path).to_set
 
           # Deferred permalink errors — mirrors run_incremental.
@@ -904,6 +904,28 @@ module Hwaro
           return false unless section = excluded_pages.find(&.is_a?(Models::Section))
           Logger.info "  Section #{section.path} left the build — running full rebuild."
           true
+        end
+
+        # A bundle whose images have resized variants (`[image_processing]`)
+        # moved to a new URL or left the build. The variants sit under the
+        # old URL and only the full build's image hooks cut, map and prune
+        # them, so escalate — rare, and correctness first.
+        private def bundle_variants_move?(
+          changed_pages : Array(Models::Page),
+          excluded_pages : Array(Models::Page),
+          before : Hash(String, {String, Models::Page}),
+        ) : Bool
+          variants = Content::Hooks::ImageHooks.resize_map_readonly
+          return false if variants.empty?
+          moved = changed_pages.select { |page| before[page.path]?.try(&.[0]) != page.url } + excluded_pages
+          moved.each do |page|
+            next unless old_url = before[page.path]?.try(&.[0])
+            bundle = File.dirname(page.path)
+            next unless page.assets.any? { |asset| variants.has_key?(File.join(old_url, Path[asset].relative_to(bundle).to_s)) }
+            Logger.info "  Image bundle #{page.path} moved or left the build — running full rebuild."
+            return true
+          end
+          false
         end
 
         # Drop the re-parsed pages that the build options exclude (draft /
