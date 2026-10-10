@@ -48,6 +48,11 @@ module Hwaro
         # Bare names of user shortcode templates (templates/shortcodes/*).
         getter shortcode_names : Array(String)
 
+        # Markdown render-hook templates (templates/hooks/render-*). They
+        # shape the body of every page, so their closures (a partial a hook
+        # includes, too) belong to every page's `closure_hash`.
+        @hook_templates : Array(String)
+
         # Literal references the snapshot loader cannot serve — `./`-prefixed
         # names, names that keep a non-template extension (never loadable by
         # the snapshot glob), and exact-extension refs to a shadowed variant
@@ -86,6 +91,7 @@ module Hwaro
           @shortcode_names = templates.keys
             .select(&.starts_with?("shortcodes/"))
             .map(&.lchop("shortcodes/"))
+          @hook_templates = templates.keys.select(&.starts_with?("hooks/render-")).sort!
 
           @shortcode_usage_patterns = {} of String => Regex
           @shortcode_names.each do |name|
@@ -165,7 +171,10 @@ module Hwaro
 
         # Stable fingerprint of everything that influences a page's rendered
         # template output: the entry template's closure plus the closures of
-        # every shortcode template the page content invokes.
+        # every shortcode template the page content invokes and of every
+        # render-hook template. The hook registry fingerprint the caller folds
+        # in covers only the hook sources themselves, so a partial a hook
+        # `{% include %}`s left `--cache` pages stale when it was edited.
         #
         # Memoized: sites have a handful of distinct (entry template,
         # shortcode set) combinations but compute this once or twice per
@@ -185,6 +194,7 @@ module Hwaro
 
             names = closure_unlocked(entry_template).dup
             shortcode_templates.each { |sc| names.concat(closure_unlocked(sc)) }
+            @hook_templates.each { |hook| names.concat(closure_unlocked(hook)) }
 
             digest = Digest::MD5.new
             names.to_a.sort!.each do |name|
