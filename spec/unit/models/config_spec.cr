@@ -3449,3 +3449,25 @@ describe "Hwaro::Models::Config" do
     end
   end
 end
+
+# The `sitemap = true` short form is a scalar, so a `[sitemap]` table in
+# config.<env>.toml replaced it and the merged sitemap came out disabled.
+describe "environment override of the sitemap short form" do
+  it "deep-merges a [sitemap] table onto sitemap = true, and back" do
+    Dir.mktmpdir do |dir|
+      base = File.join(dir, "config.toml")
+      env_path = File.join(dir, "config.production.toml")
+      File.write(base, "sitemap = true\n")
+      File.write(env_path, "[sitemap]\nchangefreq = \"daily\"\n")
+      config = Hwaro::Models::Config.load(base, env: "production")
+      config.sitemap.enabled.should be_true
+      config.sitemap.changefreq.should eq("daily")
+
+      File.write(base, "[sitemap]\nenabled = true\nfilename = \"map.xml\"\n")
+      File.write(env_path, "sitemap = false\n")
+      config = Hwaro::Models::Config.load(base, env: "production")
+      config.sitemap.enabled.should be_false
+      config.sitemap.filename.should eq("map.xml")
+    end
+  end
+end
