@@ -417,7 +417,7 @@ Allowed id characters: letters (any script), digits, `_`, `-`, `:`. The id may s
 
 Disable by setting `heading_ids = false` under `[markdown]` in `config.toml`.
 
-Custom heading IDs require `markdown.safe = false`. Under safe mode the `{#id}` syntax is stripped from the rendered output and no id is applied, so use raw HTML headings if you need both safe mode and explicit ids. Writing the same `{#id}` twice in one page keeps it on the first heading and renames the later one with a numeric suffix (`#id-1`), with a build warning.
+Custom heading IDs require `markdown.safe = false`. Under safe mode the `{#id}` syntax is stripped from the rendered output and no custom id is applied: the heading keeps its generated id (a raw HTML heading is no way around this, since safe mode strips raw HTML too). Writing the same `{#id}` twice in one page keeps it on the first heading and renames the later one with a numeric suffix (`#id-1`), with a build warning.
 
 This `{#id}` shorthand is a special case of the more general `{#id .class key=val}` attribute block (`[markdown] attributes = true`), which also applies to inline images. See [Markdown Extensions](/features/markdown-extensions/).
 

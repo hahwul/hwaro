@@ -418,7 +418,7 @@ id에 허용되는 문자: 문자(모든 문자 체계), 숫자, `_`, `-`, `:`. 
 
 `config.toml`의 `[markdown]` 아래에 `heading_ids = false`를 두면 비활성화됩니다.
 
-커스텀 헤딩 ID에는 `markdown.safe = false`가 필요합니다. safe 모드에서는 `{#id}` 문법이 출력에서 제거되고 id도 적용되지 않습니다. safe 모드와 명시적 id가 동시에 필요하면 raw HTML 헤딩을 사용합니다. 한 페이지에 같은 `{#id}`를 두 번 쓰면 첫 번째 헤딩이 그 id를 갖고, 뒤의 헤딩은 숫자 접미사(`#id-1`)로 이름이 바뀌며 빌드 경고가 출력됩니다.
+커스텀 헤딩 ID에는 `markdown.safe = false`가 필요합니다. safe 모드에서는 `{#id}` 문법이 출력에서 제거되고 커스텀 id도 적용되지 않아 헤딩은 자동 생성된 id를 유지합니다(safe 모드는 raw HTML도 제거하므로 raw HTML 헤딩으로 우회할 수 없습니다). 한 페이지에 같은 `{#id}`를 두 번 쓰면 첫 번째 헤딩이 그 id를 갖고, 뒤의 헤딩은 숫자 접미사(`#id-1`)로 이름이 바뀌며 빌드 경고가 출력됩니다.
 
 `{#id}` 단축 문법은 더 일반적인 `{#id .class key=val}` 속성 블록(`[markdown] attributes = true`)의 특수한 경우이며, 속성 블록은 인라인 이미지에도 적용됩니다. [마크다운 확장](/ko/features/markdown-extensions/)을 참고합니다.
 
