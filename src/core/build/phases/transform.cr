@@ -353,6 +353,10 @@ module Hwaro::Core::Build::Phases::Transform
     site.taxonomies.clear
 
     pages.each do |page|
+      # The generator reads site.pages only: a section `_index.md` carrying
+      # `tags` never gets onto a term page, so it must not inflate
+      # get_taxonomy counts or yield a get_taxonomy_url to an unwritten term.
+      next if page.is_a?(Models::Section)
       # Match Content::Taxonomies.build_taxonomy_index: draft / unpublished
       # (--include-future/--include-expired) / generated pages must not inflate
       # get_taxonomy counts or terms_sort_by="count" relative to written
@@ -472,6 +476,7 @@ module Hwaro::Core::Build::Phases::Transform
       # skip unpublished/draft/generated pages so get_taxonomy membership
       # stays aligned with build_taxonomy_index (and rebuild_taxonomies).
       next if excluded_paths.includes?(page_path)
+      next if page.is_a?(Models::Section) # see rebuild_taxonomies
       next if page.excluded_from_listings?
       next unless site.config.versions.in_taxonomies?(page)
 
