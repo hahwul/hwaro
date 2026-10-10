@@ -47,7 +47,9 @@ module Hwaro
         roots = {} of {String, String?} => Models::Page
         claimed = Set(String).new
         pages.each do |page|
-          claimed << page.url
+          # A headless page (a `docs/_index.md` kept only for its cascade)
+          # is never written, so its URL is still a hole to fill.
+          claimed << page.url if page.render
           version = page.version
           next unless version
           rel = counterpart_path(version, page, config)

@@ -79,7 +79,7 @@ content/
 | `content/docs/v1/_index.md` | `/docs/v1/` |
 | `content/docs/v1/install.md` | `/docs/v1/install/` |
 
-`latest_at_root = false`이면 모든 버전이 세그먼트를 유지하고(`/docs/v2/install/`, `/docs/v1/install/`), `/docs/`는 최신 버전 루트로 향하는 리디렉션 스텁이 됩니다. 직접 `content/docs/_index.md`를 작성했다면 그 페이지가 URL을 유지합니다.
+`latest_at_root = false`이면 모든 버전이 세그먼트를 유지하고(`/docs/v2/install/`, `/docs/v1/install/`), `/docs/`는 최신 버전 루트로 향하는 리디렉션 스텁이 됩니다. 직접 `content/docs/_index.md`를 작성했다면 그 페이지가 URL을 유지합니다. 다만 캐스케이드용으로 둔 헤드리스(`render = false`) 페이지는 기록되지 않으므로 스텁이 그대로 남습니다.
 
 URL 세그먼트는 디렉터리 이름이 아니라 버전 **name**입니다. `name = "2.x"`, `path = "docs/v2"`라면 루트가 아닐 때 `/docs/2.x/…`에 게시됩니다. 버전 디렉터리는 최상위(`content/v2/…`)에 둘 수도 있으며, 이 경우 최신 버전이 사이트 루트가 됩니다.
 

@@ -72,6 +72,32 @@ describe Hwaro::Content::Versions do
       latest.exists.should be_false
     end
 
+    it "stubs the parent URL over a headless authored parent index" do
+      config = load_config(<<-TOML)
+        title = "T"
+        base_url = "https://example.com"
+        [versions]
+        latest_at_root = false
+        [[versions.list]]
+        name = "v2"
+        path = "docs/v2"
+        latest = true
+        TOML
+      # `render = false`, kept for its cascade: /docs/ is never written.
+      parent = Hwaro::Models::Section.new("docs/_index.md")
+      parent.section = "docs"
+      parent.url = "/docs/"
+      parent.render = false
+      root = Hwaro::Models::Section.new("docs/v2/_index.md")
+      root.section = "docs/v2"
+      root.url = "/docs/v2/"
+      root.version = config.versions.for_path(root.path)
+
+      Hwaro::Content::Versions.link!([parent, root] of Hwaro::Models::Page, config)
+
+      root.aliases.should eq(["/docs/"])
+    end
+
     it "keeps an undeclared suffix as part of the name on a single-language site" do
       config = load_config(<<-TOML)
         title = "T"
