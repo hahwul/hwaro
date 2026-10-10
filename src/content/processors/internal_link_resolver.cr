@@ -226,8 +226,11 @@ module Hwaro
                 "href=\"#{url}\""
               end
             else
-              Logger.warn "Internal link '@/#{content_path}' in '#{source_path}' could not be resolved: page not found."
-              misses << {content_path, "page not found"} if misses
+              # Markdown percent-encoded the href (`ü` → `%C3%BC`); report the
+              # file name the author wrote.
+              shown = content_path.includes?('%') ? URI.decode(content_path) : content_path
+              Logger.warn "Internal link '@/#{shown}' in '#{source_path}' could not be resolved: page not found."
+              misses << {shown, "page not found"} if misses
               match
             end
           end

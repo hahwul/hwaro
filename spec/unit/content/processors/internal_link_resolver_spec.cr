@@ -48,6 +48,19 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
       misses.should eq [{"nonexistent.md", "page not found"}, {"", "empty link"}]
     end
 
+    # Regression: the warning printed the href Markdown percent-encoded
+    # (`p7-%C3%BCn%C3%AF.md`) instead of the file name.
+    it "reports an unresolved non-ASCII target decoded" do
+      pages = {} of String => Hwaro::Models::Page
+      html = %(<a href="@/notes/p7-%C3%BCn%C3%AF.md">x</a>)
+      misses = [] of {String, String}
+      log = with_captured_log do
+        Hwaro::Content::Processors::InternalLinkResolver.resolve(html, pages, "a.md", misses: misses)
+      end
+      log.should contain("'@/notes/p7-ünï.md'")
+      misses.should eq [{"notes/p7-ünï.md", "page not found"}]
+    end
+
     it "collects nothing for resolved links" do
       pages = {"blog/post.md" => make_page("blog/post.md", "/blog/post/")}
       html = %(<a href="@/blog/post.md">link</a>)
