@@ -861,7 +861,8 @@ module Hwaro::Core::Build::Phases::Initialize
   # digest has to see. Missing it meant editing a `data/*.csv` moved nothing
   # in the cache key, so `build --cache` re-published every page with the
   # previous CSV's values — forever, until an unrelated edit.
-  DATA_DIGEST_EXTENSIONS = "yml,yaml,json,toml,csv"
+  # Compared lowercased: the loaders read `Team.JSON` too.
+  DATA_DIGEST_EXTENSIONS = {".yml", ".yaml", ".json", ".toml", ".csv"}
 
   # Compute a content digest of the `data/` directory for cache invalidation.
   #
@@ -879,7 +880,8 @@ module Hwaro::Core::Build::Phases::Initialize
     # feed templates — an i18n edit must invalidate cached pages too, or
     # `build --cache` ships stale translations while `serve` (which watches
     # i18n/) rebuilds correctly.
-    Dir.glob("data/**/*.{#{DATA_DIGEST_EXTENSIONS}}", "i18n/**/*.{#{DATA_DIGEST_EXTENSIONS}}") do |path|
+    Dir.glob("data/**/*", "i18n/**/*") do |path|
+      next unless DATA_DIGEST_EXTENSIONS.includes?(File.extname(path).downcase)
       # Regular files only: a FIFO would block `File.read` below forever.
       # `readable_file?` is not used because the loaders warn about the same
       # dangling links, and this digest runs only under `--cache`.

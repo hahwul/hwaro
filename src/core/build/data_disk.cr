@@ -21,6 +21,9 @@ module Hwaro
       module DataDisk
         extend self
 
+        # Extensions `data/` loads into site.data, compared lowercased.
+        EXTENSIONS = {".yml", ".yaml", ".json", ".toml"}
+
         # Tree node used while assembling `site.data` from the `data/`
         # directory. Each node can hold a leaf value (a parsed data file)
         # and/or a map of children (subdirectory entries). When both are
@@ -39,7 +42,11 @@ module Hwaro
           return root unless Dir.exists?("data")
 
           entries = [] of {Array(String), String, String}
-          Dir.glob("data/**/*.{yml,yaml,json,toml}") do |path|
+          # Every file, the extension matched case-insensitively here: the
+          # glob's `*.{json,…}` is case-sensitive, so `data/Team.JSON` was
+          # dropped from site.data without a word.
+          Dir.glob("data/**/*") do |path|
+            next unless EXTENSIONS.includes?(File.extname(path).downcase)
             # Skips directories and FIFOs (a FIFO would block `File.read`).
             next unless Services::ContentWalk.readable_file?(path)
             rel = Path[path].relative_to("data")

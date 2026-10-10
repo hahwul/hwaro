@@ -24,6 +24,10 @@ module Hwaro::Core::Build
       load_data_files(site, config)
     end
 
+    def test_compute_disk_data_hash : String
+      compute_disk_data_hash
+    end
+
     def test_create_fresh_crinja_env : Crinja
       create_fresh_crinja_env
     end
@@ -486,6 +490,26 @@ describe Hwaro::Core::Build::Phases::Initialize do
           builder.test_load_data_files(site)
 
           site.data.has_key?("menu").should be_true
+        end
+      end
+    end
+
+    it "loads a data file whose extension is not lowercase" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("data")
+          File.write("data/Team.JSON", %({"lead": "kim"}))
+          File.write("data/notes.txt", "not data")
+
+          builder = Hwaro::Core::Build::Builder.new
+          site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+          builder.test_load_data_files(site)
+          site.data.keys.should eq(["Team"])
+
+          # ...and `--cache` sees it change.
+          before = builder.test_compute_disk_data_hash
+          File.write("data/Team.JSON", %({"lead": "lee"}))
+          builder.test_compute_disk_data_hash.should_not eq(before)
         end
       end
     end
