@@ -632,6 +632,9 @@ module Hwaro
           source = priority_pages || ctx.all_pages
           source.each do |page|
             next if page.assets.empty?
+            # A collision loser's URL directory is the winner's: its variants
+            # would replace the winner's (see Phases::Write#process_assets).
+            next if page.output_suppressed
 
             page_bundle_dir = File.dirname(page.path)
             url_path = page.url.lchop("/")

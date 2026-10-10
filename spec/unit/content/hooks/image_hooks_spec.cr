@@ -841,3 +841,24 @@ describe "ImageHooks render-time lookups (review fixes)" do
     end
   end
 end
+
+describe "ImageHooks page-bundle variants of a collision loser" do
+  it "resizes the winner's bundle image, not the loser's, at a shared URL" do
+    # `a-sec/_index.md` (path = "guide") wins /guide/ by path order, but
+    # pages are walked before sections, so the losing `guide/index.md` used
+    # to claim the variant name first.
+    build_site(
+      %(title = "t"\nbase_url = "https://example.com"\n[image_processing]\nenabled = true\nwidths = [20]\n),
+      content_files: {
+        "guide/index.md"  => "+++\ntitle = \"Guide\"\n+++\n![c](cover.png)\n",
+        "guide/cover.png" => png_body(30, 30),
+        "a-sec/_index.md" => "+++\ntitle = \"Sec\"\npath = \"guide\"\n+++\n![c](cover.png)\n",
+        "a-sec/cover.png" => png_body(40, 10),
+      },
+      template_files: {"page.html" => "{{ content }}", "section.html" => "{{ content }}", "index.html" => "home"},
+    ) do
+      png_size("public/guide/cover.png").should eq({40, 10})
+      png_size("public/guide/cover_20w.png").should eq({20, 5})
+    end
+  end
+end
