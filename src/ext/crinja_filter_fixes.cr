@@ -72,3 +72,10 @@ Crinja.filter({width: 4, first: false, blank: false, indentfirst: false}, :inden
            end
   arguments["first"].truthy? || arguments["indentfirst"].truthy? ? indention + result : result
 end
+
+# `wordcount` counts runs of word characters (Python's `\w+`). Upstream split
+# on a few separators and counted the pieces, so an empty string had one
+# word and punctuation-only text counted as words.
+Crinja.filter(:wordcount) do
+  target.to_s.scan(/[\p{L}\p{N}_]+/).size
+end

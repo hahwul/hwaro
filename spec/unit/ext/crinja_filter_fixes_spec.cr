@@ -37,4 +37,11 @@ describe "Crinja built-in filter fixes" do
       render_filter("{{ 'a\\nb' | indent(2, true) }}").should eq("  a\n  b")
     end
   end
+
+  describe "wordcount" do
+    it "counts word-character runs" do
+      render_filter("{{ '' | wordcount }}|{{ ' -- ' | wordcount }}|{{ \"it's a-b\" | wordcount }}|{{ '한국어 문장 x_y 42' | wordcount }}")
+        .should eq("0|0|4|4")
+    end
+  end
 end
