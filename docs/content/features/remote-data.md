@@ -41,7 +41,7 @@ on_error = "fail"           # fail | warn-and-use-cache | warn-and-skip
 | `url` | yes | Absolute `http://` or `https://` URL. Other schemes are rejected when loading config. |
 | `format` | no | `json`, `toml`, `yaml`, or `csv`. When omitted, Hwaro uses the response `Content-Type`, then the final URL extension after redirects. Set it explicitly if neither identifies a format. |
 | `headers` | no | Extra request headers. They are treated as credentials: never logged, and dropped once a redirect leaves the original origin, including any later redirect back to it. |
-| `cache` | no | Disk-cache TTL such as `"90s"`, `"30m"`, `"1h"`, `"7d"`, or `"1h30m"`. A fresh cache skips the request. |
+| `cache` | no | Disk-cache TTL such as `"90s"`, `"30m"`, `"1h"`, `"7d"`, or `"1h30m"`. A fresh cache skips the request; editing the entry's `url` or `headers` discards it. |
 | `on_error` | no | Fetch/parse failure policy: `fail` (default), `warn-and-use-cache`, or `warn-and-skip`. |
 
 CSV data becomes an array of rows; each row is an array of trimmed strings,

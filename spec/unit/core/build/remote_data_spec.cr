@@ -477,6 +477,29 @@ describe "RemoteData.load" do
     end
   end
 
+  it "does not serve a fresh cache entry fetched with different headers" do
+    handler = ->(ctx : HTTP::Server::Context) do
+      ctx.response.content_type = "application/json"
+      ctx.response.print %({"lang": "#{ctx.request.headers["Accept-Language"]? || "none"}"})
+    end
+
+    with_test_server(handler) do |base|
+      Dir.mktmpdir do |dir|
+        cache_dir = File.join(dir, "cache")
+        t0 = Time.utc
+        RemoteData.load(remote_entry("#{base}/team", cache_ttl: 1.hour, headers: {"Accept-Language" => "en"}), cache_dir: cache_dir, now: t0)
+
+        result = RemoteData.load(remote_entry("#{base}/team", cache_ttl: 1.hour, headers: {"Accept-Language" => "ko"}), cache_dir: cache_dir, now: t0).not_nil!
+        result.value["lang"].as_s.should eq("ko")
+      end
+    end
+  end
+
+  it "keeps a header-less entry's cache identity the plain url digest" do
+    entry = remote_entry("https://example.com/team")
+    RemoteData.request_digest(entry).should eq(RemoteData.url_digest("https://example.com/team"))
+  end
+
   it "on_error = fail raises a classified HWARO_E_NETWORK error without leaking the query string" do
     handler = ->(ctx : HTTP::Server::Context) do
       ctx.response.status_code = 500

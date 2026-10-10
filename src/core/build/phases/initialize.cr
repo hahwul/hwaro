@@ -947,7 +947,7 @@ module Hwaro::Core::Build::Phases::Initialize
     live_memo_keys = Set({String, String}).new if serve_mode
     digest = Digest::MD5.new
     entries.each do |entry|
-      memo_key = {entry.key, RemoteData.url_digest(entry.url)}
+      memo_key = {entry.key, RemoteData.request_digest(entry)}
       live_memo_keys.try(&.add(memo_key))
       result = serve_mode ? load_remote_entry_for_serve(entry, memo_key) : RemoteData.load(entry)
       Utils::DigestUtils.update_length_prefixed(digest, entry.key)
