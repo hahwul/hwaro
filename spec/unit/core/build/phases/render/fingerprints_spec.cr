@@ -156,6 +156,18 @@ describe "warm --cache: pages rendering other pages" do
     end
   end
 
+  it "re-renders a page serializing a listing after a body edit" do
+    with_relations_site do
+      File.write("templates/dump.html", %(DUMP={{ get_section(path="posts/_index.md").pages | tojson }}))
+      File.write("content/dump.md", "+++\ntitle = \"Dump\"\ntemplate = \"dump\"\n+++\n")
+      relations_cached_build
+      File.read("public/dump/index.html").should_not contain("three four")
+      File.write("content/posts/b.md", File.read("content/posts/b.md") + " three four")
+      relations_cached_build
+      File.read("public/dump/index.html").should contain("three four")
+    end
+  end
+
   it "re-renders a wikilink to a heading whose custom id changed" do
     with_relations_site do
       File.write("config.toml", File.read("config.toml") + "\n[markdown]\nwikilinks = true\n")

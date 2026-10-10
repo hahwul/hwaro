@@ -215,13 +215,36 @@ module Hwaro::Core::Build::Phases::Render
   # neighbour, and a section body edit every page under it.
   private def relation_page_fields(blob : String) : Builder::ListingPageFields
     rebound = blob.matches?(REBINDS_SELF_RE)
+    serialized = serializes_other_page?(blob, rebound)
     Builder::ListingPageFields.new(
-      extra: blob.matches?(CHAINED_EXTRA_RE) ||
+      extra: serialized || blob.matches?(CHAINED_EXTRA_RE) ||
              reads_other_page_field?(blob, EXTRA_ATTR_RE, EXTRA_INDEX_RE, EXTRA_ARG_RE, rebound),
-      content_derived: blob.matches?(CHAINED_CONTENT_DERIVED_RE) ||
+      content_derived: serialized || blob.matches?(CHAINED_CONTENT_DERIVED_RE) ||
                        reads_other_page_field?(blob, CONTENT_DERIVED_ATTR_RE,
                          CONTENT_DERIVED_INDEX_RE, CONTENT_DERIVED_ARG_RE, rebound),
     )
+  end
+
+  # `section.pages | tojson`, `p | jsonify`: a WHOLE page object serialized
+  # prints every field, `[extra]` and excerpt included. Only a non-self name,
+  # a call or subscript result, or a page-valued attribute counts —
+  # `p.title | tojson`, the common JSON-template idiom, prints one field the
+  # patterns above already see.
+  SERIALIZE_RE        = /(?:(?<![\w.])(\w+)|[)\]])((?:\.\w+)*)\s*\|\s*(?:tojson|jsonify)\b/
+  PAGE_VALUED_ATTR_RE = /\.(?:pages|lower|higher|series_pages|related_posts|backlinks|subsections)\z/
+
+  private def serializes_other_page?(blob : String, rebound : Bool) : Bool
+    return false unless blob.includes?("json")
+    blob.scan(SERIALIZE_RE) do |m|
+      path = m[2]
+      if path.empty?
+        root = m[1]?
+        return true if rebound || root.nil? || !SELF_RECEIVERS.includes?(root)
+      elsif path.matches?(PAGE_VALUED_ATTR_RE)
+        return true
+      end
+    end
+    false
   end
 
   # Shortcode templates (`shortcodes/<name>`) the page's content calls,
