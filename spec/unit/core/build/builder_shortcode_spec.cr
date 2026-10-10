@@ -740,7 +740,9 @@ describe Hwaro::Core::Build::Builder do
       output.should contain(%(<a href="/docs/">docs</a>))
       output.should contain(%(<a href="/ref/">r</a>))
       output.should contain(%(title="c&quot;ap"))
-      output.should contain(%(<p class="admonition-title">T&amp;i</p>))
+      # A container title is inline Markdown, so shortcode output lands in
+      # it as raw HTML, the same as in a paragraph.
+      output.should contain(%(<p class="admonition-title">T&i</p>))
       output.should contain("Escaped lit")
       output.should contain("<code>&lt;!--HWARO-SHORTCODE-PLACEHOLDER-0--&gt;</code>")
       output.scan("HWARO-SHORTCODE-PLACEHOLDER").size.should eq(1)
