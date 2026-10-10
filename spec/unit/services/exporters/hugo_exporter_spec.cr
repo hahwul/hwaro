@@ -592,3 +592,28 @@ describe "Hugo export: summary marker" do
     end
   end
 end
+
+# Regression: hwaro's `template` passed through verbatim, a param Hugo
+# ignores, so the exported page lost its layout (the Hugo importer maps
+# `layout` → `template`; the exporter now inverts it).
+describe "Hugo export: template" do
+  it "exports template as layout unless layout is authored" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(content_dir)
+      File.write(File.join(content_dir, "a.md"), "+++\ntitle = \"A\"\ntemplate = \"wide\"\n+++\na\n")
+      File.write(File.join(content_dir, "b.md"), "+++\ntitle = \"B\"\ntemplate = \"wide\"\nlayout = \"own\"\n+++\nb\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "hugo", content_dir: content_dir, output_dir: output_dir)
+      Hwaro::Services::Exporters::HugoExporter.new.run(options).success.should be_true
+
+      a = File.read(File.join(output_dir, "content", "a.md"))
+      a.should contain(%(layout = "wide"))
+      a.should_not contain("template")
+      b = File.read(File.join(output_dir, "content", "b.md"))
+      b.should contain(%(layout = "own"))
+      b.should contain(%(template = "wide"))
+    end
+  end
+end

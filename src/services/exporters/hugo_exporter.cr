@@ -127,6 +127,15 @@ module Hwaro
               else
                 hugo_fields["expiryDate"] = value
               end
+            when "template"
+              # Hugo picks a page's template from `layout` (the inverse of
+              # the Hugo importer's `layout` → `template`) and ignores an
+              # unknown `template` param, so the page lost its layout.
+              if authored?(flattened, "layout")
+                hugo_fields[key] = value
+              else
+                hugo_fields["layout"] = value
+              end
             when "path"
               # hwaro's `path` is the page's whole published path (served at
               # `/<path>/`); Hugo spells that `url` and ignores an unknown
