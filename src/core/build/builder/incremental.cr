@@ -1098,6 +1098,12 @@ module Hwaro
           all_pages = (site.pages + site.sections).as(Array(Models::Page))
           renderable_pages = all_pages.select(&.render)
 
+          # Re-claim output URLs (see run_incremental): forced content edits
+          # may have introduced or resolved a slug/alias collision. Before
+          # the listing fan-out and the globals, which both read the verdicts.
+          previously_suppressed = all_pages.select(&.output_suppressed)
+          @output_url_winners = compute_output_url_winners(all_pages)
+
           # Selective re-render: same template set, fully static graph.
           # `old_shadowed` guards extension-shadowed variants (foo.j2 next to
           # foo.html): they aren't in the snapshot hash, but an explicit
@@ -1211,10 +1217,6 @@ module Hwaro
             @render_global_vars = global_vars
           end
 
-          # Re-claim output URLs (see run_incremental): forced content edits
-          # may have introduced or resolved a slug/alias collision.
-          previously_suppressed = all_pages.select(&.output_suppressed)
-          @output_url_winners = compute_output_url_winners(all_pages)
           regained_output_pages(previously_suppressed, all_pages, output_dir).each do |page|
             pages_to_render << page if page.render && !pages_to_render.includes?(page)
           end

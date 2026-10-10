@@ -138,7 +138,11 @@ module Hwaro
           terms_map = if lt = lang_taxonomies
                         lt[taxonomy.name]? || {} of String => Array(Models::Page)
                       else
-                        site.taxonomies[taxonomy.name]? || {} of String => Array(Models::Page)
+                        # A page the render phase refused to write stays in
+                        # site.taxonomies (a later serve pass may hand its URL
+                        # back) but off the term pages and feeds.
+                        (site.taxonomies[taxonomy.name]? || {} of String => Array(Models::Page))
+                          .transform_values(&.reject(&.output_suppressed)).reject! { |_, pgs| pgs.empty? }
                       end
 
           base_path = "#{lang_prefix}/#{taxonomy.name}/"
@@ -278,9 +282,6 @@ module Hwaro
           # `[versions] taxonomies = "latest"` (default): only the latest
           # version (plus unversioned content) populates term pages.
           next unless config.versions.in_taxonomies?(page)
-          # Runs at generate time, after the render phase flagged the pages
-          # it refused to write — keep them off the term pages and feeds.
-          next if page.output_suppressed
 
           config.taxonomies.each do |taxonomy|
             name = taxonomy.name

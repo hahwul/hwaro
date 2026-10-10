@@ -92,14 +92,6 @@ module Hwaro::Core::Build::Phases::Render
 
     error_overlay = ctx.options.error_overlay
 
-    # Transform built site.taxonomies before these verdicts; a collision
-    # loser is never written and the generator keeps it off its term page
-    # (Taxonomies.build_taxonomy_index), so get_taxonomy must not count it.
-    site.taxonomies.each_value do |terms|
-      terms.each_value(&.reject!(&.output_suppressed))
-      terms.reject! { |_, term_pages| term_pages.empty? }
-    end
-
     # Fast-start mode: render only homepage + most recent N pages on this
     # pass and stash the rest on the Builder so a background fiber in
     # `serve` can render them after the server is already accepting

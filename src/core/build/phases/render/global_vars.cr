@@ -192,7 +192,15 @@ module Hwaro::Core::Build::Phases::Render
     # round-tripping through Crinja::Value per insert would re-wrap the inner hash
     # each time and keep only the last term.
     lang_slug_maps = {} of String => Hash(String, Hash(String, String))
+    # A collision loser is never written and the generator keeps it off its
+    # term page (Taxonomies.build_taxonomy_index): get_taxonomy must not
+    # count it. Read here, not pruned from site.taxonomies, because every
+    # serve pass re-claims the winners before building these vars.
+    suppressed = site.pages.any?(&.output_suppressed)
     site.taxonomies.each do |name, terms|
+      if suppressed
+        terms = terms.transform_values(&.reject(&.output_suppressed)).reject! { |_, term_pages| term_pages.empty? }
+      end
       # Disambiguate over the SAME term set the taxonomy generator uses to write
       # pages — build_taxonomy_index counts only non-draft, non-generated pages.
       # Under `--drafts`, the render-phase site.taxonomies (rebuild_taxonomies)

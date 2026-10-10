@@ -396,3 +396,38 @@ describe "Builder#run_incremental bundle asset URLs" do
     end
   end
 end
+
+describe "Builder#run_incremental get_taxonomy and collision losers" do
+  a_free = "+++\ntitle = \"A\"\ntags = [\"t1\"]\n+++\n"
+  a_taking = "+++\ntitle = \"A\"\nslug = \"x\"\ntags = [\"t1\"]\n+++\n"
+
+  # Each serve pass re-claims the output winners: get_taxonomy must follow
+  # the verdict of THIS pass, both when a page starts losing its URL and
+  # when a loser from the first build gets its URL back.
+  [{a_free, a_taking, "[t1=1]"}, {a_taking, a_free, "[t1=1][t2=1]"}].each do |(before, after, expected)|
+    it "counts only this pass's winners (#{expected})" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[[taxonomies]]\nname = "tags"))
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("templates")
+          File.write("templates/page.html", "{{ page.title }}")
+          File.write("templates/section.html", "{% for t in get_taxonomy(kind='tags').items %}[{{ t.name }}={{ t.count }}]{% endfor %}")
+          File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+          File.write("content/a.md", before)
+          File.write("content/b.md", "+++\ntitle = \"B\"\nslug = \"x\"\ntags = [\"t2\"]\n+++\n")
+
+          builder = Hwaro::Core::Build::Builder.new
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+          options.serve_mode = true
+          options.preserve_output = true
+          builder.run_incremental(["content/a.md"], options)
+
+          File.write("content/a.md", after)
+          builder.run_incremental(["content/a.md"], options)
+          File.read("public/index.html").should eq(expected)
+        end
+      end
+    end
+  end
+end
