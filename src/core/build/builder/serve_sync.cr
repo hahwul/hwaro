@@ -182,7 +182,7 @@ module Hwaro
           sources.each do |src_path|
             relative = path_relative_to(src_path, "content")
 
-            next unless config.content_files.enabled? && config.content_files.publish?(relative)
+            next unless publishes_content_file?(config, relative)
             # Same rule as the full build's raw lane: an edited asset of a
             # draft / future / expired bundle stays unpublished.
             next if withheld_content_file?(relative, withheld)
