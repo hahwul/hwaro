@@ -451,15 +451,15 @@ describe "crash hardening" do
     files = {} of String => String
     5.times { |i| files["inc/n#{i}.md"] = %({{ include_md(path="static/inc/n#{i + 1}.md") }}\n) * 10 }
     files["inc/n5.md"] = "x\n"
-    elapsed = Time.measure do
-      err = expect_raises(Hwaro::HwaroError) do
-        build_site(BASIC_CONFIG, static_files: files, content_files: {
-          "index.md" => %(---\ntitle: Home\n---\n{{ include_md(path="static/inc/n0.md") }}\n),
-        }) { }
-      end
-      err.message.not_nil!.should contain("include limit")
+    # No timing assertion: reaching the cap takes ~1s on macOS but ~15s on
+    # Windows CI. Without the cap this expands all 10^5 splices and returns
+    # normally, so the raise alone proves it.
+    err = expect_raises(Hwaro::HwaroError) do
+      build_site(BASIC_CONFIG, static_files: files, content_files: {
+        "index.md" => %(---\ntitle: Home\n---\n{{ include_md(path="static/inc/n0.md") }}\n),
+      }) { }
     end
-    elapsed.should be < 5.seconds
+    err.message.not_nil!.should contain("include limit")
   end
 
   it "scrubs invalid UTF-8 out of data strings" do
