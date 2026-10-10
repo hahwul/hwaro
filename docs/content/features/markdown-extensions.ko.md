@@ -35,7 +35,7 @@ mermaid = true
 | sup | bool | false | 위 첨자(`^text^` → `<sup>text</sup>`) |
 | attributes | bool | false | 헤딩과 인라인 이미지에 붙는 일반화된 `{#id .class key=val}` 블록 |
 | wikilinks | bool | false | `[[위키링크]]`, `![[이미지]]` 임베드, `![[노트]]` 트랜스클루전, 접을 수 있는 `> [!TIP]-` 콜아웃 ([위키링크와 백링크](/ko/writing/obsidian/) 참고) |
-| safe | bool | false | 출력에서 원시 HTML 제거(주석으로 대체). 쇼트코드 출력은 유지 |
+| safe | bool | false | 작성자가 쓴 원시 HTML을 출력에서 제거(주석으로 대체). 쇼트코드 출력과 확장 기능이 만든 마크업(표, 각주, 수식 등)은 유지 |
 | lazy_loading | bool | false | `<img>` 태그에 `loading="lazy"` 추가 |
 | emoji | bool | false | 이모지 숏코드(예: `:smile:`)를 이모지 문자로 변환 |
 | smart_punctuation | bool | false | 타이포그래피 따옴표/대시/줄임표 |
@@ -304,7 +304,7 @@ Any **markdown** body — code fences and task lists included.
 :::
 ```
 
-제목의 기본값은 타입을 대문자로 시작한 형태입니다. 더 긴 구분자는 중첩되고(`::::outer` … `:::inner` … `:::` … `::::`), 단독 `:::`는 가장 안쪽의 열린 컨테이너를 닫으며, 닫히지 않은 컨테이너는 페이지 끝에서 자동으로 닫힙니다. 코드 펜스 안의 `:::` 줄은 리터럴로 남습니다. `safe = true`와는 함께 쓸 수 없습니다(원시 래퍼가 제거되기 때문).
+제목의 기본값은 타입을 대문자로 시작한 형태입니다. 더 긴 구분자는 중첩되고(`::::outer` … `:::inner` … `:::` … `::::`), 단독 `:::`는 가장 안쪽의 열린 컨테이너를 닫으며, 닫히지 않은 컨테이너는 페이지 끝에서 자동으로 닫힙니다. 코드 펜스 안의 `:::` 줄은 리터럴로 남습니다.
 
 ## 작업 목록 클래스
 

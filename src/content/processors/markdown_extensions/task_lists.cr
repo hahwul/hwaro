@@ -14,14 +14,14 @@ module Hwaro
         # opening with a link labelled `x` (`- [x](url)`) keeps its link.
         TASK_LIST_RE = /^((?:[ \t]{0,3}>[ \t]?)*+[ \t]*+(?:[-*+]|\d{1,9}[.)])[ \t])\[([ xX])\](?=[ \t]|\r?$)/m
 
-        def preprocess_task_lists(content : String) : String
+        def preprocess_task_lists(content : String, *, trusted : Bool = false) : String
           content.gsub(TASK_LIST_RE) do |_|
             prefix = $1
             checked = $2.downcase == "x"
             if checked
-              "#{prefix}<input type=\"checkbox\" checked disabled>"
+              "#{prefix}#{trust("<input type=\"checkbox\" checked disabled>", trusted)}"
             else
-              "#{prefix}<input type=\"checkbox\" disabled>"
+              "#{prefix}#{trust("<input type=\"checkbox\" disabled>", trusted)}"
             end
           end
         end

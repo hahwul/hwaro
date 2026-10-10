@@ -239,7 +239,7 @@ module Hwaro
         #
         # Walk line by line to track the HTML-block state (a type-6 block
         # runs from its opening tag line to the next blank line).
-        private def expand_math(content : String, store : Array(MathSpan)) : String
+        private def expand_math(content : String, store : Array(MathSpan), *, trusted : Bool = false) : String
           return content if store.empty?
 
           String.build do |io|
@@ -286,31 +286,32 @@ module Hwaro
                 body = body.gsub(/\n[ \t]*(?:>[ \t]?)*/, "\n") if quote && body.includes?('\n')
                 escaped = Utils::TextUtils.escape_xml(body)
                 escaped = escaped.gsub("\n", "\n#{quote}") if quote
-                if span.display && (raw_context || bare_display)
-                  "<div class=\"math math-display\">\\[#{escaped}\\]</div>"
-                elsif span.display
-                  # Mid-paragraph display math (inline raw HTML): escape the
-                  # body like the inline branch below, and double the
-                  # delimiters' backslashes so `\\[` collapses to `\[`.
-                  inline_escaped = escaped.gsub(MATH_BODY_MARKD_ACTIVE_RE) { |c| "\\#{c}" }
-                  "<span class=\"math math-display\">\\\\[#{inline_escaped}\\\\]</span>"
-                elsif raw_context
-                  "<span class=\"math math-inline\">\\(#{escaped}\\)</span>"
-                else
-                  # Normal inline context: the body still flows through Markd's
-                  # CommonMark inline parser, which would (a) read `*`/`_` as
-                  # emphasis and pair them across math spans, (b) start code
-                  # spans on backticks, (c) form links on `[`/`]`, and (d)
-                  # CONSUME a backslash before any ASCII punctuation — stripping
-                  # the LaTeX escapes in e.g. `$\{x\}$` or `$a \& b$`. Backslash-
-                  # escape each of those active chars (backslash itself FIRST, so
-                  # `\{` survives as `\{` rather than being eaten) so Markd ships
-                  # the formula body verbatim to KaTeX/MathJax. (`~` is left
-                  # alone: GFM strikethrough is handled by hwaro's own
-                  # preprocessor, which already skips math spans.)
-                  inline_escaped = escaped.gsub(MATH_BODY_MARKD_ACTIVE_RE) { |c| "\\#{c}" }
-                  "<span class=\"math math-inline\">\\\\(#{inline_escaped}\\\\)</span>"
-                end
+                math_html = if span.display && (raw_context || bare_display)
+                              "<div class=\"math math-display\">\\[#{escaped}\\]</div>"
+                            elsif span.display
+                              # Mid-paragraph display math (inline raw HTML): escape the
+                              # body like the inline branch below, and double the
+                              # delimiters' backslashes so `\\[` collapses to `\[`.
+                              inline_escaped = escaped.gsub(MATH_BODY_MARKD_ACTIVE_RE) { |c| "\\#{c}" }
+                              "<span class=\"math math-display\">\\\\[#{inline_escaped}\\\\]</span>"
+                            elsif raw_context
+                              "<span class=\"math math-inline\">\\(#{escaped}\\)</span>"
+                            else
+                              # Normal inline context: the body still flows through Markd's
+                              # CommonMark inline parser, which would (a) read `*`/`_` as
+                              # emphasis and pair them across math spans, (b) start code
+                              # spans on backticks, (c) form links on `[`/`]`, and (d)
+                              # CONSUME a backslash before any ASCII punctuation — stripping
+                              # the LaTeX escapes in e.g. `$\{x\}$` or `$a \& b$`. Backslash-
+                              # escape each of those active chars (backslash itself FIRST, so
+                              # `\{` survives as `\{` rather than being eaten) so Markd ships
+                              # the formula body verbatim to KaTeX/MathJax. (`~` is left
+                              # alone: GFM strikethrough is handled by hwaro's own
+                              # preprocessor, which already skips math spans.)
+                              inline_escaped = escaped.gsub(MATH_BODY_MARKD_ACTIVE_RE) { |c| "\\#{c}" }
+                              "<span class=\"math math-inline\">\\\\(#{inline_escaped}\\\\)</span>"
+                            end
+                trust(math_html, trusted)
               end
             end
           end

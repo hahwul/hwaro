@@ -39,12 +39,15 @@ module Hwaro
           # gets wrapped while `~~`/`[ ]` inside formulas stays verbatim.
           # Containers run FIRST: their ::: marker lines become raw-HTML
           # wrapper lines, and everything between stays untouched for the
-          # passes below (and Markd) to parse as ordinary markdown. Not
-          # supported under safe mode — markd would strip the raw <div>
-          # wrappers (same class of limitation as custom heading ids).
-          result = preprocess_containers(result) if config.containers && !config.safe
-          result = preprocess_definition_lists(result, flags: inline_flags(config)) if config.definition_lists
-          result = preprocess_footnotes(result) if config.footnotes
+          # passes below (and Markd) to parse as ordinary markdown.
+          #
+          # Under safe mode every pass marks the markup it generates
+          # (`trusted`, see `trust`) so the renderer keeps it while still
+          # omitting the author's raw HTML.
+          trusted = config.safe
+          result = preprocess_containers(result, trusted: trusted) if config.containers
+          result = preprocess_definition_lists(result, flags: inline_flags(config), trusted: trusted) if config.definition_lists
+          result = preprocess_footnotes(result, trusted: trusted) if config.footnotes
 
           # Math spans become opaque placeholders before the combined pass —
           # `$~~x~~$` must reach KaTeX verbatim, not as `$<del>x</del>$`.
@@ -109,11 +112,11 @@ module Hwaro
 
               if do_task_lists &&
                  (transformed.includes?("[ ]") || transformed.includes?("[x]") || transformed.includes?("[X]"))
-                transformed = preprocess_task_lists(transformed)
+                transformed = preprocess_task_lists(transformed, trusted: trusted)
               end
 
               if do_strikethrough && transformed.includes?("~~")
-                transformed = rewrite_strikethrough_line(transformed)
+                transformed = rewrite_strikethrough_line(transformed, trusted: trusted)
               end
 
               if do_heading_ids && transformed.includes?("{#")
@@ -169,25 +172,25 @@ module Hwaro
               # Fixed order: ins, mark, sub, sup.
               if do_ins && transformed.includes?("++")
                 transformed = transform_outside_code_spans(transformed) do |stashed|
-                  stashed.gsub(InlineMarkdown::INLINE_INS_RE) { "<ins>#{$1}</ins>" }
+                  stashed.gsub(InlineMarkdown::INLINE_INS_RE) { "#{trust("<ins>", trusted)}#{$1}</ins>" }
                 end
               end
 
               if do_mark && transformed.includes?("==")
                 transformed = transform_outside_code_spans(transformed) do |stashed|
-                  stashed.gsub(InlineMarkdown::INLINE_MARK_RE) { "<mark>#{$1}</mark>" }
+                  stashed.gsub(InlineMarkdown::INLINE_MARK_RE) { "#{trust("<mark>", trusted)}#{$1}</mark>" }
                 end
               end
 
               if do_sub && transformed.includes?('~')
                 transformed = transform_outside_code_spans(transformed) do |stashed|
-                  stashed.gsub(InlineMarkdown::INLINE_SUB_RE) { "<sub>#{$1}</sub>" }
+                  stashed.gsub(InlineMarkdown::INLINE_SUB_RE) { "#{trust("<sub>", trusted)}#{$1}</sub>" }
                 end
               end
 
               if do_sup && transformed.includes?('^')
                 transformed = transform_outside_code_spans(transformed) do |stashed|
-                  stashed.gsub(InlineMarkdown::INLINE_SUP_RE) { "<sup>#{$1}</sup>" }
+                  stashed.gsub(InlineMarkdown::INLINE_SUP_RE) { "#{trust("<sup>", trusted)}#{$1}</sup>" }
                 end
               end
 
@@ -197,7 +200,7 @@ module Hwaro
 
           # Expand the stashed math spans into final HTML now that the
           # transforming passes are done.
-          result = expand_math(result, math_store) if math_store
+          result = expand_math(result, math_store, trusted: trusted) if math_store
 
           result
         end
@@ -242,6 +245,29 @@ module Hwaro
         # rules apply across table cells, `<dt>/<dd>`, and `<section.footnotes>`.
         private def render_inline_md(text : String, flags : InlineMarkdown::Flags) : String
           InlineMarkdown.render(text, flags: flags)
+        end
+
+        # Safe mode keeps hwaro's own markup through markd's raw-HTML
+        # stripping by marking it: every open tag and comment a pass
+        # generates carries this per-process secret (`<del MARK>`,
+        # `<!--HWARO-MARK…`), which author content cannot forge — it never
+        # reaches any output. `HighlightingRenderer` keeps a marked construct
+        # (and a close tag balancing one) and omits all other raw HTML;
+        # `untrust` then drops the marks from the rendered HTML. Engine
+        # comments keep their `ENGINE_MARKER_PREFIX`.
+        TRUSTED_MARK = "hwaro#{Random::Secure.hex(12)}"
+        TRUST_RE     = /<!--HWARO-|<[A-Za-z][A-Za-z0-9-]*+/
+        UNTRUST_RE   = Regex.new(" ?#{TRUSTED_MARK}")
+
+        # Marks every open tag and engine comment of `html`, which must be
+        # entirely hwaro-generated (any author text in it already escaped).
+        def trust(html : String, trusted : Bool = true) : String
+          return html unless trusted
+          html.gsub(TRUST_RE) { |m| m == "<!--HWARO-" ? "<!--HWARO-#{TRUSTED_MARK}" : "#{m} #{TRUSTED_MARK}" }
+        end
+
+        def untrust(html : String) : String
+          html.includes?(TRUSTED_MARK) ? html.gsub(UNTRUST_RE, "") : html
         end
 
         # `{…}` attribute blocks on images: the `attributes` switch, or

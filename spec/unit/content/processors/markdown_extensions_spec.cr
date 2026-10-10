@@ -1279,7 +1279,7 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should contain("<li>two</li>")
     end
 
-    it "is off by default and skipped in safe mode" do
+    it "is off by default and also renders in safe mode" do
       html, _ = Hwaro::Processor::Markdown.render(":::note\nx\n:::", markdown_config: make_config)
       html.should_not contain("admonition")
 
@@ -1287,7 +1287,7 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       cfg.containers = true
       cfg.safe = true
       html, _ = Hwaro::Processor::Markdown.render(":::note\nx\n:::", markdown_config: cfg, safe: true)
-      html.should_not contain("admonition")
+      html.should eq(%(<div class="admonition admonition-note">\n<p class="admonition-title">Note</p>\n<p>x</p>\n</div>\n))
     end
   end
 
@@ -2314,5 +2314,103 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should contain("<del>too</del>")
       html.should contain(%(<img src="i.png" alt="a ~~b~~" class="r" width="300" />))
     end
+  end
+end
+
+# `[markdown] safe = true` strips the author's raw HTML, but the extensions'
+# own markup reaches markd as raw HTML too and used to be stripped with it.
+private def render_safe(content : String) : String
+  cfg = make_config(task_lists: true, footnotes: true, definition_lists: true, math: true,
+    ins: true, mark: true, sub: true, sup: true)
+  cfg.containers = true
+  cfg.safe = true
+  html, _ = Hwaro::Processor::Markdown.render(content, markdown_config: cfg, safe: true)
+  html.should_not match(/hwaro[0-9a-f]{24}/) # no safe-mode mark leaks
+  html
+end
+
+describe "safe mode extension markup" do
+  it "keeps every extension's markup" do
+    html = render_safe(<<-MD)
+      | h |
+      |---|
+      | **b** |
+
+      Term
+      : Def
+
+      - [ ] todo
+      - [x] done
+
+      ~~del~~ ++ins++ ==mark== H~2~O x^2^ ref[^1] $x^2$
+
+      $$
+      y
+      $$
+
+      :::tip
+      body
+      :::
+
+      [^1]: Note **n**.
+      MD
+    html.should contain("<table>\n<thead>\n<tr>\n<th>h</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td><strong>b</strong></td>\n</tr>\n</tbody>\n</table>")
+    html.should contain("<dl>\n<dt>Term</dt>\n<dd>Def</dd>\n</dl>")
+    html.should contain(%(<li><input type="checkbox" disabled> todo</li>))
+    html.should contain(%(<li><input type="checkbox" checked disabled> done</li>))
+    html.should contain(%(<del>del</del> <ins>ins</ins> <mark>mark</mark> H<sub>2</sub>O x<sup>2</sup> ref<sup class="footnote-ref"><a href="#fn-1" id="fnref-1">[1]</a></sup> <span class="math math-inline">\\(x^2\\)</span>))
+    html.should contain(%(<div class="math math-display">\\[\ny\n\\]</div>))
+    html.should contain(%(<div class="admonition admonition-tip">\n<p class="admonition-title">Tip</p>\n<p>body</p>\n</div>))
+    html.should contain(%(<section class="footnotes">))
+    html.should contain(%(<p>Note <strong>n</strong>. <a href="#fnref-1" class="footnote-backref">))
+    html.should_not contain("raw HTML omitted")
+  end
+
+  it "still omits author raw HTML, wherever it sits" do
+    html = render_safe(<<-MD)
+      | <b>cell</b> | <img src=x onerror=alert(1)> |
+      |---|---|
+      | a | b |
+      <script>alert(2)</script>
+      <img src=x onerror=alert(3)
+
+      ~~<script>alert(4)</script>~~ <b>inline</b>
+
+      Term <i>t</i>
+      : Def <script>alert(5)</script>
+
+      <div>~~x~~ <span onclick="alert(6)">y</span></div>
+
+      $$
+      z
+      $$
+      </div></main><script>alert(7)</script>
+
+      Ref[^n].
+
+      [^n]: <img src=x onerror=alert(8)> body
+
+      <!--HWARO-FOOTNOTES-START-->
+      <!--HWARO-FN:x:1.1:<img src=x onerror=alert(9)>-->
+      <!--HWARO-FOOTNOTES-END-->
+      MD
+    html.should_not match(/<(script|img|b|i|span|main)[\s>]/)
+    html.should_not contain("</div></main>")
+    html.should_not contain("onclick=")
+    html.should contain("<!-- raw HTML omitted -->")
+    # Cell, term and footnote text is escaped, as with safe = false.
+    html.should contain("<th>&lt;b&gt;cell&lt;/b&gt;</th>")
+    html.should contain("<dt>Term &lt;i&gt;t&lt;/i&gt;</dt>")
+    html.should contain("&lt;img src=x onerror=alert(8)&gt; body")
+    html.scan(/<div\b/).size.should eq(html.scan(/<\/div>/).size)
+  end
+
+  it "renders the same markup as safe = false when there is no raw HTML" do
+    content = "| a |\n|---|\n| ~~b~~ $c$ |\n\nT\n: d[^1]\n\n- [x] e\n\n[^1]: f"
+    cfg = make_config(task_lists: true, footnotes: true, definition_lists: true, math: true,
+      ins: true, mark: true, sub: true, sup: true)
+    cfg.containers = true
+    unsafe, _ = Hwaro::Processor::Markdown.render(content, markdown_config: cfg)
+    render_safe(content).should eq(unsafe)
   end
 end

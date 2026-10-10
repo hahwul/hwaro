@@ -32,7 +32,7 @@ module Hwaro
           key.downcase(Unicode::CaseOptions::Fold).split.join(' ')
         end
 
-        def preprocess_footnotes(content : String) : String
+        def preprocess_footnotes(content : String, *, trusted : Bool = false) : String
           # Whole-content marker pre-check (memchr-fast): without `[^` there is
           # no footnote definition or reference to process, and without the
           # HWARO comment markers the neutralization gsubs below are identity —
@@ -147,14 +147,14 @@ module Hwaro
                 occ = ref_occurrences[key]
                 escaped_key = footnote_id_token(key)
                 ref_id = occ == 1 ? "fnref-#{escaped_key}" : "fnref-#{escaped_key}-#{occ}"
-                "<sup class=\"footnote-ref\"><a href=\"#fn-#{escaped_key}\" id=\"#{ref_id}\">[#{num}]</a></sup>"
+                trust("<sup class=\"footnote-ref\"><a href=\"#fn-#{escaped_key}\" id=\"#{ref_id}\">[#{num}]</a></sup>", trusted)
               end
             end
           end
 
           # Store footnotes data in a special HTML comment for postprocessing
           if ref_order.present?
-            result += "\n<!--HWARO-FOOTNOTES-START-->\n"
+            result += trust("\n<!--HWARO-FOOTNOTES-START-->\n", trusted)
             ref_order.each do |key, num|
               text = footnotes[key]? || ""
               occ = ref_occurrences[key]? || 1
@@ -163,9 +163,9 @@ module Hwaro
               # the comment stays single-line for FOOTNOTE_COMMENT_RE.
               safe_key = key.gsub("--", "&#45;&#45;").gsub(":", "&#58;")
               safe_text = text.gsub("--", "&#45;&#45;").gsub(":", "&#58;").gsub("\n", "&#10;")
-              result += "<!--HWARO-FN:#{safe_key}:#{num}.#{occ}:#{safe_text}-->\n"
+              result += "#{trust("<!--HWARO-", trusted)}FN:#{safe_key}:#{num}.#{occ}:#{safe_text}-->\n"
             end
-            result += "<!--HWARO-FOOTNOTES-END-->\n"
+            result += trust("<!--HWARO-FOOTNOTES-END-->\n", trusted)
           end
 
           result

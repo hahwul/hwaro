@@ -214,6 +214,14 @@ describe "HookedRenderer (via SyntaxHighlighter.render with in-memory contexts)"
     html.should contain("H[custom-id]:Title")
   end
 
+  it "hands hooks safe-mode extension markup without the internal marks" do
+    hooks = make_hooks(heading: "H:{{ text | upper }}")
+    cfg = Hwaro::Models::MarkdownConfig.new
+    cfg.safe = true
+    html, _ = Hwaro::Content::Processors::Markdown.new.render("## a ~~b~~", safe: true, markdown_config: cfg, hooks: hooks)
+    html.should eq("H:A <DEL>B</DEL>\n")
+  end
+
   it "dedups duplicate heading ids as foo, foo-1" do
     hooks = make_hooks(heading: "H[{{ id }}]")
     html = SyntaxHighlighter.render("## Foo\n\nBody\n\n## Foo\n\nBody2", hooks: hooks)

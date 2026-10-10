@@ -588,16 +588,83 @@ module Hwaro
         # shortcode pass leaves for its (trusted, template-rendered) output,
         # which silently erased every shortcode. Keep exactly those
         # placeholders; everything else in the node is still omitted.
+        #
+        # Extension markup (tables, `<del>`, footnotes, math, …) is raw HTML
+        # to markd too: a node that STARTS with hwaro-marked markup (see
+        # `MarkdownExtensions.trust`) is kept, minus any author raw HTML in it.
         def html_block(node : Markd::Node, entering : Bool)
-          return super unless @options.safe? && node.text.includes?("<!--HWARO-SHORTCODE-PLACEHOLDER-")
+          return super unless @options.safe?
+          if kept = keep_trusted(node.text)
+            newline
+            literal(kept)
+            newline
+            return
+          end
+          return super unless node.text.includes?("<!--HWARO-SHORTCODE-PLACEHOLDER-")
           newline
           literal(keep_shortcode_placeholders(node.text))
           newline
         end
 
         def html_inline(node : Markd::Node, entering : Bool)
-          return super unless @options.safe? && node.text.includes?("<!--HWARO-SHORTCODE-PLACEHOLDER-")
+          return super unless @options.safe?
+          if kept = keep_trusted(node.text)
+            return literal(kept)
+          end
+          return super unless node.text.includes?("<!--HWARO-SHORTCODE-PLACEHOLDER-")
           literal(keep_shortcode_placeholders(node.text))
+        end
+
+        TRUSTED_OPEN_RE    = Regex.new("<(#{Markd::Rule::TAG_NAME_STRING}) #{MarkdownExtensions::TRUSTED_MARK}#{Markd::Rule::ATTRIBUTE}*\\s*/?>")
+        TRUSTED_COMMENT_RE = Regex.new("<!--HWARO-#{MarkdownExtensions::TRUSTED_MARK}.*?-->")
+        CLOSE_TAG_RE       = Regex.new("</(#{Markd::Rule::TAG_NAME_STRING})\\s*>")
+        RAW_HTML_RE        = Regex.new(Markd::Rule::HTML_TAG_STRING, Regex::Options::IGNORE_CASE)
+
+        # Open marked elements by name, so a plain close tag is kept only
+        # when it balances one (it can then close nothing of the template's).
+        @trusted_open = Hash(String, Int32).new(0)
+
+        # nil unless `text` starts with trusted markup. Otherwise `text` with
+        # each marked tag/comment, balancing close tag, and shortcode
+        # placeholder kept, other raw HTML omitted, a stray `<` escaped, and
+        # the text between (never containing `<`) kept as is.
+        private def keep_trusted(text : String) : String?
+          start = text.byte_index('<')
+          return unless start && text.byte_slice(0, start).blank? && trusted_at(text, start, dry_run: true)
+          String.build do |io|
+            pos = 0
+            while lt = text.byte_index('<', pos)
+              io.write(text.to_slice[pos, lt - pos])
+              if m = trusted_at(text, lt)
+                # Unmarked here already, so render hooks never see a mark.
+                io << MarkdownExtensions.untrust(m[0])
+              elsif m = RAW_HTML_RE.match_at_byte_index(text, lt, Regex::MatchOptions::ANCHORED)
+                io << "<!-- raw HTML omitted -->"
+              else
+                io << "&lt;"
+                pos = lt + 1
+                next
+              end
+              pos = m.byte_end(0)
+            end
+            io.write(text.to_slice[pos, text.bytesize - pos])
+          end
+        end
+
+        private def trusted_at(text : String, pos : Int32, dry_run : Bool = false) : Regex::MatchData?
+          if m = TRUSTED_OPEN_RE.match_at_byte_index(text, pos, Regex::MatchOptions::ANCHORED)
+            @trusted_open[m[1].downcase] += 1 unless dry_run
+            m
+          elsif m = TRUSTED_COMMENT_RE.match_at_byte_index(text, pos, Regex::MatchOptions::ANCHORED)
+            m
+          elsif !dry_run && (m = InlineMarkdown::SHORTCODE_PLACEHOLDER_RE.match_at_byte_index(text, pos, Regex::MatchOptions::ANCHORED))
+            # Kept inside trusted markup; a node starting with one keeps the
+            # `keep_shortcode_placeholders` handling.
+            m
+          elsif (m = CLOSE_TAG_RE.match_at_byte_index(text, pos, Regex::MatchOptions::ANCHORED)) && @trusted_open[name = m[1].downcase] > 0
+            @trusted_open[name] -= 1 unless dry_run
+            m
+          end
         end
 
         private def keep_shortcode_placeholders(text : String) : String

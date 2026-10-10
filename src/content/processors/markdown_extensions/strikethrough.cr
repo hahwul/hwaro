@@ -47,10 +47,10 @@ module Hwaro
         # `~` in `<https://x/~a/~b>` must not turn into markup.
         HTML_TAG_OR_AUTOLINK_RE = Regex.union(HTML_TAG_RE, AUTOLINK_RE)
 
-        private def rewrite_strikethrough_line(line : String) : String
+        private def rewrite_strikethrough_line(line : String, *, trusted : Bool = false) : String
           # Stash inline code spans so a `~~` inside backticks is not rewritten.
           transform_outside_code_spans(line) do |stashed|
-            stashed.gsub(STRIKETHROUGH_RE) { "<del>#{$1}</del>" }
+            stashed.gsub(STRIKETHROUGH_RE) { "#{trust("<del>", trusted)}#{$1}</del>" }
           end
         end
 
