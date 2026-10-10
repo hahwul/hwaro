@@ -1045,6 +1045,12 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should contain("<del>bye</del>")
     end
 
+    it "leaves autolink URLs alone" do
+      md = "<https://x.com/a~~b~~c> <https://x.com/~al/~bo> <https://x.com/?a==b==c> ~~real~~"
+      html, _ = Hwaro::Processor::Markdown.render(md, markdown_config: make_config(sub: true, mark: true))
+      html.should eq(%(<p><a href="https://x.com/a~~b~~c">https://x.com/a~~b~~c</a> <a href="https://x.com/~al/~bo">https://x.com/~al/~bo</a> <a href="https://x.com/?a==b==c">https://x.com/?a==b==c</a> <del>real</del></p>\n))
+    end
+
     it "keeps backslash-escaped ~~ literal instead of leaking escaped tags" do
       html, _ = Hwaro::Processor::Markdown.render("a \\~~not\\~~ b and ~~x\\~~ y~~ and \\\\~~z~~", markdown_config: make_config)
       html.should eq("<p>a ~~not~~ b and <del>x~~ y</del> and \\<del>z</del></p>\n")

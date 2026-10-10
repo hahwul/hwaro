@@ -43,6 +43,9 @@ module Hwaro
         # same matches without backtracking frames, so a tag with thousands
         # of attributes cannot exhaust the PCRE JIT stack.
         HTML_TAG_RE = /<[A-Za-z][A-Za-z0-9-]*+(?:\s++[a-zA-Z_:][a-zA-Z0-9:._-]*+(?:\s*+=\s*+(?:[^"'=<>`\x00-\x20]++|'[^']*+'|"[^"]*+"))?+)*+\s*+\/?>|<\/[A-Za-z][A-Za-z0-9-]*+\s*+>/
+        # Tags plus `<scheme:…>` autolinks, whose URL is data too: a `~~` or
+        # `~` in `<https://x/~a/~b>` must not turn into markup.
+        HTML_TAG_OR_AUTOLINK_RE = Regex.union(HTML_TAG_RE, AUTOLINK_RE)
 
         private def rewrite_strikethrough_line(line : String) : String
           # Stash inline code spans so a `~~` inside backticks is not rewritten.
@@ -62,7 +65,7 @@ module Hwaro
           has_backticks = text.includes?('`')
           has_html_code = text.includes?("<code")
           has_link_destinations = text.includes?("](") || text.includes?("]:")
-          has_html_tags = text.includes?('<') && text.matches?(HTML_TAG_RE)
+          has_html_tags = text.includes?('<') && text.matches?(HTML_TAG_OR_AUTOLINK_RE)
           has_image_labels = text.includes?("![")
           return yield text unless has_backticks || has_html_code || has_link_destinations || has_html_tags || has_image_labels
 
@@ -89,7 +92,7 @@ module Hwaro
           stashed = stash_markdown_link_destinations(stashed, link_destinations) if has_link_destinations
 
           html_tags = [] of String
-          stashed = stashed.gsub(HTML_TAG_RE) do |tag|
+          stashed = stashed.gsub(HTML_TAG_OR_AUTOLINK_RE) do |tag|
             html_tags << tag
             "\x00HT#{html_tags.size - 1}\x00"
           end if has_html_tags
