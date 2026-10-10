@@ -1161,6 +1161,26 @@ describe Hwaro::Assets::Pipeline do
       end
     end
 
+    it "rebases a percent-encoded url() whose decoded name is beside the source" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("static/css/fonts")
+          File.write("static/css/fonts/A B.woff2", "font")
+          File.write("static/css/a.css",
+            ".a{src:url(fonts/A%20B.woff2)}\n" \
+            ".b{src:url(fonts%2FA%20B.woff2)}")
+
+          config = make_config
+          config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "main.css", files: ["css/a.css"])
+          Hwaro::Assets::Pipeline.new(config).process("public")
+
+          css = File.read("public/assets/main.css")
+          css.should contain("url(../css/fonts/A%20B.woff2)")
+          css.should contain("url(fonts%2FA%20B.woff2)") # encoded separator: as written
+        end
+      end
+    end
+
     it "leaves url()s alone when the source dir is not the published static/ tree" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

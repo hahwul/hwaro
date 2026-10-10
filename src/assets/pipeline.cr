@@ -209,9 +209,14 @@ module Hwaro
                         url.includes?("://") || url.starts_with?("//") || url.matches?(/\A[a-z][a-z0-9+.-]*:/i)
         path_part = url.split(/[?#]/, 2).first
         suffix = url[path_part.size..]
+        # A URL is percent-encoded (`fonts/A%20B.woff2`) while the file on
+        # disk is not, so the existence check decodes. An encoded `.` or `/`
+        # would change the segment structure between the two spellings; such
+        # a URL is left as written.
+        return whole if path_part.matches?(/%2[EeFf]/)
         target = Path.posix(source_dir, path_part).normalize
         return whole if Utils::PathUtils.escapes_parent?(target.to_s)
-        return whole unless File.file?(File.join(@config.source_dir, target.to_s))
+        return whole unless File.file?(File.join(@config.source_dir, URI.decode(target.to_s)))
         rebased = target.relative_to(Path.posix(bundle_dir)).to_s
         "url(#{quote}#{rebased}#{suffix}#{quote})"
       end
