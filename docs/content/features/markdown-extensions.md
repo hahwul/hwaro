@@ -58,7 +58,7 @@ Render checkboxes in lists.
 - [X] Also completed (case-insensitive)
 ```
 
-Task markers are also converted inside blockquotes, such as `> - [ ] A quoted task`.
+Task markers are also converted in ordered lists (`1. [ ] First step`) and inside blockquotes, such as `> - [ ] A quoted task`.
 
 ### Output
 

@@ -259,6 +259,13 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should contain(%(<li><input type="checkbox" disabled> todo</li>))
       html.should contain(%(<input type="checkbox" checked disabled>))
     end
+
+    it "converts task markers in ordered list items" do
+      html, _ = Hwaro::Processor::Markdown.render("1. [ ] one\n2. [x] two\n\n3) [X] three", markdown_config: make_config(task_lists: true))
+      html.should contain(%(<li><input type="checkbox" disabled> one</li>))
+      html.should contain(%(<li><input type="checkbox" checked disabled> two</li>))
+      html.should contain(%(<li><input type="checkbox" checked disabled> three</li>))
+    end
   end
 
   describe "definition lists (extended)" do

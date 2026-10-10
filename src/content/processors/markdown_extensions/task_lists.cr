@@ -12,7 +12,7 @@ module Hwaro
         # Converts - [ ] and - [x] to checkbox HTML in list items. The marker
         # must be followed by whitespace or end the line (GFM), so a list item
         # opening with a link labelled `x` (`- [x](url)`) keeps its link.
-        TASK_LIST_RE = /^((?:[ \t]{0,3}>[ \t]?)*+[ \t]*+[-*+][ \t])\[([ xX])\](?=[ \t]|\r?$)/m
+        TASK_LIST_RE = /^((?:[ \t]{0,3}>[ \t]?)*+[ \t]*+(?:[-*+]|\d{1,9}[.)])[ \t])\[([ xX])\](?=[ \t]|\r?$)/m
 
         def preprocess_task_lists(content : String) : String
           content.gsub(TASK_LIST_RE) do |_|
