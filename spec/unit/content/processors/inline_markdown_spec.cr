@@ -178,3 +178,10 @@ describe "RedirectHtml via InlineMarkdown.safe_url?" do
     html.should contain(%(content="0; url=/caf%E9.html"))
   end
 end
+
+describe "Hwaro::Content::Processors::InlineMarkdown.render entity references" do
+  it "decodes entities in text but not in code, escapes or URLs" do
+    out = Hwaro::Content::Processors::InlineMarkdown.render("a &copy; &#124; &nbsp; `&copy;` \\&amp; [x](javascript&#58;alert(1)) [y](/p?a=1&b=2) Tom & Jerry")
+    out.should eq(%(a &copy; &#124; &nbsp; <code>&amp;copy;</code> &amp;amp; <a href="javascript&amp;#58;alert(1)">x</a> <a href="/p?a=1&amp;b=2">y</a> Tom &amp; Jerry))
+  end
+end

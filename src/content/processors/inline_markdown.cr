@@ -141,6 +141,8 @@ module Hwaro
         MATHSPAN_TOKEN_RE        = /\x00MATHSPAN(\d{1,9})\x00/
         CODESPAN_TOKEN_RE        = /\x00CODESPAN(\d{1,9})\x00/
         LINK_TAG_TOKEN_RE        = /\x00IMTAG(\d{1,9})\x00/
+        # An entity or numeric character reference as `HTML.escape` left it.
+        ESCAPED_ENTITY_RE = /&amp;(#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[a-zA-Z][a-zA-Z0-9]{1,31});/
 
         # Render a small inline-markdown subset over already-HTML-escaped or
         # raw text. Code spans are extracted first so their content survives
@@ -245,6 +247,13 @@ module Hwaro
           result = result.gsub(INLINE_MARK_RE) { "<mark>#{$1}</mark>" } if flags.mark
           result = result.gsub(INLINE_SUB_RE) { "<sub>#{$1}</sub>" } if flags.sub
           result = result.gsub(INLINE_SUP_RE) { "<sup>#{$1}</sup>" } if flags.sup
+
+          # Entity references in text (`&copy;`, `&#124;`, `&nbsp;`) mean
+          # their character, as in a paragraph. Done while the <a>/<img>
+          # tags, code spans and backslash escapes are still tokens: a URL
+          # keeps its escaped form, so `javascript&#58;` cannot slip past
+          # `safe_url?`, and `` `&copy;` `` / `\&copy;` stay literal.
+          result = result.gsub(ESCAPED_ENTITY_RE) { "&#{$1};" } if result.includes?("&amp;")
 
           unless link_tags.empty?
             result = result.gsub(LINK_TAG_TOKEN_RE) { link_tags[$1.to_i]?.try(&.itself) || $0 }
