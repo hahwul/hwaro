@@ -638,6 +638,27 @@ describe Hwaro::Content::Seo::Pwa do
         end
       end
 
+      # Regression: stale-while-revalidate answered navigations from the
+      # cache too, so precached pages stayed stale after a deploy; the docs
+      # promise network-first navigation for every strategy.
+      it "sends navigations to the network first under stale-while-revalidate" do
+        Dir.mktmpdir do |dir|
+          File.write(File.join(dir, "index.html"), "<html>home</html>")
+          site = make_site(<<-TOML)
+            [pwa]
+            enabled = true
+            cache_strategy = "stale-while-revalidate"
+            TOML
+
+          Hwaro::Content::Seo::Pwa.generate(site, dir)
+
+          content = File.read(File.join(dir, "sw.js"))
+          navigate = content.index!("event.request.mode === 'navigate'")
+          navigate.should be < content.index!("caches.match(event.request)")
+          content[navigate, 200].should contain("fetch(event.request).catch(")
+        end
+      end
+
       it "leaves URLs untouched for a domain-root base_url" do
         Dir.mktmpdir do |dir|
           FileUtils.mkdir_p(File.join(dir, "css"))
