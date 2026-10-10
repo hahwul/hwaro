@@ -566,6 +566,30 @@ describe Hwaro::Content::Seo::Amp do
       end
     end
 
+    it "mirrors a page whose URL carries an encoded # or ?" do
+      Dir.mktmpdir do |dir|
+        config = make_amp_config(<<-TOML)
+          [amp]
+          enabled = true
+          TOML
+
+        # Page#url= stores `#`/`?` as %23/%3F; render writes the decoded dir.
+        page = Hwaro::Models::Page.new("posts/c#-tips.md")
+        page.url = "/posts/c#-tips/"
+        page.section = "posts"
+        canonical_dir = File.join(dir, "posts", "c#-tips")
+        FileUtils.mkdir_p(canonical_dir)
+        File.write(File.join(canonical_dir, "index.html"), "<html><head></head><body>C#</body></html>")
+
+        Hwaro::Content::Seo::Amp.generate([page], config, dir)
+
+        amp_path = File.join(dir, "amp", "posts", "c#-tips", "index.html")
+        File.exists?(amp_path).should be_true
+        Hwaro::Content::Seo::Amp.mirror_output_for(page, config, dir).should eq(amp_path)
+        File.read(File.join(canonical_dir, "index.html")).should contain(%(href="https://example.com/amp/posts/c%23-tips/"))
+      end
+    end
+
     it "skips sections not in configured list" do
       Dir.mktmpdir do |dir|
         config = make_amp_config(<<-TOML)

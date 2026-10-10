@@ -50,7 +50,7 @@ module Hwaro
 
             # Read the canonical rendered HTML
             canonical_path = output_path_for(page, output_dir)
-            next unless File.exists?(canonical_path)
+            next unless canonical_path && File.exists?(canonical_path)
 
             html = File.read(canonical_path)
             # A `--cache` hit still carries the policy `<meta>` the last
@@ -60,7 +60,7 @@ module Hwaro
             amp_html = convert_to_amp(html, page, config)
 
             # Write AMP version
-            amp_output = amp_output_path(page, output_dir, prefix)
+            amp_output = mirror_path(canonical_path, output_dir, prefix)
             unless Utils::OutputGuard.within_output_dir?(amp_output, output_dir)
               Logger.warn "Skipping AMP output outside output directory: #{amp_output}"
               next
@@ -457,13 +457,19 @@ module Hwaro
           amp_output_path(page, output_dir, prefix)
         end
 
-        private def self.output_path_for(page : Models::Page, output_dir : String) : String
-          url_path = page.url.lchop("/")
-          File.join(output_dir, url_path, "index.html")
+        # The file the render phase wrote for `page`, or nil when it wrote
+        # none. Same decoding as the render phase's `url_output_path`: a page
+        # URL carries `#`/`?` as `%23`/`%3F` (Page#url=), while the file sits
+        # in the decoded `a#b/` directory — joining the raw URL looked for
+        # `a%23b/` and silently skipped the page.
+        private def self.output_path_for(page : Models::Page, output_dir : String) : String?
+          segments, refused = Utils::PathUtils.split_safe_segments(page.url.lchop("/"))
+          return if refused
+          File.join(output_dir, segments.join("/"), "index.html")
         end
 
-        private def self.amp_output_path(page : Models::Page, output_dir : String, prefix : String) : String
-          mirror_path(output_path_for(page, output_dir), output_dir, prefix)
+        private def self.amp_output_path(page : Models::Page, output_dir : String, prefix : String) : String?
+          output_path_for(page, output_dir).try { |path| mirror_path(path, output_dir, prefix) }
         end
       end
     end
