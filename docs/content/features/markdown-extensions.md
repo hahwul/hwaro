@@ -35,7 +35,7 @@ mermaid = true
 | sup | bool | false | Superscript (`^text^` → `<sup>text</sup>`) |
 | attributes | bool | false | Generalized `{#id .class key=val}` blocks on headings and inline images |
 | wikilinks | bool | false | `[[wikilinks]]`, `![[image]]` embeds, `![[note]]` transclusion and foldable `> [!TIP]-` callouts (see [Wikilinks & Backlinks](/writing/obsidian/)) |
-| safe | bool | false | Strip raw HTML from output (replaced with comments); shortcode output is kept |
+| safe | bool | false | Strip the author's raw HTML from output (replaced with comments); shortcode output and the extensions' own markup (tables, footnotes, math, …) are kept |
 | lazy_loading | bool | false | Add `loading="lazy"` to `<img>` tags |
 | emoji | bool | false | Convert emoji shortcodes (e.g. `:smile:`) to emoji characters |
 | smart_punctuation | bool | false | Typographic quotes/dashes/ellipses |
@@ -58,7 +58,7 @@ Render checkboxes in lists.
 - [X] Also completed (case-insensitive)
 ```
 
-Task markers are also converted inside blockquotes, such as `> - [ ] A quoted task`.
+Task markers are also converted in ordered lists (`1. [ ] First step`) and inside blockquotes, such as `> - [ ] A quoted task`.
 
 ### Output
 
@@ -341,11 +341,10 @@ Any **markdown** body — code fences and task lists included.
 :::
 ```
 
-The title defaults to the capitalized type. Longer runs nest
+The title is rendered as inline markdown (`:::tip *Heads up*`) and defaults to the capitalized type. Longer runs nest
 (`::::outer` … `:::inner` … `:::` … `::::`), a bare `:::` closes the
 innermost open container, and unclosed containers auto-close at the end
-of the page. `:::` lines inside code fences stay literal. Not supported
-with `safe = true` (the raw wrapper would be stripped).
+of the page. `:::` lines inside code fences stay literal.
 
 ## Task List Classes
 

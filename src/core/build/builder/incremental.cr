@@ -162,6 +162,7 @@ module Hwaro
           # Re-claim output URLs: the edit may have introduced or resolved a
           # slug/alias collision, and a stale winner map would keep
           # suppressing (or racing) writes for the rest of the serve session.
+          previously_suppressed = (site.pages + site.sections).select(&.output_suppressed)
           @output_url_winners = compute_output_url_winners((site.pages + site.sections).as(Array(Models::Page)))
 
           # --- 2. Incrementally update relationships ---
@@ -171,7 +172,7 @@ module Hwaro
           # would otherwise still show the drafted page in tag clouds and
           # term counts until the next full build.
           excluded_pages = apply_publication_exclusions!(changed_pages, options)
-          return run(options) if excluded_section?(excluded_pages)
+          return run(options) if excluded_section?(excluded_pages) || bundle_variants_move?(changed_pages, excluded_pages, page_urls)
           excluded_paths = excluded_pages.map(&.path).to_set
 
           # Date-token permalink errors deferred by the lenient parse (see
@@ -213,9 +214,15 @@ module Hwaro
           unless excluded_pages.empty? && relinked_counterparts.empty?
             @output_url_winners = compute_output_url_winners(all_pages)
           end
+          regained = regained_output_pages(previously_suppressed.reject { |p| excluded_paths.includes?(p.path) }, all_pages, output_dir)
 
           # Rebuild lookup index (page data may have changed)
           site.build_lookup_index
+
+          # Pages linking to a page this edit moved. Their `<!-- more -->`
+          # summary prints the link too, in every listing and feed.
+          linkers = linkers_of_moved_pages(site, page_urls)
+          render_page_summaries(linkers, site, templates, highlight, link_targets: all_pages) unless linkers.empty?
 
           # Re-link the global reading order; `renav_pages` is every page whose
           # prev/next pointer actually changed (a section weight/sort/reverse edit
@@ -233,6 +240,9 @@ module Hwaro
           # pages' paths so pages that listed a now-removed page as related drop it.
           related_pages_updated = recompute_related_posts_for_pages(site, changed_pages, excluded_paths)
           compute_backlinks(site) if site.config.backlinks
+          # `site.authors` embeds each page's title and summary (Transform
+          # builds it once per full build).
+          aggregate_site_authors(site)
 
           # Invalidate Crinja caches for affected pages/sections
           invalidate_caches_for_pages(changed_pages, affected_sections)
@@ -259,7 +269,7 @@ module Hwaro
           pages_to_render = relationship_render_set(site, pages_map, reparsed, changed_pages,
             relinked_counterparts, renav_pages, affected_series, related_pages_updated, excluded_paths)
           backlinks_moved_pages(site, templates, backlink_digests).each { |p| pages_to_render << p }
-          linkers_of_moved_pages(site, page_urls).each { |p| pages_to_render << p }
+          linkers.each { |p| pages_to_render << p }
 
           # Pages that render a listing derived from the GLOBAL page/section
           # set — the homepage's "latest posts", a paginated archive, a nav
@@ -270,6 +280,7 @@ module Hwaro
           # unrelated happened to re-render them.
           listing_fanout_pages(site, templates, all_pages, listing_sets)
             .each { |p| pages_to_render << p }
+          regained.each { |p| pages_to_render << p }
 
           render_list = pages_to_render.to_a
 
@@ -364,7 +375,7 @@ module Hwaro
           # feeds, and on disk — because only the content-only strategy
           # applied the filters.
           excluded_pages = apply_publication_exclusions!(changed_pages, options)
-          return run(options) if excluded_section?(excluded_pages)
+          return run(options) if excluded_section?(excluded_pages) || bundle_variants_move?(changed_pages, excluded_pages, page_urls)
           excluded_paths = excluded_pages.map(&.path).to_set
 
           # Deferred permalink errors — mirrors run_incremental.
@@ -462,6 +473,10 @@ module Hwaro
             end
             site.sections.each do |s|
               pages_to_render << s if s.section == sec || s.section.starts_with?(prefix)
+              # Its parent lists it, or its pages once `transparent`. The
+              # parents are its ancestors (`affected_sections`) — except the
+              # root index, which is no page's ancestor.
+              pages_to_render << s if s.section.empty?
             end
           end
 
@@ -522,12 +537,18 @@ module Hwaro
           # version's root — which appears when an authored parent index
           # (`docs/_index.md`) is drafted, and must re-render the root or the
           # stub a cold build writes is missing until a full rebuild.
-          before = pages.map { |page| {page.translations.dup, page.version_links.dup, page.aliases.dup} }
+          # `page.version.url` too: it reads the version roots `link!`
+          # re-derives, so a translated root turning `render = false` moves it
+          # to the default language's root on every page of that language.
+          version_url = ->(page : Models::Page) do
+            page.version.try { |v| Content::Versions.root_url(config, v, Content::Versions.lang_prefix(page, config)) }
+          end
+          before = pages.map { |page| {page.translations.dup, page.version_links.dup, page.aliases.dup, version_url.call(page)} }
           Content::Multilingual.link_translations!(pages, config)
           Content::Versions.link!(pages, config)
           moved = [] of Models::Page
           pages.each_with_index do |page, i|
-            moved << page if {page.translations, page.version_links, page.aliases} != before[i]
+            moved << page if {page.translations, page.version_links, page.aliases, version_url.call(page)} != before[i]
           end
           moved
         end
@@ -662,7 +683,8 @@ module Hwaro
           taxonomy : String,
           lookup_targets : Array(String) = [] of String,
           lookup_fields : ListingPageFields = ListingPageFields.new(false, false),
-          lookup : String = "" do
+          lookup : String = "",
+          asset_urls : Hash(String, String)? = nil do
           def self.inert : ListingSetSnapshot
             new(false, false, false, false, "", "", "", "")
           end
@@ -691,19 +713,23 @@ module Hwaro
           # when the about page moves and not on every other edit.
           lookup_targets = get_page_targets(blob)
           lookup_fields = relation_page_fields(blob)
+          needs_asset_urls = Phases::Render::ASSET_URL_MARKERS.any? { |marker| blob.includes?(marker) }
 
           ListingSetSnapshot.new(
             needs_page: needs_page,
             needs_section: needs_section,
             needs_menu: needs_menu,
             needs_taxonomy: needs_taxonomy,
-            page: needs_page ? compute_page_set_fingerprint(site.pages, listing_page_fields(templates)) : "",
+            # Sections too, as the `--cache` page-set fingerprint does: a
+            # section's page list carries its child sections as entries.
+            page: needs_page ? compute_page_set_fingerprint(site.pages + site.sections, listing_page_fields(templates)) : "",
             section: needs_section ? compute_section_set_fingerprint(site.sections, !site.config.menus_auto_sections.nil?) : "",
             menu: needs_menu ? compute_menu_set_fingerprint(site) : "",
             taxonomy: needs_taxonomy ? compute_taxonomy_slug_fingerprint(site) : "",
             lookup_targets: lookup_targets,
             lookup_fields: lookup_fields,
             lookup: compute_get_page_lookup_fingerprint(site, lookup_targets, lookup_fields),
+            asset_urls: needs_asset_urls ? bundle_asset_urls(site) : nil,
           )
         end
 
@@ -732,7 +758,7 @@ module Hwaro
           before : ListingSetSnapshot,
         ) : Array(Models::Page)
           page_changed = before.needs_page &&
-                         compute_page_set_fingerprint(site.pages, listing_page_fields(templates)) != before.page
+                         compute_page_set_fingerprint(site.pages + site.sections, listing_page_fields(templates)) != before.page
           section_changed = before.needs_section &&
                             compute_section_set_fingerprint(site.sections, !site.config.menus_auto_sections.nil?) != before.section
           menu_changed = before.needs_menu &&
@@ -742,7 +768,11 @@ module Hwaro
           lookup_changed = !before.lookup_targets.empty? &&
                            compute_get_page_lookup_fingerprint(site, before.lookup_targets, before.lookup_fields) != before.lookup
 
-          return [] of Models::Page unless page_changed || section_changed || menu_changed || taxonomy_changed || lookup_changed
+          # ponytail: any moved bundle asset re-renders every get_url reader
+          # (most layouts); per-path targets if bundle slug edits get common.
+          asset_urls_changed = (old_asset_urls = before.asset_urls) && bundle_asset_urls(site) != old_asset_urls
+
+          return [] of Models::Page unless page_changed || section_changed || menu_changed || taxonomy_changed || lookup_changed || asset_urls_changed
 
           all_pages.select do |page|
             next false unless page.render
@@ -759,7 +789,8 @@ module Hwaro
               (deps.section && section_changed) ||
               (deps.menu && menu_changed) ||
               (deps.taxonomy_slug && taxonomy_changed) ||
-              (deps.lookup && lookup_changed)
+              (deps.lookup && lookup_changed) ||
+              (deps.asset_url && asset_urls_changed)
           end
         end
 
@@ -883,6 +914,28 @@ module Hwaro
           true
         end
 
+        # A bundle whose images have resized variants (`[image_processing]`)
+        # moved to a new URL or left the build. The variants sit under the
+        # old URL and only the full build's image hooks cut, map and prune
+        # them, so escalate — rare, and correctness first.
+        private def bundle_variants_move?(
+          changed_pages : Array(Models::Page),
+          excluded_pages : Array(Models::Page),
+          before : Hash(String, {String, Models::Page}),
+        ) : Bool
+          variants = Content::Hooks::ImageHooks.resize_map_readonly
+          return false if variants.empty?
+          moved = changed_pages.select { |page| before[page.path]?.try(&.[0]) != page.url } + excluded_pages
+          moved.each do |page|
+            next unless old_url = before[page.path]?.try(&.[0])
+            bundle = File.dirname(page.path)
+            next unless page.assets.any? { |asset| variants.has_key?(File.join(old_url, Path[asset].relative_to(bundle).to_s)) }
+            Logger.info "  Image bundle #{page.path} moved or left the build — running full rebuild."
+            return true
+          end
+          false
+        end
+
         # Drop the re-parsed pages that the build options exclude (draft /
         # expired / future) from `changed_pages`, returning them. Same
         # contract as the full parse phase: the publication window is
@@ -931,6 +984,7 @@ module Hwaro
               stale = old_output_paths[p.path]? || [get_output_path(p, output_dir)].compact
               prune_unclaimed_outputs(stale, output_dir)
             end
+            prune_unclaimed_outputs(withheld_raw_outputs(output_dir), output_dir)
           end
 
           relocated = [] of String
@@ -943,6 +997,23 @@ module Hwaro
           process_assets(changed_pages, output_dir, false) unless relocated.empty?
           prune_unclaimed_outputs(relocated, output_dir) unless relocated.empty?
           settle_page_outputs(output_dir, except: old_output_paths.values.flatten)
+        end
+
+        # Pages that lost an output-path collision before this pass and own
+        # their URL again. The edit that freed the URL was to the OTHER page,
+        # so nothing selects them: their HTML and bundle files stayed the old
+        # winner's. Copies the bundle files; the caller re-renders the pages.
+        # Pages of `all_pages` that just LOST their URL go the other way: the
+        # full build publishes none of their bundle files, so they are pruned.
+        private def regained_output_pages(previously_suppressed : Array(Models::Page), all_pages : Array(Models::Page), output_dir : String) : Array(Models::Page)
+          regained = previously_suppressed.reject(&.output_suppressed)
+          process_assets(regained, output_dir, false) unless regained.empty?
+          lost = all_pages.select(&.output_suppressed) - previously_suppressed
+          unless lost.empty?
+            stale = lost.flat_map { |p| page_asset_outputs(p, output_dir) } + withheld_raw_outputs(output_dir)
+            prune_unclaimed_outputs(stale, output_dir)
+          end
+          regained
         end
 
         # Prune what an earlier pass that raised after its re-parse left
@@ -1026,6 +1097,12 @@ module Hwaro
 
           all_pages = (site.pages + site.sections).as(Array(Models::Page))
           renderable_pages = all_pages.select(&.render)
+
+          # Re-claim output URLs (see run_incremental): forced content edits
+          # may have introduced or resolved a slug/alias collision. Before
+          # the listing fan-out and the globals, which both read the verdicts.
+          previously_suppressed = all_pages.select(&.output_suppressed)
+          @output_url_winners = compute_output_url_winners(all_pages)
 
           # Selective re-render: same template set, fully static graph.
           # `old_shadowed` guards extension-shadowed variants (foo.j2 next to
@@ -1135,13 +1212,14 @@ module Hwaro
               @section_pages_crinja_cache.clear
               @section_pages_url_index_cache.clear
             end
+            aggregate_site_authors(site)
             global_vars = build_global_vars(site, options.cache_busting)
             @render_global_vars = global_vars
           end
 
-          # Re-claim output URLs (see run_incremental): forced content edits
-          # may have introduced or resolved a slug/alias collision.
-          @output_url_winners = compute_output_url_winners(all_pages)
+          regained_output_pages(previously_suppressed, all_pages, output_dir).each do |page|
+            pages_to_render << page if page.render && !pages_to_render.includes?(page)
+          end
 
           # User feed templates (rss.xml/atom.xml overrides) are not entry
           # templates for any page, so an edit to one — or to a partial they
@@ -1324,6 +1402,9 @@ module Hwaro
           @lifecycle.trigger(Lifecycle::HookPoint::BeforeRender, deferred_ctx)
 
           global_vars = build_global_vars(site, options.cache_busting)
+          if rerender_image_summaries((site.pages + site.sections).as(Array(Models::Page)), site, templates, highlight, global_vars)
+            global_vars = build_global_vars(site, options.cache_busting)
+          end
           # Keep the 404/taxonomy stash in sync (see run_incremental).
           @render_global_vars = global_vars
           @pages_by_path = build_pages_by_path(site)

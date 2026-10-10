@@ -138,9 +138,10 @@ Access taxonomy terms and their pages:
 
 `items` is ordered by the taxonomy's
 [`terms_sort_by`](/writing/taxonomies/#sorting): `"name"` (the default,
-alphabetical) or `"count"` (page count descending, name-ascending
-tiebreak). Counts are site-wide across every language, matching the root
-taxonomy index page.
+byte order, so uppercase sorts first) or `"count"` (page count descending, name-ascending
+tiebreak). Counts are site-wide across every language. On a multilingual
+site the root taxonomy index page counts only default-language pages, so
+its `"count"` order can differ.
 
 **Term Properties:**
 
@@ -171,6 +172,12 @@ Generate URL for a taxonomy term:
 | term | String | Term name |
 
 **Returns:** String (absolute URL)
+
+On a non-default-language page the URL is that language's term page
+(`/ko/tags/crystal/`) when it has one, else the root term page. The URL is
+built for any term, so it only names a written page when the term has a
+published page there: a taxonomy left out of the default language's
+`[languages.<code>] taxonomies` has no root term pages.
 
 ---
 
@@ -333,6 +340,8 @@ Generate URL with base_url:
 
 **Returns:** String (absolute URL)
 
+A `page.assets`/`section.assets` entry (`blog/my-trip/photo.jpg`) resolves to the copy published next to its page, including when a `slug`, `path` or language prefix moves the page.
+
 ---
 
 ### get_url()
@@ -441,7 +450,7 @@ Returns a resized image variant. When [image processing](/features/image-process
 
 | Name | Type | Description |
 |------|------|-------------|
-| path | String | Image path (e.g., `/images/photo.jpg`) |
+| path | String | Image path (e.g., `/images/photo.jpg`), or a `page.assets` entry |
 | width | Int | Requested width in pixels (0 = original) |
 | height | Int | Requested height in pixels (0 = original) |
 | op | String | `fit` (default), `fill` or `crop` — see [Crop and Fill](/features/image-processing/#crop-and-fill) |

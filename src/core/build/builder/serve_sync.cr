@@ -179,15 +179,18 @@ module Hwaro
           written = Set(String).new
           withheld = withheld_bundle_dirs
           sources = changed_files.select { |src_path| File.exists?(src_path) && !File.directory?(src_path) }
+          # Once per batch, not per file: the set is O(pages).
+          shadowed : Set(String)? = nil
           sources.each do |src_path|
             relative = path_relative_to(src_path, "content")
 
-            next unless config.content_files.enabled? && config.content_files.publish?(relative)
+            next unless publishes_content_file?(config, relative)
             # Same rule as the full build's raw lane: an edited asset of a
             # draft / future / expired bundle stays unpublished.
             next if withheld_content_file?(relative, withheld)
 
-            next unless dest_path = publish_raw_file(src_path, relative, output_dir, minify)
+            shadowed ||= content_copy_shadowed_outputs(output_dir)
+            next unless dest_path = publish_raw_file(src_path, relative, output_dir, minify, shadowed)
             written << File.expand_path(dest_path)
             Logger.action :copy, dest_path, Logger::Role::Dim if verbose
             copied << src_path
@@ -198,9 +201,9 @@ module Hwaro
           # raw bytes over a file the raw lane just minified.
           if site = @site
             changed = sources.map { |src_path| path_relative_to(src_path, "content") }.to_set
-            owners = (site.pages + site.sections).select { |page| page.assets.any? { |asset| changed.includes?(asset) } }
+            owners = (site.pages + site.sections).select { |page| !page.output_suppressed && page.assets.any? { |asset| changed.includes?(asset) } }
             unless owners.empty?
-              process_assets(owners, output_dir, verbose, written)
+              process_assets(owners, output_dir, verbose, written, shadowed)
               owners.each { |page| page.assets.each { |asset| copied << File.join("content", asset) if changed.includes?(asset) } }
             end
           end
@@ -325,11 +328,11 @@ module Hwaro
         # rebuild: a source deleted and re-created under a different path in
         # one changeset (foo.md → foo/index.md) maps to the same output file,
         # which the rebuild just rewrote and must not be deleted.
-        def owned_output_paths(output_dir : String) : Set(String)
+        def owned_output_paths(output_dir : String, config : Models::Config? = @config) : Set(String)
           owned = Set(String).new
           if site = @site
             (site.pages + site.sections).each do |page|
-              collect_page_output_paths(page, output_dir).each { |path| owned << path }
+              collect_page_output_paths(page, output_dir, config).each { |path| owned << path }
             end
           end
           owned
@@ -338,12 +341,12 @@ module Hwaro
         # Primary output file plus output-format siblings for a page — used
         # to prune the old files when an edit relocates the page's URL or
         # excludes the page from the site.
-        private def collect_page_output_paths(page : Models::Page, output_dir : String) : Array(String)
+        private def collect_page_output_paths(page : Models::Page, output_dir : String, config : Models::Config? = @config) : Array(String)
           # A `render = false` page writes nothing, so it owns nothing: an
           # edit that turns rendering off must orphan the file it wrote.
           return [] of String unless page.render
           paths = [get_output_path(page, output_dir)].compact
-          if cfg = @config
+          if cfg = config
             paths.concat(format_output_paths(page, output_dir, effective_output_formats(page, cfg)))
             if mirror = Content::Seo::Amp.mirror_output_for(page, cfg, output_dir)
               paths << mirror
@@ -548,8 +551,20 @@ module Hwaro
           outputs = [] of String
           site = @site
           return outputs unless site
-          (site.pages + site.sections).each { |page| outputs.concat(page_asset_outputs(page, output_dir)) }
+          # A collision loser's files are not published (`process_assets`).
+          (site.pages + site.sections).each { |page| outputs.concat(page_asset_outputs(page, output_dir)) unless page.output_suppressed }
           outputs
+        end
+
+        # The raw-lane copies (`[content.files]`, JSON/XML) the last full
+        # build published from bundles the build now withholds — a drafted
+        # page, a collision loser. They sit at their source path, not under
+        # the page URL, so pruning the page's own outputs misses them.
+        private def withheld_raw_outputs(output_dir : String) : Array(String)
+          return [] of String unless ctx = @context
+          withheld = withheld_bundle_dirs
+          return [] of String if withheld.empty?
+          ctx.raw_files.compact_map { |raw| File.join(output_dir, raw.relative_path) if withheld_content_file?(raw.relative_path, withheld) }
         end
 
         # One page's share of `bundle_asset_outputs`. Not gated on `render`:

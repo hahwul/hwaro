@@ -251,9 +251,20 @@ module Hwaro
             JS
         end
 
+        # Navigations go to the network first, like the cache-first handler:
+        # serving them stale-while-revalidate showed every precached (or
+        # previously visited) page from the old cache after a deploy.
         private def self.stale_while_revalidate_handler(offline_url : String, root_url : String) : String
           <<-JS
             self.addEventListener('fetch', event => {
+              if (event.request.mode === 'navigate') {
+                event.respondWith(
+                  fetch(event.request).catch(() =>
+                    caches.match(#{offline_url}).then(cached => cached || caches.match(#{root_url}))
+                  )
+                );
+                return;
+              }
               event.respondWith(
                 caches.match(event.request).then(cached => {
                   const fetchPromise = fetch(event.request).then(response => {
@@ -262,12 +273,7 @@ module Hwaro
                       caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
                     }
                     return response;
-                  }).catch(() => {
-                    if (event.request.mode === 'navigate') {
-                      return caches.match(#{offline_url}).then(cached => cached || caches.match(#{root_url}));
-                    }
-                    return undefined;
-                  });
+                  }).catch(() => undefined);
                   return cached || fetchPromise;
                 })
               );

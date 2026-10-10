@@ -132,6 +132,68 @@ describe "warm --cache: pages rendering other pages" do
     end
   end
 
+  it "re-renders a page printing a computed get_page's word count after a body edit" do
+    with_relations_site do
+      File.write("templates/dyn.html", %(DYN={{ get_page(path=page.extra.ref).word_count }}))
+      File.write("content/dyn.md", "+++\ntitle = \"Dyn\"\ntemplate = \"dyn\"\n[extra]\nref = \"posts/b.md\"\n+++\n")
+      relations_cached_build
+      File.read("public/dyn/index.html").should contain("DYN=2")
+      File.write("content/posts/b.md", File.read("content/posts/b.md") + " three four")
+      relations_cached_build
+      File.read("public/dyn/index.html").should contain("DYN=4")
+    end
+  end
+
+  it "re-renders a page printing a subscripted listing entry's word count" do
+    with_relations_site do
+      File.write("templates/first.html", %(FIRST={{ get_section(path="posts/_index.md").pages[0].word_count }}))
+      File.write("content/first.md", "+++\ntitle = \"First\"\ntemplate = \"first\"\n+++\n")
+      relations_cached_build
+      File.read("public/first/index.html").should contain("FIRST=2")
+      Dir.glob("content/posts/[abc].md").each { |f| File.write(f, File.read(f) + " three four") }
+      relations_cached_build
+      File.read("public/first/index.html").should contain("FIRST=4")
+    end
+  end
+
+  it "re-renders a nav printing a menu entry page's word count after a body edit" do
+    with_relations_site do
+      File.write("templates/navt.html", %(NAV={% for m in get_menu(name="main") %}{{ m.page.word_count }}{% endfor %}))
+      File.write("content/nav.md", "+++\ntitle = \"Nav\"\ntemplate = \"navt\"\n+++\n")
+      File.write("content/posts/b.md", File.read("content/posts/b.md").sub("series =", "menus = [\"main\"]\nseries ="))
+      relations_cached_build
+      File.read("public/nav/index.html").should contain("NAV=2")
+      File.write("content/posts/b.md", File.read("content/posts/b.md") + " three four")
+      relations_cached_build
+      File.read("public/nav/index.html").should contain("NAV=4")
+    end
+  end
+
+  it "re-renders a page serializing a listing after a body edit" do
+    with_relations_site do
+      File.write("templates/dump.html", %(DUMP={{ get_section(path="posts/_index.md").pages | tojson }}))
+      File.write("content/dump.md", "+++\ntitle = \"Dump\"\ntemplate = \"dump\"\n+++\n")
+      relations_cached_build
+      File.read("public/dump/index.html").should_not contain("three four")
+      File.write("content/posts/b.md", File.read("content/posts/b.md") + " three four")
+      relations_cached_build
+      File.read("public/dump/index.html").should contain("three four")
+    end
+  end
+
+  it "re-renders a wikilink to a heading whose custom id changed" do
+    with_relations_site do
+      File.write("config.toml", File.read("config.toml") + "\n[markdown]\nwikilinks = true\n")
+      File.write("content/wl.md", "+++\ntitle = \"WL\"\ntemplate = \"plain\"\n+++\nSee [[about#Intro]].")
+      File.write("content/about.md", "+++\ntitle = \"About\"\ntemplate = \"about\"\n+++\n## Intro {#old-id}\n")
+      relations_cached_build
+      File.read("public/wl/index.html").should contain(%(href="/about/#old-id"))
+      File.write("content/about.md", "+++\ntitle = \"About\"\ntemplate = \"about\"\n+++\n## Intro {#new-id}\n")
+      relations_cached_build
+      File.read("public/wl/index.html").should contain(%(href="/about/#new-id"))
+    end
+  end
+
   it "re-renders a page whose shortcode lists the page set" do
     with_relations_site do
       File.read("public/sc/index.html").should_not contain("[Post d]")
@@ -243,6 +305,30 @@ describe "warm --cache: body edits next to relation readers" do
 end
 
 describe "warm --cache: section-set changes" do
+  it "re-renders listings showing a subsection entry's title, [extra] and excerpt" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", "title = \"T\"\nbase_url = \"http://localhost\"\n")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "SIB={% for p in section.pages %}[{{ p.title }}]{% endfor %}")
+        File.write("templates/section.html", "LIST={% for p in section.pages %}[{{ p.title }}|{{ p.extra.badge }}|{{ p.word_count }}]{% endfor %}")
+        FileUtils.mkdir_p("content/blog/sub")
+        File.write("content/blog/_index.md", "+++\ntitle = \"Blog\"\n+++\n")
+        File.write("content/blog/post.md", "+++\ntitle = \"Post\"\n+++\n")
+        File.write("content/blog/sub/_index.md", "+++\ntitle = \"Sub\"\n[extra]\nbadge = \"old\"\n+++\ntwo words\n")
+        relations_cached_build
+        File.read("public/blog/index.html").should contain("[Sub|old|2]")
+        File.read("public/blog/post/index.html").should contain("[Sub]")
+
+        File.write("content/blog/sub/_index.md", "+++\ntitle = \"Sub2\"\n[extra]\nbadge = \"new\"\n+++\nnow four words here\n")
+        relations_cached_build
+
+        File.read("public/blog/index.html").should contain("[Sub2|new|4]")
+        File.read("public/blog/post/index.html").should contain("[Sub2]")
+      end
+    end
+  end
+
   it "drops a subsection made headless from its parent listing and the sitemap" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do
@@ -503,6 +589,39 @@ describe "warm --cache: pages printing the clock" do
         File.write("public/a/index.html", "SENTINEL")
         relations_cached_build
         File.read("public/a/index.html").should eq("SENTINEL")
+      end
+    end
+  end
+end
+
+describe "warm --cache: version root URLs" do
+  it "re-renders page.version.url when a translated version root appears" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", <<-TOML)
+          title = "T"
+          base_url = "http://localhost"
+          default_language = "en"
+          [languages.en]
+          language_name = "English"
+          [languages.ko]
+          language_name = "Korean"
+          [[versions.list]]
+          name = "v1"
+          path = "docs/v1"
+          latest = true
+          TOML
+        FileUtils.mkdir_p("content/docs/v1")
+        FileUtils.mkdir_p("templates")
+        File.write("content/docs/v1/_index.md", "+++\ntitle = \"V1\"\n+++\n")
+        File.write("content/docs/v1/intro.ko.md", "+++\ntitle = \"Intro\"\n+++\nx")
+        File.write("templates/page.html", "VER={{ page.version.url }}")
+        relations_cached_build
+        # No Korean root yet: the default language's root.
+        File.read("public/ko/docs/intro/index.html").should eq("VER=/docs/")
+        File.write("content/docs/v1/_index.ko.md", "+++\ntitle = \"V1 ko\"\n+++\n")
+        relations_cached_build
+        File.read("public/ko/docs/intro/index.html").should eq("VER=/ko/docs/")
       end
     end
   end

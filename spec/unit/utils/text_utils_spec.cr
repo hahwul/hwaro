@@ -512,6 +512,12 @@ describe Hwaro::Utils::TextUtils do
         Hwaro::Utils::TextUtils.strip_html("<p>a</p><p>b</p><div>c</div>").should eq("a b c")
       end
 
+      it "separates a block boundary from a following quote, bracket or emoji" do
+        Hwaro::Utils::TextUtils.strip_html(%(<ul><li>a</li><li>"b"</li><li>(c)</li><li>✅ d</li></ul>)).should eq(%(a "b" (c) ✅ d))
+        Hwaro::Utils::TextUtils.strip_html(%(Line one<br>"after")).should eq(%(Line one "after"))
+        Hwaro::Utils::TextUtils.strip_html("<p>中文</p>。").should eq("中文。")
+      end
+
       it "matches tag names case-insensitively" do
         Hwaro::Utils::TextUtils.strip_html("a<B>b</B>c").should eq("abc")
         Hwaro::Utils::TextUtils.strip_html("a<P>b</P>c").should eq("a b c")
@@ -729,6 +735,21 @@ describe Hwaro::Utils::TextUtils do
       Hwaro::Utils::TextUtils.count_words("a <img\n  src=\"x.png\"\n  alt=\"q\"> b").should eq(2)
       Hwaro::Utils::TextUtils.count_words("a <!-- hidden words here --> b").should eq(2)
       Hwaro::Utils::TextUtils.count_words("a <!-- never closed b c d").should eq(7)
+    end
+
+    it "counts each Han/Kana character as a word, Hangul by spaces" do
+      Hwaro::Utils::TextUtils.count_words("我爱北京天安门").should eq(7)
+      Hwaro::Utils::TextUtils.count_words("今日は、いい天気です。").should eq(9)
+      Hwaro::Utils::TextUtils.count_words("カタカナ ｶﾀｶﾅ").should eq(8)
+      Hwaro::Utils::TextUtils.count_words("Hugo と hwaro").should eq(3)
+      Hwaro::Utils::TextUtils.count_words("「中文」，（测试）！").should eq(4)
+      Hwaro::Utils::TextUtils.count_words("안녕하세요 세계 입니다").should eq(3)
+      Hwaro::Utils::TextUtils.count_words_and_cjk("hello 世界 wörld").should eq({4, 2})
+      Hwaro::Utils::TextUtils.count_words("ＡＢＣ　１２３").should eq(2)
+    end
+
+    it "splits words on Unicode whitespace" do
+      Hwaro::Utils::TextUtils.count_words("one\u00A0two\u3000three\u2003four").should eq(4)
     end
   end
 end

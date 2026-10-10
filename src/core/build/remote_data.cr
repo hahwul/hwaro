@@ -22,6 +22,7 @@ require "uri"
 require "yaml"
 require "../../models/config"
 require "../../utils/crinja_utils"
+require "../../utils/digest_utils"
 require "../../utils/errors"
 require "../../utils/file_safe"
 require "../../utils/hwaro_dir"
@@ -69,7 +70,7 @@ module Hwaro
           # Before anything else, and deliberately outside the `on_error`
           # rescue: an unset `${VAR}` is a config mistake, not a flaky source.
           require_resolved_env_vars!(entry)
-          digest = url_digest(entry.url)
+          digest = request_digest(entry)
 
           if cached = fresh_cached_result(entry, cache_dir, digest, now)
             return cached
@@ -248,6 +249,23 @@ module Hwaro
         # in config.toml must miss both the disk cache and the memo.
         def url_digest(url : String) : String
           Digest::MD5.hexdigest(url)
+        end
+
+        # The identity of the request `entry` makes, for the same two caches.
+        # Headers are part of it: `Accept-Language = "ko"`, a tenant header or
+        # a rotated token asks the same url for a different payload, and a
+        # fresh cache of the old one kept answering until the TTL ran out.
+        # Header-less entries keep the plain url digest, so caches written
+        # before headers counted stay valid.
+        def request_digest(entry : Models::RemoteDataConfig) : String
+          return url_digest(entry.url) if entry.headers.empty?
+          digest = Digest::MD5.new
+          Utils::DigestUtils.update_length_prefixed(digest, entry.url)
+          entry.headers.to_a.sort!.each do |name, value|
+            Utils::DigestUtils.update_length_prefixed(digest, name.downcase)
+            Utils::DigestUtils.update_length_prefixed(digest, value)
+          end
+          digest.final.hexstring
         end
 
         private def body_path(cache_dir : String, key : String) : String

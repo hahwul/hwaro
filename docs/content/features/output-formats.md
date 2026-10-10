@@ -196,14 +196,11 @@ avoid `now()` or other non-deterministic values in a format template if you
 want byte-identical output across builds (see
 [Incremental Builds](/features/incremental-build/)).
 
-## Known Limitation: Disabling a Format Under `--cache`
+## Disabling a Format
 
-Removing a format from `[outputs]` (or from a page's front matter) does not
-retroactively delete files that a *previous* build already wrote under
-`--cache` — the incremental build only re-renders pages it detects as
-changed, and "a format was removed from config" isn't tracked as a
-per-file change. Run a full (non-incremental) build after disabling a format
-to clean up the stale `index.<fmt>` files.
+Removing a format from `[outputs]` (or from a page's front matter) deletes the
+`index.<fmt>` files earlier builds wrote for it on the next build, including
+an incremental `--cache` build.
 
 ## See Also
 

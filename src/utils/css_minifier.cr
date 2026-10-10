@@ -336,7 +336,11 @@ module Hwaro
       # feature tests get their colons tightened.
       private def collapse_prelude(run : String) : String
         return run unless run.includes?(':')
-        return run unless run.lstrip(" \t\r\n\f").starts_with?('@')
+        prelude = run.lstrip(" \t\r\n\f")
+        return run unless prelude.starts_with?('@')
+        # `@scope (.card :hover) to (…)` parenthesises SELECTORS, where the
+        # space before a pseudo-class is a descendant combinator.
+        return run if prelude[1, 5].compare("scope", case_insensitive: true) == 0
         run.gsub(PAREN_GROUP) { "(" + $1.gsub(WS_COLON, ":") + ")" }
       end
 

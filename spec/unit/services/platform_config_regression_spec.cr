@@ -180,3 +180,28 @@ describe "PlatformConfig aliases the build does not publish" do
     end
   end
 end
+
+# Only a page's own `draft` flag was checked, so an alias of a page under a
+# `[cascade] draft = true` section became a host redirect to a page the build
+# never writes; and `[build] drafts = true`, which publishes drafts, dropped
+# their redirects.
+describe "PlatformConfig alias publish state" do
+  it "skips cascaded drafts and keeps drafts the build publishes" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("content/secret")
+        File.write("content/secret/_index.md", "+++\ntitle = \"S\"\n[cascade]\ndraft = true\n+++\n")
+        File.write("content/secret/a.md", "+++\ntitle = \"A\"\naliases = [\"/old-a/\"]\n+++\nx\n")
+        File.write("content/d.md", "+++\ntitle = \"D\"\ndraft = true\naliases = [\"/old-d/\"]\n+++\nx\n")
+
+        config = Hwaro::Models::Config.new
+        Hwaro::Services::PlatformConfig.new(config).generate("netlify").should_not contain("/old-a/")
+
+        config.build.drafts = true
+        result = Hwaro::Services::PlatformConfig.new(config).generate("netlify")
+        result.should contain(%(from = "/old-a/"))
+        result.should contain(%(from = "/old-d/"))
+      end
+    end
+  end
+end

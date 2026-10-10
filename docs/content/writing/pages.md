@@ -74,7 +74,7 @@ For JSON, the first balanced `{...}` at the very start of the file is the front 
 | in_search_index | bool | Include in search |
 | in_sitemap | bool | Include in sitemap |
 | insert_anchor_links | bool | Add heading anchors |
-| redirect_to | string | Redirect page to this URL (the redirect stub is left out of the sitemap, feeds, search index and llms.txt) |
+| redirect_to | string | Redirect page to this URL, or to a content file given as an `@/` path (`@/blog/post.md`) (the redirect stub is left out of the sitemap, feeds, search index and llms.txt) |
 | render | bool | Render page to output (default: true) |
 | expires | date | Auto-exclude after this date |
 | series | string | Series name for grouping |
@@ -273,6 +273,8 @@ This is the summary shown in listings.
 The full article continues here...
 ```
 
+The summary renders like the body: shortcodes, Markdown extensions and render hooks apply. A marker placed inside a block shortcode's body (`{% note() %}` … `{% end %}`) ends the summary inside that block, and the summary closes the block at that point. The same goes for raw HTML: a marker inside `<details>` … `</details>` (or any element left open) ends the summary there, and the summary closes the open elements, so a listing that prints it is not swallowed by an unclosed tag.
+
 ### Automatic summaries
 
 A page with neither a marker nor a `description` gets an automatic summary: the first 70 words of its rendered body, wrapped in a single `<p>` and followed by an ellipsis (`…`) when text was cut. The excerpt is built from the rendered HTML, so shortcodes are expanded and code blocks, headings, images and figures are skipped, so it reads as prose.
@@ -351,6 +353,8 @@ Use `@/` to link to other content pages by their source path. Hwaro resolves the
 
 This is useful because you don't need to know the final URL, because Hwaro calculates it from the content path. If the target page doesn't exist, the link is left unchanged and a warning is logged during build.
 
+`@/` links are resolved in page content only (Markdown, and HTML or shortcode output inside it). Templates are not rewritten, so `<a href="@/about.md">` in `page.html` is emitted as-is; in a template use `{{ get_page(path="about.md").url }}` instead.
+
 | Syntax | Resolved URL |
 |--------|-------------|
 | `@/blog/post.md` | `/blog/post/` |
@@ -415,7 +419,7 @@ Allowed id characters: letters (any script), digits, `_`, `-`, `:`. The id may s
 
 Disable by setting `heading_ids = false` under `[markdown]` in `config.toml`.
 
-Custom heading IDs require `markdown.safe = false`. Under safe mode the `{#id}` syntax is stripped from the rendered output and no id is applied, so use raw HTML headings if you need both safe mode and explicit ids. Writing the same `{#id}` twice in one page produces duplicate id attributes; the first anchor wins.
+Custom heading IDs require `markdown.safe = false`. Under safe mode the `{#id}` syntax is stripped from the rendered output and no custom id is applied: the heading keeps its generated id (a raw HTML heading is no way around this, since safe mode strips raw HTML too). Writing the same `{#id}` twice in one page keeps it on the first heading and renames the later one with a numeric suffix (`#id-1`), with a build warning.
 
 This `{#id}` shorthand is a special case of the more general `{#id .class key=val}` attribute block (`[markdown] attributes = true`), which also applies to inline images. See [Markdown Extensions](/features/markdown-extensions/).
 
@@ -450,7 +454,7 @@ content/
     └── _index.md
 ```
 
-Hwaro will copy all non-markdown files from the page bundle directory to the output directory, maintaining the relative path.
+Hwaro will copy all non-markdown files from the page bundle directory to the output directory, maintaining the relative path. When [`[content.files]`](/features/content-files/) is configured (the `hwaro init` scaffolds set an image allowlist), only the files its rules allow are copied.
 
 In your markdown, you can link to these assets using relative paths:
 
@@ -462,7 +466,7 @@ In your markdown, you can link to these assets using relative paths:
 
 ### Accessing Assets in Templates
 
-You can access the list of colocated assets in your templates using `page.assets`. This returns an array of relative paths to the files.
+You can access the list of colocated assets in your templates using `page.assets`. This returns an array of paths relative to `content/` (`blog/my-trip/photo.jpg`).
 
 ```jinja
 {% for asset in page.assets %}

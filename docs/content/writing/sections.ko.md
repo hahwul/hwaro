@@ -45,7 +45,7 @@ Welcome to my blog.
 | paginate_path | string | "page" | 페이저 URL의 경로 세그먼트(기본값이면 `/blog/page/2/` 형태) |
 | transparent | bool | false | 페이지를 상위 섹션으로 넘김 |
 | generate_feeds | bool | false | RSS 피드 생성 |
-| redirect_to | string | — | 섹션을 렌더링하는 대신 이 URL로 가는 HTML 리다이렉트 페이지 생성 |
+| redirect_to | string | — | 섹션을 렌더링하는 대신 이 URL(또는 `@/blog/post.md` 같은 `@/` 콘텐츠 경로)로 가는 HTML 리다이렉트 페이지 생성 |
 | draft | bool | false | 프로덕션에서 제외 |
 | weight | int | 0 | 섹션 정렬 순서 |
 | cascade | table | — | 하위 항목이 상속하는 기본값 ([캐스케이드](#캐스케이드) 참고) |
@@ -83,7 +83,7 @@ banner = "default-banner.png"
 | `weight`  | 낮은 weight 우선(오름차순) | 높은 weight 우선 |
 | `title`   | A → Z(오름차순) | Z → A |
 
-`date` 정렬은 `updated` 날짜가 있으면 그 날짜를 쓰므로, 수정한 글이 목록 위로 올라갑니다. 날짜가 전혀 없는 페이지는 맨 뒤로 갑니다. `title`은 바이트 단위로 비교하므로 대문자가 소문자보다 앞에 오고, 악센트가 붙은 글자는 `z` 뒤에 옵니다.
+`date` 정렬은 `updated` 날짜가 있으면 그 날짜를 쓰므로, 수정한 글이 목록 위로 올라갑니다. 날짜가 전혀 없는 페이지는 1970년 이전 날짜의 페이지보다도 뒤, 맨 뒤로 갑니다(`reverse = true`는 목록 전체를 뒤집으므로 맨 앞). `title`은 바이트 단위로 비교하므로 대문자가 소문자보다 앞에 오고, 악센트가 붙은 글자는 `z` 뒤에 옵니다.
 
 `reverse`는 선택한 `sort_by`의 자연스러운 방향을 그대로 뒤집습니다. 예를 들어 `date`로 정렬한 블로그 인덱스는 기본이 최신순이고, `reverse = true`를 주면 오래된 순으로 바뀝니다.
 

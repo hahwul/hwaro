@@ -81,7 +81,7 @@ sections = []             # Limit to specific sections, e.g., ["posts"]
 | `limit` | `10` | Maximum number of items in feed |
 | `truncate` | `0` | Truncate content to N characters (0 = full content) |
 | `full_content` | `true` | `true` = full HTML in feed, `false` = use front matter `description` or auto-generated summary |
-| `filename` | `""` | Custom filename (empty = `rss.xml`, `atom.xml` or `feed.json`) |
+| `filename` | `""` | Custom filename of the main feed (empty = `rss.xml`, `atom.xml` or `feed.json`). Section, language and taxonomy term feeds always use the default name |
 | `sections` | `[]` | Limit feed to specific sections |
 | `default_language_only` | `true` | Multilingual: main feed includes default language only |
 
@@ -173,7 +173,7 @@ To take full control of the feed markup, create a template named after the feed 
 | Atom | `templates/atom.xml.jinja` | `atom.xml` |
 | JSON Feed | `templates/feed.json.jinja` | `feed.json` |
 
-Any template extension works (`.jinja`, `.j2`, `.jinja2`, `.html`). Only the final extension is stripped, so `rss.xml.jinja` loads under the key `rss.xml`. Whatever the extension, the file is always rendered as **Jinja** (an `.ecr` file is picked up too, but ECR `<%= %>` tags pass through as literal text, so use Jinja syntax). The template file itself is the opt-in: when it's absent, Hwaro emits its built-in feed exactly as before, and deleting the template falls back to the built-in output. The override applies to **all four feed kinds** (the main feed, per-section feeds, per-language feeds, and per-taxonomy-term feeds), and a custom `[feeds] filename` still controls the output path.
+Any template extension works (`.jinja`, `.j2`, `.jinja2`, `.html`). Only the final extension is stripped, so `rss.xml.jinja` loads under the key `rss.xml`. Whatever the extension, the file is always rendered as **Jinja** (an `.ecr` file is picked up too, but ECR `<%= %>` tags pass through as literal text, so use Jinja syntax). The template file itself is the opt-in: when it's absent, Hwaro emits its built-in feed exactly as before, and deleting the template falls back to the built-in output. The override applies to **all four feed kinds** (the main feed, per-section feeds, per-language feeds, and per-taxonomy-term feeds), and a custom `[feeds] filename` still controls the main feed's output path.
 
 `{% include %}` works inside feed templates, and a broken template fails the build with a template error naming the file.
 

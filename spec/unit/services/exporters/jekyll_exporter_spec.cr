@@ -698,3 +698,105 @@ describe "Jekyll export: post addresses" do
     end
   end
 end
+
+# Regression: a post's `slug` renames its URL segment in the build
+# (`/posts/renamed/`), but the export pinned the post to its source path and
+# rewrote `@/` links to it there, so both 404ed in Jekyll.
+describe "Jekyll export: slugged posts" do
+  it "pins the post to its slug URL and links to it there" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(File.join(content_dir, "posts"))
+      File.write(File.join(content_dir, "posts", "a.md"), "+++\ntitle = \"A\"\ndate = 2024-01-15\nslug = \"renamed\"\n+++\na\n")
+      File.write(File.join(content_dir, "posts", "b.md"), "+++\ntitle = \"B\"\ndate = 2024-02-15\n+++\nSee [A](@/posts/a.md#x)\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+      Hwaro::Services::Exporters::JekyllExporter.new.run(options).success.should be_true
+
+      posts = File.join(output_dir, "_posts")
+      File.read(File.join(posts, "2024-01-15-a.md")).should contain(%(permalink: "/posts/renamed/"))
+      File.read(File.join(posts, "2024-02-15-b.md")).should contain("[A](/posts/renamed/#x)")
+    end
+  end
+end
+
+# Regression: Jekyll's excerpt is the first paragraph unless the page names
+# its separator, so the build's `<!-- more -->` summary was lost on export.
+describe "Jekyll export: summary marker" do
+  it "names the build's summary marker as the excerpt separator" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(File.join(content_dir, "posts"))
+      File.write(File.join(content_dir, "posts", "a.md"), "+++\ntitle = \"A\"\ndate = 2024-01-15\n+++\nOne\n\nTwo\n\n<!-- more -->\n\nRest\n")
+      File.write(File.join(content_dir, "posts", "b.md"), "+++\ntitle = \"B\"\ndate = 2024-01-16\n+++\n`<!-- more -->`\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+      Hwaro::Services::Exporters::JekyllExporter.new.run(options).success.should be_true
+
+      posts = File.join(output_dir, "_posts")
+      File.read(File.join(posts, "2024-01-15-a.md")).should contain(%(excerpt_separator: "<!-- more -->"))
+      File.read(File.join(posts, "2024-01-16-b.md")).should_not contain("excerpt_separator")
+    end
+  end
+end
+
+# Regression: `render = false` passed through as a key Jekyll ignores, so a
+# headless page the build never writes was published by Jekyll.
+describe "Jekyll export: headless pages" do
+  it "exports render = false as published: false" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(content_dir)
+      File.write(File.join(content_dir, "a.md"), "+++\ntitle = \"A\"\nrender = false\n+++\na\n")
+      File.write(File.join(content_dir, "b.md"), "+++\ntitle = \"B\"\nrender = false\ndraft = true\n+++\nb\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir, drafts: true)
+      Hwaro::Services::Exporters::JekyllExporter.new.run(options).success.should be_true
+
+      a = File.read(File.join(output_dir, "a.md"))
+      a.should contain("published: false")
+      a.should_not contain("render")
+      File.read(File.join(output_dir, "b.md")).scan("published:").size.should eq(1)
+    end
+  end
+end
+
+describe "Jekyll export: in_sitemap" do
+  it "maps in_sitemap = false to sitemap: false" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(content_dir)
+      File.write(File.join(content_dir, "hidden.md"), "+++\ntitle = \"Hidden\"\nin_sitemap = false\n+++\nBody\n")
+
+      Hwaro::Services::Exporters::JekyllExporter.new.run(
+        Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir))
+
+      fm = YAML.parse(File.read(File.join(output_dir, "hidden.md")).split("---")[1])
+      fm["sitemap"].as_bool.should be_false
+      fm["in_sitemap"]?.should be_nil
+    end
+  end
+end
+
+describe "Jekyll export: links to translated section indexes" do
+  it "links _index.ko.md where it is exported (index.ko.md)" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(File.join(content_dir, "docs"))
+      File.write(File.join(content_dir, "about.md"), "+++\ntitle = \"About\"\n+++\n[i](@/docs/_index.ko.md) [k](@/about.ko.md)\n")
+      File.write(File.join(content_dir, "about.ko.md"), "+++\ntitle = \"KO\"\n+++\n")
+      File.write(File.join(content_dir, "docs", "_index.ko.md"), "+++\ntitle = \"D\"\n+++\n")
+
+      Hwaro::Services::Exporters::JekyllExporter.new.run(
+        Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir))
+
+      File.exists?(File.join(output_dir, "docs", "index.ko.md")).should be_true
+      File.read(File.join(output_dir, "about.md")).should contain("[i](/docs/index.ko) [k](/about.ko)")
+    end
+  end
+end

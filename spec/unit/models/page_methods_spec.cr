@@ -143,6 +143,18 @@ describe Hwaro::Models::Page do
       time = page.calculate_reading_time
       time.should eq(3)
     end
+
+    it "reads Chinese/Japanese characters at ~500 per minute" do
+      page = Hwaro::Models::Page.new("test.md")
+      # 1500 kanji: 1500 words, 3 minutes (not 1 word / 1 minute, not 8).
+      page.raw_content = "漢字" * 750
+      page.calculate_word_count.should eq(1500)
+      page.calculate_reading_time.should eq(3)
+      # Mixed: 400 English words (2 min) + 500 kana (1 min).
+      page.raw_content = (["word"] * 400).join(" ") + " " + "かな" * 250
+      page.calculate_word_count.should eq(900)
+      page.calculate_reading_time.should eq(3)
+    end
   end
 
   describe "#extract_summary" do
@@ -669,6 +681,53 @@ describe Hwaro::Models::Page do
         assets = page.collect_assets(dir, content_files)
         assets.should contain("post/photo.png")
         assets.should_not contain("post/private/robots.txt")
+      end
+    end
+
+    # Regression: raw `.json`/`.xml` publish without an allowlist entry, so
+    # a bundle keeps them too — otherwise a slugged bundle published its
+    # `data.json` only at the source path and a relative link from the page
+    # 404ed. The deny rules still apply.
+    it "keeps .json/.xml bundle files under an allowlist that omits them" do
+      Dir.mktmpdir do |dir|
+        bundle = File.join(dir, "post")
+        FileUtils.mkdir_p(bundle)
+        File.write(File.join(bundle, "index.md"), "# Post")
+        File.write(File.join(bundle, "d.json"), "{}")
+        File.write(File.join(bundle, "feed.xml"), "<a/>")
+        File.write(File.join(bundle, "secret.json"), "{}")
+
+        page = Hwaro::Models::Page.new("post/index.md")
+        page.is_index = true
+
+        content_files = Hwaro::Models::ContentFilesConfig.new
+        content_files.allow_extensions = Hwaro::Models::ContentFilesConfig.normalize_extensions(["png"])
+        content_files.disallow_paths = ["**/secret.json"]
+
+        page.collect_assets(dir, content_files).should eq(["post/d.json", "post/feed.xml"])
+      end
+    end
+
+    # Regression: `disallow_paths`/`disallow_extensions` without an
+    # `allow_extensions` list were ignored for bundles, publishing the very
+    # files they exclude.
+    it "applies the deny rules when no allowlist is set" do
+      Dir.mktmpdir do |dir|
+        bundle = File.join(dir, "post")
+        FileUtils.mkdir_p(File.join(bundle, "private"))
+        File.write(File.join(bundle, "index.md"), "# Post")
+        File.write(File.join(bundle, "ok.txt"), "ok")
+        File.write(File.join(bundle, "art.psd"), "x")
+        File.write(File.join(bundle, "private", "notes.txt"), "x")
+
+        page = Hwaro::Models::Page.new("post/index.md")
+        page.is_index = true
+
+        content_files = Hwaro::Models::ContentFilesConfig.new
+        content_files.disallow_extensions = Hwaro::Models::ContentFilesConfig.normalize_extensions(["psd"])
+        content_files.disallow_paths = ["post/private/**"]
+
+        page.collect_assets(dir, content_files).should eq(["post/ok.txt"])
       end
     end
 

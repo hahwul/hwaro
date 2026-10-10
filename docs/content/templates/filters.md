@@ -63,7 +63,7 @@ same text renders in page bodies. The rest of the extension pipeline
 | Filter | Description | Example |
 |--------|-------------|---------|
 | unique | Remove duplicates while keeping distinct value types | {{ items \| unique }} |
-| flatten | Flatten nested arrays | {{ nested \| flatten }} |
+| flatten | Flatten nested arrays one level | {{ nested \| flatten }} |
 | compact | Remove nil/empty values | {{ items \| compact }} |
 
 ## Math Filters
@@ -132,7 +132,7 @@ Always use `safe` for rendered content:
 {{ page.image | default(value="/images/default.png") }}
 ```
 
-`default` returns the fallback when the value is undefined, `none`, or an empty string. The fallback keeps its type, so `default(value=0)` still works in arithmetic; a `none` fallback (`default(value=none)`) renders as an empty string. A value that is not empty is returned as follows: an array, map, or object passes through unchanged, and any other value (a string, number, or boolean) is returned as a string, so string filters such as `length` or `replace` can follow it.
+`default` returns the fallback when the value is undefined, `none`, or an empty string. The fallback keeps its type, so `default(value=0)` still works in arithmetic; a `none` fallback (`default(value=none)`) renders as an empty string. A value that is not empty is returned as follows: an array, map, or object passes through unchanged, and any other value (a string, number, or boolean) is returned as a string, so string filters such as `length` or `replace` can follow it. Pass `boolean=true` (`default(value="N/A", boolean=true)`) to also replace any falsy value: `false`, `0`, or an empty list or map.
 
 ### Date Formatting
 
@@ -213,6 +213,7 @@ Tests evaluate conditions in `{% if %}` statements.
 | matching | Regex match | `{% if asset is matching("[.](jpg\|png)$") %}` |
 | empty | Is empty | `{% if page.description is empty %}` |
 | present | Is not empty | `{% if page.title is present %}` |
+| eq, ne, lt, le, gt, ge | Compare with a value (also `==`, `!=`, `<`, `<=`, `>`, `>=`, `equalto`, `lessthan`, `greaterthan`) | `{{ posts \| selectattr("extra.year", ">=", 2020) \| list }}` |
 
 ### Test Examples
 

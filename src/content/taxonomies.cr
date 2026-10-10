@@ -95,8 +95,10 @@ module Hwaro
             next if lang_cfg.taxonomies.empty?
 
             # Build a filtered view of taxonomies for just this language's pages
+            # No early exit on an empty map: like the root, a configured
+            # taxonomy writes its (empty) index so `/<lang>/tags/` links
+            # never 404 on a site with no terms yet.
             lang_taxonomies = build_language_taxonomies(site, lang_cfg.taxonomies)
-            next if lang_taxonomies.empty?
 
             lang_taxonomy_configs = config.taxonomies.select { |t| lang_cfg.taxonomies.includes?(t.name) }
             generate_taxonomies_for_language(lang_taxonomy_configs, site, output_dir, templates, builder, verbose, global_vars, collected,
@@ -136,7 +138,11 @@ module Hwaro
           terms_map = if lt = lang_taxonomies
                         lt[taxonomy.name]? || {} of String => Array(Models::Page)
                       else
-                        site.taxonomies[taxonomy.name]? || {} of String => Array(Models::Page)
+                        # A page the render phase refused to write stays in
+                        # site.taxonomies (a later serve pass may hand its URL
+                        # back) but off the term pages and feeds.
+                        (site.taxonomies[taxonomy.name]? || {} of String => Array(Models::Page))
+                          .transform_values(&.reject(&.output_suppressed)).reject! { |_, pgs| pgs.empty? }
                       end
 
           base_path = "#{lang_prefix}/#{taxonomy.name}/"
@@ -276,9 +282,6 @@ module Hwaro
           # `[versions] taxonomies = "latest"` (default): only the latest
           # version (plus unversioned content) populates term pages.
           next unless config.versions.in_taxonomies?(page)
-          # Runs at generate time, after the render phase flagged the pages
-          # it refused to write — keep them off the term pages and feeds.
-          next if page.output_suppressed
 
           config.taxonomies.each do |taxonomy|
             name = taxonomy.name
@@ -542,17 +545,22 @@ module Hwaro
         feed_title = "#{site.config.title} - #{taxonomy.name.capitalize}: #{term}"
         # Same reason as the term page: nothing else records that this feed is
         # still wanted, so a removed term left `tags/<slug>/rss.xml` behind.
-        # `process_feed` derives the name the same way.
+        # Like section and language feeds, a term feed always takes the
+        # default name for `[feeds] type` — `[feeds] filename` names only the
+        # main feed — so this is the "" that `process_feed` gets below.
         builder.try(&.claim_generated_output(
-          File.join(feed_output_dir, Content::Seo::Feeds.safe_feed_filename(site.config.feeds.filename, site.config.feeds.type))
+          File.join(feed_output_dir, Content::Seo::Feeds.safe_feed_filename("", site.config.feeds.type))
         ))
 
         # No caller-side sort/limit: process_feed itself sorts date-desc
         # (SortUtils.compare_by_date) and applies feeds.limit. Dedupe by URL
         # so collision losers (not written as HTML) never appear in the feed,
-        # and keep `redirect_to` stubs out like every other feed does.
+        # and keep `redirect_to` stubs out like every other feed does. Older
+        # versions follow `[versions] feeds`, not `taxonomies`, as in every
+        # other feed.
+        versions = site.config.versions
         Content::Seo::Feeds.process_feed(
-          Content::Seo::Feeds.dedupe_by_output_url(pages.select(&.published_content?)),
+          Content::Seo::Feeds.dedupe_by_output_url(pages.select { |p| p.published_content? && versions.in_feeds?(p) }),
           site.config,
           feed_output_dir,
           "",

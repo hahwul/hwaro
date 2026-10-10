@@ -1103,6 +1103,28 @@ describe Hwaro::Assets::Pipeline do
     end
   end
 
+  describe "#process — @import in a later CSS entry" do
+    it "warns when an entry after the first carries an @import" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("static/css")
+          File.write("static/css/a.css", "@import url(x.css);\n.a{color:red}")
+          File.write("static/css/b.css", "/* @import none */ .b{content:\"@import\"}")
+          File.write("static/css/c.css", "@IMPORT url(https://fonts.example/f.css);\n.c{color:blue}")
+
+          config = make_config
+          config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "main.css", files: ["css/a.css", "css/b.css"])
+          config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "late.css", files: ["css/b.css", "css/c.css"])
+          log = with_captured_log { Hwaro::Assets::Pipeline.new(config).process("public") }
+
+          log.should_not contain("'css/a.css' has an @import")
+          log.should_not contain("'css/b.css' has an @import")
+          log.should contain("'css/c.css' has an @import")
+        end
+      end
+    end
+  end
+
   # Regression: a bundle is published under `[assets] output_dir`, but a
   # stylesheet's relative `url(...)` resolves against the stylesheet's own
   # directory — `url(img/x.png)` from `static/css/a.css` pointed at
@@ -1157,6 +1179,26 @@ describe Hwaro::Assets::Pipeline do
           css.should contain("/* don't url(sp.png) */")
           css.should contain(".c{background:url(../css/sp.png)}")
           css.should contain(%(.d{background:url("../css/sp.png")}))
+        end
+      end
+    end
+
+    it "rebases a percent-encoded url() whose decoded name is beside the source" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("static/css/fonts")
+          File.write("static/css/fonts/A B.woff2", "font")
+          File.write("static/css/a.css",
+            ".a{src:url(fonts/A%20B.woff2)}\n" \
+            ".b{src:url(fonts%2FA%20B.woff2)}")
+
+          config = make_config
+          config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "main.css", files: ["css/a.css"])
+          Hwaro::Assets::Pipeline.new(config).process("public")
+
+          css = File.read("public/assets/main.css")
+          css.should contain("url(../css/fonts/A%20B.woff2)")
+          css.should contain("url(fonts%2FA%20B.woff2)") # encoded separator: as written
         end
       end
     end

@@ -181,6 +181,19 @@ describe Hwaro::Content::Seo::OgImage do
       slug_a.should eq(Hwaro::Content::Seo::OgImage.slug_for(a, {} of String => String))
     end
 
+    # Regression: Page#url= stores `#`/`?` as %23/%3F; the escape ended up
+    # in the file name, which the og:image URL then addressed decoded (404).
+    it "keeps percent escapes out of the slug of a URL with # or ?" do
+      page = Hwaro::Models::Page.new("posts/c#-tips.md")
+      page.url = "/posts/c#-tips/"
+      slug = Hwaro::Content::Seo::OgImage.slug_for(page, {} of String => String)
+      slug.should eq("posts-c--tips")
+
+      config = Hwaro::Models::Config.new
+      image_url = config.og.resolve_image_url("/og-images/#{slug}.png", "https://example.com").not_nil!
+      URI.decode(URI.parse(image_url).path).should eq("/og-images/#{slug}.png")
+    end
+
     it "does not touch slugs that already fit" do
       page = Hwaro::Models::Page.new("a.md")
       page.url = "/posts/#{"b" * 200}/"

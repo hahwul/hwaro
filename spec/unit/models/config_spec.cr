@@ -3071,6 +3071,17 @@ describe "Hwaro::Models::Config" do
       config.not_nil!.title.should eq(Hwaro::Models::Config.new.title)
     end
 
+    it "warns on a non-string base_url / default_language too" do
+      config = nil
+      log = with_captured_log do
+        config = load_config("base_url = 7\ndefault_language = 7")
+      end
+      log.should contain("Ignoring non-string config value base_url = 7")
+      log.should contain("Ignoring non-string config value default_language = 7")
+      config.not_nil!.default_language.should eq("en")
+      config.not_nil!.base_url.should eq("")
+    end
+
     it "does not warn when they are absent or strings" do
       log = with_captured_log do
         load_config(%(title = "My Site"))
@@ -3446,6 +3457,28 @@ describe "Hwaro::Models::Config" do
     it "falls back to standalone on an unknown display mode" do
       config = load_config(%(title = "x"\nbase_url = "https://example.com"\n\n[pwa]\nenabled = true\ndisplay = "weird"\n))
       config.pwa.display.should eq("standalone")
+    end
+  end
+end
+
+# The `sitemap = true` short form is a scalar, so a `[sitemap]` table in
+# config.<env>.toml replaced it and the merged sitemap came out disabled.
+describe "environment override of the sitemap short form" do
+  it "deep-merges a [sitemap] table onto sitemap = true, and back" do
+    Dir.mktmpdir do |dir|
+      base = File.join(dir, "config.toml")
+      env_path = File.join(dir, "config.production.toml")
+      File.write(base, "sitemap = true\n")
+      File.write(env_path, "[sitemap]\nchangefreq = \"daily\"\n")
+      config = Hwaro::Models::Config.load(base, env: "production")
+      config.sitemap.enabled.should be_true
+      config.sitemap.changefreq.should eq("daily")
+
+      File.write(base, "[sitemap]\nenabled = true\nfilename = \"map.xml\"\n")
+      File.write(env_path, "sitemap = false\n")
+      config = Hwaro::Models::Config.load(base, env: "production")
+      config.sitemap.enabled.should be_false
+      config.sitemap.filename.should eq("map.xml")
     end
   end
 end

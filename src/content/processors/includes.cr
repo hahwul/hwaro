@@ -261,6 +261,21 @@ module Hwaro
           lines[first...stop].join
         end
 
+        # The custom id (`## Setup {#install}`, `{#install .cls}`) of the
+        # first ATX heading of `markdown` that `heading_section` would match,
+        # or nil when that heading has none (its id is then the slug).
+        def heading_id(markdown : String, heading : String) : String?
+          want = Utils::TextUtils.slugify(heading)
+          tracker = FenceTracker.new
+          markdown.each_line(chomp: false) do |line|
+            next if tracker.fence_line?(line)
+            next unless m = ATX_RE.match(line)
+            text = m[2]? || ""
+            next unless Utils::TextUtils.slugify(visible_text(text.sub(/[ \t]*\{[^{}]*\}\z/, ""))) == want
+            return text[/\{\#([\w][\w:-]*)(?:[ \t][^{}]*)?\}\z/, 1]?
+          end
+        end
+
         # `{first line, level, visible text}` of every heading outside code.
         private def section_headings(lines : Array(String)) : Array({Int32, Int32, String})
           tracker = FenceTracker.new

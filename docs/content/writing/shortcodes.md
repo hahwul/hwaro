@@ -383,8 +383,10 @@ Arguments support multiple quote styles:
 ```markdown
 {{ alert(type="warning", message="Double quotes") }}
 {{ alert(type='info', message='Single quotes') }}
-{{ alert(type=danger, message=No quotes for simple values) }}
+{{ alert(type=danger, message=Unquoted) }}
 ```
+
+An unquoted value ends at the first space (`message=No quotes here` passes just `No`), so quote anything longer than one word.
 
 ### Positional Arguments
 

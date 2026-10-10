@@ -252,6 +252,20 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_task_lists("")
       result.should eq("")
     end
+
+    it "keeps a list item that opens with a link labelled x" do
+      html, _ = Hwaro::Processor::Markdown.render("- [x](https://x.com) link\n- [ ] todo\n- [X]", markdown_config: make_config(task_lists: true))
+      html.should contain(%(<li><a href="https://x.com">x</a> link</li>))
+      html.should contain(%(<li><input type="checkbox" disabled> todo</li>))
+      html.should contain(%(<input type="checkbox" checked disabled>))
+    end
+
+    it "converts task markers in ordered list items" do
+      html, _ = Hwaro::Processor::Markdown.render("1. [ ] one\n2. [x] two\n\n3) [X] three", markdown_config: make_config(task_lists: true))
+      html.should contain(%(<li><input type="checkbox" disabled> one</li>))
+      html.should contain(%(<li><input type="checkbox" checked disabled> two</li>))
+      html.should contain(%(<li><input type="checkbox" checked disabled> three</li>))
+    end
   end
 
   describe "definition lists (extended)" do
@@ -304,6 +318,23 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
   end
 
   describe "footnotes (extended)" do
+    it "extracts definitions indented by up to three spaces" do
+      md = "A[^a] B[^b]\n\n   [^a]: three spaces\n\nText.\n\n    [^b]: four is code"
+      html, _ = Hwaro::Processor::Markdown.render(md, markdown_config: make_config(footnotes: true))
+      html.should contain(%(<li id="fn-a">\n<p>three spaces <a))
+      html.should contain(%(B[^b]))
+      html.should contain(%(<pre><code>[^b]: four is code))
+    end
+
+    it "matches footnote labels case-insensitively, exact keys first" do
+      md = "A[^Note] B[^my  key] C[^x] D[^X]\n\n[^note]: folded\n[^My Key]: spaced\n[^x]: lower\n[^X]: upper"
+      html, _ = Hwaro::Processor::Markdown.render(md, markdown_config: make_config(footnotes: true))
+      html.should contain(%(A<sup class="footnote-ref"><a href="#fn-note" id="fnref-note">[1]</a></sup>))
+      html.should contain(%(B<sup class="footnote-ref"><a href="#fn-My-Key" id="fnref-My-Key">[2]</a></sup>))
+      html.should contain(%(<li id="fn-x">\n<p>lower ))
+      html.should contain(%(<li id="fn-X">\n<p>upper ))
+    end
+
     it "handles footnote keys with special characters (dashes)" do
       content = "Text[^my--note].\n\n[^my--note]: Note with dashes"
       result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_footnotes(content)
@@ -374,6 +405,12 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
   end
 
   describe "math (extended)" do
+    it "keeps multi-line display math inside its blockquote" do
+      html, _ = Hwaro::Processor::Markdown.render("> $$\n> a > b\n> $$\n\n> text $$x\n> y$$ end", markdown_config: make_config(math: true))
+      html.should eq("<blockquote>\n<div class=\"math math-display\">\\[\na &gt; b\n\\]</div>\n</blockquote>\n" \
+                     "<blockquote>\n<p>text <span class=\"math math-display\">\\[x\ny\\]</span> end</p>\n</blockquote>\n")
+    end
+
     it "handles multiline display math" do
       content = "$$\na + b\n= c\n$$"
       result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))
@@ -1007,6 +1044,17 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html, _ = Hwaro::Processor::Markdown.render("~~bye~~", markdown_config: cfg)
       html.should contain("<del>bye</del>")
     end
+
+    it "leaves autolink URLs alone" do
+      md = "<https://x.com/a~~b~~c> <https://x.com/~al/~bo> <https://x.com/?a==b==c> ~~real~~"
+      html, _ = Hwaro::Processor::Markdown.render(md, markdown_config: make_config(sub: true, mark: true))
+      html.should eq(%(<p><a href="https://x.com/a~~b~~c">https://x.com/a~~b~~c</a> <a href="https://x.com/~al/~bo">https://x.com/~al/~bo</a> <a href="https://x.com/?a==b==c">https://x.com/?a==b==c</a> <del>real</del></p>\n))
+    end
+
+    it "keeps backslash-escaped ~~ literal instead of leaking escaped tags" do
+      html, _ = Hwaro::Processor::Markdown.render("a \\~~not\\~~ b and ~~x\\~~ y~~ and \\\\~~z~~", markdown_config: make_config)
+      html.should eq("<p>a ~~not~~ b and <del>x~~ y</del> and \\<del>z</del></p>\n")
+    end
   end
 
   describe "footnote inline markdown" do
@@ -1231,7 +1279,14 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should contain("<li>two</li>")
     end
 
-    it "is off by default and skipped in safe mode" do
+    it "renders the title as inline markdown, escaping raw HTML" do
+      cfg = make_config
+      cfg.containers = true
+      html, _ = Hwaro::Processor::Markdown.render(":::tip *Heads* `up` <b>x</b>\nbody\n:::", markdown_config: cfg)
+      html.should contain(%(<p class="admonition-title"><em>Heads</em> <code>up</code> &lt;b&gt;x&lt;/b&gt;</p>))
+    end
+
+    it "is off by default and also renders in safe mode" do
       html, _ = Hwaro::Processor::Markdown.render(":::note\nx\n:::", markdown_config: make_config)
       html.should_not contain("admonition")
 
@@ -1239,11 +1294,26 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       cfg.containers = true
       cfg.safe = true
       html, _ = Hwaro::Processor::Markdown.render(":::note\nx\n:::", markdown_config: cfg, safe: true)
-      html.should_not contain("admonition")
+      html.should eq(%(<div class="admonition admonition-note">\n<p class="admonition-title">Note</p>\n<p>x</p>\n</div>\n))
     end
   end
 
   describe "multi-line footnotes" do
+    it "keeps the first of duplicate definitions and drops the rest" do
+      cfg = make_config(footnotes: true)
+      html, _ = Hwaro::Processor::Markdown.render("a[^1]\n\n[^1]: first\n[^1]: second\n    more\n", markdown_config: cfg)
+      html.should contain("<p>first <a href")
+      html.should_not contain("second")
+      html.should_not contain("more")
+    end
+
+    it "starts a bare `[^1]:` body on the next line without a leading newline" do
+      cfg = make_config(footnotes: true)
+      html, _ = Hwaro::Processor::Markdown.render("a[^1] b[^2]\n\n[^1]:\n    one\n\n[^2]: \n\n    two", markdown_config: cfg)
+      html.should contain(%(<li id="fn-1">\n<p>one <a href))
+      html.should contain(%(<li id="fn-2">\n<p>two <a href))
+    end
+
     it "joins indented continuation lines into one paragraph" do
       cfg = make_config(footnotes: true)
       html, _ = Hwaro::Processor::Markdown.render(
@@ -1755,6 +1825,15 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should contain("<td><span class=\"math math-inline\">\\(x+y\\)</span></td>")
     end
 
+    it "escapes math bodies in cells, definitions and footnotes exactly once" do
+      md = "| col |\n|-----|\n| $a<b$ and $c\\&d$ |\n\nT\n: $x<y$\n\nN[^1]\n\n[^1]: fn $f>g$"
+      html, _ = Hwaro::Processor::Markdown.render(md, markdown_config: make_config(math: true, definition_lists: true, footnotes: true))
+      html.should contain(%(<td><span class="math math-inline">\\(a&lt;b\\)</span> and <span class="math math-inline">\\(c\\&amp;d\\)</span></td>))
+      html.should contain(%(<dd><span class="math math-inline">\\(x&lt;y\\)</span></dd>))
+      html.should contain(%(<p>fn <span class="math math-inline">\\(f&gt;g\\)</span> <a href="#fnref-1"))
+      html.should_not contain("&amp;lt;")
+    end
+
     it "renders footnote refs inside a table cell" do
       html, _ = Hwaro::Processor::Markdown.render("| col |\n|-----|\n| see[^1] |\n\n[^1]: note", markdown_config: make_config(footnotes: true))
       html.should contain("<td>see<sup class=\"footnote-ref\">")
@@ -1819,7 +1898,7 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
 
     it "keeps math spans untouched in footnote bodies while striking the rest" do
       html, _ = Hwaro::Processor::Markdown.render("Note[^1].\n\n[^1]: formula $~~x~~$ and ~~real~~", markdown_config: make_config(math: true, footnotes: true))
-      html.should contain("$~~x~~$")
+      html.should contain(%(<span class="math math-inline">\\(~~x~~\\)</span>))
       html.should contain("<del>real</del>")
     end
 
@@ -2257,5 +2336,103 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should contain("<del>too</del>")
       html.should contain(%(<img src="i.png" alt="a ~~b~~" class="r" width="300" />))
     end
+  end
+end
+
+# `[markdown] safe = true` strips the author's raw HTML, but the extensions'
+# own markup reaches markd as raw HTML too and used to be stripped with it.
+private def render_safe(content : String) : String
+  cfg = make_config(task_lists: true, footnotes: true, definition_lists: true, math: true,
+    ins: true, mark: true, sub: true, sup: true)
+  cfg.containers = true
+  cfg.safe = true
+  html, _ = Hwaro::Processor::Markdown.render(content, markdown_config: cfg, safe: true)
+  html.should_not match(/hwaro[0-9a-f]{24}/) # no safe-mode mark leaks
+  html
+end
+
+describe "safe mode extension markup" do
+  it "keeps every extension's markup" do
+    html = render_safe(<<-MD)
+      | h |
+      |---|
+      | **b** |
+
+      Term
+      : Def
+
+      - [ ] todo
+      - [x] done
+
+      ~~del~~ ++ins++ ==mark== H~2~O x^2^ ref[^1] $x^2$
+
+      $$
+      y
+      $$
+
+      :::tip
+      body
+      :::
+
+      [^1]: Note **n**.
+      MD
+    html.should contain("<table>\n<thead>\n<tr>\n<th>h</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td><strong>b</strong></td>\n</tr>\n</tbody>\n</table>")
+    html.should contain("<dl>\n<dt>Term</dt>\n<dd>Def</dd>\n</dl>")
+    html.should contain(%(<li><input type="checkbox" disabled> todo</li>))
+    html.should contain(%(<li><input type="checkbox" checked disabled> done</li>))
+    html.should contain(%(<del>del</del> <ins>ins</ins> <mark>mark</mark> H<sub>2</sub>O x<sup>2</sup> ref<sup class="footnote-ref"><a href="#fn-1" id="fnref-1">[1]</a></sup> <span class="math math-inline">\\(x^2\\)</span>))
+    html.should contain(%(<div class="math math-display">\\[\ny\n\\]</div>))
+    html.should contain(%(<div class="admonition admonition-tip">\n<p class="admonition-title">Tip</p>\n<p>body</p>\n</div>))
+    html.should contain(%(<section class="footnotes">))
+    html.should contain(%(<p>Note <strong>n</strong>. <a href="#fnref-1" class="footnote-backref">))
+    html.should_not contain("raw HTML omitted")
+  end
+
+  it "still omits author raw HTML, wherever it sits" do
+    html = render_safe(<<-MD)
+      | <b>cell</b> | <img src=x onerror=alert(1)> |
+      |---|---|
+      | a | b |
+      <script>alert(2)</script>
+      <img src=x onerror=alert(3)
+
+      ~~<script>alert(4)</script>~~ <b>inline</b>
+
+      Term <i>t</i>
+      : Def <script>alert(5)</script>
+
+      <div>~~x~~ <span onclick="alert(6)">y</span></div>
+
+      $$
+      z
+      $$
+      </div></main><script>alert(7)</script>
+
+      Ref[^n].
+
+      [^n]: <img src=x onerror=alert(8)> body
+
+      <!--HWARO-FOOTNOTES-START-->
+      <!--HWARO-FN:x:1.1:<img src=x onerror=alert(9)>-->
+      <!--HWARO-FOOTNOTES-END-->
+      MD
+    html.should_not match(/<(script|img|b|i|span|main)[\s>]/)
+    html.should_not contain("</div></main>")
+    html.should_not contain("onclick=")
+    html.should contain("<!-- raw HTML omitted -->")
+    # Cell, term and footnote text is escaped, as with safe = false.
+    html.should contain("<th>&lt;b&gt;cell&lt;/b&gt;</th>")
+    html.should contain("<dt>Term &lt;i&gt;t&lt;/i&gt;</dt>")
+    html.should contain("&lt;img src=x onerror=alert(8)&gt; body")
+    html.scan(/<div\b/).size.should eq(html.scan(/<\/div>/).size)
+  end
+
+  it "renders the same markup as safe = false when there is no raw HTML" do
+    content = "| a |\n|---|\n| ~~b~~ $c$ |\n\nT\n: d[^1]\n\n- [x] e\n\n[^1]: f"
+    cfg = make_config(task_lists: true, footnotes: true, definition_lists: true, math: true,
+      ins: true, mark: true, sub: true, sup: true)
+    cfg.containers = true
+    unsafe, _ = Hwaro::Processor::Markdown.render(content, markdown_config: cfg)
+    render_safe(content).should eq(unsafe)
   end
 end

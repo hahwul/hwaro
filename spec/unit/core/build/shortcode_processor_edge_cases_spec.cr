@@ -449,6 +449,40 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
       builder.test_sc_process_with_results(content, templates, {} of String => Crinja::Value, results)
       results.values.first.should_not contain("HWARO-INLINE-CODE")
     end
+
+    # A fenced example inside a block body was live text to the block
+    # parser: the fenced `{% alert %}…{% end %}` paired as a nested block and
+    # expanded, leaving its placeholder escaped inside the rendered code.
+    it "keeps shortcode examples fenced inside a block body literal" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {
+        "shortcodes/note"  => %(<div class="note">{{ body }}</div>),
+        "shortcodes/alert" => %(<b>ALERT</b>),
+        "shortcodes/say"   => %(<i>SAY</i>),
+      }
+      results = {} of String => String
+      fenced = %(```markdown\n{% alert(type="info") %}Hi{% end %}\n{{ say() }}\n```)
+      content = %({% note() %}\nShow:\n\n#{fenced}\n\n{{ say() }} live\n{% endnote %}\n\nafter)
+      out = builder.test_sc_process_with_results(content, templates, {} of String => Crinja::Value, results)
+      results.size.should eq(2)
+      note = results.values.find!(&.starts_with?(%(<div class="note">)))
+      note.should contain(fenced)
+      note.should_not contain("ALERT")
+      note.should_not contain("HWARO-INLINE-CODE")
+      out.should contain("after")
+      out.should_not contain("{% endnote %}")
+    end
+
+    it "keeps a fenced block closer inside a block body from closing the block" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/note" => %(<div class="note">{{ body }}</div>)}
+      results = {} of String => String
+      content = "{% note() %}\n```\n{% if x %}{% end %}\n```\ntail\n{% end %}\n\nafter"
+      out = builder.test_sc_process_with_results(content, templates, {} of String => Crinja::Value, results)
+      results.size.should eq(1)
+      results.values.first.should contain("{% if x %}{% end %}\n```\ntail")
+      out.should contain("after")
+    end
   end
 
   describe "nested shortcodes" do

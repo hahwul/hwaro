@@ -261,6 +261,7 @@ hwaro build -i /path/to/my-site -o ./dist
 | -v, --verbose | Show detailed output |
 | --profile | Print phase-by-phase and per-template build timing |
 | --debug | Print debug information after build |
+| -j, --json | Print one JSON summary (`{"status","pages_generated","duration_ms","cache_hits","raw_files_processed","pages_not_published"}`) on stdout instead of the log; implies `--quiet` |
 
 **About the output directory:** a full build starts from an empty output
 directory, but hwaro only clears a directory it can vouch for: the
@@ -373,6 +374,7 @@ hwaro serve -i /path/to/my-site -p 8080
 | --minify | Serve minified output |
 | --jobs N | Concurrent render workers. Default: auto, derived from the site listing fan-out |
 | --open | Open browser after starting |
+| --no-open | Do not open a browser (the default; overrides an earlier `--open`) |
 | -d, --drafts | Include draft content |
 | --include-expired | Include expired content |
 | --include-future | Include future-dated content |
@@ -392,6 +394,8 @@ hwaro serve -i /path/to/my-site -p 8080
 | --skip-og-image | Skip auto OG image generation |
 | --skip-image-processing | Skip image resizing and LQIP generation |
 | --profile | Print phase-by-phase and per-template build timing |
+| --fast | Fast dev mode: skip OG image generation and image processing (same as `--skip-og-image --skip-image-processing`; `[serve] fast = true` sets it by default) |
+| -j, --json | Print the ready event as one JSON line (`{"event":"ready","url",…,"pid"}`) instead of `hwaro serve: ready url=… pid=…`; implies `--quiet` |
 
 > **Fast dev server on large sites:** Set `[og.auto_image] lazy_generate = true` in `config.toml` to skip bulk OG generation during `hwaro serve`. Images are created on first request instead. See the [Faster Dev Server section](/features/og-images/#faster-dev-server) for the full explanation and recommended workflow with `--fast-start`.
 
@@ -516,6 +520,9 @@ hwaro doctor               # Diagnose config, template, and structure issues
 hwaro doctor --fix         # Normalize config values (base_url trailing slash, sitemap priority…)
 hwaro doctor --approve     # Add recommended config sections to config.toml
 hwaro doctor --full        # Both (equivalent to --fix --approve)
+hwaro doctor --fix --dry-run  # Preview the config.toml changes without writing
+hwaro doctor -e production    # Check config.toml merged with config.production.toml
+hwaro doctor -c site/content  # Check a non-default content directory
 ```
 
 **Exit codes.** `doctor` returns a classified exit code based on the most

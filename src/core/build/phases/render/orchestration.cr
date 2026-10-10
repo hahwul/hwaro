@@ -27,6 +27,11 @@ module Hwaro::Core::Build::Phases::Render
     # fingerprint of those sets into the rebuild decision.
     @unpublished_pages.set(0)
     @published_pages.set(0)
+    # Claim a deterministic owner for every output URL (slug collisions and
+    # alias collisions) — under parallel render the colliding file's bytes
+    # used to be whichever worker finished last, flapping run-to-run. First:
+    # a loser publishes no bundle files (withheld_bundle_dirs) or asset URLs.
+    @output_url_winners = compute_output_url_winners(all_pages)
     publish_asset_sources(ctx)
 
     # What templates read outside the tracked files (see render_inputs.cr):
@@ -45,7 +50,12 @@ module Hwaro::Core::Build::Phases::Render
       build_cache.check_render_inputs(render_inputs_digest(render_globals, build_cache.render_input_keys, render_input_values))
     end
     listing_fields = cache_enabled ? listing_page_fields(templates) : Builder::ListingPageFields.new(false, false)
-    page_set_fp = cache_enabled ? compute_page_set_fingerprint(site.pages, listing_fields) : ""
+    # Sections too: a section's page list carries its child sections as
+    # entries (Site#pages_for_section), so a sibling list or a parent
+    # listing prints a subsection's title, `[extra]` and excerpt — fields
+    # the section-set fingerprint does not carry, and readers of `.pages`
+    # that are not section-set dependent never consult anyway.
+    page_set_fp = cache_enabled ? compute_page_set_fingerprint(site.pages + site.sections, listing_fields) : ""
     section_set_fp = cache_enabled ? compute_section_set_fingerprint(site.sections, !site.config.menus_auto_sections.nil?) : ""
     pages_to_build = if cache_enabled
                        filtered = filter_changed_pages(all_pages, output_dir, build_cache, templates, site, page_set_fp, section_set_fp)
@@ -81,11 +91,6 @@ module Hwaro::Core::Build::Phases::Render
     use_highlight = highlight && (site.config.highlight.enabled)
 
     error_overlay = ctx.options.error_overlay
-
-    # Claim a deterministic owner for every output URL (slug collisions and
-    # alias collisions) — under parallel render the colliding file's bytes
-    # used to be whichever worker finished last, flapping run-to-run.
-    @output_url_winners = compute_output_url_winners(all_pages)
 
     # Fast-start mode: render only homepage + most recent N pages on this
     # pass and stash the rest on the Builder so a background fiber in
@@ -127,6 +132,10 @@ module Hwaro::Core::Build::Phases::Render
     result = @lifecycle.run_phase(Lifecycle::Phase::Render, ctx) do
       Logger.status_phase(pages_to_build.size > 0 ? "render #{pages_to_build.size} pages" : "render")
       global_vars = build_global_vars(site, ctx.options.cache_busting)
+      # The BeforeRender image hooks just filled the resize map.
+      if rerender_image_summaries(all_pages, site, templates, use_highlight, global_vars)
+        global_vars = build_global_vars(site, ctx.options.cache_busting)
+      end
       # Stash for the Write phase's 404 page (see @render_global_vars).
       @render_global_vars = global_vars
       @pages_by_path = build_pages_by_path(site)

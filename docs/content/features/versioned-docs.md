@@ -79,7 +79,7 @@ The version directory is swapped for the directory the version *publishes* under
 | `content/docs/v1/_index.md` | `/docs/v1/` |
 | `content/docs/v1/install.md` | `/docs/v1/install/` |
 
-With `latest_at_root = false` every version keeps its segment (`/docs/v2/install/`, `/docs/v1/install/`) and `/docs/` becomes a redirect stub to the latest version's root, unless you author your own `content/docs/_index.md`, which then keeps that URL.
+With `latest_at_root = false` every version keeps its segment (`/docs/v2/install/`, `/docs/v1/install/`) and `/docs/` becomes a redirect stub to the latest version's root, unless you author your own `content/docs/_index.md`, which then keeps that URL. A headless one (`render = false`, kept for its cascade) is never written, so the stub stays.
 
 The URL segment is the version **name**, not the directory basename: `name = "2.x"` with `path = "docs/v2"` publishes at `/docs/2.x/…` when it is not at root. Version directories may also sit at the top level (`content/v2/…`), in which case the latest version *is* the site root.
 
@@ -116,7 +116,7 @@ One entry per configured version, in config order. These are the switcher rows. 
 | `.name` | String | Version name |
 | `.label` | String | Display label |
 | `.latest` | Bool | Is the latest version |
-| `.url` | String | The **same page** in that version when it exists, else that version's root |
+| `.url` | String | The **same page** in that version when it exists, else that version's root (in the default language when the page's language has no root in that version) |
 | `.exists` | Bool | Whether the counterpart page exists (`false` → `url` is the version root) |
 | `.current` | Bool | Whether this row is the page's own version |
 
@@ -212,7 +212,7 @@ Latest-version pages self-canonicalize as usual. Paginated listings keep self-ca
 |---------|--------|---------|
 | `search.json` | `[versions] search` | latest only |
 | `sitemap.xml` | `[versions] search` (same switch) | latest only |
-| RSS / Atom (main, section, per-language) | `[versions] feeds` | latest only |
+| RSS / Atom (main, section, per-language, taxonomy term) | `[versions] feeds` | latest only |
 | Taxonomy term pages | `[versions] taxonomies` | latest only |
 | `llms.txt` / `llms-full.txt` | — | always latest only |
 

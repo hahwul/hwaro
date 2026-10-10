@@ -27,7 +27,6 @@ module Hwaro::Core::Build::Phases::ReadContent
   # Collect content file paths without parsing (single directory traversal)
   private def collect_content_paths(ctx : Lifecycle::BuildContext, include_drafts : Bool)
     config = ctx.config
-    content_files_enabled = config.try(&.content_files.enabled?) || false
     seen_raw = Set(String).new
     @content_index_dirs = Set(String).new
 
@@ -141,15 +140,26 @@ module Hwaro::Core::Build::Phases::ReadContent
         # `[content.files]` deny rules still apply to it — `disallow_paths =
         # ["drafts/**"]` must not leak `drafts/secrets.json`.
         next if seen_raw.includes?(relative_path)
-        is_raw = (ext == ".json" || ext == ".xml") && !config.try(&.content_files.denied?(relative_path))
-        is_content_file = content_files_enabled && config && config.content_files.publish?(relative_path)
 
-        if is_raw || is_content_file
+        if config && publishes_content_file?(config, relative_path)
           ctx.raw_files << Lifecycle::RawFile.new(file_path, relative_path)
           seen_raw << relative_path
         end
       end
     end
+  end
+
+  # Is the non-page file `content/<relative_path>` published by the Write
+  # phase's raw lane? Raw JSON/XML is published without an
+  # `allow_extensions` opt-in, but the `[content.files]` deny rules still
+  # apply to it — `disallow_paths = ["drafts/**"]` must not leak
+  # `drafts/secrets.json`. Shared with serve's content-file republish, which
+  # used to test `allow_extensions` alone and so never refreshed an edited
+  # `data.json` that every build publishes.
+  def publishes_content_file?(config : Models::Config, relative_path : String) : Bool
+    ext = File.extname(relative_path).downcase
+    return !config.content_files.denied?(relative_path) if ext == ".json" || ext == ".xml"
+    config.content_files.enabled? && config.content_files.publish?(relative_path)
   end
 
   # Extract the language code from a filename (`about.ko.md` -> "ko",

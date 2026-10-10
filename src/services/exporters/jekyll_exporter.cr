@@ -151,7 +151,12 @@ module Hwaro
           # `published`: letting an authored `published: true` pass through
           # would duplicate the key and (under Jekyll's last-wins loader)
           # publish the draft.
-          if is_draft
+          # A headless page (`render = false`: no output, kept out of
+          # listings) is unpublished in Jekyll terms; the bare `render` key
+          # was ignored and Jekyll published the page.
+          headless = fields["render"]?.try(&.raw) == false
+          handled << "render" if headless
+          if is_draft || (headless && fields["published"]?.try(&.raw).nil?)
             yaml_lines << "published: false"
             handled << "published"
           end
@@ -187,6 +192,13 @@ module Hwaro
             handled << "image"
           end
 
+          # jekyll-sitemap leaves out a page marked `sitemap: false`; the
+          # bare `in_sitemap` key was ignored and the page was listed again.
+          if fields["in_sitemap"]?.try(&.raw) == false && fields["sitemap"]?.try(&.raw).nil?
+            yaml_lines << "sitemap: false"
+            handled << "in_sitemap"
+          end
+
           # The inverse of the Jekyll importer's mappings. Passed through
           # under hwaro's names, Jekyll ignored all three: the page moved off
           # its `path`, its `aliases` stopped redirecting, and its
@@ -203,7 +215,8 @@ module Hwaro
               # Jekyll's default `/:year/:month/:day/:title.html`, away from the
               # address the build gave it and the one the rewritten `@/` links
               # (and every inbound URL) point at.
-              url = file_path.sub(content_dir, "").lstrip('/').sub(/\.(?:md|markdown)\z/, "").sub(/(\A|\/)_?index\z/, "\\1").strip('/')
+              relative = file_path.sub(content_dir, "").lstrip('/')
+              url = (front_matter_url(relative, fields) || relative.sub(/\.(?:md|markdown)\z/, "").sub(/(\A|\/)_?index\z/, "\\1")).strip('/')
               yaml_lines << "permalink: #{Hwaro::Utils::FrontmatterWriter.yaml_scalar("/#{url}/")}" unless url.empty?
             end
           end
@@ -219,6 +232,12 @@ module Hwaro
           if fields["last_modified_at"]?.try(&.raw).nil? && (updated = scalar_string(fields["updated"]?))
             yaml_lines << "last_modified_at: #{yaml_date_value(updated)}"
             handled << "updated"
+          end
+
+          # Jekyll's excerpt is the first paragraph unless the page names its
+          # separator, so the build's `<!-- more -->` summary was lost.
+          if fields["excerpt_separator"]?.try(&.raw).nil? && (marker = summary_marker(body))
+            yaml_lines << "excerpt_separator: #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(marker[0])}"
           end
 
           if passthrough = passthrough_yaml(fields, handled)

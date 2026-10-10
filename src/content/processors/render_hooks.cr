@@ -173,7 +173,7 @@ module Hwaro
               "url"      => Crinja::Value.new(page.url),
               "title"    => Crinja::Value.new(page.title),
               "path"     => Crinja::Value.new(page.path),
-              "language" => Crinja::Value.new(page.language || ""),
+              "language" => Crinja::Value.new(page.language || config.default_language),
             } of String => Crinja::Value),
             "config" => Crinja::Value.new({
               "base_url" => Crinja::Value.new(config.base_url),

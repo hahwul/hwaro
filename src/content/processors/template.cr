@@ -150,6 +150,9 @@ module Hwaro
           # url_for() function - generate URL for a path
           @env.functions["url_for"] = Crinja.function({path: ""}) do
             path = arguments["path"].to_s
+            # A `page.assets` entry names the content file; it publishes next
+            # to its page.
+            path = TemplateEngine.published_asset_url(env, path) || path
             base_url = env.resolve("base_url").to_s
             Crinja::Value.new(Filters::UrlFilters.absolutize(path, base_url))
           end
@@ -450,7 +453,7 @@ module Hwaro
             suffix_at = path.index(/[?#]/)
             suffix = suffix_at ? path[suffix_at..] : ""
             file_path = suffix_at ? path[0, suffix_at] : path
-            normalized = URI.decode(TemplateEngine.bundle_image_url(env, file_path) || (file_path.starts_with?("/") ? file_path : "/#{file_path}"))
+            normalized = URI.decode(TemplateEngine.bundle_image_url(env, file_path) || TemplateEngine.published_asset_url(env, file_path) || (file_path.starts_with?("/") ? file_path : "/#{file_path}"))
             normalized = Path.posix(normalized).normalize.to_s unless normalized.includes?('\0')
 
             if op != "fit"
@@ -526,6 +529,16 @@ module Hwaro
           nil
         end
 
+        # The URL a `page.assets` entry (content path) is published at, next
+        # to its page (Render#bundle_asset_urls); nil for anything else.
+        # Recorded as a render read, hit or miss: the answer moves with the
+        # owning page's slug/path and with the bundle's file list.
+        def self.published_asset_url(env : Crinja, path : String) : String?
+          record_render_read(BUNDLE_ASSET_READ_PREFIX + path) unless path.empty? || path.starts_with?('/') || path.includes?("://")
+          assets = env.resolve("__bundle_asset_urls__").raw
+          assets[path]?.try(&.to_s) if assets.is_a?(Hash)
+        end
+
         # Inputs a render read from OUTSIDE the tracked tree, recorded so a
         # `--cache` build can tell when they move: `env()` names, `load_data()`
         # files and `resize_image()` source images. None of them is in any
@@ -543,6 +556,9 @@ module Hwaro
         # `asset_integrity(name)`: the value is the integrity of what the name
         # resolves to (see AssetHooks.integrity), wherever the output lives.
         ASSET_READ_PREFIX = "asset:"
+        # `get_url`/`resize_image` of a `page.assets` entry: the value is the
+        # URL it publishes at (Render#bundle_asset_urls), or none.
+        BUNDLE_ASSET_READ_PREFIX = "bundle_asset:"
         # The wall clock, as a `Time#to_s`/date format: `now()` records its
         # format, and the build records the one behind each `current_*`
         # variable a template prints. The value is the clock formatted that
@@ -776,7 +792,10 @@ module Hwaro
               # env("VAR") — substitute if set (even empty)
               Crinja::Value.new(env_value)
             else
-              Logger.warn "Environment variable '#{var_name}' is not set (referenced in template)"
+              # Once per name per build, like load_data(): an `env()` in a
+              # base layout warned once for every page on the site.
+              first = @@load_data_mutex.synchronize { @@load_data_warned.add?("env:#{var_name}") }
+              Logger.warn "Environment variable '#{var_name}' is not set (referenced in template)" if first
               Crinja::Value.new("")
             end
           end

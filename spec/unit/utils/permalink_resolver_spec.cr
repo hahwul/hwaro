@@ -304,4 +304,15 @@ describe Hwaro::Utils::PermalinkResolver do
       resolve("old/my-post/index.md", config, slug: "renamed").should eq("/archive/renamed/")
     end
   end
+
+  # The writer drops empty segments (`a//b` -> `a/b/index.html`), so the
+  # URL must too: page.url and the sitemap advertised `/a//b/`.
+  describe "repeated slashes" do
+    it "collapses them in path, slug and pattern URLs" do
+      resolve("x.md", nil, custom_path: "a//b").should eq("/a/b/")
+      resolve("x.md", nil, custom_path: "/a/b//").should eq("/a/b/")
+      resolve("blog/x.md", nil, slug: "/y").should eq("/blog/y/")
+      resolve("posts/x.md", config_with({"posts" => "/:slug//:year/"}), slug: "s", date: Time.utc(2026, 1, 2)).should eq("/s/2026/")
+    end
+  end
 end

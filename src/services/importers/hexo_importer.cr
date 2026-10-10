@@ -167,8 +167,10 @@ module Hwaro
             fields["date"] = format_date(filename_date)
           end
 
-          # Mark drafts
-          if file_info[:draft]
+          # Mark drafts. Hexo also withholds a `_posts` file marked
+          # `published: false` (as the Jekyll importer maps it); dropping the
+          # key published it.
+          if file_info[:draft] || yaml.try { |y| y["published"]?.try(&.raw) == false }
             fields["draft"] = true
           end
 

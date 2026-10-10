@@ -191,7 +191,7 @@ adds about 54, so Hwaro warns about pages whose policy is longer.
 A host serves `404.html` at the missing URL, where no rule matches, so the
 404 page gets no policy in headers mode. Likewise, Cloudflare Pages redirects
 `/page.html` to `/page`, so a rule for a page published as a file
-(`/404.html`, or `path = "x.html"`) may never match there and the page gets no
+(`/404.html`, or an alias such as `aliases = ["/old.html"]`) may never match there and the page gets no
 policy. Use meta mode if those pages matter.
 
 ## Meta Mode

@@ -15,7 +15,7 @@ module Hwaro
         # `flags` threads math (keeps `$…$` spans in <dt>/<dd> bodies
         # untransformed for the later math pass) and the F10 opt-in inline
         # markup (ins/mark/sub/sup) into term/definition bodies.
-        def preprocess_definition_lists(content : String, *, flags : InlineMarkdown::Flags = InlineMarkdown::Flags.new) : String
+        def preprocess_definition_lists(content : String, *, flags : InlineMarkdown::Flags = InlineMarkdown::Flags.new, trusted : Bool = false) : String
           # Whole-content marker pre-check (memchr-fast): every definition line
           # must lstrip-start with ": " (see the loop conditions below), so a
           # content without ": " anywhere cannot contain a definition list and
@@ -48,7 +48,7 @@ module Hwaro
             # ": " line through as literal text.
             if i + 1 < lines.size && !fenced[i + 1] && !line.strip.empty? && lines[i + 1].lstrip.starts_with?(": ")
               # This is a definition list
-              result << "<dl>"
+              result << trust("<dl>", trusted)
               while i < lines.size && !fenced[i]
                 term = lines[i].strip
                 if term.empty?
@@ -56,7 +56,7 @@ module Hwaro
                   break
                 end
 
-                result << "<dt>#{render_inline_md(term, flags)}</dt>"
+                result << trust("<dt>#{render_inline_md(term, flags)}</dt>", trusted)
                 i += 1
 
                 # Collect definitions for this term
@@ -72,7 +72,7 @@ module Hwaro
                     definition += " #{lines[i].strip}"
                     i += 1
                   end
-                  result << "<dd>#{render_inline_md(definition, flags)}</dd>"
+                  result << trust("<dd>#{render_inline_md(definition, flags)}</dd>", trusted)
                 end
 
                 # Skip one or more blank lines between term groups within the same dl

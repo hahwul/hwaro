@@ -382,8 +382,10 @@ This is the **body** content of the shortcode.
 ```markdown
 {{ alert(type="warning", message="Double quotes") }}
 {{ alert(type='info', message='Single quotes') }}
-{{ alert(type=danger, message=No quotes for simple values) }}
+{{ alert(type=danger, message=Unquoted) }}
 ```
+
+따옴표 없는 값은 첫 공백에서 끝나므로(`message=No quotes here`는 `No`만 전달) 한 단어보다 긴 값은 따옴표로 감싸세요.
 
 ### 위치 인자
 

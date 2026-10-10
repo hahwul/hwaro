@@ -268,6 +268,7 @@ hwaro build -i /path/to/my-site -o ./dist
 | -v, --verbose | 상세 출력 |
 | --profile | 단계별·템플릿별 빌드 시간 출력 |
 | --debug | 빌드 후 디버그 정보 출력 |
+| -j, --json | 로그 대신 JSON 요약 하나(`{"status","pages_generated","duration_ms","cache_hits","raw_files_processed","pages_not_published"}`)를 stdout에 출력. `--quiet` 포함 |
 
 **출력 디렉토리에 대해:** 전체 빌드는 빈 출력 디렉토리에서 시작하지만, hwaro는
 자신이 책임질 수 있는 디렉토리만 비웁니다. 프로젝트 옆의 관례적인 `public/`,
@@ -379,6 +380,7 @@ hwaro serve -i /path/to/my-site -p 8080
 | --minify | 압축된 출력 서빙 |
 | --jobs N | 동시 렌더 워커 수. 기본값은 자동이며 사이트의 리스팅 fan-out에서 산정 |
 | --open | 시작 후 브라우저 열기 |
+| --no-open | 브라우저를 열지 않음(기본값. 앞선 `--open`을 덮어씀) |
 | -d, --drafts | 초안 콘텐츠 포함 |
 | --include-expired | 만료된 콘텐츠 포함 |
 | --include-future | 미래 날짜 콘텐츠 포함 |
@@ -398,6 +400,8 @@ hwaro serve -i /path/to/my-site -p 8080
 | --skip-og-image | 자동 OG 이미지 생성 생략 |
 | --skip-image-processing | 이미지 리사이즈와 LQIP 생성 생략 |
 | --profile | 단계별·템플릿별 빌드 시간 출력 |
+| --fast | 빠른 개발 모드: OG 이미지 생성과 이미지 처리를 생략(`--skip-og-image --skip-image-processing`와 동일. `[serve] fast = true`로 기본 적용) |
+| -j, --json | 준비 이벤트를 `hwaro serve: ready url=… pid=…` 대신 JSON 한 줄(`{"event":"ready","url",…,"pid"}`)로 출력. `--quiet` 포함 |
 
 > **대규모 사이트의 빠른 개발 서버:** `config.toml`에 `[og.auto_image] lazy_generate = true`를 설정하면 `hwaro serve` 중 일괄 OG 생성을 생략합니다. 이미지는 첫 요청 시 생성됩니다. 전체 설명과 `--fast-start`를 곁들인 권장 워크플로는 [개발 서버 속도 개선](/ko/features/og-images/#개발-서버-속도-개선) 절을 참고합니다.
 
@@ -519,6 +523,9 @@ hwaro doctor               # 설정, 템플릿, 구조 문제 진단
 hwaro doctor --fix         # 설정 값 정규화 (base_url 끝 슬래시, sitemap priority…)
 hwaro doctor --approve     # 권장 설정 섹션을 config.toml에 추가
 hwaro doctor --full        # 둘 다 (--fix --approve와 동일)
+hwaro doctor --fix --dry-run  # config.toml 변경 사항을 쓰지 않고 미리 보기
+hwaro doctor -e production    # config.production.toml을 병합한 설정으로 검사
+hwaro doctor -c site/content  # 기본값이 아닌 콘텐츠 디렉터리 검사
 ```
 
 **종료 코드.** `doctor`는 보고된 가장 심각한 문제를 기준으로 분류된

@@ -167,6 +167,11 @@ module Hwaro
       # Build warnings collected during rendering (used for error overlay in serve mode)
       property build_warnings : Array(String)
 
+      # Warnings already logged for this page by its summary pass and body
+      # render (see `Logger.dedupe_warnings`); cleared when the summary pass
+      # starts and when the body render ends.
+      getter warned_messages = Set(String).new
+
       # Whether parsing (front-matter / markdown) failed for this page
       property parse_failed : Bool
 
@@ -221,6 +226,8 @@ module Hwaro
       # New: Word count and reading time (computed)
       property word_count : Int32
       property reading_time : Int32 # in minutes
+      # How many of `word_count`'s words are single Han/Kana characters.
+      @cjk_word_count : Int32 = 0
 
       # New: Permalink (absolute URL with base_url)
       property permalink : String?
@@ -397,8 +404,8 @@ module Hwaro
       # root `_index.md` turns the whole `content/` tree into one recursive
       # bundle and republishes arbitrary non-markdown files (e.g.
       # `content/public/robots.txt`) to the output regardless of
-      # `allow_extensions`. When `[content.files]` is not configured, every
-      # non-markdown file is collected (unchanged behavior).
+      # `allow_extensions`. Without an allowlist every non-markdown file the
+      # deny rules leave is collected.
       #
       # Two structural limits keep the recursion inside the bundle it belongs
       # to (both hold regardless of `[content.files]`, which many hand-written
@@ -434,9 +441,18 @@ module Hwaro
           next if nested_bundle?(page_dir, file, content_dir, bundle_dirs)
 
           relative = Path[file].relative_to(content_dir).to_s
-          # Honor [content.files] allow/disallow rules when configured so the
-          # bundle path can't bypass the user's publishing allowlist.
-          next if content_files && content_files.enabled? && !content_files.publish?(relative)
+          # Honor [content.files] so the bundle path can't bypass the user's
+          # publishing rules. The deny rules (`disallow_extensions` /
+          # `disallow_paths`) always apply, like they do to raw JSON/XML; the
+          # allowlist only when set. Like the raw lane
+          # (ReadContent#publishes_content_file?), `.json`/`.xml` need no
+          # allowlist entry — dropping them here left a slugged bundle's
+          # `data.json` at its source path only, 404ing from the page.
+          if content_files
+            next if content_files.denied?(relative)
+            ext = File.extname(relative).downcase
+            next if content_files.enabled? && ext != ".json" && ext != ".xml" && !content_files.publish?(relative)
+          end
 
           relative
         end
@@ -473,14 +489,15 @@ module Hwaro
         # Shared with `hwaro tool stats` via TextUtils so the CLI report and
         # the published `page.word_count` can never drift apart. `text` is
         # the include-expanded body once the build has expanded it.
-        @word_count = Utils::TextUtils.count_words(text)
+        @word_count, @cjk_word_count = Utils::TextUtils.count_words_and_cjk(text)
         @word_count
       end
 
-      # Reading time in minutes at ~200 words per minute, from the
-      # `word_count` that `calculate_word_count` set.
+      # Reading time in minutes from the counts `calculate_word_count` set:
+      # ~200 words per minute, and ~500 per minute for Chinese/Japanese
+      # characters (each counted as a word, but read much faster).
       def calculate_reading_time : Int32
-        @reading_time = (@word_count / 200.0).ceil.to_i
+        @reading_time = ((@word_count - @cjk_word_count) / 200.0 + @cjk_word_count / 500.0).ceil.to_i
       end
 
       # Extract summary from content using <!-- more --> marker

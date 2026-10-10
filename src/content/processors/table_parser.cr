@@ -126,8 +126,9 @@ module Hwaro
         # also threads the F10 inline markup flags (ins/mark/sub/sup) into
         # cell rendering. `hooks` routes each table through the render-table
         # hook (see `Table#to_html`); nil keeps the stock output.
+        # `trusted` (safe mode) marks the emitted markup, see `MarkdownExtensions.trust`.
         def process(content : String, *, math : Bool = false, flags : InlineMarkdown::Flags? = nil,
-                    hooks : RenderHooks::HookRenderContext? = nil) : String
+                    hooks : RenderHooks::HookRenderContext? = nil, trusted : Bool = false) : String
           return content unless has_table?(content)
 
           effective = flags || InlineMarkdown::Flags.new(math: math)
@@ -168,7 +169,7 @@ module Hwaro
                 end
                 table, consumed = parse_table(quoted, 0)
                 if table
-                  table.to_html(flags: effective, hooks: hooks).each_line(chomp: true) do |html_line|
+                  MarkdownExtensions.trust(table.to_html(flags: effective, hooks: hooks), trusted).each_line(chomp: true) do |html_line|
                     result << "#{quote}#{html_line}"
                   end
                   # A `<table>` starts a type-6 HTML block that runs until a
@@ -187,7 +188,7 @@ module Hwaro
               # Try to parse the table
               table, consumed = parse_table(lines, i)
               if table
-                html = table.to_html(flags: effective, hooks: hooks)
+                html = MarkdownExtensions.trust(table.to_html(flags: effective, hooks: hooks), trusted)
                 # A table inside a list item is indented by the item's content
                 # column. The HTML block must carry the same indent, or it
                 # ends the item (and the list), orphaning what follows. (A

@@ -21,6 +21,28 @@ module Hwaro::Core::Build::Phases::Render
     build_global_vars(site, cache_busting)
   end
 
+  # Content-relative bundle asset (a `page.assets` entry) → the root-relative
+  # URL Write#process_assets copies it to, next to its page. `get_url(path=
+  # asset)` resolves through this: the content path itself is only published
+  # under a `[content.files]` allowlist, and a `slug`/`path`/language prefix
+  # moves the page (and its assets) away from it. A translated bundle shares
+  # its files; the default-language copy wins.
+  private def bundle_asset_urls(site : Models::Site) : Hash(String, String)
+    urls = {} of String => String
+    {site.pages, site.sections}.each do |list|
+      list.each do |p|
+        next if p.assets.empty? || p.output_suppressed
+        base = p.url.ends_with?('/') ? p.url : "#{p.url}/"
+        bundle = "#{File.dirname(p.path)}/"
+        p.assets.each do |asset|
+          next if p.language && urls.has_key?(asset)
+          urls[asset] = "#{base}#{asset.lchop(bundle)}"
+        end
+      end
+    end
+    urls
+  end
+
   private def build_global_vars(site : Models::Site, cache_busting : Bool = true) : Hash(String, Crinja::Value)
     config = site.config
     vars = {} of String => Crinja::Value
@@ -50,6 +72,7 @@ module Hwaro::Core::Build::Phases::Render
 
     vars["__all_pages__"] = Crinja::Value.new(all_pages_array)
     vars["__pages_by_path__"] = Crinja::Value.new(pages_by_path)
+    vars["__bundle_asset_urls__"] = Crinja::Value.new(bundle_asset_urls(site).transform_values { |url| Crinja::Value.new(url) })
 
     all_sections_array = [] of Crinja::Value
     sections_by_key = {} of String => Crinja::Value
@@ -169,7 +192,15 @@ module Hwaro::Core::Build::Phases::Render
     # round-tripping through Crinja::Value per insert would re-wrap the inner hash
     # each time and keep only the last term.
     lang_slug_maps = {} of String => Hash(String, Hash(String, String))
+    # A collision loser is never written and the generator keeps it off its
+    # term page (Taxonomies.build_taxonomy_index): get_taxonomy must not
+    # count it. Read here, not pruned from site.taxonomies, because every
+    # serve pass re-claims the winners before building these vars.
+    suppressed = site.pages.any?(&.output_suppressed)
     site.taxonomies.each do |name, terms|
+      if suppressed
+        terms = terms.transform_values(&.reject(&.output_suppressed)).reject! { |_, term_pages| term_pages.empty? }
+      end
       # Disambiguate over the SAME term set the taxonomy generator uses to write
       # pages — build_taxonomy_index counts only non-draft, non-generated pages.
       # Under `--drafts`, the render-phase site.taxonomies (rebuild_taxonomies)
@@ -195,10 +226,10 @@ module Hwaro::Core::Build::Phases::Render
       # Term order matches the taxonomy's `terms_sort_by` as the ROOT index
       # page applies it: "name" = alphabetical (also the default for
       # unconfigured taxonomy names), "count" = page count descending,
-      # name-ascending tiebreak. Counts here are site-wide (all languages,
-      # like the root index); per-language index pages sort by their own
-      # language-filtered counts and may order differently — get_taxonomy
-      # is a site-wide view, so the root rule is the right parity target.
+      # name-ascending tiebreak. Counts here are site-wide (all languages);
+      # every index page (the root one included, on a multilingual site)
+      # sorts by its own language-filtered counts and may order differently
+      # — get_taxonomy is a site-wide view (documented in functions.md).
       tax_cfg = config.taxonomies.find { |t| t.name == name }
       sorted_term_names = if tax_cfg.try(&.terms_sort_by) == "count"
                             terms.keys.sort! do |a, b|

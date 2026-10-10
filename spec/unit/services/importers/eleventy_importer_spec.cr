@@ -146,6 +146,24 @@ describe Hwaro::Services::Importers::EleventyImporter do
       end
     end
 
+    it "maps permalink: false to render = false and a literal permalink to path" do
+      Dir.mktmpdir do |dir|
+        posts_dir = File.join(dir, "posts")
+        FileUtils.mkdir_p(posts_dir)
+        File.write(File.join(posts_dir, "hidden.md"), "---\ntitle: Hidden\npermalink: false\n---\nX\n")
+        File.write(File.join(posts_dir, "moved.md"), "---\ntitle: Moved\npermalink: /about-us/\n---\nX\n")
+        File.write(File.join(posts_dir, "tpl.md"), "---\ntitle: Tpl\npermalink: \"{{ page.fileSlug }}/\"\n---\nX\n")
+
+        output_dir = File.join(dir, "output")
+        Hwaro::Services::Importers::EleventyImporter.new.run(
+          Hwaro::Config::Options::ImportOptions.new(source_type: "eleventy", path: dir, output_dir: output_dir))
+
+        File.read(File.join(output_dir, "posts", "hidden.md")).should contain("render = false")
+        File.read(File.join(output_dir, "posts", "moved.md")).should contain(%(path = "about-us"))
+        File.read(File.join(output_dir, "posts", "tpl.md")).should_not contain("path =")
+      end
+    end
+
     it "maps layout to template" do
       Dir.mktmpdir do |dir|
         posts_dir = File.join(dir, "posts")

@@ -10,7 +10,7 @@ module Hwaro::Core::Build
     end
 
     def test_process_raw_files(raw_files, output_dir, minify, verbose, written = Set(String).new) : Int32
-      process_raw_files(raw_files, output_dir, minify, verbose, written)
+      process_raw_files(raw_files, output_dir, minify, verbose, written, Set(String).new)
     end
 
     def test_process_assets(pages, output_dir, verbose, already_written = Set(String).new)
@@ -513,6 +513,26 @@ describe "Phases::Write withheld bundle files" do
     end
   end
 
+  it "keeps a collision loser's bundle files out of the winner's directory" do
+    # posts/a (slug = "x") and posts/x both publish /posts/x/; posts/a wins
+    # by path order, so /posts/x/cover.png must be posts/a's file.
+    {WITHHELD_BUNDLE_CONFIG, "title = \"T\"\nbase_url = \"http://localhost\"\n"}.each do |config|
+      build_site(
+        config,
+        content_files: {
+          "posts/a/index.md"  => "+++\ntitle = \"A\"\nslug = \"x\"\n+++\nA\n",
+          "posts/a/cover.png" => "A-cover",
+          "posts/x/index.md"  => "+++\ntitle = \"X\"\n+++\nX\n",
+          "posts/x/cover.png" => "X-cover",
+        },
+        template_files: {"page.html" => "{{ page.title }}"},
+      ) do
+        File.read("public/posts/x/index.html").should eq("A")
+        File.read("public/posts/x/cover.png").should eq("A-cover")
+      end
+    end
+  end
+
   it "publishes a draft bundle's files under --drafts" do
     build_site(
       WITHHELD_BUNDLE_CONFIG,
@@ -553,6 +573,138 @@ describe "Phases::Write withheld bundle files" do
       File.exists?("public/drafts/secrets.json").should be_false
       File.exists?("public/feed.xml").should be_false
       File.exists?("public/public.json").should be_true
+    end
+  end
+end
+
+describe "Phases::Write content copies vs pages and generated outputs" do
+  config = <<-TOML
+    title = "T"
+    base_url = "http://localhost"
+    [content.files]
+    allow_extensions = ["html", "txt"]
+    [sitemap]
+    enabled = true
+    TOML
+  content = {
+    "about.md"            => "+++\ntitle = \"About\"\n+++\n",
+    "about/index.html"    => "RAW",
+    "sitemap.xml"         => "<raw/>",
+    "post/index.md"       => "+++\ntitle = \"Post\"\naliases = [\"/post/old/\"]\n+++\n",
+    "post/index.html"     => "RAW",
+    "post/old/index.html" => "RAW",
+    "post/data.json"      => "{}",
+    "notes.txt"           => "kept",
+  }
+  templates = {"page.html" => "{{ page.title }}", "section.html" => "{{ section.title }}"}
+
+  it "keeps the rendered page, alias stub and sitemap over a same-path content file" do
+    build_site(config, content_files: content, template_files: templates) do
+      File.read("public/about/index.html").should eq("About")
+      File.read("public/post/index.html").should eq("Post")
+      File.read("public/post/old/index.html").should contain("url=/post/")
+      File.read("public/sitemap.xml").should contain("<urlset")
+      File.read("public/post/data.json").should eq("{}")
+      File.read("public/notes.txt").should eq("kept")
+    end
+  end
+
+  it "keeps them on a warm --cache build too" do
+    build_site(config, content_files: content, template_files: templates, cache: true) do
+      # Every page is a cache hit: the alias stub is on record only in the
+      # page's cache entry.
+      builder = Hwaro::Core::Build::Builder.new
+      Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+      builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false))
+      File.read("public/about/index.html").should eq("About")
+      File.read("public/post/index.html").should eq("Post")
+      File.read("public/post/old/index.html").should contain("url=/post/")
+      File.read("public/sitemap.xml").should contain("<urlset")
+    end
+  end
+end
+
+# Counts the O(pages) shadowed-output scans; a subclass so the count stays
+# out of every other spec's builder.
+private class ShadowScanCountingBuilder < Hwaro::Core::Build::Builder
+  getter shadow_scans = 0
+
+  def content_copy_shadowed_outputs(output_dir : String) : Set(String)
+    @shadow_scans += 1
+    super
+  end
+end
+
+describe "Phases::Write shadowed-output scan cost" do
+  # The scan costs O(pages) (owned outputs plus, on --cache, every cached
+  # page's derived paths): 6,300 pages took the Write phase from 0.4ms to
+  # 125ms+ with nothing to copy.
+  it "skips the scan when the build has no content copies" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}")
+        File.write("content/a.md", "+++\ntitle = \"A\"\n+++\n")
+        builder = ShadowScanCountingBuilder.new
+        builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)).should be_true
+        builder.shadow_scans.should eq(0)
+      end
+    end
+  end
+
+  it "scans once for a serve batch of content files" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[content.files]\nallow_extensions = ["txt"]))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}")
+        File.write("content/a.md", "+++\ntitle = \"A\"\n+++\n")
+        files = (1..3).map { |i| "content/f#{i}.txt" }
+        files.each { |path| File.write(path, "x") }
+        builder = ShadowScanCountingBuilder.new
+        builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)).should be_true
+        before = builder.shadow_scans
+
+        builder.copy_changed_content_files(files, "public")
+        (builder.shadow_scans - before).should eq(1)
+        File.read("public/f3.txt").should eq("x")
+      end
+    end
+  end
+end
+
+# Plays the other render worker: between this worker's failed mkdir and its
+# walk for the stale file, the rival deletes the file and makes its own
+# directory under the freed path.
+private class RivalWorkerBuilder < Hwaro::Core::Build::Builder
+  def initialize(kept_output_dir : String)
+    super()
+    @kept_output_dir = kept_output_dir
+  end
+
+  def test_mkdir_output(dir : String)
+    mkdir_output(dir)
+  end
+
+  private def remove_stale_file_in_the_way(dir : String) : Bool
+    File.delete("public/blog")
+    Hwaro::Utils::FileSafe.mkdir_p("public/blog/b")
+    super
+  end
+end
+
+describe "Phases::Write mkdir_output under parallel render" do
+  it "creates the directory when a rival worker already removed the stale file" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("public")
+        File.write("public/blog", "previous build's file")
+        RivalWorkerBuilder.new("public").test_mkdir_output("public/blog/a")
+        Dir.exists?("public/blog/a").should be_true
+      end
     end
   end
 end

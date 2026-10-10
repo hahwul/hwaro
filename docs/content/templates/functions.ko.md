@@ -138,9 +138,10 @@ toc = true
 
 `items`의 순서는 해당 택소노미의
 [`terms_sort_by`](/ko/writing/taxonomies/#정렬)를 따릅니다. `"name"`(기본값,
-가나다순) 또는 `"count"`(페이지 수 내림차순, 동수일 때 이름 오름차순)입니다.
-개수는 모든 언어를 합산한 사이트 전체 기준으로, 루트 택소노미 인덱스
-페이지와 동일합니다.
+바이트 순서라 대문자가 먼저) 또는 `"count"`(페이지 수 내림차순, 동수일 때 이름 오름차순)입니다.
+개수는 모든 언어를 합산한 사이트 전체 기준입니다. 다국어 사이트의 루트
+택소노미 인덱스 페이지는 기본 언어 페이지만 세므로 `"count"` 순서가 다를 수
+있습니다.
 
 **Term 속성:**
 
@@ -171,6 +172,12 @@ toc = true
 | term | String | 항목 이름 |
 
 **반환값:** String(절대 URL)
+
+기본 언어가 아닌 페이지에서는 해당 언어의 항목 페이지(`/ko/tags/crystal/`)가
+있으면 그 URL을, 없으면 루트 항목 페이지 URL을 반환합니다. URL은 어떤 항목에
+대해서도 만들어지므로, 그 항목이 실제로 게시된 페이지를 가질 때만 존재하는
+페이지를 가리킵니다. 기본 언어의 `[languages.<code>] taxonomies`에서 빠진
+택소노미에는 루트 항목 페이지가 없습니다.
 
 ---
 
@@ -333,6 +340,8 @@ base_url이 포함된 URL을 생성합니다.
 
 **반환값:** String(절대 URL)
 
+`page.assets`/`section.assets` 항목(`blog/my-trip/photo.jpg`)을 넘기면 페이지 옆에 게시된 사본의 URL이 됩니다. `slug`, `path`, 언어 접두사로 페이지가 옮겨 가도 마찬가지입니다.
+
 ---
 
 ### get_url()
@@ -441,7 +450,7 @@ base_url이 포함된 URL을 생성합니다.
 
 | 이름 | 타입 | 설명 |
 |------|------|-------------|
-| path | String | 이미지 경로(예: `/images/photo.jpg`) |
+| path | String | 이미지 경로(예: `/images/photo.jpg`) 또는 `page.assets` 항목 |
 | width | Int | 요청 너비(픽셀, 0 = 원본) |
 | height | Int | 요청 높이(픽셀, 0 = 원본) |
 | op | String | `fit`(기본값), `fill`, `crop` — [자르기와 채우기](/ko/features/image-processing/#자르기와-채우기) 참고 |

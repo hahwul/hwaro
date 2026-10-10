@@ -6,9 +6,11 @@
 module Hwaro::Core::Build::Phases::Render
   # Markers in a page's resolved template closure that mean it renders content
   # derived from the global page/section set, so it must re-render when that set
-  # changes (not only when its own source changes).
+  # changes (not only when its own source changes). Version URLs
+  # (`page.version`, `page.version_links`, `versions`) name the version root
+  # sections the set actually holds (Versions.root_url).
   PAGE_SET_MARKERS    = ["site.pages", "__all_pages__", ".pages", "paginate", "site.taxonomies", "__taxonomies__", "get_taxonomy", "site.menus", "get_menu", "__menus__", "version_links", "versions"]
-  SECTION_SET_MARKERS = ["site.sections", "__all_sections__", "get_section", "site.menus", "get_menu", "__menus__"]
+  SECTION_SET_MARKERS = ["site.sections", "__all_sections__", "get_section", "site.menus", "get_menu", "__menus__", "page.version", "versions"]
 
   # The same markers split into the PROJECTIONS of the page set they actually
   # read. `filter_changed_pages` already distinguishes two (pages vs
@@ -31,6 +33,11 @@ module Hwaro::Core::Build::Phases::Render
   TAXONOMY_URL_MARKER = "get_taxonomy_url"
   GET_TAXONOMY_RE     = /get_taxonomy(?!_url)/
 
+  # `get_url`/`resize_image` of a `page.assets` entry resolves through the
+  # bundle asset URL map (Render#bundle_asset_urls), which moves with the
+  # owning page's URL.
+  ASSET_URL_MARKERS = ["get_url", "url_for", "resize_image"]
+
   LISTING_PAGE_MARKERS    = PAGE_SET_MARKERS - MENU_SET_MARKERS
   LISTING_SECTION_MARKERS = SECTION_SET_MARKERS - MENU_SET_MARKERS
 
@@ -49,7 +56,8 @@ module Hwaro::Core::Build::Phases::Render
     section : Bool,
     menu : Bool,
     taxonomy_slug : Bool,
-    lookup : Bool
+    lookup : Bool,
+    asset_url : Bool = false
 
   # Projection scan of one closure source blob for the serve fan-out. Same
   # closure (and same tracking-off fallback) as `listing_template_deps`,
@@ -63,6 +71,7 @@ module Hwaro::Core::Build::Phases::Render
       menu: MENU_SET_MARKERS.any? { |marker| blob.includes?(marker) },
       taxonomy_slug: blob.includes?(TAXONOMY_URL_MARKER),
       lookup: !get_page_targets(blob).empty?,
+      asset_url: ASSET_URL_MARKERS.any? { |marker| blob.includes?(marker) },
     )
   end
 
@@ -122,11 +131,13 @@ module Hwaro::Core::Build::Phases::Render
   INTERNAL_LINK_TARGET_RE = /<@\/([^>\n#?]+)|@\/([^\s()"'#?<>\[\]]+)/
 
   # A content-derived field or `[extra]` read straight off a relation —
-  # `page.higher.summary`, `get_page(path="x").extra.badge` — where the
-  # receiver is an attribute or a call result, so the `<receiver>.<field>`
-  # patterns above (which need a bare word receiver) cannot see it.
-  CHAINED_CONTENT_DERIVED_RE = /(?:\.(?:lower|higher)|\))\s*(?:\.\s*(?:summary(?:_truncated)?|word_count|reading_time)\b|\[\s*["'](?:summary(?:_truncated)?|word_count|reading_time)["'])/
-  CHAINED_EXTRA_RE           = /(?:\.(?:lower|higher)|\))\s*(?:\.\s*extra\b|\[\s*["']extra["'])/
+  # `page.higher.summary`, a menu entry's `m.page.extra.icon`,
+  # `get_page(path="x").extra.badge`, `xs[0].summary` —
+  # where the receiver is an attribute, a call result or a subscript, so
+  # the `<receiver>.<field>` patterns above (which need a bare word
+  # receiver) cannot see it.
+  CHAINED_CONTENT_DERIVED_RE = /(?:\.(?:lower|higher|page)|[)\]])\s*(?:\.\s*(?:summary(?:_truncated)?|word_count|reading_time)\b|\[\s*["'](?:summary(?:_truncated)?|word_count|reading_time)["'])/
+  CHAINED_EXTRA_RE           = /(?:\.(?:lower|higher|page)|[)\]])\s*(?:\.\s*extra\b|\[\s*["']extra["'])/
 
   # Which relations one page's template closure reads (see the markers above),
   # and which optional page fields it reads off them (`fields`).
@@ -212,13 +223,36 @@ module Hwaro::Core::Build::Phases::Render
   # neighbour, and a section body edit every page under it.
   private def relation_page_fields(blob : String) : Builder::ListingPageFields
     rebound = blob.matches?(REBINDS_SELF_RE)
+    serialized = serializes_other_page?(blob, rebound)
     Builder::ListingPageFields.new(
-      extra: blob.matches?(CHAINED_EXTRA_RE) ||
+      extra: serialized || blob.matches?(CHAINED_EXTRA_RE) ||
              reads_other_page_field?(blob, EXTRA_ATTR_RE, EXTRA_INDEX_RE, EXTRA_ARG_RE, rebound),
-      content_derived: blob.matches?(CHAINED_CONTENT_DERIVED_RE) ||
+      content_derived: serialized || blob.matches?(CHAINED_CONTENT_DERIVED_RE) ||
                        reads_other_page_field?(blob, CONTENT_DERIVED_ATTR_RE,
                          CONTENT_DERIVED_INDEX_RE, CONTENT_DERIVED_ARG_RE, rebound),
     )
+  end
+
+  # `section.pages | tojson`, `p | jsonify`: a WHOLE page object serialized
+  # prints every field, `[extra]` and excerpt included. Only a non-self name,
+  # a call or subscript result, or a page-valued attribute counts —
+  # `p.title | tojson`, the common JSON-template idiom, prints one field the
+  # patterns above already see.
+  SERIALIZE_RE        = /(?:(?<![\w.])(\w+)|[)\]])((?:\.\w+)*)\s*\|\s*(?:tojson|jsonify)\b/
+  PAGE_VALUED_ATTR_RE = /\.(?:pages|lower|higher|series_pages|related_posts|backlinks|subsections)\z/
+
+  private def serializes_other_page?(blob : String, rebound : Bool) : Bool
+    return false unless blob.includes?("json")
+    blob.scan(SERIALIZE_RE) do |m|
+      path = m[2]
+      if path.empty?
+        root = m[1]?
+        return true if rebound || root.nil? || !SELF_RECEIVERS.includes?(root)
+      elsif path.matches?(PAGE_VALUED_ATTR_RE)
+        return true
+      end
+    end
+    false
   end
 
   # Shortcode templates (`shortcodes/<name>`) the page's content calls,
@@ -384,17 +418,14 @@ module Hwaro::Core::Build::Phases::Render
   end
 
   # Decide which optional page fields the page-set fingerprint must cover for
-  # THIS site (see Builder::ListingPageFields).
+  # THIS site (see Builder::ListingPageFields). Same receiver rules as the
+  # relations hash, chained reads included: a non-literal
+  # `get_page(path=page.extra.ref).summary` puts its template in the listing
+  # union, and only the chained match sees which field it prints.
   private def listing_page_fields(templates : Hash(String, String)) : Builder::ListingPageFields
     blob = listing_source_union(templates)
     return Builder::ListingPageFields.new(false, false) if blob.empty?
-
-    rebound = blob.matches?(REBINDS_SELF_RE)
-    Builder::ListingPageFields.new(
-      extra: reads_other_page_field?(blob, EXTRA_ATTR_RE, EXTRA_INDEX_RE, EXTRA_ARG_RE, rebound),
-      content_derived: reads_other_page_field?(blob, CONTENT_DERIVED_ATTR_RE,
-        CONTENT_DERIVED_INDEX_RE, CONTENT_DERIVED_ARG_RE, rebound),
-    )
+    relation_page_fields(blob)
   end
 
   # True when some listing template reads the field off a page OTHER than the
@@ -899,7 +930,10 @@ module Hwaro::Core::Build::Phases::Render
   # sorted and unique.
   private def internal_link_targets(page : Models::Page) : Array(String)
     targets = [] of String
-    page_scan_texts(page).each do |text|
+    texts = page_scan_texts(page)
+    # `redirect_to = "@/…"` resolves like a body link (generate_redirect_page).
+    page.redirect_to.try { |r| texts << r }
+    texts.each do |text|
       next unless Utils::ByteScan.includes?(text, "@/")
       text.scan(INTERNAL_LINK_TARGET_RE) { |m| targets << (m[1]? || m[2]) }
     end
@@ -925,7 +959,13 @@ module Hwaro::Core::Build::Phases::Render
         resolved = if link.image?
                      index.resolve_file(link.target, page) || ""
                    else
-                     index.resolve(link.target, page).try { |t| "#{t.path} #{t.url}" } ||
+                     # `#heading` links to the target's custom `{#id}` when
+                     # it declares one (Wikilinks#fragment), so that id is
+                     # part of what the link renders.
+                     index.resolve(link.target, page).try { |t|
+                       id = link.heading.try { |h| Content::Processors::Includes.heading_id(t.raw_content, h) }
+                       "#{t.path} #{t.url}##{id}"
+                     } ||
                        (index.resolve_file(link.target, page) if link.file?) || ""
                    end
         values << "#{link.embed ? '!' : ' '}#{link.target}=#{resolved}"

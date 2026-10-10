@@ -50,7 +50,7 @@ module Hwaro
 
             # Read the canonical rendered HTML
             canonical_path = output_path_for(page, output_dir)
-            next unless File.exists?(canonical_path)
+            next unless canonical_path && File.exists?(canonical_path)
 
             html = File.read(canonical_path)
             # A `--cache` hit still carries the policy `<meta>` the last
@@ -60,7 +60,7 @@ module Hwaro
             amp_html = convert_to_amp(html, page, config)
 
             # Write AMP version
-            amp_output = amp_output_path(page, output_dir, prefix)
+            amp_output = mirror_path(canonical_path, output_dir, prefix)
             unless Utils::OutputGuard.within_output_dir?(amp_output, output_dir)
               Logger.warn "Skipping AMP output outside output directory: #{amp_output}"
               next
@@ -174,11 +174,83 @@ module Hwaro
         # carrying an image or an embed failed validation on a DISALLOWED_ATTR
         # the author never wrote. Scoped to the converted tag's attribute
         # string (not a document-wide gsub) so a `loading=` appearing inside
-        # `<style amp-custom>` or JSON-LD text is untouched.
-        AMP_DISALLOWED_ATTR_RE = /\s+loading\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+)/i
+        # `<style amp-custom>` or JSON-LD text is untouched. `decoding` and
+        # `fetchpriority` are the image hints themes write on hero/card
+        # images; amp-img rejects both the same way.
+        AMP_DISALLOWED_ATTR_RE = /\s+(?:loading|decoding|fetchpriority)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+)/i
 
         private def self.strip_non_amp_attributes(attrs : String) : String
           attrs.gsub(AMP_DISALLOWED_ATTR_RE, "")
+        end
+
+        # amp-iframe accepts `allowfullscreen`/`allowtransparency` only as bare
+        # boolean attributes and `frameborder` only as 0/1; the values embed
+        # snippets carry (`allowfullscreen="true"`, `frameborder="no"`) fail
+        # validation.
+        private def self.normalize_iframe_attributes(attrs : String) : String
+          attrs
+            .gsub(/(\s)(allowfullscreen|allowtransparency)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+)/i) { "#{$1}#{$2}" }
+            .gsub(/(\s)frameborder\s*=\s*(["']?)(no|yes)\2(?=[\s>]|\z)/i) { %(#{$1}frameborder="#{$3.downcase == "no" ? 0 : 1}") }
+        end
+
+        # At-rules AMP accepts inside `<style amp-custom>`. Anything else
+        # (`@view-transition`, `@starting-style`, `@layer`, `@import`, …) is a
+        # CSS syntax error that fails the whole page.
+        AMP_CSS_AT_RULES = {"font-face", "keyframes", "-webkit-keyframes", "-moz-keyframes",
+                            "-o-keyframes", "-ms-keyframes", "media", "supports", "page"}
+
+        # Drop every at-rule (statement or block, at any nesting depth) whose
+        # name AMP disallows. Comments and quoted strings are copied verbatim
+        # so an `@name` inside them is never mistaken for a rule.
+        private def self.strip_disallowed_at_rules(css : String) : String
+          return css unless css.includes?('@')
+          String.build(css.bytesize) do |io|
+            reader = Char::Reader.new(css)
+            while reader.has_next?
+              c = reader.current_char
+              if c == '/' && reader.peek_next_char == '*'
+                start = reader.pos
+                close = css.byte_index("*/", start + 2)
+                stop = close ? close + 2 : css.bytesize
+                io << css.byte_slice(start, stop - start)
+                reader.pos = stop
+              elsif c == '"' || c == '\''
+                start = reader.pos
+                reader.next_char
+                while reader.has_next? && reader.current_char != c
+                  reader.next_char if reader.current_char == '\\'
+                  reader.next_char if reader.has_next?
+                end
+                reader.next_char if reader.has_next?
+                io << css.byte_slice(start, reader.pos - start)
+              elsif c == '@' && (name = css.byte_slice(reader.pos + 1).match(/\A[-\w]+/).try(&.[0])) &&
+                    !AMP_CSS_AT_RULES.includes?(name.downcase)
+                reader = skip_at_rule(reader)
+              else
+                io << c
+                reader.next_char
+              end
+            end
+          end
+        end
+
+        # `reader` advanced past the at-rule it sits on: up to the `;` ending
+        # a statement, or past the `}` closing its block. (Char::Reader is a
+        # struct, so the advanced copy is returned.)
+        private def self.skip_at_rule(reader : Char::Reader) : Char::Reader
+          depth = 0
+          while reader.has_next?
+            c = reader.current_char
+            reader.next_char
+            case c
+            when '{' then depth += 1
+            when '}'
+              depth -= 1
+              break if depth <= 0
+            when ';' then break if depth == 0
+            end
+          end
+          reader
         end
 
         # Convert standard HTML to AMP-compliant HTML
@@ -202,14 +274,13 @@ module Hwaro
           # Add AMP boilerplate to <html> tag
           result = result.sub(/<html([^>]*)>/i, %(<html amp\\1>))
 
-          # Remove disallowed tags: <script> (except application/ld+json and amp scripts)
-          # Use [\s\S]*? instead of .*? to match across newlines
-          # The `async`/`custom-element` exceptions must be anchored to real
-          # attribute boundaries (preceded by whitespace, followed by a value /
-          # tag terminator); otherwise a substring match like `id="async"` would
-          # cause an author `<script>` to survive into the AMP page. The
-          # cdn.ampproject.org src allowlist stays in its own lookahead.
-          result = result.gsub(/<script(?![^>]*type=["']application\/ld\+json["'])(?![^>]*\s(?:async|custom-element)(?:\s|=|>|\/))(?![^>]*src=["']https:\/\/cdn\.ampproject\.org)[^>]*>[\s\S]*?<\/script>/mi, "")
+          # Remove disallowed tags: <script> (except application/ld+json and
+          # the AMP runtime/extension scripts, which all load from
+          # cdn.ampproject.org). Use [\s\S]*? instead of .*? to match across
+          # newlines. An `async` attribute is NOT an exemption: it let every
+          # third-party async script (analytics, the tweet shortcode's
+          # widgets.js) through, and AMP forbids all of them.
+          result = result.gsub(/<script(?![^>]*type=["']application\/ld\+json["'])(?![^>]*src=["']https:\/\/cdn\.ampproject\.org)[^>]*>[\s\S]*?<\/script>/mi, "")
 
           # Remove disallowed external stylesheets. AMP forbids
           # `<link rel="stylesheet">` except from allowlisted font providers;
@@ -226,9 +297,12 @@ module Hwaro
           end
 
           # Remove style attributes and JS event handlers BEFORE element conversion
-          # (so that container divs added by amp-img conversion aren't affected)
-          result = result.gsub(/\s+style=["'][^"']*["']/i, "")
-          result = result.gsub(/\s+on\w+=["'][^"']*["']/i, "")
+          # (so that container divs added by amp-img conversion aren't affected).
+          # Each value runs to its OWN closing quote: `[^"']*` stopped at the
+          # first quote of either kind, so `onclick="f('x')"` lost only
+          # `onclick="f('` and left `x')"` behind as a garbage attribute.
+          result = result.gsub(/\s+style=(?:"[^"]*"|'[^']*')/i, "")
+          result = result.gsub(/\s+on\w+=(?:"[^"]*"|'[^']*')/i, "")
 
           # Convert <img> to <amp-img>. Quote-aware attribute scan (same
           # pattern as IMG_LAZY_REGEX in markdown.cr): a `>` inside a quoted
@@ -274,10 +348,14 @@ module Hwaro
             needs_amp_iframe = true
             # Capture both groups before any inner match: `$~` is per-scope,
             # so the src lookup below would otherwise clobber `$2`.
-            attrs = strip_non_amp_attributes($1)
+            attrs = normalize_iframe_attributes(strip_non_amp_attributes($1))
             inner = $2
             unless attrs.includes?("layout=")
-              attrs += %( layout="responsive")
+              # `responsive` needs both dimensions. A height-only embed (the
+              # codepen shortcode, CodePen's own embed snippet) is full-width
+              # by design, which is what `fixed-height` means.
+              height_only = !attrs.matches?(/\swidth\s*=/i) && attrs.matches?(/\sheight\s*=/i)
+              attrs += height_only ? %( layout="fixed-height") : %( layout="responsive")
             end
             # amp-iframe requires a sandbox attribute; add a sane default when
             # the source <iframe> didn't carry one.
@@ -336,10 +414,10 @@ module Hwaro
               ""
             end
             # `!important` is disallowed inside amp-custom.
-            extracted_css = theme_css.join("\n").gsub(/\s*!important/i, "")
+            extracted_css = strip_disallowed_at_rules(theme_css.join("\n").gsub(/\s*!important/i, ""))
 
             amp_boilerplate = <<-HTML
-              <style amp-boilerplate>body{-webkit-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-moz-animation:-amp-start 8s steps(1,end) 0s 1 normal both;animation:-amp-start 8s steps(1,end) 0s 1 normal both}@-webkit-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-moz-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-ms-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-o-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}</style><noscript><style amp-boilerplate>body{-webkit-animation:none;-moz-animation:none;-ms-animation:none;animation:none}</style></noscript>
+              <style amp-boilerplate>body{-webkit-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-moz-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-ms-animation:-amp-start 8s steps(1,end) 0s 1 normal both;animation:-amp-start 8s steps(1,end) 0s 1 normal both}@-webkit-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-moz-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-ms-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-o-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}</style><noscript><style amp-boilerplate>body{-webkit-animation:none;-moz-animation:none;-ms-animation:none;animation:none}</style></noscript>
               <style amp-custom>.amp-img-container{position:relative;width:100%;min-height:200px}#{extracted_css}</style>
               <script async src="https://cdn.ampproject.org/v0.js"></script>#{extension_scripts}
               HTML
@@ -357,9 +435,10 @@ module Hwaro
             end
           end
 
-          # Add canonical link to the original page
+          # Add canonical link to the original page — percent-encoded like
+          # the `canonical_tag` the page itself carries.
           base_url = config.base_url.rstrip('/')
-          canonical_url = Utils::TextUtils.escape_xml("#{base_url}#{page.url}")
+          canonical_url = Utils::TextUtils.escape_xml(Utils::TextUtils.encode_url_path("#{base_url}#{page.url}"))
           if !result.includes?("rel=\"canonical\"") && result.matches?(/<\/head>/i)
             result = result.sub(/<\/head>/i, %(<link rel="canonical" href="#{canonical_url}">\n</head>))
           end
@@ -378,7 +457,9 @@ module Hwaro
           return if html.includes?("rel=\"amphtml\"")
 
           base_url = config.base_url.rstrip('/')
-          amp_url = Utils::TextUtils.escape_xml("#{base_url}/#{prefix}#{page.url}")
+          # Percent-encoded like every other page URL hwaro emits: a raw
+          # space or non-ASCII slug is not a valid href.
+          amp_url = Utils::TextUtils.escape_xml(Utils::TextUtils.encode_url_path("#{base_url}/#{prefix}#{page.url}"))
           link_tag = %(<link rel="amphtml" href="#{amp_url}">)
 
           if html.matches?(/<\/head>/i)
@@ -454,16 +535,18 @@ module Hwaro
           return unless config.amp.section_enabled?(page.section)
           prefix = effective_prefix(config)
           return unless prefix
-          amp_output_path(page, output_dir, prefix)
+          output_path_for(page, output_dir).try { |path| mirror_path(path, output_dir, prefix) }
         end
 
-        private def self.output_path_for(page : Models::Page, output_dir : String) : String
-          url_path = page.url.lchop("/")
-          File.join(output_dir, url_path, "index.html")
-        end
-
-        private def self.amp_output_path(page : Models::Page, output_dir : String, prefix : String) : String
-          mirror_path(output_path_for(page, output_dir), output_dir, prefix)
+        # The file the render phase wrote for `page`, or nil when it wrote
+        # none. Same decoding as the render phase's `url_output_path`: a page
+        # URL carries `#`/`?` as `%23`/`%3F` (Page#url=), while the file sits
+        # in the decoded `a#b/` directory — joining the raw URL looked for
+        # `a%23b/` and silently skipped the page.
+        private def self.output_path_for(page : Models::Page, output_dir : String) : String?
+          segments, refused = Utils::PathUtils.split_safe_segments(page.url.lchop("/"))
+          return if refused
+          File.join(output_dir, segments.join("/"), "index.html")
         end
       end
     end

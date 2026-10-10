@@ -353,6 +353,10 @@ module Hwaro::Core::Build::Phases::Transform
     site.taxonomies.clear
 
     pages.each do |page|
+      # The generator reads site.pages only: a section `_index.md` carrying
+      # `tags` never gets onto a term page, so it must not inflate
+      # get_taxonomy counts or yield a get_taxonomy_url to an unwritten term.
+      next if page.is_a?(Models::Section)
       # Match Content::Taxonomies.build_taxonomy_index: draft / unpublished
       # (--include-future/--include-expired) / generated pages must not inflate
       # get_taxonomy counts or terms_sort_by="count" relative to written
@@ -472,6 +476,7 @@ module Hwaro::Core::Build::Phases::Transform
       # skip unpublished/draft/generated pages so get_taxonomy membership
       # stays aligned with build_taxonomy_index (and rebuild_taxonomies).
       next if excluded_paths.includes?(page_path)
+      next if page.is_a?(Models::Section) # see rebuild_taxonomies
       next if page.excluded_from_listings?
       next unless site.config.versions.in_taxonomies?(page)
 
@@ -811,8 +816,13 @@ module Hwaro::Core::Build::Phases::Transform
   # template's `page.series_pages` guard skips the orphan series-nav box.
   private def assign_series_groups(groups : Hash({String, String, String}, Array(Models::Page)))
     groups.each do |_name, pages|
+      # An undated part sorts after the dated ones (as in SortUtils) rather
+      # than as 1970-01-01, which put it ahead of every part dated after
+      # that. Path last so equal weight/date/title still order the same
+      # way on every build.
       sorted = pages.sort_by do |p|
-        {p.series_weight, p.date || Time::UNIX_EPOCH, p.title}
+        date = p.date
+        {p.series_weight, date ? 0 : 1, date || Time::UNIX_EPOCH, p.title, p.path}
       end
 
       sorted.each_with_index do |page, idx|

@@ -45,7 +45,7 @@ Welcome to my blog.
 | paginate_path | string | "page" | Path segment for pager URLs (default produces `/blog/page/2/`) |
 | transparent | bool | false | Pass pages to parent |
 | generate_feeds | bool | false | Generate RSS feed |
-| redirect_to | string | — | Write an HTML redirect page to this URL instead of rendering the section |
+| redirect_to | string | — | Write an HTML redirect page to this URL (or an `@/` content path such as `@/blog/post.md`) instead of rendering the section |
 | draft | bool | false | Exclude from production |
 | weight | int | 0 | Section sort order |
 | cascade | table | — | Defaults inherited by descendants (see [Cascade](#cascade)) |
@@ -92,7 +92,7 @@ Each `sort_by` value has a different natural direction, chosen to match what aut
 | `weight`  | Lowest weight first (ascending) | Highest weight first |
 | `title`   | A → Z (ascending) | Z → A |
 
-A page's `date` order uses its `updated` date when it has one, so a revised post moves up the list; pages without any date sort last. `title` compares titles byte by byte, so uppercase letters sort before lowercase ones and accented letters come after `z`.
+A page's `date` order uses its `updated` date when it has one, so a revised post moves up the list; pages without any date sort last (first with `reverse = true`, which flips the whole list), after pages dated before 1970 too. `title` compares titles byte by byte, so uppercase letters sort before lowercase ones and accented letters come after `z`.
 
 `reverse` flips whichever direction is natural for the chosen `sort_by`. For example, a blog index sorted by `date` is newest-first by default; setting `reverse = true` switches it to oldest-first.
 

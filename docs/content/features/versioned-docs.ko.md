@@ -79,7 +79,7 @@ content/
 | `content/docs/v1/_index.md` | `/docs/v1/` |
 | `content/docs/v1/install.md` | `/docs/v1/install/` |
 
-`latest_at_root = false`이면 모든 버전이 세그먼트를 유지하고(`/docs/v2/install/`, `/docs/v1/install/`), `/docs/`는 최신 버전 루트로 향하는 리디렉션 스텁이 됩니다. 직접 `content/docs/_index.md`를 작성했다면 그 페이지가 URL을 유지합니다.
+`latest_at_root = false`이면 모든 버전이 세그먼트를 유지하고(`/docs/v2/install/`, `/docs/v1/install/`), `/docs/`는 최신 버전 루트로 향하는 리디렉션 스텁이 됩니다. 직접 `content/docs/_index.md`를 작성했다면 그 페이지가 URL을 유지합니다. 다만 캐스케이드용으로 둔 헤드리스(`render = false`) 페이지는 기록되지 않으므로 스텁이 그대로 남습니다.
 
 URL 세그먼트는 디렉터리 이름이 아니라 버전 **name**입니다. `name = "2.x"`, `path = "docs/v2"`라면 루트가 아닐 때 `/docs/2.x/…`에 게시됩니다. 버전 디렉터리는 최상위(`content/v2/…`)에 둘 수도 있으며, 이 경우 최신 버전이 사이트 루트가 됩니다.
 
@@ -116,7 +116,7 @@ URL 세그먼트는 디렉터리 이름이 아니라 버전 **name**입니다. `
 | `.name` | String | 버전 이름 |
 | `.label` | String | 표시 라벨 |
 | `.latest` | Bool | 최신 버전인지 |
-| `.url` | String | 그 버전에 **같은 페이지**가 있으면 그 URL, 없으면 그 버전의 루트 |
+| `.url` | String | 그 버전에 **같은 페이지**가 있으면 그 URL, 없으면 그 버전의 루트 (페이지 언어의 루트가 그 버전에 없으면 기본 언어의 루트) |
 | `.exists` | Bool | 대응 페이지 존재 여부 (`false`면 `url`은 버전 루트) |
 | `.current` | Bool | 이 행이 현재 페이지의 버전인지 |
 
@@ -212,7 +212,7 @@ URL 세그먼트는 디렉터리 이름이 아니라 버전 **name**입니다. `
 |------|--------|--------|
 | `search.json` | `[versions] search` | 최신만 |
 | `sitemap.xml` | `[versions] search` (같은 스위치) | 최신만 |
-| RSS / Atom (메인, 섹션, 언어별) | `[versions] feeds` | 최신만 |
+| RSS / Atom (메인, 섹션, 언어별, 택소노미 용어) | `[versions] feeds` | 최신만 |
 | 택소노미 용어 페이지 | `[versions] taxonomies` | 최신만 |
 | `llms.txt` / `llms-full.txt` | — | 항상 최신만 |
 

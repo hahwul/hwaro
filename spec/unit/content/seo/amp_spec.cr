@@ -58,6 +58,17 @@ describe Hwaro::Models::AmpConfig do
       config.amp.section_enabled?("posts").should be_true
       config.amp.section_enabled?("pages").should be_false
     end
+
+    it "covers a configured section's descendants, like [feeds] sections" do
+      config = make_amp_config(<<-TOML)
+        [amp]
+        enabled = true
+        sections = ["posts"]
+        TOML
+
+      config.amp.section_enabled?("posts/2024").should be_true
+      config.amp.section_enabled?("postscript").should be_false
+    end
   end
 end
 
@@ -173,6 +184,18 @@ describe Hwaro::Content::Seo::Amp do
       result.should contain("text")
     end
 
+    # Regression: the value ended at the first quote of EITHER kind, leaving
+    # `dialog').showModal()"` behind as a garbage attribute.
+    it "removes whole event handlers and styles whose values nest the other quote" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      html = %(<html><head></head><body><div class="c" onclick="this.querySelector('dialog').showModal()" ) +
+             %(style="font-family:'Foo'">x</div><p onmouseover='say("hi")'>y</p></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, Hwaro::Models::Config.new)
+      result.should contain(%(<div class="c">x</div>))
+      result.should contain(%(<p>y</p>))
+    end
+
     # Regression: `loading` is legal on <img>/<iframe> but is not an allowed
     # attribute on amp-img/amp-iframe/amp-video, so it fails AMP validation as
     # DISALLOWED_ATTR. hwaro emits it itself — `[markdown] lazy_loading`, the
@@ -198,6 +221,16 @@ describe Hwaro::Content::Seo::Amp do
       result.should contain(%(src="/a.png"))
       result.should contain(%(alt="A"))
       result.should contain(%(width="560"))
+    end
+
+    # Regression: theme image hints `decoding`/`fetchpriority` are not
+    # allowed on amp-img and failed validation.
+    it "drops decoding and fetchpriority from amp-img" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      html = %(<html><head></head><body><img src="/h.png" width="8" height="4" alt="h" decoding="async" fetchpriority="high"></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, Hwaro::Models::Config.new)
+      result.should contain(%(<amp-img src="/h.png" width="8" height="4" alt="h" layout="responsive">))
     end
 
     # Scoped to the converted tag's attribute string, so `loading=` appearing
@@ -242,6 +275,23 @@ describe Hwaro::Content::Seo::Amp do
       result.should contain("cdn.ampproject.org")
     end
 
+    # Regression: the -ms-animation declaration was missing, and the AMP
+    # validator requires the boilerplate verbatim — every page failed with
+    # "The mandatory text inside tag 'head > style[amp-boilerplate]' is
+    # missing or incorrect".
+    it "injects the AMP boilerplate verbatim" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      result = Hwaro::Content::Seo::Amp.convert_to_amp("<html><head></head><body>x</body></html>", page, Hwaro::Models::Config.new)
+      result.should contain(
+        "<style amp-boilerplate>body{-webkit-animation:-amp-start 8s steps(1,end) 0s 1 normal both;" \
+        "-moz-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-ms-animation:-amp-start 8s steps(1,end) 0s 1 normal both;" \
+        "animation:-amp-start 8s steps(1,end) 0s 1 normal both}@-webkit-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}" \
+        "@-moz-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-ms-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}" \
+        "@-o-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}</style>" \
+        "<noscript><style amp-boilerplate>body{-webkit-animation:none;-moz-animation:none;-ms-animation:none;animation:none}</style></noscript>")
+    end
+
     it "adds canonical link to original page" do
       page = Hwaro::Models::Page.new("test.md")
       page.url = "/posts/hello/"
@@ -283,6 +333,58 @@ describe Hwaro::Content::Seo::Amp do
       html = %(<html><head><script type="application/ld+json">{"@type":"Article"}</script></head><body>Hello</body></html>)
       result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
       result.should contain("application/ld+json")
+    end
+
+    # Regression: any `async` script survived (analytics, the tweet
+    # shortcode's widgets.js), which AMP forbids.
+    it "removes third-party async scripts but keeps AMP's own" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      amp_ext = %(<script async custom-element="amp-bind" src="https://cdn.ampproject.org/v0/amp-bind-0.1.js"></script>)
+      html = %(<html><head><script async src="https://www.googletagmanager.com/gtag/js?id=G-1"></script>#{amp_ext}</head>) +
+             %(<body><script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, Hwaro::Models::Config.new)
+      result.should_not contain("googletagmanager")
+      result.should_not contain("platform.twitter.com")
+      result.should contain(amp_ext)
+    end
+
+    # Regression: the simple scaffold's inline CSS uses @view-transition and
+    # @starting-style; folded into <style amp-custom> they are CSS syntax
+    # errors that fail every AMP page.
+    it "drops at-rules AMP disallows from folded theme CSS" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      css = "/* @starting-style in a comment; */ a{content:\"@x {\"}\n" \
+            "@view-transition { navigation: auto; }\n@import url(x.css);\n" \
+            "@media (prefers-reduced-motion: no-preference) { .m{opacity:1} @starting-style { .m{opacity:0} } }\n" \
+            "@font-face{font-family:F;src:url(f.woff2)} @keyframes k{from{opacity:0}to{opacity:1}} b{c:d} @layer x"
+      html = "<html><head><style>#{css}</style></head><body>x</body></html>"
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, Hwaro::Models::Config.new)
+      custom = result[/<style amp-custom>([\s\S]*?)<\/style>/, 1]
+      custom.should_not contain("@view-transition")
+      custom.should_not contain("@import")
+      custom.should_not contain("@starting-style {")
+      custom.should contain("/* @starting-style in a comment; */ a{content:\"@x {\"}")
+      custom.should contain("@media (prefers-reduced-motion: no-preference) { .m{opacity:1}  }")
+      custom.should contain("@font-face{font-family:F;src:url(f.woff2)} @keyframes k{from{opacity:0}to{opacity:1}} b{c:d}")
+      custom.should_not contain("@layer")
+    end
+
+    # Regression: the codepen shortcode / CodePen embed snippet (height only,
+    # allowfullscreen="true", frameborder="no") became an invalid amp-iframe.
+    it "converts a height-only embed iframe into a valid amp-iframe" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      html = %(<html><head></head><body><iframe height="300" scrolling="no" src="https://codepen.io/u/embed/x" ) +
+             %(frameborder="no" allowtransparency="true" allowfullscreen="true"></iframe></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, Hwaro::Models::Config.new)
+      tag = result[/<amp-iframe[^>]*>/]
+      tag.should contain(%(layout="fixed-height"))
+      tag.should contain(%(frameborder="0"))
+      tag.should contain(" allowtransparency ")
+      tag.should contain(" allowfullscreen ")
+      tag.should_not contain(%(="true"))
     end
 
     it "converts iframe to amp-iframe" do
@@ -563,6 +665,52 @@ describe Hwaro::Content::Seo::Amp do
         canonical_content = File.read(File.join(canonical_dir, "index.html"))
         canonical_content.should contain("rel=\"amphtml\"")
         canonical_content.should contain("/amp/posts/hello/")
+      end
+    end
+
+    it "mirrors a page whose URL carries an encoded # or ?" do
+      Dir.mktmpdir do |dir|
+        config = make_amp_config(<<-TOML)
+          [amp]
+          enabled = true
+          TOML
+
+        # Page#url= stores `#`/`?` as %23/%3F; render writes the decoded dir.
+        page = Hwaro::Models::Page.new("posts/c#-tips.md")
+        page.url = "/posts/c#-tips/"
+        page.section = "posts"
+        canonical_dir = File.join(dir, "posts", "c#-tips")
+        FileUtils.mkdir_p(canonical_dir)
+        File.write(File.join(canonical_dir, "index.html"), "<html><head></head><body>C#</body></html>")
+
+        Hwaro::Content::Seo::Amp.generate([page], config, dir)
+
+        amp_path = File.join(dir, "amp", "posts", "c#-tips", "index.html")
+        File.exists?(amp_path).should be_true
+        Hwaro::Content::Seo::Amp.mirror_output_for(page, config, dir).should eq(amp_path)
+        File.read(File.join(canonical_dir, "index.html")).should contain(%(href="https://example.com/amp/posts/c%23-tips/"))
+      end
+    end
+
+    it "percent-encodes the amphtml and fallback canonical URLs" do
+      Dir.mktmpdir do |dir|
+        config = make_amp_config(<<-TOML)
+          [amp]
+          enabled = true
+          TOML
+
+        page = Hwaro::Models::Page.new("글 하나.md")
+        page.url = "/글 하나/"
+        canonical_dir = File.join(dir, "글 하나")
+        FileUtils.mkdir_p(canonical_dir)
+        File.write(File.join(canonical_dir, "index.html"), "<html><head></head><body>x</body></html>")
+
+        Hwaro::Content::Seo::Amp.generate([page], config, dir)
+
+        File.read(File.join(canonical_dir, "index.html"))
+          .should contain(%(rel="amphtml" href="https://example.com/amp/%EA%B8%80%20%ED%95%98%EB%82%98/"))
+        File.read(File.join(dir, "amp", "글 하나", "index.html"))
+          .should contain(%(rel="canonical" href="https://example.com/%EA%B8%80%20%ED%95%98%EB%82%98/"))
       end
     end
 

@@ -70,6 +70,7 @@ module Hwaro::Core::Build::Phases::Initialize
       # hidden static file) is not mistaken for one.
       dev_marker_found = !ctx.options.serve_mode && Utils::DevMarker.present?(output_dir)
       setup_output_dir(output_dir, keep_output)
+      @kept_output_dir = keep_output ? output_dir : nil
       copy_static_files(output_dir, verbose, keep_output)
 
       if ctx.options.serve_mode
@@ -505,7 +506,18 @@ module Hwaro::Core::Build::Phases::Initialize
   # creation stays sequential to avoid the check-then-create race that fires
   # under the multi-threaded runtime.
   private def copy_static_pairs(files_to_copy : Array({String, String, Time}))
-    files_to_copy.each { |_, dest, _| Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest)) }
+    files_to_copy.each do |_, dest, _|
+      mkdir_output(File.dirname(dest))
+      # A kept tree can also hold a DIRECTORY where this file now goes (the
+      # source was `static/x/…` last build, or a page published `/x/`), and
+      # `FileUtils.cp` copies INTO a directory: `public/x/x` instead of
+      # `public/x`. Nothing has been written this build yet, so whatever is
+      # there is the previous build's.
+      if (kept = @kept_output_dir) && File.info?(dest, follow_symlinks: false).try(&.directory?) &&
+         Utils::OutputGuard.safe_to_delete_directory?(dest, kept)
+        FileUtils.rm_rf(dest)
+      end
+    end
 
     # One `getcwd` for the whole copy rather than one per file: the canonical
     # form recorded below is only needed so filter_changed_pages can compare
@@ -514,6 +526,12 @@ module Hwaro::Core::Build::Phases::Initialize
 
     config = ParallelConfig.new(enabled: true)
     worker_count = config.calculate_workers(files_to_copy.size)
+
+    # The first copy failure, re-raised once every copy has drained: only
+    # logging it let the build exit 0 and deploy a site missing the file,
+    # where an unreadable page-bundle asset fails the build.
+    failure : Exception? = nil
+    failure_mutex = Mutex.new
 
     ParallelHelper.each_concurrently(files_to_copy, worker_count) do |(src, dest, src_mtime), _worker_id|
       FileUtils.cp(src, dest)
@@ -540,8 +558,16 @@ module Hwaro::Core::Build::Phases::Initialize
         Logger.debug "Could not stamp mtime on #{dest}: #{ex.message}"
       end
     rescue ex
+      # A source deleted since the scan (an editor's swap file under serve)
+      # is simply gone; only a file that is still there must not be lost.
+      if ex.is_a?(File::NotFoundError) && !File.exists?(src)
+        Logger.warn "Static file vanished before it was copied: #{src}"
+        next
+      end
       Logger.error "Copy failed #{src} -> #{dest}: #{ex.message}"
+      failure_mutex.synchronize { failure ||= ex }
     end
+    failure.try { |ex| raise ex }
   end
 
   private def load_templates : Hash(String, String)
@@ -835,7 +861,8 @@ module Hwaro::Core::Build::Phases::Initialize
   # digest has to see. Missing it meant editing a `data/*.csv` moved nothing
   # in the cache key, so `build --cache` re-published every page with the
   # previous CSV's values — forever, until an unrelated edit.
-  DATA_DIGEST_EXTENSIONS = "yml,yaml,json,toml,csv"
+  # Compared lowercased: the loaders read `Team.JSON` too.
+  DATA_DIGEST_EXTENSIONS = {".yml", ".yaml", ".json", ".toml", ".csv"}
 
   # Compute a content digest of the `data/` directory for cache invalidation.
   #
@@ -853,7 +880,8 @@ module Hwaro::Core::Build::Phases::Initialize
     # feed templates — an i18n edit must invalidate cached pages too, or
     # `build --cache` ships stale translations while `serve` (which watches
     # i18n/) rebuilds correctly.
-    Dir.glob("data/**/*.{#{DATA_DIGEST_EXTENSIONS}}", "i18n/**/*.{#{DATA_DIGEST_EXTENSIONS}}") do |path|
+    Dir.glob("data/**/*", "i18n/**/*") do |path|
+      next unless DATA_DIGEST_EXTENSIONS.includes?(File.extname(path).downcase)
       # Regular files only: a FIFO would block `File.read` below forever.
       # `readable_file?` is not used because the loaders warn about the same
       # dangling links, and this digest runs only under `--cache`.
@@ -935,7 +963,7 @@ module Hwaro::Core::Build::Phases::Initialize
     live_memo_keys = Set({String, String}).new if serve_mode
     digest = Digest::MD5.new
     entries.each do |entry|
-      memo_key = {entry.key, RemoteData.url_digest(entry.url)}
+      memo_key = {entry.key, RemoteData.request_digest(entry)}
       live_memo_keys.try(&.add(memo_key))
       result = serve_mode ? load_remote_entry_for_serve(entry, memo_key) : RemoteData.load(entry)
       Utils::DigestUtils.update_length_prefixed(digest, entry.key)

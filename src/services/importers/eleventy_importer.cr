@@ -243,6 +243,19 @@ module Hwaro
               if layout = yaml_hash["layout"]?
                 fields["template"] = yaml_string(layout)
               end
+
+              # `permalink: false` writes no file in 11ty (hwaro's
+              # `render = false`), and a literal permalink is the page's
+              # published address. Both were dropped, publishing the page
+              # or moving it. A templated one (`{{ page.fileSlug }}/`) is
+              # left alone.
+              if permalink = yaml_hash["permalink"]?
+                if permalink.raw == false
+                  fields["render"] = false
+                elsif (url = permalink.as_s?) && !url.includes?('{')
+                  apply_source_url(fields, url, file_path)
+                end
+              end
             end
           end
 

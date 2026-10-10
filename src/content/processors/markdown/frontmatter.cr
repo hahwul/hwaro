@@ -36,9 +36,13 @@ module Hwaro
         # Suggests the *closest* known key, not merely the first within the threshold —
         # otherwise `tag` (a typo of `tags`, distance 1) would resolve to whichever
         # distance-2 key happens to appear earlier in the set (e.g. `toc`).
-        private def warn_typo_keys(unknown_keys : Array(String), file_path : String)
+        # `declared_keys` are top-level keys the site's config makes legitimate
+        # (a `[[content.schema]]` field, a taxonomy name), so `author` declared
+        # in a schema is not a typo of `authors`.
+        private def warn_typo_keys(unknown_keys : Array(String), file_path : String, declared_keys : Set(String)?)
           return if file_path.empty?
           unknown_keys.each do |key|
+            next if declared_keys.try(&.includes?(key))
             if suggestion = typo_suggestion(key)
               Logger.warn "#{file_path}: unknown front-matter key '#{key}' — did you mean '#{suggestion}'?"
             end
@@ -68,7 +72,7 @@ module Hwaro
         end
 
         # Returns parsed metadata and content
-        def parse(raw_content : String, file_path : String = "")
+        def parse(raw_content : String, file_path : String = "", declared_keys : Set(String)? = nil)
           # A UTF-8 BOM would defeat every `\A`-anchored fence below and the
           # leading-`{` JSON test, silently turning the front matter into body
           # text. Strip it first so BOM'd files parse like any other.
@@ -82,11 +86,11 @@ module Hwaro
           # with no `key:` line) must keep its FULL content — assigning
           # match[2] up front silently dropped the first block.
           if match = raw_content.match(TOML_FRONT_MATTER_REGEX)
-            if result = extract_from_toml(match[1], file_path)
+            if result = extract_from_toml(match[1], file_path, declared_keys)
               markdown_content = match[2]
             end
           elsif match = raw_content.match(YAML_FRONT_MATTER_REGEX)
-            if result = extract_from_yaml(match[1], file_path)
+            if result = extract_from_yaml(match[1], file_path, declared_keys)
               markdown_content = match[2]
             elsif yaml_empty_front_matter?(match[1])
               # `---\n---` / comment-only blocks are EMPTY front matter:
@@ -101,7 +105,7 @@ module Hwaro
             if end_idx = Utils::FrontmatterScanner.find_json_end(raw_content)
               # find_json_end returns a BYTE offset; slice on bytes so multibyte
               # (CJK/emoji/accented) JSON frontmatter isn't split mid-codepoint.
-              result = extract_from_json(raw_content.byte_slice(0, end_idx), file_path)
+              result = extract_from_json(raw_content.byte_slice(0, end_idx), file_path, declared_keys)
               body = raw_content.byte_slice(end_idx)
               markdown_content = body.lchop("\r\n").lchop("\n")
             elsif !file_path.empty?
@@ -244,7 +248,7 @@ module Hwaro
         end
 
         # Extract front matter fields from TOML content
-        private def extract_from_toml(raw : String, file_path : String)
+        private def extract_from_toml(raw : String, file_path : String, declared_keys : Set(String)? = nil)
           toml_fm = begin
             TOML.parse(raw)
           rescue ex
@@ -280,7 +284,7 @@ module Hwaro
             unknown_keys << key
             extra[key] = extract_extra_value(value)
           end
-          warn_typo_keys(unknown_keys, file_path)
+          warn_typo_keys(unknown_keys, file_path, declared_keys)
 
           front_matter_keys = toml_fm.keys
           taxonomies = extract_taxonomies(toml_fm, front_matter_keys, file_path)
@@ -311,7 +315,7 @@ module Hwaro
         end
 
         # Extract front matter fields from YAML content
-        private def extract_from_yaml(raw : String, file_path : String)
+        private def extract_from_yaml(raw : String, file_path : String, declared_keys : Set(String)? = nil)
           yaml_fm = begin
             YAML.parse(raw)
           rescue ex
@@ -359,7 +363,7 @@ module Hwaro
               extra[key] = extract_extra_value(value)
             end
           end
-          warn_typo_keys(unknown_keys, file_path)
+          warn_typo_keys(unknown_keys, file_path, declared_keys)
 
           front_matter_keys = yaml_fm.as_h?.try(&.keys).try { |ks| ks.compact_map(&.as_s?) } || [] of String
           taxonomies = extract_taxonomies(yaml_fm, front_matter_keys, file_path)
@@ -388,7 +392,7 @@ module Hwaro
         end
 
         # Extract front matter fields from JSON content
-        private def extract_from_json(raw : String, file_path : String)
+        private def extract_from_json(raw : String, file_path : String, declared_keys : Set(String)? = nil)
           json_fm = begin
             JSON.parse(raw)
           rescue ex
@@ -422,7 +426,7 @@ module Hwaro
             unknown_keys << key
             extra[key] = extract_extra_value(value)
           end
-          warn_typo_keys(unknown_keys, file_path)
+          warn_typo_keys(unknown_keys, file_path, declared_keys)
 
           front_matter_keys = fm_hash.keys
           taxonomies = extract_taxonomies(json_fm, front_matter_keys, file_path)
@@ -544,12 +548,24 @@ module Hwaro
           nil
         end
 
-        # `fm_string?` for a value that becomes part of the page's URL and
+        # `fm_string?` where a blank value means "absent". `hwaro new` and the
+        # default archetype scaffold unlisted fields as `key = ""`, and a blank
+        # string is never a usable value for these keys: `image = ""` emitted
+        # the bare base URL as og:image/twitter:image, `series = ""` grouped
+        # every such page into one nameless series, `path = ""` claimed `/`
+        # (and could win the homepage over `index.md`), `slug = ""` collided
+        # with the section index, `description = ""` shipped empty JSON-LD /
+        # feed descriptions instead of falling back to the site's.
+        private def fm_value?(fm : TOML::Table | YAML::Any | JSON::Any, key : String, file_path : String = "") : String?
+          fm_string?(fm, key, file_path).presence
+        end
+
+        # `fm_value?` for a value that becomes part of the page's URL and
         # output path. A NUL (a valid TOML/JSON `\u0000` escape) makes every
         # `File`/`Path` call on that path raise, which aborted the build from
         # whichever output generator touched it first (AMP).
         private def fm_url_string?(fm : TOML::Table | YAML::Any | JSON::Any, key : String, file_path : String = "") : String?
-          str = fm_string?(fm, key, file_path)
+          str = fm_value?(fm, key, file_path)
           return str unless str && str.includes?('\0')
           Logger.warn "#{file_path}: `#{key}` contains a NUL byte — ignored." unless file_path.empty?
           nil
@@ -606,7 +622,9 @@ module Hwaro
               Logger.warn "#{file_path}: `#{key}` has a non-string value (#{item.raw.inspect}) — ignored; quote it to keep it as a term."
             end
           end
-          terms.map { |term| Utils::TextUtils.normalize_term(term) }.reject(&.empty?)
+          # `uniq`: `tags = ["a", "a"]` is one term — a repeat must not list
+          # the page twice under it or double its get_taxonomy count.
+          terms.map { |term| Utils::TextUtils.normalize_term(term) }.reject(&.empty?).uniq!
         end
 
         # Build the front matter result NamedTuple from any front matter source.
@@ -638,10 +656,10 @@ module Hwaro
           end
           {
             title:          fm_string?(fm, "title", file_path) || "Untitled",
-            description:    fm_string?(fm, "description", file_path),
-            image:          fm_string?(fm, "image", file_path),
+            description:    fm_value?(fm, "description", file_path),
+            image:          fm_value?(fm, "image", file_path),
             draft:          fm_bool(fm, "draft", false, file_path),
-            template:       fm_string?(fm, "template", file_path),
+            template:       fm_value?(fm, "template", file_path),
             in_sitemap:     fm_bool(fm, "in_sitemap", true, file_path),
             toc:            fm_bool(fm, "toc", false, file_path),
             date:           date,
@@ -657,17 +675,17 @@ module Hwaro
             # instead of silently rendering one unbounded page.
             paginate:            fm_int?(fm, "paginate", file_path) || fm_int?(fm, "paginate_by", file_path),
             pagination_enabled:  fm_bool?(fm, "pagination_enabled", file_path),
-            sort_by:             fm_string?(fm, "sort_by", file_path),
+            sort_by:             fm_value?(fm, "sort_by", file_path),
             reverse:             fm_bool?(fm, "reverse", file_path),
             authors:             authors,
             extra:               extra,
             in_search_index:     fm_bool(fm, "in_search_index", true, file_path),
             insert_anchor_links: fm_bool?(fm, "insert_anchor_links", file_path),
-            page_template:       fm_string?(fm, "page_template", file_path),
+            page_template:       fm_value?(fm, "page_template", file_path),
             paginate_path:       fm_paginate_path(fm, file_path),
-            redirect_to:         fm_string?(fm, "redirect_to", file_path),
+            redirect_to:         fm_value?(fm, "redirect_to", file_path),
             weight:              fm_int?(fm, "weight", file_path) || 0,
-            series:              fm_string?(fm, "series", file_path),
+            series:              fm_value?(fm, "series", file_path),
             series_weight:       fm_int?(fm, "series_weight", file_path) || 0,
             expires:             nil.as(Time?),
             front_matter_keys:   front_matter_keys,

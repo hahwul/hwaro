@@ -111,7 +111,12 @@ bundle = false                        # true: scaffold foo/index.md instead of f
 ```
 
 Fields that overlap with the built-ins (`title`, `date`, `draft`, `tags`)
-are ignored so they aren't duplicated with empty values.
+are ignored so they aren't duplicated with empty values. Keys the build reads
+as a number, boolean, list or table get the value it assumes when the key is
+absent instead of `""` (`weight = 0`, `toc = false`, `in_sitemap = true`,
+`aliases = []`, `extra = {}`), so a new page builds without type warnings.
+Keys with no neutral value (`path`, `redirect_to`, `paginate`, `paginate_by`,
+`pagination_enabled`, `reverse`, `insert_anchor_links`) are left out.
 
 ### Leaf-bundle (directory) layout
 
@@ -214,8 +219,6 @@ draft = {{ draft }}
 description = "{{ description }}"
 tags = {{ tags }}
 +++
-
-# {{ title }}
 ```
 
 This mirrors the `archetypes/default.md` that `hwaro init` ships. The

@@ -77,7 +77,10 @@ module Hwaro
         # re-matched across the two `**` runs into `<em>* 3 and 4 *</em>`.
         INLINE_ITALIC_ASTERISK_RE   = /(?<!\*)\*(?=[^\s*])(.+?)(?<=[^\s*])\*(?!\*)/
         INLINE_ITALIC_UNDERSCORE_RE = /(?<![a-zA-Z0-9_])_(?=[^\s_])(.+?)(?<=[^\s_])_(?![a-zA-Z0-9_])/
-        INLINE_STRIKETHROUGH_RE     = /~~(?=\S)(.+?)(?<=\S)~~/
+        # A `~~` right after an unescaped backslash is literal (`\~~not\~~`):
+        # rewriting it would leave `\<del>`, which Markd escapes into visible
+        # `&lt;del&gt;` text. `\\~~x~~` (escaped backslash) still strikes.
+        INLINE_STRIKETHROUGH_RE = /(?<!(?<!\\)\\)~~(?=\S)(.+?)(?<=\S)(?<!(?<!\\)\\)~~/
 
         # Opt-in inline markup (F10) — all gated behind their own
         # `[markdown]` flags (see `Flags`), so with every flag off these
@@ -138,6 +141,10 @@ module Hwaro
         MATHSPAN_TOKEN_RE        = /\x00MATHSPAN(\d{1,9})\x00/
         CODESPAN_TOKEN_RE        = /\x00CODESPAN(\d{1,9})\x00/
         LINK_TAG_TOKEN_RE        = /\x00IMTAG(\d{1,9})\x00/
+        # A CommonMark URI autolink (`<https://…>`) as `HTML.escape` left it.
+        AUTOLINK_RE = /&lt;([a-zA-Z][a-zA-Z0-9+.\-]{1,31}:(?:[^\s&]|&(?!lt;|gt;))*+)&gt;/
+        # An entity or numeric character reference as `HTML.escape` left it.
+        ESCAPED_ENTITY_RE = /&amp;(#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[a-zA-Z][a-zA-Z0-9]{1,31});/
 
         # Render a small inline-markdown subset over already-HTML-escaped or
         # raw text. Code spans are extracted first so their content survives
@@ -222,6 +229,18 @@ module Hwaro
             end
           end
 
+          # `<scheme:…>` autolinks, as in a paragraph. The whole anchor rides
+          # out the emphasis passes as an escape token, so a `_`/`*` in the
+          # URL text stays literal.
+          if result.includes?("&lt;")
+            result = result.gsub(AUTOLINK_RE) do |match|
+              url = restore_escapes($1, escapes)
+              next match unless safe_url?(url)
+              escapes << %(<a href="#{url}">#{url}</a>)
+              "\x00ESC#{escapes.size - 1}\x00"
+            end
+          end
+
           # The emphasis-like passes below run over rendered inline HTML so
           # link text gets formatting too. Keep generated <a>/<img> opening
           # tags opaque during those passes; otherwise delimiters in a valid
@@ -242,6 +261,13 @@ module Hwaro
           result = result.gsub(INLINE_MARK_RE) { "<mark>#{$1}</mark>" } if flags.mark
           result = result.gsub(INLINE_SUB_RE) { "<sub>#{$1}</sub>" } if flags.sub
           result = result.gsub(INLINE_SUP_RE) { "<sup>#{$1}</sup>" } if flags.sup
+
+          # Entity references in text (`&copy;`, `&#124;`, `&nbsp;`) mean
+          # their character, as in a paragraph. Done while the <a>/<img>
+          # tags, code spans and backslash escapes are still tokens: a URL
+          # keeps its escaped form, so `javascript&#58;` cannot slip past
+          # `safe_url?`, and `` `&copy;` `` / `\&copy;` stay literal.
+          result = result.gsub(ESCAPED_ENTITY_RE) { "&#{$1};" } if result.includes?("&amp;")
 
           unless link_tags.empty?
             result = result.gsub(LINK_TAG_TOKEN_RE) { link_tags[$1.to_i]?.try(&.itself) || $0 }

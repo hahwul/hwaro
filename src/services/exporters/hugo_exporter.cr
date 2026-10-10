@@ -127,6 +127,33 @@ module Hwaro
               else
                 hugo_fields["expiryDate"] = value
               end
+            when "template"
+              # Hugo picks a page's template from `layout` (the inverse of
+              # the Hugo importer's `layout` → `template`) and ignores an
+              # unknown `template` param, so the page lost its layout.
+              if authored?(flattened, "layout")
+                hugo_fields[key] = value
+              else
+                hugo_fields["layout"] = value
+              end
+            when "render"
+              # A headless page (`render = false`: no output, kept out of
+              # listings) is Hugo's `build` options; the bare param is
+              # ignored and Hugo published the page.
+              if value.raw == false && !authored?(flattened, "build") && !authored?(flattened, "_build")
+                never = YAML::Any.new("never")
+                hugo_fields["build"] = YAML::Any.new({YAML::Any.new("render") => never, YAML::Any.new("list") => never})
+              else
+                hugo_fields[key] = value
+              end
+            when "in_sitemap"
+              # Hugo leaves a page out of its sitemap via `sitemap.disable`;
+              # the bare param was ignored and the page was listed again.
+              if value.raw == false && !authored?(flattened, "sitemap")
+                hugo_fields["sitemap"] = YAML::Any.new({YAML::Any.new("disable") => YAML::Any.new(true)})
+              else
+                hugo_fields[key] = value
+              end
             when "path"
               # hwaro's `path` is the page's whole published path (served at
               # `/<path>/`); Hugo spells that `url` and ignores an unknown
@@ -161,6 +188,11 @@ module Hwaro
 
           frontmatter = generate_toml_frontmatter(hugo_fields)
           body = rewrite_internal_links(body)
+          # Hugo splits the summary only at a literal `<!--more-->`; the
+          # build's spaced/any-case form was exported as a plain comment.
+          if (marker = summary_marker(body)) && marker[0] != "<!--more-->"
+            body = "#{marker.pre_match}<!--more-->#{marker.post_match}"
+          end
 
           # Preserve directory structure
           relative = file_path.sub(content_dir, "").lstrip('/')
@@ -173,6 +205,12 @@ module Hwaro
 
           note_exported_index(file_path, content_dir)
           :exported
+        end
+
+        # Hugo serves `about.ko.md` at `/ko/about/` (its default
+        # `defaultContentLanguageInSubdir = false`), as the build does.
+        protected def language_prefixed_links? : Bool
+          true
         end
 
         # Where `relative` lands under Hugo's `content/`.

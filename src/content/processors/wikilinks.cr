@@ -12,6 +12,7 @@
 
 require "html"
 require "./fence_tracker"
+require "./includes"
 require "./markdown_extensions"
 require "./table_parser"
 require "../../models/page"
@@ -169,7 +170,12 @@ module Hwaro
             return unless list
             return list.first if list.size == 1
             same = list.select { |c| c.language == source.language }
-            pick(same.empty? ? list : same, source, target) { |c| {c.path, Index.container_dir(c)} }
+            return pick(same, source, target) { |c| {c.path, Index.container_dir(c)} } unless same.empty?
+            # No candidate in the source's language: translations of one page
+            # (`a.md`, `a.ja.md` linked from a French page) are not ambiguous;
+            # only two candidates sharing a language are.
+            langs = list.map(&.language)
+            pick(list, source, target, warn: langs.uniq.size < langs.size) { |c| {c.path, Index.container_dir(c)} }
           end
 
           # The URL of the file an embed names: one of the source page's own
@@ -208,13 +214,13 @@ module Hwaro
 
           # Ambiguity: same directory as the source first, then the shortest
           # path, then lexicographic order; warned once per source and target.
-          # The caller has already narrowed pages to the source's language.
-          private def pick(list : Array(T), source : Models::Page, target : String, & : T -> {String, String}) : T forall T
+          # The caller narrows pages to the source's language when it can.
+          private def pick(list : Array(T), source : Models::Page, target : String, warn : Bool = true, & : T -> {String, String}) : T forall T
             return list.first if list.size == 1
             src_dir = Index.container_dir(source)
             keyed = list.map { |c| path, dir = yield(c); {c, path, dir} }
             chosen = keyed.min_by { |_, path, dir| {dir == src_dir ? 0 : 1, path.size, path} }
-            if @warned.first?(source.path, target)
+            if warn && @warned.first?(source.path, target)
               Logger.warn "Ambiguous wikilink '[[#{target}]]' in '#{source.path}' matches #{keyed.map(&.[1]).sort!.join(", ")}; using '#{chosen[1]}'."
             end
             chosen[0]
@@ -294,10 +300,10 @@ module Hwaro
               return image(link, url, inline)
             end
           elsif link.target.empty?
-            return "[#{text(link.text, inline)}](##{encode(slug(link.heading))})"
+            return "[#{text(link.text, inline)}](##{encode(fragment(source, link.heading))})"
           elsif page = index.resolve(link.target, source)
             dest = "@/#{encode(page.path)}"
-            dest += "##{encode(slug(link.heading))}" if link.heading
+            dest += "##{encode(fragment(page, link.heading))}" if link.heading
             return "[#{text(link.text, inline)}](#{dest})"
           elsif link.file? && (url = index.resolve_file(link.target, source))
             # An attachment (`[[doc.pdf]]`, `![[doc.pdf]]`): a plain link.
@@ -327,6 +333,12 @@ module Hwaro
               io << '}'
             end
           end
+        end
+
+        # The id `heading` gets on `page`: its custom `{#id}` when the
+        # source declares one, else the slug.
+        private def fragment(page : Models::Page, heading : String?) : String
+          heading.try { |h| Includes.heading_id(page.raw_content, h) } || slug(heading)
         end
 
         # Same rule HeadingIds applies to a rendered heading, so the
@@ -395,7 +407,7 @@ module Hwaro
         QUOTE_PREFIX_RE = /\A {0,3}> ?/
         # A footnote definition starts a new block, as a list item does. Same
         # shape preprocess_footnotes extracts (`FOOTNOTE_DEF_RE` there).
-        FOOTNOTE_DEF_RE = /\A\[\^[^\]]+\]:[^\n]/
+        FOOTNOTE_DEF_RE = /\A {0,3}\[\^[^\]]+\]:[^\n]/
         # The blockquote markers a line opens with.
         QUOTE_MARKERS_RE = /\A(?: {0,3}>[ \t]?)*/
 

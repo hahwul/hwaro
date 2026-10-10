@@ -172,10 +172,37 @@ describe Hwaro::Utils::HtmlMinifier do
           .should eq("<em>a</em> <object data=\"x\"></object>")
       end
 
+      it "treats picture as inline" do
+        # Two images on one line of a paragraph, each wrapped in <picture>
+        # by an image render hook: the space between them is visible.
+        Hwaro::Utils::HtmlMinifier.minify("<p><picture><img src=\"a.png\"></picture>\n<picture><img src=\"b.png\"></picture></p>")
+          .should eq("<p><picture><img src=\"a.png\"></picture> <picture><img src=\"b.png\"></picture></p>")
+      end
+
       it "still strips whitespace between a block neighbour and a video element" do
         html = "<div>\n  <video src=\"v.mp4\"></video>\n</div>"
         result = Hwaro::Utils::HtmlMinifier.minify(html)
         result.should eq("<div><video src=\"v.mp4\"></video></div>")
+      end
+    end
+
+    describe "hidden elements (script, style, noscript)" do
+      # They render nothing, so the whitespace beside one still separates
+      # the inline content around it.
+      it "keeps the space between inline siblings around a script" do
+        Hwaro::Utils::HtmlMinifier.minify("<p><span>a</span>\n<script>x()</script>\n<span>b</span></p>")
+          .should eq("<p><span>a</span> <script>x()</script> <span>b</span></p>")
+      end
+
+      it "keeps the space before a noscript between inline siblings" do
+        Hwaro::Utils::HtmlMinifier.minify("<p><b>a</b> <noscript><i>n</i></noscript><b>c</b></p>")
+          .should eq("<p><b>a</b> <noscript><i>n</i></noscript><b>c</b></p>")
+      end
+
+      it "still strips whitespace between hidden and block neighbours" do
+        html = "<head>\n  <meta charset=\"utf-8\">\n  <style>a{}</style>\n  <script src=\"a.js\"></script>\n  <script src=\"b.js\"></script>\n</head>\n<body>\n<script>x()</script>\n<div>y</div>\n</body>"
+        Hwaro::Utils::HtmlMinifier.minify(html)
+          .should eq("<head><meta charset=\"utf-8\"><style>a{}</style><script src=\"a.js\"></script><script src=\"b.js\"></script></head><body><script>x()</script><div>y</div></body>")
       end
     end
 
@@ -225,6 +252,14 @@ describe Hwaro::Utils::HtmlMinifier do
         result.should contain("<pre>first</pre>")
         result.should contain("<script>second</script>")
         result.should contain("<pre>third</pre>")
+      end
+
+      it "does not mistake a custom element for a protected tag" do
+        # `<pre-view>` is an inline custom element, not <pre>: the space
+        # before it is visible and must survive.
+        html = "<p><b>a</b> <pre-view>x</pre-view></p>\n<pre>y</pre>"
+        Hwaro::Utils::HtmlMinifier.minify(html)
+          .should eq("<p><b>a</b> <pre-view>x</pre-view></p><pre>y</pre>")
       end
 
       it "does not let a literal <script> string inside <style> derail extraction" do

@@ -70,6 +70,20 @@ describe RenderHooks do
     RenderHooks.configure({} of String => String, {} of String => String)
   end
 
+  describe ".page_vars" do
+    it "reports the default language for a default-language page, as templates do" do
+      config = Hwaro::Models::Config.new
+      config.default_language = "fr"
+      page = Hwaro::Models::Page.new("about.md")
+      lang = RenderHooks.page_vars(page, config)["page"].raw.as(Hash)["language"]
+      lang.to_s.should eq("fr")
+
+      page.language = "ko"
+      lang = RenderHooks.page_vars(page, config)["page"].raw.as(Hash)["language"]
+      lang.to_s.should eq("ko")
+    end
+  end
+
   describe ".configure" do
     it "builds a registry entry per recognized hook and leaves the rest nil" do
       RenderHooks.configure(
@@ -212,6 +226,14 @@ describe "HookedRenderer (via SyntaxHighlighter.render with in-memory contexts)"
     cfg = Hwaro::Models::MarkdownConfig.new
     html, _ = Hwaro::Content::Processors::Markdown.new.render("## Title {#custom-id}\n\nBody", markdown_config: cfg, hooks: hooks)
     html.should contain("H[custom-id]:Title")
+  end
+
+  it "hands hooks safe-mode extension markup without the internal marks" do
+    hooks = make_hooks(heading: "H:{{ text | upper }}")
+    cfg = Hwaro::Models::MarkdownConfig.new
+    cfg.safe = true
+    html, _ = Hwaro::Content::Processors::Markdown.new.render("## a ~~b~~", safe: true, markdown_config: cfg, hooks: hooks)
+    html.should eq("H:A <DEL>B</DEL>\n")
   end
 
   it "dedups duplicate heading ids as foo, foo-1" do

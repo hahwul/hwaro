@@ -149,6 +149,16 @@ module Hwaro::Core::Build::Phases::Render
           next
         end
 
+        # A section's `/page/N/` pager pages are its own content, written by
+        # its render, so they beat a redirect stub too. Without the claim the
+        # winner was write order: the pager page on a cold build, the stub on
+        # a `--cache` build that re-rendered only the aliasing page.
+        if owner = pager_page_owner(norm, writers)
+          Logger.warn "Duplicate alias output path '#{norm}' — alias on '#{page.path}' collides with a pagination page of '#{owner}' and is not written"
+          winners[norm] = owner
+          next
+        end
+
         # A redirect stub is a published file too, so it goes through the same
         # file/fold identity check a page URL does.
         if file_key = Utils::PathUtils.output_file_key(norm)
@@ -180,6 +190,24 @@ module Hwaro::Core::Build::Phases::Render
     winners
   end
 
+  # The section whose render writes the pager page `url`
+  # (`<section url><paginate_path>/<N>/`, N ≥ 2), or nil.
+  private def pager_page_owner(url : String, writers : Array(Models::Page)) : String?
+    return unless (site = @site) && (templates = @templates)
+    writers.each do |section|
+      next unless section.is_a?(Models::Section)
+      base = "#{section.url.rstrip('/')}/#{section.paginate_path}/"
+      next unless url.starts_with?(base) && (match = url[base.size..].match(/\A([1-9]\d*)\/\z/))
+      number = match[1].to_i? || next
+      next unless number >= 2 && paginated_section?(section, determine_template(section, templates, site))
+      # The page list render_section_with_pagination paginates.
+      section_name = Path[section.path].dirname
+      section_name = "" if section_name == "."
+      pages = site.pages_for_section(section_name, section.language).reject(&.output_suppressed)
+      return section.path if number <= Content::Pagination::Paginator.new(site.config).paginate(section, pages).paginated_pages.size
+    end
+  end
+
   # The page whose own HTML lands on `output_path` (inside `output_dir`),
   # or nil. A generated page — a paginator's `/page/N/`, a taxonomy index or
   # term page — whose path an authored page already publishes is not
@@ -209,6 +237,7 @@ module Hwaro::Core::Build::Phases::Render
   )
     redirect_url = page.redirect_to
     return unless redirect_url
+    redirect_url = resolve_redirect_target(page, site, redirect_url)
 
     # Prefix a root-relative target with `base_url`'s path component, exactly
     # as generate_aliases does: without it, `redirect_to = "/about/"` on a
@@ -241,6 +270,26 @@ module Hwaro::Core::Build::Phases::Render
     Hwaro::Utils::FileSafe.atomic_write(output_path, Utils::RedirectHtml.full_redirect(redirect_url))
     note_published_page
     Logger.action :create, output_path if verbose
+  end
+
+  # `redirect_to = "@/blog/post.md"` names a content file the way an `@/`
+  # body link does, and resolves the same way (query/fragment kept); it was
+  # emitted literally as `url=@/blog/post.md`. An unresolved target is kept
+  # as written and reported like an unresolved body link.
+  private def resolve_redirect_target(page : Models::Page, site : Models::Site, target : String) : String
+    return target unless target.starts_with?("@/")
+    rest = target.lchop("@/")
+    split = rest.index(/[?#]/) || rest.size
+    pages_by_path = @pages_by_path || build_pages_by_path(site)
+    if dest = Content::Processors::InternalLinkResolver.page_for(pages_by_path, rest[0, split])
+      url = dest.url.starts_with?('/') ? dest.url : "/#{dest.url}"
+      return "#{url}#{rest[split..]}"
+    end
+    Logger.warn "`redirect_to` #{target.inspect} in '#{page.path}' could not be resolved: page not found."
+    if site.config.links.broken_internal == "error"
+      @broken_links_mutex.synchronize { @broken_internal_links << "#{page.path} → #{target} (page not found)" }
+    end
+    target
   end
 
   private def generate_aliases(page : Models::Page, site : Models::Site, output_dir : String, verbose : Bool)

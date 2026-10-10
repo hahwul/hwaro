@@ -195,6 +195,11 @@ module Hwaro
 
         prev = chars[j]
         return false if prev == ')' || prev == ']'
+        # A postfix `i++ / 2` ends an expression; `++` can never precede a
+        # regex literal (a literal is not incrementable). Read as a regex,
+        # the "literal" swallowed a template's opening backtick on the same
+        # line and the template body was then stripped as code.
+        return false if (prev == '+' || prev == '-') && j > 0 && chars[j - 1] == prev
         if prev.alphanumeric? || prev == '_' || prev == '$'
           return regex_keyword_before?(chars, j)
         end

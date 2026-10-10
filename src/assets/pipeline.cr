@@ -102,6 +102,11 @@ module Hwaro
               content = SassCompiler.compile_source(content, source)
             end
             content = rebase_css_urls(content, file, bundle_dir) if css_bundle && publishes_source_dir?
+            # `@import` is only honoured before every other rule, so one in a
+            # later entry is dropped by the browser once concatenated.
+            if css_bundle && wrote_any && css_import?(content)
+              Logger.warn "Asset pipeline: '#{file}' has an @import that browsers ignore after the earlier files of bundle '#{bundle.name}'; move it to the first file."
+            end
             io << content
             wrote_any = true
           end
@@ -209,9 +214,14 @@ module Hwaro
                         url.includes?("://") || url.starts_with?("//") || url.matches?(/\A[a-z][a-z0-9+.-]*:/i)
         path_part = url.split(/[?#]/, 2).first
         suffix = url[path_part.size..]
+        # A URL is percent-encoded (`fonts/A%20B.woff2`) while the file on
+        # disk is not, so the existence check decodes. An encoded `.` or `/`
+        # would change the segment structure between the two spellings; such
+        # a URL is left as written.
+        return whole if path_part.matches?(/%2[EeFf]/)
         target = Path.posix(source_dir, path_part).normalize
         return whole if Utils::PathUtils.escapes_parent?(target.to_s)
-        return whole unless File.file?(File.join(@config.source_dir, target.to_s))
+        return whole unless File.file?(File.join(@config.source_dir, URI.decode(target.to_s)))
         rebased = target.relative_to(Path.posix(bundle_dir)).to_s
         "url(#{quote}#{rebased}#{suffix}#{quote})"
       end
@@ -229,6 +239,28 @@ module Hwaro
           i += c == '\\'.ord ? 2 : 1
         end
         n
+      end
+
+      # True when `css` holds an `@import` rule outside strings and comments.
+      private def css_import?(css : String) : Bool
+        bytes = css.to_slice
+        n = bytes.size
+        i = 0
+        while i < n
+          b = bytes[i]
+          if b == '"'.ord || b == '\''.ord
+            i = css_string_end(bytes, i, n)
+          elsif b == '/'.ord && i + 1 < n && bytes[i + 1] == '*'.ord
+            close = css.byte_index("*/", i + 2)
+            i = close ? close + 2 : n
+          elsif b == '@'.ord && i + 7 <= n && String.new(bytes[i + 1, 6]).compare("import", case_insensitive: true) == 0 &&
+                (i + 7 == n || !css_ident_byte?(bytes[i + 7]))
+            return true
+          else
+            i += 1
+          end
+        end
+        false
       end
 
       private def css_ident_byte?(b : UInt8) : Bool

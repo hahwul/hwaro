@@ -10,7 +10,7 @@ module Hwaro
       module MarkdownExtensions
         # --- Footnotes ---
         # Pre-processing: extract footnote definitions and replace references with placeholders
-        FOOTNOTE_DEF_RE = /^\[\^([^\]]+)\]:\s*(.+?)$/m
+        FOOTNOTE_DEF_RE = /^ {0,3}\[\^([^\]]+)\]:\s*(.+?)$/m
         FOOTNOTE_REF_RE = /\[\^([^\]]+)\]/
         # Occurrence count rides on the number field as `NUM.OCC` (e.g. `1.3`).
         # The `.` separator can't appear in the legacy 3-field `NUM:` form, so a
@@ -28,7 +28,11 @@ module Hwaro
           HTML.escape(key.gsub(/\s+/, "-"))
         end
 
-        def preprocess_footnotes(content : String) : String
+        private def footnote_label(key : String) : String
+          key.downcase(Unicode::CaseOptions::Fold).split.join(' ')
+        end
+
+        def preprocess_footnotes(content : String, *, trusted : Bool = false) : String
           # Whole-content marker pre-check (memchr-fast): without `[^` there is
           # no footnote definition or reference to process, and without the
           # HWARO comment markers the neutralization gsubs below are identity —
@@ -64,7 +68,11 @@ module Hwaro
           # definition. Consumed lines are replaced with bare "\n" so the
           # surrounding CommonMark block structure is unchanged.
           footnotes = {} of String => String
+          # Case-folded label → first definition key: GFM matches footnote
+          # labels like link labels, so `[^Note]` finds `[^note]:`.
+          labels = {} of String => String
           pending_key = nil.as(String?)
+          pending_store = footnotes
           pending_blank = false
           cleaned = String.build do |io|
             tracker = FenceTracker.new
@@ -82,8 +90,9 @@ module Hwaro
                   io << line
                   next
                 elsif line.starts_with?("    ") || line.starts_with?('\t')
-                  footnotes[key] += pending_blank ? "\n\n" : "\n"
-                  footnotes[key] += line.strip
+                  # A bare `[^1]:` starts its body here, with no separator.
+                  pending_store[key] += pending_blank ? "\n\n" : "\n" unless pending_store[key].empty?
+                  pending_store[key] += line.strip
                   pending_blank = false
                   io << "\n"
                   next
@@ -98,8 +107,12 @@ module Hwaro
               end
 
               if m = line.match(FOOTNOTE_DEF_RE)
+                # The first definition of a key wins (cmark-gfm); a later
+                # one is still consumed, with its continuation lines.
+                pending_store = footnotes.has_key?(m[1]) ? {} of String => String : footnotes
                 # rstrip: on CRLF content the captured text carries a trailing \r
-                footnotes[m[1]] = m[2].rstrip
+                pending_store[m[1]] = m[2].rstrip
+                labels[footnote_label(m[1])] ||= m[1]
                 pending_key = m[1]
                 io << "\n"
               else
@@ -125,7 +138,10 @@ module Hwaro
             transform_outside_code_spans(line) do |stashed|
               stashed.gsub(FOOTNOTE_REF_RE) do |full_match|
                 key = $~[1]
-                next full_match unless footnotes.has_key?(key)
+                unless footnotes.has_key?(key)
+                  next full_match unless label_key = labels[footnote_label(key)]?
+                  key = label_key
+                end
 
                 unless ref_order.has_key?(key)
                   counter += 1
@@ -136,14 +152,14 @@ module Hwaro
                 occ = ref_occurrences[key]
                 escaped_key = footnote_id_token(key)
                 ref_id = occ == 1 ? "fnref-#{escaped_key}" : "fnref-#{escaped_key}-#{occ}"
-                "<sup class=\"footnote-ref\"><a href=\"#fn-#{escaped_key}\" id=\"#{ref_id}\">[#{num}]</a></sup>"
+                trust("<sup class=\"footnote-ref\"><a href=\"#fn-#{escaped_key}\" id=\"#{ref_id}\">[#{num}]</a></sup>", trusted)
               end
             end
           end
 
           # Store footnotes data in a special HTML comment for postprocessing
           if ref_order.present?
-            result += "\n<!--HWARO-FOOTNOTES-START-->\n"
+            result += trust("\n<!--HWARO-FOOTNOTES-START-->\n", trusted)
             ref_order.each do |key, num|
               text = footnotes[key]? || ""
               occ = ref_occurrences[key]? || 1
@@ -152,18 +168,17 @@ module Hwaro
               # the comment stays single-line for FOOTNOTE_COMMENT_RE.
               safe_key = key.gsub("--", "&#45;&#45;").gsub(":", "&#58;")
               safe_text = text.gsub("--", "&#45;&#45;").gsub(":", "&#58;").gsub("\n", "&#10;")
-              result += "<!--HWARO-FN:#{safe_key}:#{num}.#{occ}:#{safe_text}-->\n"
+              result += "#{trust("<!--HWARO-", trusted)}FN:#{safe_key}:#{num}.#{occ}:#{safe_text}-->\n"
             end
-            result += "<!--HWARO-FOOTNOTES-END-->\n"
+            result += trust("<!--HWARO-FOOTNOTES-END-->\n", trusted)
           end
 
           result
         end
 
         # Post-processing: convert footnote comments to HTML section.
-        # `flags.math` keeps `$…$` spans in footnote bodies untransformed
-        # (math is not rendered in footnotes, but its internals must not be
-        # rewritten by emphasis/strikethrough either); `flags` also threads
+        # `flags.math` renders `$…$` spans in footnote bodies as math, their
+        # internals untouched by emphasis/strikethrough; `flags` also threads
         # the F10 opt-in inline markup (ins/mark/sub/sup).
         def postprocess_footnotes(html : String, *, flags : InlineMarkdown::Flags = InlineMarkdown::Flags.new) : String
           return html unless html.includes?("<!--HWARO-FOOTNOTES-START-->")
@@ -210,6 +225,7 @@ module Hwaro
               paragraphs = fn[:text].split(/\n{2,}/)
               paragraphs.each_with_index do |para, idx|
                 rendered_text = InlineMarkdown.render(para, flags: flags)
+                rendered_text = wrap_rendered_math(rendered_text) if flags.math
                 if idx == paragraphs.size - 1
                   str << "<p>#{rendered_text} #{backrefs}</p>\n"
                 else

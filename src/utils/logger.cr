@@ -15,6 +15,12 @@
 require "colorize"
 require "./text_utils"
 
+class Fiber
+  # Warnings this fiber has printed for the page it renders; see
+  # `Logger.dedupe_warnings`.
+  property hwaro_warned : Set(String)? = nil
+end
+
 module Hwaro
   class Logger
     # Terminal stream that a vanished reader cannot turn into a failure.
@@ -27,8 +33,15 @@ module Hwaro
     # page was rendered, for the rest of the session. Logging is never the
     # point of the work: the first failed write marks the stream gone and
     # every later one is dropped.
+    #
+    # It is also the one lock on the stream. Render workers run on several
+    # threads and warn concurrently; the terminal IO's buffer is not
+    # thread-safe, so unlocked writes interleaved, duplicated and dropped
+    # warning lines and even emitted NUL bytes. `puts` writes the line and
+    # its newline as one locked write so lines never interleave either.
     class GuardedIO < IO
       @gone = false
+      @mutex = Mutex.new
 
       def initialize(@io : IO)
       end
@@ -38,17 +51,25 @@ module Hwaro
       end
 
       def write(slice : Bytes) : Nil
-        return if @gone
-        @io.write(slice)
-      rescue IO::Error
-        @gone = true
+        @mutex.synchronize do
+          return if @gone
+          @io.write(slice)
+        rescue IO::Error
+          @gone = true
+        end
+      end
+
+      def puts(string : String) : Nil
+        string.ends_with?('\n') ? write(string.to_slice) : write("#{string}\n".to_slice)
       end
 
       def flush : Nil
-        return if @gone
-        @io.flush
-      rescue IO::Error
-        @gone = true
+        @mutex.synchronize do
+          return if @gone
+          @io.flush
+        rescue IO::Error
+          @gone = true
+        end
       end
 
       def tty? : Bool
@@ -175,11 +196,25 @@ module Hwaro
     # "[WARN] " prefix so scripts that grep for it keep working.
     def self.warn(message : String)
       return if @@level > Level::Warn
+      return if (seen = Fiber.current.hwaro_warned) && !seen.add?(message)
       clear_active_line
       if color_enabled?
         @@err_io.puts "#{glyph(:warn)} #{paint(message, Role::Warn)}"
       else
         @@err_io.puts "[WARN] #{message}"
+      end
+    end
+
+    # Inside the block, a warning already in `seen` is dropped. One page's
+    # Markdown is rendered by its summary pass and again by its body render;
+    # both share the page's set so each diagnostic prints once per page.
+    def self.dedupe_warnings(seen : Set(String), &)
+      previous = Fiber.current.hwaro_warned
+      Fiber.current.hwaro_warned = seen
+      begin
+        yield
+      ensure
+        Fiber.current.hwaro_warned = previous
       end
     end
 

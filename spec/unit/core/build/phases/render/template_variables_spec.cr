@@ -73,3 +73,26 @@ describe "resize_image with a page-bundle image" do
     end
   end
 end
+
+describe "section.subsections" do
+  # Documented as Array<Section>, but each entry was a four-key stub
+  # (title/description/url/pages_count), so a nested nav looping
+  # `sub.pages` rendered nothing.
+  it "exposes each subsection's pages, name and own subsections" do
+    build_site(
+      "title = \"T\"\nbase_url = \"http://localhost\"\n",
+      content_files: {
+        "docs/_index.md"            => "+++\ntitle = \"Docs\"\n+++\n",
+        "docs/guide/_index.md"      => "+++\ntitle = \"Guide\"\n+++\n",
+        "docs/guide/a.md"           => "+++\ntitle = \"A\"\n+++\n",
+        "docs/guide/deep/_index.md" => "+++\ntitle = \"Deep\"\n+++\n",
+      },
+      template_files: {
+        "page.html"    => "P",
+        "section.html" => "{% for s in section.subsections %}[{{ s.title }}:{{ s.name }}:{{ s.pages | map(attribute=\"title\") | join(\",\") }}:{{ s.subsections | map(attribute=\"title\") | join(\",\") }}]{% endfor %}",
+      },
+    ) do
+      File.read("public/docs/index.html").should eq("[Guide:docs/guide:A,Deep:Deep]")
+    end
+  end
+end

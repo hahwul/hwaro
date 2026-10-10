@@ -115,6 +115,27 @@ module Hwaro
           exact_page_for(pages_by_path, path) || folded_page_for(pages_by_path, path.includes?('%') ? URI.decode(path) : path)
         end
 
+        # Index a default-language page whose file spells its suffix out
+        # (`about.en.md`) under the bare path too (`about.md`), the way
+        # `get_page(path="about.md")` finds it — `@/about.md` otherwise warned
+        # and shipped literally. A literal file of the bare name keeps its key.
+        # Multilingual sites only: elsewhere `about.en.md` is just a name.
+        # Call on a finished content-path map; returns it.
+        def add_default_language_aliases(map : Hash(String, Models::Page), config : Models::Config) : Hash(String, Models::Page)
+          return map unless config.multilingual?
+          suffix = ".#{config.default_language}"
+          map.to_a.each do |path, page|
+            next unless page.language.nil? && page.path == path
+            ext = File.extname(path)
+            stem = path.rchop(ext)
+            next unless stem.ends_with?(suffix)
+            bare = stem.rchop(suffix)
+            next if bare.empty? || bare.ends_with?('/')
+            map["#{bare}#{ext}"] ||= page
+          end
+          map
+        end
+
         private def exact_page_for(pages_by_path : Hash(String, Models::Page), path : String) : Models::Page?
           return pages_by_path[path]? unless path.includes?('%') || path.includes?("&amp;")
           candidates = path.includes?("&amp;") ? [path.gsub("&amp;", "&"), path] : [path]
@@ -205,8 +226,11 @@ module Hwaro
                 "href=\"#{url}\""
               end
             else
-              Logger.warn "Internal link '@/#{content_path}' in '#{source_path}' could not be resolved: page not found."
-              misses << {content_path, "page not found"} if misses
+              # Markdown percent-encoded the href (`ü` → `%C3%BC`); report the
+              # file name the author wrote.
+              shown = content_path.includes?('%') ? URI.decode(content_path) : content_path
+              Logger.warn "Internal link '@/#{shown}' in '#{source_path}' could not be resolved: page not found."
+              misses << {shown, "page not found"} if misses
               match
             end
           end

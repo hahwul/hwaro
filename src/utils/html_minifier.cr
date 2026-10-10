@@ -50,8 +50,9 @@ module Hwaro
       # between siblings collapses to a single rendered space and must
       # therefore be kept as one literal space. Replaced elements that
       # default to display:inline (iframe, video, audio, canvas, embed,
-      # object) are deliberately NOT listed: whitespace adjacent to them
-      # renders as a visible space and must be preserved.
+      # object — and `picture`, an inline wrapper around its `<img>`) are
+      # deliberately NOT listed: whitespace adjacent to them renders as a
+      # visible space and must be preserved.
       BLOCK_TAGS = Set{
         "address", "article", "aside", "base", "blockquote", "body",
         "caption", "col", "colgroup", "dd", "details", "dialog",
@@ -59,7 +60,7 @@ module Hwaro
         "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6",
         "head", "header", "hgroup", "hr", "html",
         "li", "link", "main", "menu", "meta", "nav", "noscript",
-        "ol", "p", "picture", "pre", "script", "section",
+        "ol", "p", "pre", "script", "section",
         "source", "style", "summary", "table", "tbody", "td",
         "tfoot", "th", "thead", "title", "tr", "track", "ul",
       }
@@ -80,6 +81,13 @@ module Hwaro
       # they were their original tag.
       PROTECTED_INLINE = Set{"code", "svg", "math", "textarea"}
 
+      # Protected tags that render nothing (display:none; `noscript` while
+      # scripting is on). They take no part in whitespace collapsing, so
+      # the space beside one still separates the inline content around
+      # it: `<b>a</b> <script>…</script> <b>c</b>` renders "a c", and
+      # treating the script as block deleted that gap ("ac").
+      PROTECTED_HIDDEN = Set{"script", "style", "noscript"}
+
       # Per-tag extraction patterns, compiled once at load time. minify()
       # runs once per rendered page, so building these eight Regex objects
       # inside protect_sensitive_blocks paid a PCRE2 compile per tag per
@@ -95,20 +103,24 @@ module Hwaro
         # covers author-written uppercase tags.
          "<#{tag}",
          Regex.new("<#{tag}", Regex::Options::IGNORE_CASE),
+         # `(?![\w-])`, not `\b`: a custom element such as `<pre-view>`
+         # or `<math-field>` is not the protected tag, and `\b` matched it
+         # and sealed everything up to the next real `</pre>` as one block.
          Regex.new(
-           "<#{tag}\\b[^>]*>.*?</#{tag}\\s*>",
+           "<#{tag}(?![\\w-])[^>]*>.*?</#{tag}\\s*>",
            Regex::Options::IGNORE_CASE | Regex::Options::MULTILINE
          )}
       end
 
       # Sentinel format for protected blocks. `\x00` is illegal in HTML,
       # so the placeholder cannot collide with author content. The
-      # `B`/`I` suffix lets the whitespace collapser look up the
+      # `B`/`I`/`H` suffix lets the whitespace collapser look up the
       # original element's display class without re-parsing the body.
       private PRESERVE_PREFIX_BLOCK  = "\x00HW_HTML_PB_"
       private PRESERVE_PREFIX_INLINE = "\x00HW_HTML_PI_"
+      private PRESERVE_PREFIX_HIDDEN = "\x00HW_HTML_PH_"
       private PRESERVE_SUFFIX        = "\x00"
-      # Common prefix of both placeholder forms, for cheap presence probes.
+      # Common prefix of every placeholder form, for cheap presence probes.
       private PRESERVE_TOKEN_PROBE = "\x00HW_HTML_P"
 
       # Regex constants
@@ -138,10 +150,10 @@ module Hwaro
       # the rendered HTML, and collapsing it either downgraded it to a
       # breakable space (inline neighbours) or deleted it outright
       # (block neighbours), silently changing the rendered page.
-      private REGEX_INTERTOKEN_WS  = /(<\/?[A-Za-z][\w-]*[^>]*>|\x00HW_HTML_P[BI]_\d+\x00)([ \t\r\n\f]+)(?=(<\/?[A-Za-z][\w-]*[^>]*>|\x00HW_HTML_P[BI]_\d+\x00))/
+      private REGEX_INTERTOKEN_WS  = /(<\/?[A-Za-z][\w-]*[^>]*>|\x00HW_HTML_P[BIH]_\d+\x00)([ \t\r\n\f]+)(?=(<\/?[A-Za-z][\w-]*[^>]*>|\x00HW_HTML_P[BIH]_\d+\x00))/
       private REGEX_TAG_NAME       = /^<\/?([A-Za-z][\w-]*)/
       private REGEX_BLANK_LINES    = /\n{2,}/
-      private REGEX_PRESERVE_TOKEN = /\x00HW_HTML_P[BI]_(\d{1,9})\x00/
+      private REGEX_PRESERVE_TOKEN = /\x00HW_HTML_P[BIH]_(\d{1,9})\x00/
 
       # Minify the given HTML.
       #
@@ -209,7 +221,13 @@ module Hwaro
         result = html
         PROTECTED_PATTERNS.each do |(tag, open_literal, probe, pattern)|
           next unless ByteScan.includes?(result, open_literal) || result.matches?(probe)
-          prefix = PROTECTED_INLINE.includes?(tag) ? PRESERVE_PREFIX_INLINE : PRESERVE_PREFIX_BLOCK
+          prefix = if PROTECTED_INLINE.includes?(tag)
+                     PRESERVE_PREFIX_INLINE
+                   elsif PROTECTED_HIDDEN.includes?(tag)
+                     PRESERVE_PREFIX_HIDDEN
+                   else
+                     PRESERVE_PREFIX_BLOCK
+                   end
           result = result.gsub(pattern) do |match|
             idx = preserves.size
             preserves << match
@@ -358,12 +376,17 @@ module Hwaro
       #   * keep a single space only when both neighbours are inline,
       #     preserving the visible gap between adjacent inline elements
       #     like `<a>x</a> <a>y</a>`.
+      # A hidden placeholder (script/style/noscript) is neither: next to
+      # an inline neighbour its space is kept, between two hidden ones
+      # (the usual run of tags in `<head>`) it is stripped.
+      # ponytail: decided per pair, so `<b>a</b><script/> <script/><b>c</b>`
+      # still loses its one space; look past hidden runs if that shows up.
       private def collapse_inter_token_whitespace(html : String) : String
         html.gsub(REGEX_INTERTOKEN_WS) do
           prior = $1
           # $2 = whitespace run (discarded except when we re-emit one space)
           nxt = $3
-          if block_token?(prior) || block_token?(nxt)
+          if block_token?(prior) || block_token?(nxt) || (hidden_token?(prior) && hidden_token?(nxt))
             prior
           else
             "#{prior} "
@@ -376,12 +399,15 @@ module Hwaro
       # block).
       private def block_token?(token : String) : Bool
         return true if token.starts_with?(PRESERVE_PREFIX_BLOCK)
-        return false if token.starts_with?(PRESERVE_PREFIX_INLINE)
         if m = REGEX_TAG_NAME.match(token)
           BLOCK_TAGS.includes?(m[1].downcase)
         else
           false
         end
+      end
+
+      private def hidden_token?(token : String) : Bool
+        token.starts_with?(PRESERVE_PREFIX_HIDDEN)
       end
 
       # Collapse whitespace runs *inside* tag openings to a single

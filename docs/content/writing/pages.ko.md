@@ -74,7 +74,7 @@ JSON은 파일 맨 앞에서 처음으로 짝이 맞는 `{...}`가 프론트 매
 | in_search_index | bool | 검색 포함 여부 |
 | in_sitemap | bool | 사이트맵 포함 여부 |
 | insert_anchor_links | bool | 헤딩 앵커 추가 |
-| redirect_to | string | 페이지를 이 URL로 리다이렉트(리다이렉트 페이지는 사이트맵, 피드, 검색 인덱스, llms.txt에서 빠짐) |
+| redirect_to | string | 페이지를 이 URL 또는 `@/` 경로로 지정한 콘텐츠 파일(`@/blog/post.md`)로 리다이렉트(리다이렉트 페이지는 사이트맵, 피드, 검색 인덱스, llms.txt에서 빠짐) |
 | render | bool | 페이지를 출력으로 렌더링(기본값: true) |
 | expires | date | 이 날짜 이후 자동 제외 |
 | series | string | 묶음용 시리즈 이름 |
@@ -274,6 +274,8 @@ This is the summary shown in listings.
 The full article continues here...
 ```
 
+요약은 본문과 같은 방식으로 렌더링되며 숏코드, Markdown 확장, 렌더 훅이 모두 적용됩니다. 블록 숏코드 본문(`{% note() %}` … `{% end %}`) 안에 마커를 두면 요약은 그 블록 안에서 끝나고, 요약 쪽에서 그 지점에서 블록을 닫습니다. 원시 HTML도 마찬가지입니다. `<details>` … `</details>`처럼 열린 요소 안에 마커를 두면 요약은 그 지점에서 끝나고 열린 요소를 닫으므로, 요약을 출력하는 목록 페이지가 닫히지 않은 태그에 묻히지 않습니다.
+
 ### 자동 요약
 
 마커도 `description`도 없는 페이지에는 자동 요약이 생성됩니다. 렌더링된 본문의 처음 70단어를 `<p>` 하나로 감싸고, 텍스트가 잘린 경우에만 말줄임표(`…`)를 붙입니다. 발췌문은 렌더링된 HTML에서 만들어지므로 숏코드는 확장되고 코드 블록, 헤딩, 이미지, figure는 건너뛰어 자연스러운 산문으로 읽힙니다.
@@ -352,6 +354,8 @@ console.log("Hello");
 
 최종 URL을 몰라도 된다는 점이 장점입니다. Hwaro가 콘텐츠 경로에서 URL을 계산합니다. 대상 페이지가 없으면 링크는 그대로 남고 빌드 중 경고가 기록됩니다.
 
+`@/` 링크는 페이지 콘텐츠(Markdown, 그리고 그 안의 HTML이나 숏코드 출력)에서만 해석됩니다. 템플릿은 다시 쓰지 않으므로 `page.html`에 쓴 `<a href="@/about.md">`는 그대로 출력됩니다. 템플릿에서는 `{{ get_page(path="about.md").url }}`을 사용하세요.
+
 | 문법 | 변환된 URL |
 |--------|-------------|
 | `@/blog/post.md` | `/blog/post/` |
@@ -416,7 +420,7 @@ id에 허용되는 문자: 문자(모든 문자 체계), 숫자, `_`, `-`, `:`. 
 
 `config.toml`의 `[markdown]` 아래에 `heading_ids = false`를 두면 비활성화됩니다.
 
-커스텀 헤딩 ID에는 `markdown.safe = false`가 필요합니다. safe 모드에서는 `{#id}` 문법이 출력에서 제거되고 id도 적용되지 않습니다. safe 모드와 명시적 id가 동시에 필요하면 raw HTML 헤딩을 사용합니다. 한 페이지에 같은 `{#id}`를 두 번 쓰면 id 속성이 중복되며, 앵커는 첫 번째가 우선합니다.
+커스텀 헤딩 ID에는 `markdown.safe = false`가 필요합니다. safe 모드에서는 `{#id}` 문법이 출력에서 제거되고 커스텀 id도 적용되지 않아 헤딩은 자동 생성된 id를 유지합니다(safe 모드는 raw HTML도 제거하므로 raw HTML 헤딩으로 우회할 수 없습니다). 한 페이지에 같은 `{#id}`를 두 번 쓰면 첫 번째 헤딩이 그 id를 갖고, 뒤의 헤딩은 숫자 접미사(`#id-1`)로 이름이 바뀌며 빌드 경고가 출력됩니다.
 
 `{#id}` 단축 문법은 더 일반적인 `{#id .class key=val}` 속성 블록(`[markdown] attributes = true`)의 특수한 경우이며, 속성 블록은 인라인 이미지에도 적용됩니다. [마크다운 확장](/ko/features/markdown-extensions/)을 참고합니다.
 
@@ -451,7 +455,7 @@ content/
     └── _index.md
 ```
 
-Hwaro는 페이지 번들 디렉터리의 마크다운이 아닌 파일 전부를 상대 경로를 유지한 채 출력 디렉터리로 복사합니다.
+Hwaro는 페이지 번들 디렉터리의 마크다운이 아닌 파일 전부를 상대 경로를 유지한 채 출력 디렉터리로 복사합니다. [`[content.files]`](/ko/features/content-files/)를 설정했다면(`hwaro init` 스캐폴드는 이미지 허용 목록을 설정함) 그 규칙이 허용하는 파일만 복사합니다.
 
 마크다운에서는 상대 경로로 이 에셋에 링크하면 됩니다:
 
@@ -463,7 +467,7 @@ Hwaro는 페이지 번들 디렉터리의 마크다운이 아닌 파일 전부�
 
 ### 템플릿에서 에셋 접근
 
-템플릿에서는 `page.assets`로 함께 둔 에셋 목록에 접근합니다. 파일의 상대 경로 배열을 반환합니다.
+템플릿에서는 `page.assets`로 함께 둔 에셋 목록에 접근합니다. `content/` 기준 경로(`blog/my-trip/photo.jpg`)의 배열을 반환합니다.
 
 ```jinja
 {% for asset in page.assets %}

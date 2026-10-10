@@ -1,0 +1,433 @@
+require "../../../../spec_helper"
+require "../../../../../src/core/build/builder"
+require "../../../../../src/content/hooks"
+
+describe "Builder#run_incremental output collisions" do
+  it "republishes a bundle's assets once the collision that suppressed it is gone" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content/posts/a")
+        FileUtils.mkdir_p("content/posts/x")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}")
+        File.write("content/posts/a/index.md", "+++\ntitle = \"A\"\n+++\n")
+        File.write("content/posts/a/cover.png", "A-cover")
+        File.write("content/posts/x/index.md", "+++\ntitle = \"X\"\n+++\n")
+        File.write("content/posts/x/cover.png", "X-cover")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/posts/a/index.md"], options)
+
+        # posts/a takes /posts/x/ (it sorts first): the URL serves A's files.
+        File.write("content/posts/a/index.md", "+++\ntitle = \"A\"\nslug = \"x\"\n+++\n")
+        builder.run_incremental(["content/posts/a/index.md"], options)
+        File.read("public/posts/x/index.html").should eq("A")
+        File.read("public/posts/x/cover.png").should eq("A-cover")
+
+        # Collision resolved: posts/x owns /posts/x/ again, files included.
+        File.write("content/posts/a/index.md", "+++\ntitle = \"A\"\n+++\n")
+        builder.run_incremental(["content/posts/a/index.md"], options)
+        File.read("public/posts/x/index.html").should eq("X")
+        File.read("public/posts/x/cover.png").should eq("X-cover")
+        File.read("public/posts/a/cover.png").should eq("A-cover")
+      end
+    end
+  end
+
+  it "re-renders a page once the collision that suppressed it is gone" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content/posts")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}")
+        # `m` sits between `a` and `b` in date order, so `b` neither links
+        # to `a` nor neighbours it: nothing but the collision ties them.
+        File.write("content/posts/a.md", "+++\ntitle = \"A\"\ndate = 2024-01-01\n+++\n")
+        File.write("content/posts/m.md", "+++\ntitle = \"M\"\ndate = 2024-01-02\n+++\n")
+        File.write("content/posts/m2.md", "+++\ntitle = \"M2\"\ndate = 2024-01-03\n+++\n")
+        File.write("content/posts/b.md", "+++\ntitle = \"B\"\ndate = 2024-01-04\n+++\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/posts/a.md"], options)
+
+        File.write("content/posts/a.md", "+++\ntitle = \"A\"\ndate = 2024-01-01\nslug = \"b\"\n+++\n")
+        builder.run_incremental(["content/posts/a.md"], options)
+        File.read("public/posts/b/index.html").should eq("A")
+
+        File.write("content/posts/a.md", "+++\ntitle = \"A\"\ndate = 2024-01-01\n+++\n")
+        builder.run_incremental(["content/posts/a.md"], options)
+        File.read("public/posts/a/index.html").should eq("A")
+        File.read("public/posts/b/index.html").should eq("B")
+      end
+    end
+  end
+end
+
+# `site.authors` embeds each page's title and summary; only the full build's
+# Transform phase built it, so serve kept printing the pre-edit values.
+describe "Builder serve passes and site.authors" do
+  it "refreshes author page lists after a content edit and a shortcode edit" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content/blog")
+        FileUtils.mkdir_p("templates/shortcodes")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("templates/section.html", "A[{% for p in site.authors.ann.pages %}{{ p.title }}:{{ p.summary }}{% endfor %}]")
+        File.write("templates/shortcodes/sc.html", "one")
+        File.write("content/blog/_index.md", "+++\ntitle = \"B\"\n+++\n")
+        post = "+++\ntitle = \"Old\"\nauthors = [\"ann\"]\n+++\nIntro {{ sc() }}\n\n<!-- more -->\n\nRest.\n"
+        File.write("content/blog/post.md", post)
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/blog/post.md"], options)
+        File.read("public/blog/index.html").should eq("A[Old:<p>Intro one</p>\n]")
+
+        File.write("content/blog/post.md", post.sub("Old", "New").sub("Intro", "Lead"))
+        builder.run_incremental(["content/blog/post.md"], options)
+        File.read("public/blog/index.html").should eq("A[New:<p>Lead one</p>\n]")
+
+        File.write("templates/shortcodes/sc.html", "two")
+        builder.run_rerender(options)
+        File.read("public/blog/index.html").should eq("A[New:<p>Lead two</p>\n]")
+      end
+    end
+  end
+end
+
+describe "Builder#run_incremental listing fan-out" do
+  it "refreshes sibling section.pages loops when a subsection's body changes" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content/blog/sub")
+        FileUtils.mkdir_p("templates")
+        listing = "{% for p in section.pages %}[{{ p.title }}:{{ p.summary }}]{% endfor %}"
+        File.write("templates/page.html", listing)
+        File.write("templates/section.html", listing)
+        File.write("content/blog/_index.md", "+++\ntitle = \"Blog\"\n+++\n")
+        File.write("content/blog/sub/_index.md", "+++\ntitle = \"Sub\"\n+++\nold\n")
+        File.write("content/blog/a.md", "+++\ntitle = \"A\"\n+++\na\n")
+        File.write("content/blog/b.md", "+++\ntitle = \"B\"\n+++\nb\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/blog/sub/_index.md"], options)
+        File.read("public/blog/a/index.html").should contain("<p>old</p>")
+
+        # Only the subsection's body moves: its title, URL and the section
+        # set are unchanged, so only the page-set projection can see it.
+        File.write("content/blog/sub/_index.md", "+++\ntitle = \"Sub\"\n+++\nnew\n")
+        builder.run_incremental(["content/blog/sub/_index.md"], options)
+        File.read("public/blog/a/index.html").should contain("<p>new</p>")
+        File.read("public/blog/b/index.html").should contain("<p>new</p>")
+      end
+    end
+  end
+end
+
+describe "Builder#run_incremental version roots" do
+  it "refreshes page.version.url when a translated version root stops rendering" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", <<-TOML)
+          title = "T"
+          base_url = "http://localhost"
+          default_language = "en"
+          [languages.en]
+          language_name = "English"
+          [languages.ko]
+          language_name = "Korean"
+          [[versions.list]]
+          name = "v2"
+          path = "docs/v2"
+          latest = true
+          [[versions.list]]
+          name = "v1"
+          path = "docs/v1"
+          TOML
+        FileUtils.mkdir_p("content/docs/v2")
+        FileUtils.mkdir_p("content/docs/v1/guide")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.version.url }}")
+        File.write("templates/section.html", "{{ page.version.url }}")
+        File.write("content/docs/v2/_index.md", "+++\ntitle = \"v2\"\n+++\n")
+        File.write("content/docs/v1/_index.md", "+++\ntitle = \"v1\"\n+++\n")
+        File.write("content/docs/v1/_index.ko.md", "+++\ntitle = \"v1 ko\"\n+++\n")
+        File.write("content/docs/v1/guide/_index.ko.md", "+++\ntitle = \"g\"\n+++\n")
+        File.write("content/docs/v1/guide/deep.ko.md", "+++\ntitle = \"deep\"\n+++\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/docs/v1/_index.ko.md"], options)
+        File.read("public/ko/docs/v1/guide/deep/index.html").should eq("/ko/docs/v1/")
+
+        # The Korean root is no longer written, so every Korean v1 page
+        # points at the default language's root, as a cold build does.
+        File.write("content/docs/v1/_index.ko.md", "+++\ntitle = \"v1 ko\"\nrender = false\n+++\n")
+        builder.run_incremental(["content/docs/v1/_index.ko.md"], options)
+        File.read("public/ko/docs/v1/guide/deep/index.html").should eq("/docs/v1/")
+        File.read("public/ko/docs/v1/guide/index.html").should eq("/docs/v1/")
+      end
+    end
+  end
+end
+
+describe "Builder#run_incremental drafting a bundle" do
+  it "unpublishes the bundle's [content.files] copies when a slug moved the page" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[content.files]\nallow_extensions = ["png"]\n))
+        FileUtils.mkdir_p("content/notes/p")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}")
+        File.write("content/notes/p/index.md", "+++\ntitle = \"P\"\nslug = \"sl\"\n+++\n")
+        File.write("content/notes/p/img0.png", "PNG")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/notes/p/index.md"], options)
+        File.exists?("public/notes/p/img0.png").should be_true
+        File.exists?("public/notes/sl/img0.png").should be_true
+
+        File.write("content/notes/p/index.md", "+++\ntitle = \"P\"\nslug = \"sl\"\ndraft = true\n+++\n")
+        builder.run_incremental(["content/notes/p/index.md"], options)
+        File.exists?("public/notes/sl/img0.png").should be_false
+        File.exists?("public/notes/p/img0.png").should be_false
+      end
+    end
+  end
+
+  it "unpublishes the bundle's raw JSON and XML files" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[content.files]\nallow_extensions = ["png"]\n))
+        FileUtils.mkdir_p("content/notes/p")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}")
+        File.write("content/notes/p/index.md", "+++\ntitle = \"P\"\n+++\n")
+        File.write("content/notes/p/data.json", %({"a": 1}))
+        File.write("content/notes/p/feed.xml", "<x/>")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/notes/p/index.md"], options)
+        File.exists?("public/notes/p/data.json").should be_true
+
+        File.write("content/notes/p/index.md", "+++\ntitle = \"P\"\ndraft = true\n+++\n")
+        builder.run_incremental(["content/notes/p/index.md"], options)
+        File.exists?("public/notes/p/data.json").should be_false
+        File.exists?("public/notes/p/feed.xml").should be_false
+      end
+    end
+  end
+end
+
+describe "Builder#run_incremental image bundles" do
+  it "moves a bundle's resized variants with its slug" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[image_processing]\nenabled = true\nwidths = [16]\n))
+        FileUtils.mkdir_p("content/notes/p")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("content/notes/p/index.md", "+++\ntitle = \"P\"\n+++\n![i](pic.png)\n")
+        pixels = Bytes.new(32 * 32 * 3, 128_u8)
+        LibStb.stbi_write_png("content/notes/p/pic.png", 32, 32, 3, pixels.to_unsafe.as(Void*), 32 * 3)
+
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hook| builder.register(hook) }
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/notes/p/index.md"], options)
+        File.exists?("public/notes/p/pic_16w.png").should be_true
+
+        File.write("content/notes/p/index.md", "+++\ntitle = \"P\"\nslug = \"sl\"\n+++\n![i](pic.png)\n")
+        builder.run_incremental(["content/notes/p/index.md"], options)
+        File.exists?("public/notes/sl/pic_16w.png").should be_true
+        File.read("public/notes/sl/index.html").should contain("/notes/sl/pic_16w.png")
+        File.exists?("public/notes/p/pic_16w.png").should be_false
+      end
+    end
+  end
+end
+
+describe "Builder#run_incremental section edits" do
+  it "re-renders the root listing when a top-level section turns transparent" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content/posts")
+        FileUtils.mkdir_p("content/other")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}")
+        File.write("templates/section.html", "{% for p in section.pages %}{{ p.title }},{% endfor %}")
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/posts/_index.md", "+++\ntitle = \"Posts\"\n+++\n")
+        File.write("content/posts/a.md", "+++\ntitle = \"A\"\ndate = 2024-01-01\n+++\n")
+        # Another section, so the root index is not a neighbour of posts/a.
+        File.write("content/other/_index.md", "+++\ntitle = \"Other\"\n+++\n")
+        File.write("content/other/o.md", "+++\ntitle = \"O\"\ndate = 2023-01-01\n+++\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/posts/_index.md"], options)
+        File.read("public/index.html").should contain("Posts,")
+
+        File.write("content/posts/_index.md", "+++\ntitle = \"Posts\"\ntransparent = true\n+++\n")
+        builder.run_incremental(["content/posts/_index.md"], options)
+        File.read("public/index.html").should contain("A,")
+        File.read("public/index.html").should_not contain("Posts,")
+      end
+    end
+  end
+end
+
+describe "Builder#run_incremental moved link targets" do
+  it "re-renders the marker summary of a page linking to a re-slugged page" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content/posts")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}")
+        File.write("templates/section.html", "{% for p in section.pages %}[{{ p.summary }}]{% endfor %}")
+        File.write("content/posts/_index.md", "+++\ntitle = \"Posts\"\n+++\n")
+        File.write("content/posts/b.md", "+++\ntitle = \"B\"\n+++\nB\n")
+        File.write("content/posts/c.md", "+++\ntitle = \"C\"\n+++\nSee [B](@/posts/b.md).\n\n<!-- more -->\n\nRest.\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/posts/b.md"], options)
+        File.read("public/posts/index.html").should contain(%(href="/posts/b/"))
+
+        File.write("content/posts/b.md", "+++\ntitle = \"B\"\nslug = \"bee\"\n+++\nB\n")
+        builder.run_incremental(["content/posts/b.md"], options)
+        File.read("public/posts/index.html").should contain(%(href="/posts/bee/"))
+      end
+    end
+  end
+end
+
+describe "Builder#run_incremental collision loser" do
+  it "unpublishes the bundle files of a page that just lost its URL" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content/posts/a")
+        FileUtils.mkdir_p("content/posts/x")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}")
+        File.write("content/posts/a/index.md", "+++\ntitle = \"A\"\n+++\n")
+        File.write("content/posts/a/cover.png", "A-cover")
+        File.write("content/posts/x/index.md", "+++\ntitle = \"X\"\n+++\n")
+        File.write("content/posts/x/cover.png", "X-cover")
+        File.write("content/posts/x/xonly.png", "X-only")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/posts/a/index.md"], options)
+        File.exists?("public/posts/x/xonly.png").should be_true
+
+        File.write("content/posts/a/index.md", "+++\ntitle = \"A\"\nslug = \"x\"\n+++\n")
+        builder.run_incremental(["content/posts/a/index.md"], options)
+        File.read("public/posts/x/cover.png").should eq("A-cover")
+        File.exists?("public/posts/x/xonly.png").should be_false
+      end
+    end
+  end
+end
+
+describe "Builder#run_incremental bundle asset URLs" do
+  it "re-renders get_url(path=asset) readers when the bundle page moves" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content/posts/foo")
+        FileUtils.mkdir_p("content/other")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", %({{ get_url(path="posts/foo/photo.jpg") }}))
+        File.write("content/posts/_index.md", "+++\ntitle = \"Posts\"\n+++\n")
+        File.write("content/posts/foo/index.md", "+++\ntitle = \"Foo\"\n+++\n")
+        File.write("content/posts/foo/photo.jpg", "jpg")
+        # `d` sits in another section, past the bundle's reading-order
+        # neighbours: nothing but the call ties it to the bundle.
+        File.write("content/other/c.md", "+++\ntitle = \"C\"\n+++\n")
+        File.write("content/other/d.md", "+++\ntitle = \"D\"\n+++\n")
+        File.write("content/posts/e.md", "+++\ntitle = \"E\"\n+++\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/posts/foo/index.md"], options)
+        File.read("public/other/d/index.html").should eq("http://localhost/posts/foo/photo.jpg")
+
+        File.write("content/posts/foo/index.md", "+++\ntitle = \"Foo\"\nslug = \"moved\"\n+++\n")
+        builder.run_incremental(["content/posts/foo/index.md"], options)
+        File.read("public/other/d/index.html").should eq("http://localhost/posts/moved/photo.jpg")
+      end
+    end
+  end
+end
+
+describe "Builder#run_incremental get_taxonomy and collision losers" do
+  a_free = "+++\ntitle = \"A\"\ntags = [\"t1\"]\n+++\n"
+  a_taking = "+++\ntitle = \"A\"\nslug = \"x\"\ntags = [\"t1\"]\n+++\n"
+
+  # Each serve pass re-claims the output winners: get_taxonomy must follow
+  # the verdict of THIS pass, both when a page starts losing its URL and
+  # when a loser from the first build gets its URL back.
+  [{a_free, a_taking, "[t1=1]"}, {a_taking, a_free, "[t1=1][t2=1]"}].each do |(before, after, expected)|
+    it "counts only this pass's winners (#{expected})" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[[taxonomies]]\nname = "tags"))
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("templates")
+          File.write("templates/page.html", "{{ page.title }}")
+          File.write("templates/section.html", "{% for t in get_taxonomy(kind='tags').items %}[{{ t.name }}={{ t.count }}]{% endfor %}")
+          File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+          File.write("content/a.md", before)
+          File.write("content/b.md", "+++\ntitle = \"B\"\nslug = \"x\"\ntags = [\"t2\"]\n+++\n")
+
+          builder = Hwaro::Core::Build::Builder.new
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+          options.serve_mode = true
+          options.preserve_output = true
+          builder.run_incremental(["content/a.md"], options)
+
+          File.write("content/a.md", after)
+          builder.run_incremental(["content/a.md"], options)
+          File.read("public/index.html").should eq(expected)
+        end
+      end
+    end
+  end
+end

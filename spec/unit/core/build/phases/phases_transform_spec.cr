@@ -424,6 +424,26 @@ describe Hwaro::Core::Build::Phases::Transform do
       site.taxonomies["tags"]["ssg"].size.should eq(1)
     end
 
+    it "keeps section index pages out of get_taxonomy" do
+      # The generator reads site.pages only, so a section's `tags` never get
+      # a term page: counting it inflated get_taxonomy and let
+      # get_taxonomy_url link /tags/sectag/, which is never written.
+      site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+      section = Hwaro::Models::Section.new("blog/_index.md")
+      section.taxonomies = {"tags" => ["sectag", "shared"]}
+      page = make_page("blog/p.md", "blog")
+      page.taxonomies = {"tags" => ["shared"]}
+
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_rebuild_taxonomies(site, [page, section] of Hwaro::Models::Page)
+      site.taxonomies["tags"].keys.should eq(["shared"])
+      site.taxonomies["tags"]["shared"].should eq([page])
+
+      # Serve-mode incremental add follows the same rule.
+      builder.test_update_taxonomies_incremental(site, [section] of Hwaro::Models::Page, {} of String => Hash(String, Array(String)))
+      site.taxonomies["tags"].keys.should eq(["shared"])
+    end
+
     it "clears existing taxonomies before rebuilding" do
       site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
       site.taxonomies["stale"] = {"old" => [] of Hwaro::Models::Page}

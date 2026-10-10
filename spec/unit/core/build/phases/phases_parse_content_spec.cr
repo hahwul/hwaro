@@ -370,3 +370,31 @@ describe "ParseContent [[content.schema]] check" do
     end
   end
 end
+
+describe "ParseContent re-parse of a page with an auto OG image" do
+  it "moves the preserved og:image URL with a slug edit" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[og.auto_image]\nenabled = true\nformat = "svg"\n))
+        FileUtils.mkdir_p("content/posts")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.image }}")
+        File.write("content/posts/a.md", "+++\ntitle = \"A\"\n+++\n")
+        File.write("content/posts/b.md", "+++\ntitle = \"B\"\n+++\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/posts/a.md"], options)
+        File.read("public/posts/a/index.html").should eq("/og-images/posts-a.svg")
+
+        File.write("content/posts/a.md", "+++\ntitle = \"A\"\nslug = \"new-a\"\n+++\n")
+        builder.run_incremental(["content/posts/a.md"], options)
+        File.read("public/posts/new-a/index.html").should eq("/og-images/posts-new-a.svg")
+        File.exists?("public/og-images/posts-new-a.svg").should be_true
+      end
+    end
+  end
+end

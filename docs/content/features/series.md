@@ -36,7 +36,7 @@ series_weight = 1
 | series | string | — | Series name to assign this post to |
 | series_weight | int | 0 | Order within the series (lower = earlier) |
 
-Posts within a series are sorted by `series_weight`, then by date, then by title.
+Posts within a series are sorted by `series_weight`, then by date (oldest first, undated posts last), then by title.
 
 A series is scoped to one language (and, on a [versioned](/features/versioned-docs/) site, one version). On a [multilingual](/features/multilingual/) site, `hello.md` and its translation `hello.ko.md` sharing a `series` name belong to two parallel series, each numbered and linked within its own language.
 

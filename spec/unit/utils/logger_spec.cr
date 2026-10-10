@@ -762,5 +762,22 @@ describe Hwaro::Logger do
       guarded.puts "hello"
       io.to_s.should eq("hello\n")
     end
+
+    it "keeps lines whole when threads write at once" do
+      io = IO::Memory.new
+      guarded = Hwaro::Logger::GuardedIO.new(io)
+      context = Fiber::ExecutionContext::Parallel.new("guarded-io-spec", 8)
+      done = Channel(Nil).new
+      8.times do |t|
+        context.spawn do
+          2000.times { |i| guarded.puts "[WARN] worker #{t} line #{i} could not be resolved" }
+          done.send(nil)
+        end
+      end
+      8.times { done.receive }
+      lines = io.to_s.lines
+      lines.size.should eq(16_000)
+      lines.all?(/\A\[WARN\] worker \d line \d+ could not be resolved\z/).should be_true
+    end
   end
 end

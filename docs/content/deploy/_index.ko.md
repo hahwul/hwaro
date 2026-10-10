@@ -36,7 +36,7 @@ hwaro build --minify
 Hwaro에는 설정해 둔 타깃으로 배포하는 `hwaro deploy` 명령이 내장되어 있습니다:
 
 ```bash
-hwaro deploy              # 첫 번째로 설정된 타깃에 배포
+hwaro deploy              # [deployment] target에, 없으면 첫 번째로 설정된 타깃에 배포
 hwaro deploy s3           # 이름으로 특정 타깃에 배포
 hwaro deploy s3 backup    # 여러 타깃에 배포
 hwaro deploy --dry-run    # 변경 사항 미리 보기

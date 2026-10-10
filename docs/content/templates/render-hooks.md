@@ -102,7 +102,7 @@ These templates reproduce hwaro's stock output exactly, so they are a useful sta
 
 ```jinja
 {# templates/hooks/render-codeblock.html #}
-<pre><code{% if lang is present %} class="language-{{ lang }} hljs"{% endif %}>{% if highlighted is present %}{{ highlighted }}{% else %}{{ code }}{% endif %}</code></pre>
+{% if name is present %}<div class="code-block"><div class="code-filename">{{ name }}</div>{% endif %}<pre{% if copy is present %} data-copy="true"{% endif %}><code{% if lang is present %} class="language-{{ lang }} hljs"{% endif %}>{% if highlighted is present %}{{ highlighted }}{% else %}{{ code }}{% endif %}</code></pre>{% if name is present %}</div>{% endif %}
 ```
 
 ```jinja
@@ -116,13 +116,15 @@ These templates reproduce hwaro's stock output exactly, so they are a useful sta
 {{ html }}
 ```
 
-Note `{% if title is present %}`, not a bare `{% if title %}`. Crinja's truthiness only treats `false`/`0`/nil as falsy, so a bare `{% if title %}` would render `title=""` even when there's no title. The custom `is present`/`is empty` tests (also used throughout hwaro's own templates) check for that correctly.
+`title`, `lang`, `name` and `copy` are empty strings when absent, so `{% if title is present %}` (the idiom hwaro's own templates use) and a bare `{% if title %}` behave the same here.
 
 The codeblock template's ` hljs` class matches stock output under the
 default config (`[highlight] enabled = true`; most Highlight.js themes key
 their base styling off that class). If you've disabled highlighting
 entirely, stock output emits `class="language-{{ lang }}"` with no ` hljs`;
-drop it from your hook to stay byte-identical.
+drop it from your hook to stay byte-identical. Line numbers and highlighted
+lines (`linenos`, `hl_lines`) are not part of `highlighted`; a hook that wants
+them has to read `options` and add the line markup itself.
 
 ## Example: Figure-Wrapped Images
 
@@ -139,7 +141,7 @@ Every `![alt](src "caption")` in your Markdown now renders as a captioned `<figu
 ## Rules
 
 1. **Values are pre-escaped, so emit them verbatim.** Autoescape is off in hwaro templates (the same as everywhere else), and `destination`/`title`/`alt`/`lang`/`options`/`code` are already HTML-escaped by the renderer. Piping any of them through `| e` double-escapes; piping `text` or `highlighted` through it corrupts already-rendered HTML.
-2. **Keep conventional double-quoted `href`/`src` attributes.** Everything downstream (`@/internal-page.md` link resolution, subpath (`base_path`) prefixing of root-relative links, responsive-image `srcset`/`sizes` injection, and `loading="lazy"`) runs as a plain-text pass over the *final* HTML, matching on `href="..."` / `src="..."`. A hook that emits an unquoted or single-quoted attribute, or restructures the destination into something other than a normal attribute value, opts that element out of all of it. An `@/`-prefixed `destination` must land inside `href="..."` for `InternalLinkResolver` to find and resolve it.
+2. **Keep conventional double-quoted `href`/`src` attributes.** Everything downstream (`@/internal-page.md` link resolution, subpath (`base_path`) prefixing of root-relative links, responsive-image `srcset`/`sizes` injection, and `loading="lazy"`) runs as a plain-text pass over the page's rendered body HTML (after every hook, before the page template wraps it), matching on `href="..."` / `src="..."`. A hook that emits an unquoted or single-quoted attribute, or restructures the destination into something other than a normal attribute value, opts that element out of all of it. An `@/`-prefixed `destination` must land inside `href="..."` for `InternalLinkResolver` to find and resolve it.
 3. **`render-heading.html` must emit an `<hN id="{{ id }}">` element.** The TOC (`{{ toc }}` / `page.toc`) and `insert_anchor_links` both post-process the final HTML looking for `<h1>` to `<h6>` tags with an `id` attribute; a hook that renders something other than a heading tag, or drops `id`, silently falls out of both.
 4. **Don't transform `{{ text }}`.** It's already-rendered HTML, and on pages using shortcodes it may contain an internal placeholder comment (`<!--HWARO-SHORTCODE-PLACEHOLDER-N-->`) that gets swapped for the shortcode's output in a later pass. Filtering, truncating, or re-escaping `text` can corrupt or strand that placeholder.
 5. **Mermaid owns its own fence.** With `[markdown] mermaid = true`, a `` ```mermaid `` fence always renders through the existing Mermaid pipeline (`<div class="mermaid">…</div>`), never through `render-codeblock.html`. This is a config-decided exception to "every hook always applies to every matching element." Set `mermaid = false` to have your codeblock hook render mermaid fences like any other language instead.

@@ -100,6 +100,7 @@ so they are named in a warning instead.
 | expires | expiryDate |
 | weight | weight |
 | path | url (`/<path>/`) |
+| in_sitemap = false | sitemap = { disable = true } |
 | [taxonomies] table | flattened to top-level `tags` / `categories` / … |
 
 Every other front-matter key is passed through as a Hugo page param.
@@ -125,6 +126,7 @@ keep their name.
 | path | permalink (`/<path>/`) |
 | aliases | redirect_from (jekyll-redirect-from; aliases the build skips are dropped) |
 | updated | last_modified_at |
+| in_sitemap = false | sitemap: false (jekyll-sitemap) |
 | [taxonomies] table | flattened to top-level `tags` / `categories` / … |
 
 Output conventions:
@@ -153,6 +155,11 @@ Internal links using the `@/` prefix are automatically converted to absolute pat
 A section `_index.md` and a page-bundle `index.md` both map to their directory
 URL. Links shown inside code blocks or inline code spans are left exactly as
 written, since the build does not resolve them there either.
+
+A link to a translation (`@/about.ko.md`, with `ko` declared under
+`[languages]`) exports to Hugo as `/ko/about`, the URL Hugo and the build both
+serve it at. Jekyll has no languages, so there it points at the exported file
+(`/about.ko`, and `/docs/index.ko` for `@/docs/_index.ko.md`).
 
 ## Example Output
 

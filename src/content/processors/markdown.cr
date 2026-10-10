@@ -59,7 +59,8 @@ module Hwaro
           processed = TableParser.process(
             content,
             flags: markdown_config ? MarkdownExtensions.inline_flags(markdown_config) : InlineMarkdown::Flags.new,
-            hooks: hooks)
+            hooks: hooks,
+            trusted: safe)
 
           # Pre-process markdown extensions (task lists, footnotes, etc.)
           if md_cfg = markdown_config
@@ -70,6 +71,8 @@ module Hwaro
           # Tables were already converted above.
           smart = markdown_config.try(&.smart_punctuation) || false
           html = SyntaxHighlighter.render(processed, highlight, safe, smart: smart, hooks: hooks)
+          # Safe mode: drop the marks that kept extension markup alive.
+          html = MarkdownExtensions.untrust(html) if safe
 
           # Post-process markdown extensions (footnotes section, mermaid)
           if md_cfg = markdown_config

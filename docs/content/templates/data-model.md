@@ -339,8 +339,8 @@ Rendered HTML content is available as the top-level `content` variable.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| page.word_count | Int | Word count, including text pulled in by `include_md`, `include_code` and `![[note]]` |
-| page.reading_time | Int | Reading time (minutes) |
+| page.word_count | Int | Word count, including text pulled in by `include_md`, `include_code` and `![[note]]`. Each Chinese/Japanese (Han, Hiragana, Katakana) character counts as one word; other scripts, Korean included, count space-separated words |
+| page.reading_time | Int | Reading time in minutes, rounded up: ~200 words per minute, plus ~500 Chinese/Japanese characters per minute |
 | page.summary | String? | Summary HTML: the chunk before `<!-- more -->`, else `page.description`, else an automatic excerpt of the rendered body (`[content] summary_length`, one escaped `<p>`). Use with `\| safe` to embed (e.g. `{{ page.summary \| safe }}`); for `<meta name="description">` use `page.description` directly. |
 | page.summary_truncated | Bool | `true` only when `page.summary` is an automatic excerpt that was cut short (useful for a "Read more" link). |
 | page.assets | Array<String> | Static files in page bundle |
@@ -383,11 +383,11 @@ Rendered HTML content is available as the top-level `content` variable.
 | Variable | Equivalent |
 |----------|------------|
 | page_title | page.title |
-| page_description | page.description |
+| page_description | page.description, else site.description |
 | page_url | page.url |
 | page_section | page.section |
 | page_date | page.date |
-| page_image | page.image |
+| page_image | page.image, else `[og] default_image` |
 | page_summary | page.summary |
 | page_word_count | page.word_count |
 | page_reading_time | page.reading_time |
@@ -663,7 +663,7 @@ Only available when `toc = true` in front matter.
 | toc_obj.headers[].level | Int | Heading level (2-6) |
 | toc_obj.headers[].id | String | Anchor ID |
 | toc_obj.headers[].title | String | Heading text |
-| toc_obj.headers[].permalink | String | Full anchor permalink |
+| toc_obj.headers[].permalink | String | Fragment link to the heading (`#id`) |
 | toc_obj.headers[].children | Array | Nested child headers (same structure) |
 
 ```jinja

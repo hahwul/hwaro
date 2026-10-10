@@ -63,7 +63,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 | 필터 | 설명 | 예시 |
 |--------|-------------|---------|
 | unique | 서로 다른 값의 타입은 구분해 중복 제거 | {{ items \| unique }} |
-| flatten | 중첩 배열 평탄화 | {{ nested \| flatten }} |
+| flatten | 중첩 배열을 한 단계 평탄화 | {{ nested \| flatten }} |
 | compact | nil/빈 값 제거 | {{ items \| compact }} |
 
 ## 수학 필터
@@ -132,7 +132,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 {{ page.image | default(value="/images/default.png") }}
 ```
 
-`default`는 값이 정의되지 않았거나 `none`이거나 빈 문자열일 때 폴백 값을 반환합니다. 폴백 값은 원래 타입을 유지하므로 `default(value=0)`의 결과로 산술 연산을 할 수 있으며, `none` 폴백(`default(value=none)`)은 빈 문자열로 렌더링됩니다. 값이 비어 있지 않으면 배열, 맵, 객체는 그대로 반환하고, 그 밖의 값(문자열, 숫자, 불리언)은 문자열로 반환하므로 뒤에 `length`나 `replace` 같은 문자열 필터를 이어서 쓸 수 있습니다.
+`default`는 값이 정의되지 않았거나 `none`이거나 빈 문자열일 때 폴백 값을 반환합니다. 폴백 값은 원래 타입을 유지하므로 `default(value=0)`의 결과로 산술 연산을 할 수 있으며, `none` 폴백(`default(value=none)`)은 빈 문자열로 렌더링됩니다. 값이 비어 있지 않으면 배열, 맵, 객체는 그대로 반환하고, 그 밖의 값(문자열, 숫자, 불리언)은 문자열로 반환하므로 뒤에 `length`나 `replace` 같은 문자열 필터를 이어서 쓸 수 있습니다. `boolean=true`를 함께 넘기면(`default(value="N/A", boolean=true)`) `false`, `0`, 빈 리스트나 맵처럼 거짓으로 평가되는 값도 폴백 값으로 바꿉니다.
 
 ### 날짜 포맷
 
@@ -213,6 +213,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 | matching | 정규식 일치 | `{% if asset is matching("[.](jpg\|png)$") %}` |
 | empty | 비어 있음 | `{% if page.description is empty %}` |
 | present | 비어 있지 않음 | `{% if page.title is present %}` |
+| eq, ne, lt, le, gt, ge | 값과 비교(`==`, `!=`, `<`, `<=`, `>`, `>=`, `equalto`, `lessthan`, `greaterthan`도 사용 가능) | `{{ posts \| selectattr("extra.year", ">=", 2020) \| list }}` |
 
 ### 테스트 예시
 

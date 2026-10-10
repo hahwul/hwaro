@@ -412,6 +412,12 @@ module Hwaro
         # when an edit lands on one (see `copy_changed_static`). Reset with
         # the claims; guarded by @generated_claims_mutex.
         @generator_output_claims : Set(String) = Set(String).new
+        # The generator claims above that are the Write phase's own content
+        # copies (`[content.files]`/raw files, bundle assets): those lose to a
+        # page or a real generator at the same path, so they must not count as
+        # one (see `content_copy_shadowed_outputs`). Reset with the claims;
+        # guarded by @generated_claims_mutex.
+        @content_copy_claims : Set(String) = Set(String).new
         # True while @generated_output_claims is the running full build's own
         # set (reset by the Initialize phase); false once an incremental serve
         # pass starts, which re-claims nothing — so the set then still names
@@ -470,6 +476,11 @@ module Hwaro
         # drives the Finalize phase without a build (unit specs) gets exactly
         # the pruning contract it asks for.
         @build_output_epoch : Time? = nil
+        # The output directory when this build kept the previous build's tree
+        # (`--cache`, serve), nil when it started from an empty one. Only a
+        # kept tree can hold a leftover of the other kind where this build
+        # writes (see `mkdir_output`).
+        @kept_output_dir : String? = nil
         # Files a page wrote BESIDES its own output: its `aliases` redirect
         # stubs and, for a section, its `/page/N/` pagination pages. Both are
         # produced by the render pass, so a warm `--cache` build that skips a
@@ -526,11 +537,13 @@ module Hwaro
         #
         # `static_copy` marks the Initialize phase's copy of `static/`: it is
         # a claim like any other, but not a generator's (see
-        # `@generator_output_claims`).
-        def claim_generated_output(path : String, static_copy : Bool = false) : Nil
+        # `@generator_output_claims`); `content_copy` marks the Write phase's
+        # content copies (see `@content_copy_claims`).
+        def claim_generated_output(path : String, static_copy : Bool = false, content_copy : Bool = false) : Nil
           @generated_claims_mutex.synchronize do
             @generated_output_claims << path
             @generator_output_claims << path unless static_copy
+            @content_copy_claims << path if content_copy
             @taxonomy_pass_outputs.try(&.<<(path))
           end
         end
@@ -545,6 +558,7 @@ module Hwaro
             @previous_generated_claims = @carry_prune_baselines ? @previous_generated_claims | @generated_output_claims : @generated_output_claims
             @generated_output_claims = Set(String).new
             @generator_output_claims = Set(String).new
+            @content_copy_claims = Set(String).new
           end
           @generated_claims_current = true
         end
@@ -759,6 +773,7 @@ module Hwaro
           # for missing files and TOML parse failures, so callers (and
           # `--json` consumers) can branch on HWARO_E_CONFIG without the
           # build pipeline rewrapping the exception.
+          previous_config = @config
           config = Models::Config.load(env: options.env)
           @config = config
           # `[build]` supplies output_dir/drafts/parallel/cache for anything the
@@ -808,7 +823,10 @@ module Hwaro
           # Reset internal caches (preserve @config loaded above)
           @carry_prune_baselines = @prune_baselines_pending
           @prune_baselines_pending = true
-          current_outputs = @site ? owned_output_paths(options.output_dir) : Set(String).new
+          # Shaped by the config the previous site was BUILT with: a config
+          # edit that turned an `[outputs]` format or AMP off must still
+          # prune the files those wrote.
+          current_outputs = @site ? owned_output_paths(options.output_dir, previous_config) : Set(String).new
           @previous_page_outputs = @carry_prune_baselines ? @previous_page_outputs | current_outputs : current_outputs
           @site = nil
           @templates = nil

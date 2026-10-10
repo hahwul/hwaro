@@ -14,7 +14,8 @@
 #     `[auto_includes]` / local-highlight tags with their `?v=` digest and,
 #     under `[assets] sri`, their `integrity` digests;
 #   * reads made mid-render — `env()`, `load_data()` of a file outside data/,
-#     the source image behind `resize_image()`, and the wall clock behind
+#     the source image behind `resize_image()`, where `get_url()` publishes a
+#     bundle asset, and the wall clock behind
 #     `now()` and the `current_year`/`current_date`/`current_datetime`
 #     variables.
 #
@@ -76,6 +77,8 @@ module Hwaro::Core::Build::Phases::Render
   # In-memory memo key for the CURRENT stamp of a file (NUL keeps it apart
   # from every real read key).
   private RENDER_INPUT_STAMP_MEMO = "\0stamp:"
+  # Set once `values` holds the build's bundle asset URLs.
+  private RENDER_INPUT_BUNDLE_MEMO = "\0bundle_assets"
 
   # One digest over the globals and the current value of every read in
   # `keys`. SHA-256 rather than MD5: env values (possibly secrets) are folded
@@ -156,6 +159,18 @@ module Hwaro::Core::Build::Phases::Render
     elsif key.starts_with?(Content::Processors::TemplateEngine::ASSET_READ_PREFIX)
       name = key[Content::Processors::TemplateEngine::ASSET_READ_PREFIX.size..]
       Content::Hooks::AssetHooks.integrity(name, record: false) || "<absent>"
+    elsif key.starts_with?(Content::Processors::TemplateEngine::BUNDLE_ASSET_READ_PREFIX)
+      # The whole map lands in `values` once; a key missing from it names no
+      # bundle asset.
+      unless values.has_key?(RENDER_INPUT_BUNDLE_MEMO)
+        values[RENDER_INPUT_BUNDLE_MEMO] = ""
+        @site.try do |site|
+          bundle_asset_urls(site).each do |asset, url|
+            values[Content::Processors::TemplateEngine::BUNDLE_ASSET_READ_PREFIX + asset] = url
+          end
+        end
+      end
+      values[key]? || "<none>"
     else
       ""
     end

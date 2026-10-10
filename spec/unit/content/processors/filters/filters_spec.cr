@@ -542,6 +542,13 @@ describe "MiscFilters" do
       render_crinja("{{ (missing | default(value=40)) + 2 }}").strip.should eq("42")
     end
 
+    # Jinja's (and the replaced Crinja built-in's) second argument was
+    # silently ignored: `false | default("x", true)` rendered "false".
+    it "replaces falsy values when boolean is true" do
+      render_crinja(%([{{ false | default("x", true) }}|{{ 0 | default(value="x", boolean=true) }}|{{ [] | default("x", true) }}])).should eq("[x|x|x]")
+      render_crinja(%([{{ false | default("x") }}|{{ 0 | default("x") }}|{{ "a" | default("x", true) }}])).should eq("[false|0|a]")
+    end
+
     it "renders a none fallback as an empty string" do
       render_crinja("[{{ missing | default(value=none) }}]").strip.should eq("[]")
       vars = {"text" => Crinja::Value.new("")}
@@ -643,6 +650,24 @@ describe "HtmlFilters" do
         result = render_crinja("{{ md | markdownify }}", vars)
         result.should_not contain("<script>")
         result.should contain("text")
+      ensure
+        Hwaro::Processor::Markdown.filter_markdown_config = nil
+      end
+    end
+
+    # A block body carries nested shortcodes as placeholder comments; safe
+    # mode replaced them with `<!-- raw HTML omitted -->`, so the nested
+    # shortcode's output vanished (the built-in alert markdownifies its body).
+    it "keeps shortcode placeholders under safe mode" do
+      cfg = Hwaro::Models::MarkdownConfig.new
+      cfg.safe = true
+      Hwaro::Processor::Markdown.filter_markdown_config = cfg
+      begin
+        vars = {"md" => Crinja::Value.new("A <!--HWARO-SHORTCODE-PLACEHOLDER-0--> <b>x</b>\n\n<!--HWARO-SHORTCODE-PLACEHOLDER-1-->\n")}
+        result = render_crinja("{{ md | markdownify }}", vars)
+        result.should contain("<!--HWARO-SHORTCODE-PLACEHOLDER-0-->")
+        result.should contain("<!--HWARO-SHORTCODE-PLACEHOLDER-1-->")
+        result.should_not contain("<b>")
       ensure
         Hwaro::Processor::Markdown.filter_markdown_config = nil
       end
@@ -1230,6 +1255,14 @@ describe "MiscFilters (extended)" do
       vars = {"val" => Crinja::Value.new(3.14)}
       result = render_crinja("{{ val | inspect }}", vars)
       result.should eq("3.14")
+    end
+
+    # Nested containers printed Crystal internals: `[1, [Crinja::Value<2>]]`.
+    it "inspects nested arrays and mappings" do
+      result = render_crinja(%({{ [1, [2, [3]], {"k": ["v"]}] | inspect }}), {} of String => Crinja::Value)
+      result.should eq("[1, [2, [3]], {k: [v]}]")
+      result = render_crinja(%({{ {"a": [1, 2], "b": {"c": "d"}} | inspect }}), {} of String => Crinja::Value)
+      result.should eq("{a: [1, 2], b: {c: d}}")
     end
 
     it "inspects an empty array" do

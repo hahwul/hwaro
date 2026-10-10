@@ -12,12 +12,20 @@ module Hwaro::Core::Build
       copy_static_files(output_dir, verbose, incremental)
     end
 
+    def test_copy_static_pairs(pairs : Array({String, String, Time}))
+      copy_static_pairs(pairs)
+    end
+
     def test_load_templates : Hash(String, String)
       load_templates
     end
 
     def test_load_data_files(site : Models::Site, config : Models::Config = Models::Config.new)
       load_data_files(site, config)
+    end
+
+    def test_compute_disk_data_hash : String
+      compute_disk_data_hash
     end
 
     def test_create_fresh_crinja_env : Crinja
@@ -125,6 +133,38 @@ describe Hwaro::Core::Build::Phases::Initialize do
           builder.test_copy_static_files("public")
           # Nothing copied; directory still empty
           Dir.children("public").should be_empty
+        end
+      end
+    end
+
+    it "raises instead of publishing without a static file it could not copy" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("static")
+          File.write("static/ok.css", "ok")
+          File.write("static/locked.css", "secret")
+          File.chmod("static/locked.css", 0o000)
+          FileUtils.mkdir_p("public")
+          begin
+            # Root reads it anyway; nothing to assert there.
+            next if File.readable?("static/locked.css")
+            expect_raises(File::Error, /locked\.css/) do
+              Hwaro::Core::Build::Builder.new.test_copy_static_files("public")
+            end
+            File.read("public/ok.css").should eq("ok")
+          ensure
+            File.chmod("static/locked.css", 0o644)
+          end
+        end
+      end
+    end
+
+    it "skips a static file deleted after the scan instead of failing" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("public")
+          Hwaro::Core::Build::Builder.new.test_copy_static_pairs([{"static/gone.swp", "public/gone.swp", Time.utc}])
+          File.exists?("public/gone.swp").should be_false
         end
       end
     end
@@ -450,6 +490,26 @@ describe Hwaro::Core::Build::Phases::Initialize do
           builder.test_load_data_files(site)
 
           site.data.has_key?("menu").should be_true
+        end
+      end
+    end
+
+    it "loads a data file whose extension is not lowercase" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("data")
+          File.write("data/Team.JSON", %({"lead": "kim"}))
+          File.write("data/notes.txt", "not data")
+
+          builder = Hwaro::Core::Build::Builder.new
+          site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+          builder.test_load_data_files(site)
+          site.data.keys.should eq(["Team"])
+
+          # ...and `--cache` sees it change.
+          before = builder.test_compute_disk_data_hash
+          File.write("data/Team.JSON", %({"lead": "lee"}))
+          builder.test_compute_disk_data_hash.should_not eq(before)
         end
       end
     end

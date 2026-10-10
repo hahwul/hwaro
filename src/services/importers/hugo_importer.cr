@@ -90,8 +90,13 @@ module Hwaro
             end
 
             # date (falling back to Hugo's publishDate so a page dated only
-            # via publishDate doesn't lose its date entirely)
-            if date = date_string(data, "date", local_keys) || date_string(data, "publishdate", local_keys)
+            # via publishDate doesn't lose its date entirely). Hugo withholds
+            # a page until its publishDate; hwaro withholds a future `date`,
+            # so a post scheduled with a future publishDate (and a past date)
+            # takes publishDate as its date — keeping `date` published it
+            # immediately.
+            date_key = time_value(data, "publishdate").try { |t| t > Time.utc } ? "publishdate" : "date"
+            if date = date_string(data, date_key, local_keys) || date_string(data, "publishdate", local_keys)
               fields["date"] = date
             end
 
@@ -167,6 +172,19 @@ module Hwaro
             # expires (from expiryDate)
             if expires = date_string(data, "expirydate", local_keys)
               fields["expires"] = expires
+            end
+
+            # A Hugo page with no output — `headless = true`, or `build` /
+            # `_build` with `render = "never"`/`"link"` (`false` in older
+            # Hugo) — is hwaro's `render = false`; carried into [extra] only,
+            # the page was published. `sitemap.disable = true` is
+            # `in_sitemap = false`. The inverse of `tool export hugo`.
+            build_render = (data["build"]? || data["_build"]?).try(&.as_h?).try(&.["render"]?).try(&.raw)
+            if data["headless"]?.try(&.raw) == true || build_render.in?("never", "link", false)
+              fields["render"] = false
+            end
+            if data["sitemap"]?.try(&.as_h?).try(&.["disable"]?).try(&.raw) == true
+              fields["in_sitemap"] = false
             end
 
             # Hugo's `layout` picks the page template, hwaro's `template` —

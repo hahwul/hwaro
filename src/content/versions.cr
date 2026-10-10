@@ -2,6 +2,7 @@ require "crinja"
 require "../models/page"
 require "../models/section"
 require "../models/config"
+require "./multilingual"
 
 # Versioned documentation (`[versions]` + `[[versions.list]]`).
 #
@@ -43,35 +44,33 @@ module Hwaro
         return unless versions.enabled?
 
         by_key = {} of {String, String?, String} => Models::Page
-        roots = {} of {String, String?} => Models::Page
+        versions.written_roots.clear
         claimed = Set(String).new
         pages.each do |page|
-          claimed << page.url
+          # A headless page (a `docs/_index.md` kept only for its cascade)
+          # is never written, so its URL is still a hole to fill.
+          claimed << page.url if page.render
           version = page.version
           next unless version
-          rel = version.relative_path(page.path)
+          rel = counterpart_path(version, page, config)
           next unless rel
           by_key[{version.name, page.language, rel}] ||= page
-          roots[{version.name, page.language}] ||= page if page.is_a?(Models::Section) && page.section == version.path
+          if page.render && page.is_a?(Models::Section) && page.section == version.path
+            versions.written_roots[{version.name, lang_prefix(page, config)}] ||= page.url
+          end
         end
 
         pages.each do |page|
           version = page.version
           next unless version
-          rel = version.relative_path(page.path)
+          rel = counterpart_path(version, page, config)
           next unless rel
 
           prefix = lang_prefix(page, config)
           page.version_links = versions.list.map do |other|
             target = by_key[{other.name, page.language, rel}]?
             target = nil if target && !target.render
-            url = if target
-                    target.url
-                  elsif root = roots[{other.name, page.language}]?
-                    root.url
-                  else
-                    versions.root_url(other, prefix)
-                  end
+            url = target ? target.url : root_url(config, other, prefix)
             Models::VersionLink.new(other.name, other.label, other.latest, url, !target.nil?, other.same?(version))
           end
 
@@ -86,6 +85,24 @@ module Hwaro
         end
       end
 
+      # Root URL of `version` for a language prefix: the root section in that
+      # language, else (a partial translation) the default language's root,
+      # never the unwritten `/<lang>/…` URL. The computed URL is the last
+      # resort when no root section exists at all.
+      def root_url(config : Models::Config, version : Models::VersionConfig, prefix : String) : String
+        roots = config.versions.written_roots
+        roots[{version.name, prefix}]? || roots[{version.name, ""}]? || config.versions.root_url(version, prefix)
+      end
+
+      # The page's path inside its version, without its language suffix
+      # (`install.en.md` → `install.md`): the language is already part of
+      # the counterpart key, and the default language's suffix is optional,
+      # so `v1/install.md` and `v2/install.en.md` are the same page.
+      private def counterpart_path(version : Models::VersionConfig, page : Models::Page, config : Models::Config) : String?
+        rel = version.relative_path(page.path)
+        rel && config.multilingual? ? Multilingual.translation_key(rel, config) : rel
+      end
+
       # `/docs/v2/` → `/docs/`, `/ko/v2/` → `/ko/`; nil when the URL was
       # remapped away from the `<name>/` shape (a `[permalinks]` rule).
       private def parent_url(url : String, name : String) : String?
@@ -97,11 +114,11 @@ module Hwaro
       # --- Crinja shapes --------------------------------------------------
 
       # `page.version` object: {name, label, latest, url}. `url` is the root
-      # URL of the version in the page's language.
+      # URL of the version in the page's language (see `root_url`).
       def page_version_value(page : Models::Page, config : Models::Config) : Crinja::Value
         version = page.version
         return Crinja::Value.new(nil) unless version
-        version_value(version, config.versions.root_url(version, lang_prefix(page, config)))
+        version_value(version, root_url(config, version, lang_prefix(page, config)))
       end
 
       def version_value(version : Models::VersionConfig, url : String) : Crinja::Value
@@ -133,9 +150,9 @@ module Hwaro
       # (`versions.latest`, `versions.all`, `versions.size`).
       def versions_value(config : Models::Config, lang_prefix : String) : Crinja::Value
         versions = config.versions
-        items = versions.list.map { |v| version_value(v, versions.root_url(v, lang_prefix)) }
+        items = versions.list.map { |v| version_value(v, root_url(config, v, lang_prefix)) }
         latest = versions.latest
-        latest_value = latest ? version_value(latest, versions.root_url(latest, lang_prefix)) : Crinja::Value.new(nil)
+        latest_value = latest ? version_value(latest, root_url(config, latest, lang_prefix)) : Crinja::Value.new(nil)
         Crinja::Value.new(VersionList.new(items, latest_value))
       end
 

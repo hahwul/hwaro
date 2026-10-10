@@ -35,7 +35,9 @@ module Hwaro::Core::Build::Phases::ParseContent
       # A full build reports each ambiguous wikilink again; serve rebuilds don't.
       @wikilink_warnings.clear
       refresh_wikilink_index(ctx.all_pages, site)
-      render_page_summaries(ctx.all_pages, site, templates, ctx.options.highlight && site.config.highlight.enabled)
+      # The image hooks have not run yet: rerender_image_summaries redoes
+      # the summaries they change once the resize map is filled.
+      render_page_summaries(ctx.all_pages, site, templates, ctx.options.highlight && site.config.highlight.enabled, images_ready: false)
     end
 
     Lifecycle::HookResult::Continue
@@ -62,6 +64,25 @@ module Hwaro::Core::Build::Phases::ParseContent
   # (run_rerender). When nil, build_template_variables self-heals by building
   # globals per shortcode-bearing page — cheap during the full-build call
   # (site.pages is still empty pre-Transform) but O(site) per page after.
+  #
+  # `images_ready` is false only before the BeforeRender `image:resize`
+  # hook has filled the resize map: `<img>` then get no srcset/dimensions
+  # (rerender_image_summaries redoes those pages). `rerender` keeps the
+  # warnings an earlier pass of this build already printed.
+  # The link tail of a summary: `@/` links (strict mode must see summary links
+  # too: a `render: false` page never reaches the body render pass, yet its
+  # summary ships inside every listing that embeds `{{ p.summary }}`), then
+  # relative links rooted at the page — listings and other pages print the
+  # summary too, so a bundle's `![](photo.jpg)` must not resolve against
+  # THEIR URL.
+  private def finish_summary_html(html : String, page : Models::Page, site : Models::Site, pages_by_path : Hash(String, Models::Page), images_ready : Bool) : String
+    html = resolve_internal_links(html, pages_by_path, page, site)
+    html = Content::Processors::InternalLinkResolver.absolutize_links(html, page.url, document_relative_only: true)
+    html = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, site.config.base_url, site.config.base_path)
+    html = apply_responsive_images(html, page, site.config) if images_ready
+    close_open_elements(html)
+  end
+
   private def render_page_summaries(
     pages : Array(Models::Page),
     site : Models::Site,
@@ -69,9 +90,21 @@ module Hwaro::Core::Build::Phases::ParseContent
     use_highlight : Bool,
     link_targets : Array(Models::Page) = pages,
     global_vars : Hash(String, Crinja::Value)? = nil,
+    images_ready : Bool = true,
+    rerender : Bool = false,
   )
     md_config = site.config.markdown
     pages_by_path : Hash(String, Models::Page)? = nil
+    # Built once, on the first summary that needs it.
+    link_map = -> do
+      map = pages_by_path
+      unless map
+        map = {} of String => Models::Page
+        link_targets.each { |p| map[p.path] ||= p }
+        pages_by_path = map = Content::Processors::InternalLinkResolver.add_default_language_aliases(map, site.config)
+      end
+      map
+    end
     # Pages whose summary_html this pass (re)assigns. The shortcode-context
     # build below caches the page's own Crinja value BEFORE the assignment,
     # so without invalidation every `{{ p.summary }}` in a listing would
@@ -80,88 +113,58 @@ module Hwaro::Core::Build::Phases::ParseContent
     recomputed_paths = [] of String
 
     pages.each do |page|
-      recomputed_paths << page.path if recount_included_words(page, site)
-      # parse_single_page already extracted the chunk into page.summary;
-      # extract_summary is only a fallback for hook-based parse paths that
-      # skipped it (it re-scans the whole raw_content, so don't repeat it).
-      summary_md = page.summary || page.extract_summary
-      unless summary_md
-        # No marker: the automatic body excerpt, unless a description
-        # already provides the summary (precedence: marker > description >
-        # excerpt). Recorded in recomputed_paths for the same cache reason.
-        recomputed_paths << page.path if assign_auto_summary(page, site, templates, global_vars)
-        next
-      end
-
-      shortcode_results = {} of String => String
-      summary_md = complete_summary_chunk(summary_md, page.raw_content, md_config.footnotes)
-      summary_md = expand_includes(summary_md, page, site)
-      processed = if content_may_contain_shortcodes?(summary_md)
-                    context = build_template_variables(page, site, "", "", "", global_vars: global_vars)
-                    process_shortcodes_jinja(summary_md, templates, context, shortcode_results)
-                  else
-                    summary_md
-                  end
-      processed = rewrite_wikilinks(processed, page, site)
-
-      html, _ = Processor::Markdown.render(processed, use_highlight, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config)
-      html = replace_shortcode_placeholders(html, shortcode_results)
-
-      pbp = (pages_by_path ||= begin
-        map = {} of String => Models::Page
-        link_targets.each { |p| map[p.path] ||= p }
-        map
-      end)
-      if site.config.links.broken_internal == "error"
-        # Strict mode must see summary links too: a `render: false` page
-        # never reaches the body render pass, yet its summary ships inside
-        # every listing that embeds `{{ p.summary }}`. Entries use the same
-        # "path → @/target (reason)" shape as the body pass, so pages that
-        # DO render report each link once (raise_… sort-uniqs).
-        misses = [] of {String, String}
-        html = Content::Processors::InternalLinkResolver.resolve(html, pbp, page.path, site.config.base_url, misses: misses)
-        unless misses.empty?
-          @broken_links_mutex.synchronize do
-            misses.each { |target, reason| @broken_internal_links << "#{page.path} → @/#{target} (#{reason})" }
-          end
+      # The body render shares the set, so each warning prints once per page.
+      page.warned_messages.clear unless rerender
+      Logger.dedupe_warnings(page.warned_messages) do
+        recomputed_paths << page.path if recount_included_words(page, site)
+        # parse_single_page already extracted the chunk into page.summary;
+        # extract_summary is only a fallback for hook-based parse paths that
+        # skipped it (it re-scans the whole raw_content, so don't repeat it).
+        summary_md = page.summary || page.extract_summary
+        unless summary_md
+          # No marker: the automatic body excerpt, unless a description
+          # already provides the summary (precedence: marker > description >
+          # excerpt). Recorded in recomputed_paths for the same cache reason.
+          recomputed_paths << page.path if assign_auto_summary(page, site, templates, global_vars)
+          next
         end
-      else
-        html = Content::Processors::InternalLinkResolver.resolve(html, pbp, page.path, site.config.base_url)
-      end
-      html = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, site.config.base_url, site.config.base_path)
+        # The marker wins: drop an excerpt a serve rerender left on this
+        # page object before the marker was added.
+        page.auto_summary = nil
+        page.summary_truncated = false
 
-      page.summary_html = html
-      recomputed_paths << page.path
-    rescue ex
-      # A broken shortcode in a summary must not abort the whole parse
-      # phase — fall back to plain-Markdown rendering (same config flags,
-      # critically including safe mode). Still resolve `@/` links: body
-      # render never sees render:false summaries, and strict mode would
-      # otherwise miss broken links that ship in listings. An include
-      # failure on a rendered page is the body render's to report (once).
-      unless page.render && ex.is_a?(Content::Processors::Includes::IncludeError)
-        Logger.warn "Summary render failed for #{page.path} — falling back to plain Markdown: #{ex.message}"
-      end
-      fallback, _ = Processor::Markdown.render(rewrite_wikilinks(summary_md.to_s, page, site), use_highlight, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config)
-      pbp = (pages_by_path ||= begin
-        map = {} of String => Models::Page
-        link_targets.each { |p| map[p.path] ||= p }
-        map
-      end)
-      if site.config.links.broken_internal == "error"
-        misses = [] of {String, String}
-        fallback = Content::Processors::InternalLinkResolver.resolve(fallback, pbp, page.path, site.config.base_url, misses: misses)
-        unless misses.empty?
-          @broken_links_mutex.synchronize do
-            misses.each { |target, reason| @broken_internal_links << "#{page.path} → @/#{target} (#{reason})" }
-          end
+        shortcode_results = {} of String => String
+        summary_md = complete_summary_chunk(summary_md, page.raw_content, md_config.footnotes)
+        summary_md = expand_includes(summary_md, page, site)
+        processed = if content_may_contain_shortcodes?(summary_md)
+                      context = build_template_variables(page, site, "", "", "", global_vars: global_vars)
+                      process_shortcodes_jinja(summary_md, templates, context, shortcode_results)
+                    else
+                      summary_md
+                    end
+        processed = rewrite_wikilinks(processed, page, site)
+
+        # The body's render hooks too: the summary is the body's opening HTML.
+        hooks = Content::Processors::RenderHooks.registry.try { |reg| build_hook_render_context(reg, page, site, nil, nil) }
+        html, _ = Processor::Markdown.render(processed, use_highlight, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config, hooks: hooks)
+        html = replace_shortcode_placeholders(html, shortcode_results)
+
+        page.summary_html = finish_summary_html(html, page, site, link_map.call, images_ready)
+        recomputed_paths << page.path
+      rescue ex
+        # A broken shortcode in a summary must not abort the whole parse
+        # phase — fall back to plain-Markdown rendering (same config flags,
+        # critically including safe mode). Still resolve `@/` links: body
+        # render never sees render:false summaries, and strict mode would
+        # otherwise miss broken links that ship in listings. An include
+        # failure on a rendered page is the body render's to report (once).
+        unless rerender || (page.render && ex.is_a?(Content::Processors::Includes::IncludeError))
+          Logger.warn "Summary render failed for #{page.path} — falling back to plain Markdown: #{ex.message}"
         end
-      else
-        fallback = Content::Processors::InternalLinkResolver.resolve(fallback, pbp, page.path, site.config.base_url)
+        fallback, _ = Processor::Markdown.render(rewrite_wikilinks(summary_md.to_s, page, site), use_highlight, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config)
+        page.summary_html = finish_summary_html(fallback, page, site, link_map.call, images_ready)
+        recomputed_paths << page.path
       end
-      fallback = Content::Processors::InternalLinkResolver.prefix_root_relative_links(fallback, site.config.base_url, site.config.base_path)
-      page.summary_html = fallback
-      recomputed_paths << page.path
     end
 
     # Drop Crinja values cached before the summaries above were assigned —
@@ -175,6 +178,43 @@ module Hwaro::Core::Build::Phases::ParseContent
         @section_pages_url_index_cache.clear
       end
     end
+  end
+
+  # Redo the ParseContent summaries the BeforeRender image hooks change:
+  # `<img>` that now get srcset/dimensions, and shortcodes whose
+  # `resize_image()` returned the original URL before the resize map was
+  # filled. Rebuilds the author lists that embedded the old summaries and
+  # drops every Crinja value cached since. True when anything was redone,
+  # so the caller rebuilds `global_vars`.
+  private def rerender_image_summaries(
+    pages : Array(Models::Page),
+    site : Models::Site,
+    templates : Hash(String, String),
+    use_highlight : Bool,
+    global_vars : Hash(String, Crinja::Value),
+  ) : Bool
+    image_cfg = site.config.image_processing
+    srcset = image_cfg.enabled || image_cfg.dimensions
+    resizes = templates.each_value.any?(&.includes?("resize_image"))
+    return false unless srcset || resizes
+    redo = pages.select do |page|
+      next false unless html = page.summary_html
+      (srcset && html.includes?("<img")) ||
+        (resizes && page.summary.try { |chunk| content_may_contain_shortcodes?(chunk) })
+    end
+    return false if redo.empty?
+
+    render_page_summaries(redo, site, templates, use_highlight,
+      link_targets: pages, global_vars: global_vars, rerender: true)
+    aggregate_site_authors(site)
+    @crinja_cache_mutex.synchronize do
+      @page_crinja_value_cache.clear
+      @section_pages_crinja_cache.clear
+      @section_pages_url_index_cache.clear
+      @series_crinja_cache.clear
+      @related_posts_crinja_cache.clear
+    end
+    true
   end
 
   # `page.word_count` / `reading_time` count the text the page renders, so a
@@ -257,6 +297,33 @@ module Hwaro::Core::Build::Phases::ParseContent
     had || false # nil when the raise preceded the assignment above
   end
 
+  # Comments and script/style bodies are skipped; group 3 is a tag name.
+  SUMMARY_TAG_RE     = /<!--.*?-->|<(script|style)\b.*?<\/\1\s*>|<(\/?)([a-zA-Z][\w-]*)[^>]*>/im
+  VOID_HTML_ELEMENTS = Set{"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
+
+  # A marker inside a raw HTML block (`<details>` … `<!-- more -->` …
+  # `</details>`) ends the summary inside that element: close what is still
+  # open, as complete_summary_chunk does for a block shortcode, or the
+  # unclosed tag swallows whatever a listing prints after the summary.
+  private def close_open_elements(html : String) : String
+    open = [] of String
+    html.scan(SUMMARY_TAG_RE) do |m|
+      next unless name = m[3]?
+      next if m[0].ends_with?("/>")
+      name = name.downcase
+      if m[2].empty?
+        open << name unless VOID_HTML_ELEMENTS.includes?(name)
+      elsif at = open.rindex(name)
+        open.truncate(0, at)
+      end
+    end
+    return html if open.empty?
+    String.build do |io|
+      io << html
+      open.reverse_each { |name| io << "</" << name << ">\n" }
+    end
+  end
+
   SUMMARY_LINK_DEFINITION_RE     = /\A {0,3}\[(?!\^)[^\]\n]+\]:[ \t]*\S/
   SUMMARY_FOOTNOTE_DEFINITION_RE = /\A {0,3}\[\^([^\]\s]+)\]:/
   SUMMARY_FOOTNOTE_REF_RE        = /\[\^([^\]\s]+)\](?!:)/
@@ -279,6 +346,9 @@ module Hwaro::Core::Build::Phases::ParseContent
       end
     end
     chunk = strip_dangling_footnote_refs(chunk) if footnotes && chunk.includes?("[^")
+    # A marker inside a block shortcode's body: close the block where the
+    # summary ends, as the body would at its own `{% end %}`.
+    chunk += "\n{% end %}" * blocks_open_across(chunk, rest)
     definitions.empty? ? chunk : "#{chunk}\n\n#{definitions.join('\n')}"
   end
 
@@ -419,7 +489,10 @@ module Hwaro::Core::Build::Phases::ParseContent
     end
     math = transclude && site.config.markdown.math
     map_shortcode_chunks(content) do |chunk|
-      masked, spans = mask_inline_code(chunk)
+      # Fences inside a block-shortcode body are masked before code spans:
+      # a span may start on a fence line and hide it from the fence walk.
+      spans = [] of String
+      masked, spans = mask_inline_code(mask_body_fences(chunk, spans), spans)
       masked = mask_raw_blocks(masked, spans)
       # With `[markdown] math`, math is stashed out first, as the wikilink
       # walk does, so an embed inside display math stays literal.
@@ -438,20 +511,13 @@ module Hwaro::Core::Build::Phases::ParseContent
   # as `math_sources` when on; include calls see the math restored).
   private def expand_include_lines(text : String, math_sources : Array(String), spans : Array(String), transclude : Bool,
                                    page : Models::Page, site : Models::Site, chain : Array(String)) : String
-    # The chunk walk does not split at a fence inside a block-shortcode
-    # body; this tracker sees only body lines and keeps those literal.
-    body_lines = block_body_lines(text)
-    body_fences = Content::Processors::FenceTracker.new(raw_html_code: false)
     # What the wikilink rewrite leaves alone: raw HTML blocks (and code).
     verbatim_lines = Content::Processors::FenceTracker.new
     String.build(text.bytesize) do |io|
-      text.each_line(chomp: false).with_index do |line, i|
-        fenced = (body_lines[i]? || false) && body_fences.fence_line?(line)
+      text.each_line(chomp: false) do |line|
         verbatim = verbatim_lines.fence_line?(line) || verbatim_lines.html_block_line?
-        if fenced
-          io << line
-        elsif transclude && !verbatim && (m = TRANSCLUDE_LINE_RE.match(line)) &&
-              (spliced = transclusion(m[2], m[1], page, site, chain))
+        if transclude && !verbatim && (m = TRANSCLUDE_LINE_RE.match(line)) &&
+           (spliced = transclusion(m[2], m[1], page, site, chain))
           io << spliced
           io << '\n' if line.ends_with?('\n')
         else
@@ -784,7 +850,7 @@ module Hwaro::Core::Build::Phases::ParseContent
 
       raw_content = File.read(source_path)
     end
-    data = Processor::Markdown.parse(raw_content, source_path)
+    data = Processor::Markdown.parse(raw_content, source_path, @config.try { |c| Content::FrontMatterSchema.declared_keys(c) })
 
     # A serve incremental re-parse works on the LIVE page object, and
     # `og_image:generate` (a BeforeRender hook the incremental paths never
@@ -797,6 +863,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     # (page.image nil), so this is a no-op there. A front-matter image the
     # edit just added still wins.
     previous_image = page.image
+    previous_url = page.url
 
     page.title = data[:title]
     page.description = data[:description]
@@ -885,6 +952,17 @@ module Hwaro::Core::Build::Phases::ParseContent
 
     # Calculate URL
     calculate_page_url(page)
+
+    # The preserved auto-OG URL above is named after the page URL. A slug or
+    # path edit moved the page, and the image regenerated after this
+    # re-render lives under the new name: re-derive it now, or the page's
+    # og:image kept pointing at the old, deleted file.
+    if (img = page.image) && img == previous_image && page.url != previous_url && (cfg = @config)
+      ai = cfg.og.auto_image
+      if ai.enabled && Content::Seo::OgImage.auto_assigned?(img, ai)
+        page.image = "/#{ai.output_dir}/#{Content::Seo::OgImage.slug_for(page, {} of String => String)}#{File.extname(img)}"
+      end
+    end
   end
 
   # Attach the page's commit metadata (see Builder#@git_info) and fill the
@@ -1212,10 +1290,10 @@ module Hwaro::Core::Build::Phases::ParseContent
   # build's alias handling (`tool export`, `tool platform`) cannot drift.
 
   private def site_relative_aliases(aliases : Array(String), page_path : String) : Array(String)
-    return aliases unless aliases.any? { |a| Utils::PathUtils.external_alias?(a) }
+    return aliases unless aliases.any? { |a| Utils::PathUtils.unpublishable_alias(a) }
     aliases.reject do |a|
-      next false unless Utils::PathUtils.external_alias?(a)
-      Logger.warn "Skipping alias #{a.inspect} on #{page_path}: an alias is a path on this site, not an absolute or protocol-relative URL."
+      next false unless reason = Utils::PathUtils.unpublishable_alias(a)
+      Logger.warn "Skipping alias #{a.inspect} on #{page_path}: #{reason}."
       true
     end
   end

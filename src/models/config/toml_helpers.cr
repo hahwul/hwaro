@@ -154,14 +154,15 @@ module Hwaro
       private def self.deep_merge(
         base : Hash(String, TOML::Any),
         override : Hash(String, TOML::Any),
+        top_level : Bool = true,
       ) : Hash(String, TOML::Any)
         merged = base.dup
         override.each do |key, value|
           if base_val = merged[key]?
-            base_hash = base_val.as_h?
-            over_hash = value.as_h?
+            base_hash = merge_table(key, base_val, top_level)
+            over_hash = merge_table(key, value, top_level)
             if base_hash && over_hash
-              merged[key] = TOML::Any.new(deep_merge(base_hash, over_hash))
+              merged[key] = TOML::Any.new(deep_merge(base_hash, over_hash, false))
             else
               merged[key] = value
             end
@@ -170,6 +171,16 @@ module Hwaro
           end
         end
         merged
+      end
+
+      # `value` as a table to merge into. The `sitemap = true` short form
+      # reads as `[sitemap] enabled = true`, so a `[sitemap]` override keeps
+      # the switch instead of replacing it (which turned the sitemap off).
+      private def self.merge_table(key : String, value : TOML::Any, top_level : Bool) : Hash(String, TOML::Any)?
+        if top_level && BOOLEAN_SECTION_KEYS.includes?(key) && !(flag = value.as_bool?).nil?
+          return {"enabled" => TOML::Any.new(flag)}
+        end
+        value.as_h?
       end
 
       # Safe boolean loader: returns the parsed Bool if present, otherwise the default.

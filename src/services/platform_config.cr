@@ -6,6 +6,7 @@ require "../content/processors/markdown"
 require "../utils/frontmatter_writer"
 require "../utils/logger"
 require "../utils/path_utils"
+require "./content_lister"
 require "./github_actions_workflow"
 
 module Hwaro
@@ -16,6 +17,7 @@ module Hwaro
       @config : Models::Config
 
       @output_dir : String? = nil
+      @draft_paths = Set(String).new
 
       def initialize(@config : Models::Config)
       end
@@ -364,6 +366,9 @@ module Hwaro
         content_dir = "content"
         return redirects unless Dir.exists?(content_dir)
 
+        # Own flag or one cascaded from a section (ContentLister is the
+        # publish-state source of truth).
+        @draft_paths = ContentLister.new(content_dir).draft_paths
         scan_content_for_aliases(content_dir, redirects)
         redirects
       end
@@ -422,7 +427,8 @@ module Hwaro
         # not fail platform generation over a date-token permalink they
         # never ship (build uses resolve_url_lenient + raise only on
         # surviving render=true pages).
-        return if data[:draft]
+        # `[build] drafts = true` publishes them, as `hwaro build` does.
+        return if (data[:draft] || @draft_paths.includes?(File.expand_path(path))) && @config.build.drafts != true
         return unless data[:render]
         now = Time.utc
         if exp = data[:expires]
