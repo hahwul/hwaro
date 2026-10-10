@@ -30,6 +30,20 @@ describe Hwaro::Utils::SortUtils do
       Hwaro::Utils::SortUtils.compare_by_date(a, b).should be < 0
     end
 
+    it "sorts an undated page after a pre-1970 one" do
+      # Docs: pages without any date sort last. A 1970 stand-in date put the
+      # Moon landing (1969) below every undated page.
+      moon = Hwaro::Models::Page.new("moon.md")
+      moon.date = Time.utc(1969, 7, 20)
+      recent = Hwaro::Models::Page.new("recent.md")
+      recent.date = Time.utc(2024, 1, 1)
+      undated = Hwaro::Models::Page.new("undated.md")
+
+      Hwaro::Utils::SortUtils.sort_pages([undated, moon, recent]).map(&.path).should eq(["recent.md", "moon.md", "undated.md"])
+      # Two undated pages fall back to the path tiebreak.
+      Hwaro::Utils::SortUtils.compare_by_date(Hwaro::Models::Page.new("b.md"), Hwaro::Models::Page.new("a.md")).should be > 0
+    end
+
     it "breaks ties by path for deterministic ordering" do
       a = Hwaro::Models::Page.new("alpha.md")
       a.date = Time.utc(2024, 1, 1)

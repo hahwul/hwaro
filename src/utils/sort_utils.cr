@@ -14,19 +14,28 @@ module Hwaro
     module SortUtils
       extend self
 
-      # Default fallback date used when a page has no date set
+      # Stand-in date for an undated page where a timestamp must be printed
+      # (feed <updated>); never used for ordering.
       FALLBACK_DATE = Time.utc(1970, 1, 1)
 
       # Compare two pages by date (newest first by default)
       #
-      # Uses updated date if available, falls back to date, then FALLBACK_DATE
+      # Uses updated date if available, then date. An undated page sorts
+      # after every dated one — including pre-1970 dates, which a 1970
+      # stand-in date used to put below undated pages.
       # Returns negative if a should come first, positive if b should come first
       #
       def compare_by_date(a : Models::Page, b : Models::Page) : Int32
-        a_date = a.updated || a.date || FALLBACK_DATE
-        b_date = b.updated || b.date || FALLBACK_DATE
+        a_date = a.updated || a.date
+        b_date = b.updated || b.date
         # Default: newest first (descending); tiebreak by path for deterministic ordering
-        result = b_date <=> a_date
+        result = if a_date && b_date
+                   b_date <=> a_date
+                 elsif a_date || b_date
+                   a_date ? -1 : 1
+                 else
+                   0
+                 end
         result == 0 ? (a.path <=> b.path) : result
       end
 
