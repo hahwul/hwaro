@@ -105,6 +105,17 @@ module Hwaro
         names.uniq
       end
 
+      # Top-level front-matter keys the config declares beyond the built-in
+      # ones: taxonomy names and bare `[[content.schema]]` field names. The
+      # parser's typo warning skips them.
+      def declared_keys(config : Models::Config) : Set(String)
+        keys = taxonomy_names(config).to_set
+        config.content_schema.each do |rule|
+          rule.fields.each { |f| keys << f.name unless f.extra_key }
+        end
+        keys
+      end
+
       # Fail the build (HWARO_E_CONTENT) with every violation, sorted by file.
       def raise_if_any!(violations : Array(Violation)) : Nil
         return if violations.empty?

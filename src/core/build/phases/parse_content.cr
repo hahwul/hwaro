@@ -868,7 +868,7 @@ module Hwaro::Core::Build::Phases::ParseContent
 
       raw_content = File.read(source_path)
     end
-    data = Processor::Markdown.parse(raw_content, source_path)
+    data = Processor::Markdown.parse(raw_content, source_path, @config.try { |c| Content::FrontMatterSchema.declared_keys(c) })
 
     # A serve incremental re-parse works on the LIVE page object, and
     # `og_image:generate` (a BeforeRender hook the incremental paths never

@@ -1,4 +1,4 @@
-require "../../spec_helper"
+require "../../support/build_helper"
 
 private alias FMS = Hwaro::Content::FrontMatterSchema
 
@@ -236,5 +236,23 @@ describe Hwaro::Content::FrontMatterSchema do
     err = expect_raises(Hwaro::HwaroError) { FMS.raise_if_any!(violations) }
     err.code.should eq(Hwaro::Errors::HWARO_E_CONTENT)
     err.message.should eq(%(2 front-matter schema violations:\n  content/a.md: field "y": required but missing\n  content/b.md:2: field "x": bad))
+  end
+end
+
+describe "front-matter typo warning vs config-declared keys" do
+  # Regression: the parser's "unknown key ... did you mean" warning fired
+  # for a key the config declares — a schema field or a taxonomy name.
+  it "does not flag schema fields or taxonomy names as typos" do
+    log = with_captured_log do
+      build_site(
+        "title = \"T\"\nbase_url = \"http://localhost\"\n\n[[taxonomies]]\nname = \"tag\"\n\n" \
+        "[[content.schema]]\nsections = [\"**\"]\n[content.schema.fields.author]\ntype = \"string\"\n",
+        content_files: {"a.md" => "+++\ntitle = \"A\"\nauthor = \"me\"\ntag = [\"x\"]\ntitel = \"t\"\n+++\nx"},
+        template_files: {"page.html" => "{{ page.title }}"},
+      ) { }
+    end
+    log.should_not contain("'author'")
+    log.should_not contain("'tag'")
+    log.should contain("unknown front-matter key 'titel'")
   end
 end
