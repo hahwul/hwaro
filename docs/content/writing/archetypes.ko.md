@@ -108,7 +108,7 @@ default_fields = ["description"]      # 빈 값으로 스캐폴드할 추가 키
 bundle = false                        # true: foo.md 대신 foo/index.md 스캐폴드
 ```
 
-내장 필드(`title`, `date`, `draft`, `tags`)와 겹치는 항목은 빈 값으로 중복 생성되지 않도록 무시됩니다.
+내장 필드(`title`, `date`, `draft`, `tags`)와 겹치는 항목은 빈 값으로 중복 생성되지 않도록 무시됩니다. 빌드가 숫자·불리언·리스트·테이블로 읽는 키는 `""` 대신 키가 없을 때 가정하는 값으로 채워지므로(`weight = 0`, `toc = false`, `in_sitemap = true`, `aliases = []`, `extra = {}`) 새 페이지가 타입 경고 없이 빌드됩니다. 중립적인 값이 없는 키(`path`, `redirect_to`, `paginate`, `paginate_by`, `pagination_enabled`, `reverse`, `insert_anchor_links`)는 생략됩니다.
 
 ### 리프 번들(디렉터리) 레이아웃
 

@@ -829,12 +829,45 @@ module Hwaro
           extra_fields = ["description"] + extra_fields unless extra_fields.includes?("description")
         end
 
+        fields = scaffold_fields(extra_fields, field_values)
         if content_new.json?
-          build_json_front_matter(title, date, is_draft, tags, extra_fields, field_values)
+          build_json_front_matter(title, date, is_draft, tags, fields)
         elsif content_new.yaml?
-          build_yaml_front_matter(title, date, is_draft, tags, extra_fields, field_values)
+          build_yaml_front_matter(title, date, is_draft, tags, fields)
         else
-          build_toml_front_matter(title, date, is_draft, tags, extra_fields, field_values)
+          build_toml_front_matter(title, date, is_draft, tags, fields)
+        end
+      end
+
+      # Front matter keys the build reads as something other than a string,
+      # mapped to the value it assumes when the key is absent: scaffolding
+      # `weight = ""` made the very next build warn "`weight` must be an
+      # integer". The literals are valid TOML, YAML and JSON alike. `nil`
+      # marks a key with no neutral value — any value changes what the page
+      # does (`path = ""` claims the homepage URL, `redirect_to = ""` turns
+      # the page into a redirect stub, `paginate`/`reverse`/... override the
+      # section) — so it is left out of the scaffold.
+      TYPED_FIELD_PLACEHOLDERS = {
+        "weight" => "0", "series_weight" => "0",
+        "toc" => "false", "transparent" => "false", "generate_feeds" => "false",
+        "in_sitemap" => "true", "in_search_index" => "true", "render" => "true",
+        "aliases" => "[]", "authors" => "[]", "categories" => "[]",
+        "extra" => "{}", "taxonomies" => "{}", "cascade" => "{}",
+        "paginate" => nil, "paginate_by" => nil, "pagination_enabled" => nil,
+        "reverse" => nil, "insert_anchor_links" => nil, "path" => nil, "redirect_to" => nil,
+      } of String => String?
+
+      # `{name, value, literal?}` per scaffolded field: a supplied value or
+      # `""` is written as a quoted string, a typed placeholder verbatim.
+      private def scaffold_fields(extra_fields : Array(String), field_values : Hash(String, String)) : Array({String, String, Bool})
+        extra_fields.compact_map do |f|
+          if value = field_values[f]?
+            {f, value, false}
+          elsif TYPED_FIELD_PLACEHOLDERS.has_key?(f)
+            TYPED_FIELD_PLACEHOLDERS[f].try { |literal| {f, literal, true} }
+          else
+            {f, "", false}
+          end
         end
       end
 
@@ -849,14 +882,14 @@ module Hwaro
       # `<h1>{{ page.title | e }}</h1>`, so injecting a markdown `# title`
       # here would produce two H1s on every page created via `hwaro new`
       # (gh#525).
-      private def build_toml_front_matter(title : String, date : String, is_draft : Bool, tags : Array(String), extra_fields : Array(String), field_values : Hash(String, String) = {} of String => String) : String
+      private def build_toml_front_matter(title : String, date : String, is_draft : Bool, tags : Array(String), fields : Array({String, String, Bool})) : String
         safe_title = escape_string(title)
         date_literal = date.matches?(TOML_DATETIME_RE) ? date : "\"#{escape_string(date)}\""
         String.build do |str|
           str << "+++\n"
           str << "title = \"#{safe_title}\"\n"
           str << "date = #{date_literal}\n"
-          extra_fields.each { |f| str << "#{Utils::FrontmatterWriter.format_toml_key(f)} = \"#{escape_string(field_values[f]? || "")}\"\n" }
+          fields.each { |(f, v, literal)| str << "#{Utils::FrontmatterWriter.format_toml_key(f)} = #{literal ? v : "\"#{escape_string(v)}\""}\n" }
           str << "draft = true\n" if is_draft
           unless tags.empty?
             rendered = tags.map { |t| "\"#{escape_string(t)}\"" }.join(", ")
@@ -866,7 +899,7 @@ module Hwaro
         end
       end
 
-      private def build_yaml_front_matter(title : String, date : String, is_draft : Bool, tags : Array(String), extra_fields : Array(String), field_values : Hash(String, String) = {} of String => String) : String
+      private def build_yaml_front_matter(title : String, date : String, is_draft : Bool, tags : Array(String), fields : Array({String, String, Bool})) : String
         safe_title = escape_string(title)
         String.build do |str|
           str << "---\n"
@@ -875,7 +908,7 @@ module Hwaro
           # valid YAML, and a normal date parses back as a String scalar (an
           # unquoted YYYY-MM-DD parses as a Time node and is silently dropped).
           str << "date: \"#{escape_string(date)}\"\n"
-          extra_fields.each { |f| str << "#{Utils::FrontmatterWriter.yaml_scalar(f)}: \"#{escape_string(field_values[f]? || "")}\"\n" }
+          fields.each { |(f, v, literal)| str << "#{Utils::FrontmatterWriter.yaml_scalar(f)}: #{literal ? v : "\"#{escape_string(v)}\""}\n" }
           str << "draft: true\n" if is_draft
           unless tags.empty?
             str << "tags:\n"
@@ -885,11 +918,11 @@ module Hwaro
         end
       end
 
-      private def build_json_front_matter(title : String, date : String, is_draft : Bool, tags : Array(String), extra_fields : Array(String), field_values : Hash(String, String) = {} of String => String) : String
+      private def build_json_front_matter(title : String, date : String, is_draft : Bool, tags : Array(String), extra : Array({String, String, Bool})) : String
         fields = {} of String => JSON::Any
         fields["title"] = JSON::Any.new(title)
         fields["date"] = JSON::Any.new(date)
-        extra_fields.each { |f| fields[f] = JSON::Any.new(field_values[f]? || "") }
+        extra.each { |(f, v, literal)| fields[f] = literal ? JSON.parse(v) : JSON::Any.new(v) }
         fields["draft"] = JSON::Any.new(true) if is_draft
         unless tags.empty?
           fields["tags"] = JSON::Any.new(tags.map { |t| JSON::Any.new(t) })

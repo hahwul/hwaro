@@ -869,6 +869,42 @@ describe Hwaro::Services::Creator do
       end
     end
 
+    it "scaffolds typed default_fields with values the build accepts" do
+      # `weight = ""` made the next build warn "`weight` must be an integer";
+      # keys with no neutral value (path, redirect_to, paginate) are left out.
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          config = Hwaro::Models::Config.new
+          config.content_new.default_fields = ["weight", "toc", "in_sitemap", "aliases", "extra", "path", "redirect_to", "paginate", "summary"]
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "t.md", title: "T")
+          toml = TOML.parse(File.read(Hwaro::Services::Creator.new.run(options, config)).split("+++")[1])
+          toml["weight"].as_i.should eq(0)
+          toml["toc"].as_bool.should be_false
+          toml["in_sitemap"].as_bool.should be_true
+          toml["aliases"].as_a.should be_empty
+          toml["extra"].as_h.should be_empty
+          toml["summary"].as_s.should eq("")
+          {"path", "redirect_to", "paginate"}.each { |k| toml.has_key?(k).should be_false }
+
+          config.content_new.front_matter_format = "yaml"
+          options = Hwaro::Config::Options::NewOptions.new(path: "y.md", title: "Y")
+          yaml = YAML.parse(File.read(Hwaro::Services::Creator.new.run(options, config)).split("---")[1])
+          yaml["weight"].as_i.should eq(0)
+          yaml["in_sitemap"].as_bool.should be_true
+          yaml["path"]?.should be_nil
+
+          config.content_new.front_matter_format = "json"
+          options = Hwaro::Config::Options::NewOptions.new(path: "j.md", title: "J")
+          json = JSON.parse(File.read(Hwaro::Services::Creator.new.run(options, config)))
+          json["weight"].as_i.should eq(0)
+          json["aliases"].as_a.should be_empty
+          json["summary"].as_s.should eq("")
+        end
+      end
+    end
+
     it "ignores built-in fields listed in default_fields" do
       # Built-ins (title/date/draft/tags) have dedicated rendering. Listing
       # them in default_fields must not duplicate them with empty values.
