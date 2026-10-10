@@ -226,6 +226,8 @@ module Hwaro
       # New: Word count and reading time (computed)
       property word_count : Int32
       property reading_time : Int32 # in minutes
+      # How many of `word_count`'s words are single Han/Kana characters.
+      @cjk_word_count : Int32 = 0
 
       # New: Permalink (absolute URL with base_url)
       property permalink : String?
@@ -478,14 +480,15 @@ module Hwaro
         # Shared with `hwaro tool stats` via TextUtils so the CLI report and
         # the published `page.word_count` can never drift apart. `text` is
         # the include-expanded body once the build has expanded it.
-        @word_count = Utils::TextUtils.count_words(text)
+        @word_count, @cjk_word_count = Utils::TextUtils.count_words_and_cjk(text)
         @word_count
       end
 
-      # Reading time in minutes at ~200 words per minute, from the
-      # `word_count` that `calculate_word_count` set.
+      # Reading time in minutes from the counts `calculate_word_count` set:
+      # ~200 words per minute, and ~500 per minute for Chinese/Japanese
+      # characters (each counted as a word, but read much faster).
       def calculate_reading_time : Int32
-        @reading_time = (@word_count / 200.0).ceil.to_i
+        @reading_time = ((@word_count - @cjk_word_count) / 200.0 + @cjk_word_count / 500.0).ceil.to_i
       end
 
       # Extract summary from content using <!-- more --> marker

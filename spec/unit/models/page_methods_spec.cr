@@ -143,6 +143,18 @@ describe Hwaro::Models::Page do
       time = page.calculate_reading_time
       time.should eq(3)
     end
+
+    it "reads Chinese/Japanese characters at ~500 per minute" do
+      page = Hwaro::Models::Page.new("test.md")
+      # 1500 kanji: 1500 words, 3 minutes (not 1 word / 1 minute, not 8).
+      page.raw_content = "漢字" * 750
+      page.calculate_word_count.should eq(1500)
+      page.calculate_reading_time.should eq(3)
+      # Mixed: 400 English words (2 min) + 500 kana (1 min).
+      page.raw_content = (["word"] * 400).join(" ") + " " + "かな" * 250
+      page.calculate_word_count.should eq(900)
+      page.calculate_reading_time.should eq(3)
+    end
   end
 
   describe "#extract_summary" do

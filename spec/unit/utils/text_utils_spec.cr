@@ -736,5 +736,20 @@ describe Hwaro::Utils::TextUtils do
       Hwaro::Utils::TextUtils.count_words("a <!-- hidden words here --> b").should eq(2)
       Hwaro::Utils::TextUtils.count_words("a <!-- never closed b c d").should eq(7)
     end
+
+    it "counts each Han/Kana character as a word, Hangul by spaces" do
+      Hwaro::Utils::TextUtils.count_words("我爱北京天安门").should eq(7)
+      Hwaro::Utils::TextUtils.count_words("今日は、いい天気です。").should eq(9)
+      Hwaro::Utils::TextUtils.count_words("カタカナ ｶﾀｶﾅ").should eq(8)
+      Hwaro::Utils::TextUtils.count_words("Hugo と hwaro").should eq(3)
+      Hwaro::Utils::TextUtils.count_words("「中文」，（测试）！").should eq(4)
+      Hwaro::Utils::TextUtils.count_words("안녕하세요 세계 입니다").should eq(3)
+      Hwaro::Utils::TextUtils.count_words_and_cjk("hello 世界 wörld").should eq({4, 2})
+      Hwaro::Utils::TextUtils.count_words("ＡＢＣ　１２３").should eq(2)
+    end
+
+    it "splits words on Unicode whitespace" do
+      Hwaro::Utils::TextUtils.count_words("one\u00A0two\u3000three\u2003four").should eq(4)
+    end
   end
 end

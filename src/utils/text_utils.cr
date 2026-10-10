@@ -328,10 +328,22 @@ module Hwaro
       # behind both `page.word_count` / `page.reading_time` and
       # `hwaro tool stats`, which previously split on whitespace alone and
       # reported ~30% more words than the site itself rendered.
+      #
+      # Chinese and Japanese are written without spaces, so each Han,
+      # Hiragana or Katakana character counts as one word (Hangul keeps
+      # space-based counting: Korean separates words with spaces). Any
+      # Unicode whitespace (NBSP, U+3000 ideographic space) splits words.
       def count_words(text : String) : Int32
+        count_words_and_cjk(text)[0]
+      end
+
+      # `{words, cjk}`: the `count_words` total, and how many of those words
+      # are single Han/Kana characters (reading time weighs them apart).
+      def count_words_and_cjk(text : String) : {Int32, Int32}
         in_tag = false
         in_word = false
         count = 0
+        cjk = 0
 
         bytes = text.to_slice
         last_comment_close = nil.as(Int32?)
@@ -377,18 +389,39 @@ module Hwaro
           elsif char == '>'
             in_tag = false
           elsif !in_tag
-            is_word_char = !char.ascii_whitespace? && !char.in?('#', '*', '_', '`', '[', ']', '(', ')', '~', '>', '<', '|')
-            if is_word_char
+            if cjk_word_char?(char)
+              count += 1
+              cjk += 1
+              in_word = false
+            elsif char.whitespace? || cjk_punctuation?(char) || char.in?('#', '*', '_', '`', '[', ']', '(', ')', '~', '>', '<', '|')
+              in_word = false
+            else
               count += 1 unless in_word
               in_word = true
-            else
-              in_word = false
             end
           end
           reader.next_char
         end
 
-        count
+        {count, cjk}
+      end
+
+      # Han ideographs (with 々〆〇), Hiragana and Katakana (incl. halfwidth).
+      private def cjk_word_char?(c : Char) : Bool
+        ord = c.ord
+        return false if ord < 0x3005
+        (0x3005 <= ord <= 0x3007) || (0x3040 <= ord <= 0x30FF) || (0x31F0 <= ord <= 0x31FF) ||
+          (0x3400 <= ord <= 0x4DBF) || (0x4E00 <= ord <= 0x9FFF) || (0xF900 <= ord <= 0xFAFF) ||
+          (0xFF66 <= ord <= 0xFF9F) || (0x20000 <= ord <= 0x3FFFF)
+      end
+
+      # CJK punctuation (。、「」) and fullwidth punctuation (，！？（）)
+      # separate words like ASCII whitespace; fullwidth letters and digits
+      # stay word characters.
+      private def cjk_punctuation?(c : Char) : Bool
+        ord = c.ord
+        return false if ord < 0x3000
+        (ord <= 0x303F) || (0xFF00 <= ord <= 0xFF65 && !c.alphanumeric?)
       end
 
       # Convert text to a URL-friendly slug

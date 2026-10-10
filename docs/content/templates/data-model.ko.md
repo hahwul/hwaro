@@ -339,8 +339,8 @@ john-doe:
 
 | 속성 | 타입 | 설명 |
 |----------|------|-------------|
-| page.word_count | Int | 단어 수. `include_md`, `include_code`, `![[note]]`로 가져온 텍스트도 포함 |
-| page.reading_time | Int | 읽기 시간(분) |
+| page.word_count | Int | 단어 수. `include_md`, `include_code`, `![[note]]`로 가져온 텍스트도 포함. 중국어/일본어(한자, 히라가나, 가타카나)는 글자 하나를 한 단어로 세고, 한국어를 포함한 나머지 문자는 공백으로 구분된 단어를 셈 |
+| page.reading_time | Int | 읽기 시간(분, 올림): 분당 약 200단어, 중국어/일본어 글자는 분당 약 500자 |
 | page.summary | String? | 요약 HTML: `<!-- more -->` 앞부분, 없으면 `page.description`, 그것도 없으면 렌더링된 본문의 자동 발췌문(`[content] summary_length`, 이스케이프된 `<p>` 하나). 삽입할 때는 `\| safe`와 함께 사용(예: `{{ page.summary \| safe }}`). `<meta name="description">`에는 `page.description`을 직접 사용 |
 | page.summary_truncated | Bool | `page.summary`가 잘린 자동 발췌문일 때만 `true` ("더 읽기" 링크에 유용) |
 | page.assets | Array<String> | 페이지 번들의 정적 파일 |
