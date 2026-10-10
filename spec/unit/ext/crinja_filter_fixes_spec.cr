@@ -14,4 +14,14 @@ describe "Crinja built-in filter fixes" do
       render_filter("{{ d | dictsort(true) }}").should eq("[('C', 3), ('a', 1), ('b', 2)]")
     end
   end
+
+  describe "urlencode" do
+    it "keeps slashes in a string, like Python's quote" do
+      render_filter("{{ '/a b/c?d=é~*' | urlencode }}").should eq("/a%20b/c%3Fd%3D%C3%A9~%2A")
+    end
+
+    it "encodes a mapping as a query string" do
+      render_filter("{{ {'a': 'b c', 'x': '/~*'} | urlencode }}").should eq("a=b+c&x=%2F~%2A")
+    end
+  end
 end
