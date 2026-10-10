@@ -80,88 +80,92 @@ module Hwaro::Core::Build::Phases::ParseContent
     recomputed_paths = [] of String
 
     pages.each do |page|
-      recomputed_paths << page.path if recount_included_words(page, site)
-      # parse_single_page already extracted the chunk into page.summary;
-      # extract_summary is only a fallback for hook-based parse paths that
-      # skipped it (it re-scans the whole raw_content, so don't repeat it).
-      summary_md = page.summary || page.extract_summary
-      unless summary_md
-        # No marker: the automatic body excerpt, unless a description
-        # already provides the summary (precedence: marker > description >
-        # excerpt). Recorded in recomputed_paths for the same cache reason.
-        recomputed_paths << page.path if assign_auto_summary(page, site, templates, global_vars)
-        next
-      end
-
-      shortcode_results = {} of String => String
-      summary_md = complete_summary_chunk(summary_md, page.raw_content, md_config.footnotes)
-      summary_md = expand_includes(summary_md, page, site)
-      processed = if content_may_contain_shortcodes?(summary_md)
-                    context = build_template_variables(page, site, "", "", "", global_vars: global_vars)
-                    process_shortcodes_jinja(summary_md, templates, context, shortcode_results)
-                  else
-                    summary_md
-                  end
-      processed = rewrite_wikilinks(processed, page, site)
-
-      html, _ = Processor::Markdown.render(processed, use_highlight, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config)
-      html = replace_shortcode_placeholders(html, shortcode_results)
-
-      pbp = (pages_by_path ||= begin
-        map = {} of String => Models::Page
-        link_targets.each { |p| map[p.path] ||= p }
-        Content::Processors::InternalLinkResolver.add_default_language_aliases(map, site.config)
-      end)
-      if site.config.links.broken_internal == "error"
-        # Strict mode must see summary links too: a `render: false` page
-        # never reaches the body render pass, yet its summary ships inside
-        # every listing that embeds `{{ p.summary }}`. Entries use the same
-        # "path → @/target (reason)" shape as the body pass, so pages that
-        # DO render report each link once (raise_… sort-uniqs).
-        misses = [] of {String, String}
-        html = Content::Processors::InternalLinkResolver.resolve(html, pbp, page.path, site.config.base_url, misses: misses)
-        unless misses.empty?
-          @broken_links_mutex.synchronize do
-            misses.each { |target, reason| @broken_internal_links << "#{page.path} → @/#{target} (#{reason})" }
-          end
+      # The body render shares the set, so each warning prints once per page.
+      page.warned_messages.clear
+      Logger.dedupe_warnings(page.warned_messages) do
+        recomputed_paths << page.path if recount_included_words(page, site)
+        # parse_single_page already extracted the chunk into page.summary;
+        # extract_summary is only a fallback for hook-based parse paths that
+        # skipped it (it re-scans the whole raw_content, so don't repeat it).
+        summary_md = page.summary || page.extract_summary
+        unless summary_md
+          # No marker: the automatic body excerpt, unless a description
+          # already provides the summary (precedence: marker > description >
+          # excerpt). Recorded in recomputed_paths for the same cache reason.
+          recomputed_paths << page.path if assign_auto_summary(page, site, templates, global_vars)
+          next
         end
-      else
-        html = Content::Processors::InternalLinkResolver.resolve(html, pbp, page.path, site.config.base_url)
-      end
-      html = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, site.config.base_url, site.config.base_path)
 
-      page.summary_html = html
-      recomputed_paths << page.path
-    rescue ex
-      # A broken shortcode in a summary must not abort the whole parse
-      # phase — fall back to plain-Markdown rendering (same config flags,
-      # critically including safe mode). Still resolve `@/` links: body
-      # render never sees render:false summaries, and strict mode would
-      # otherwise miss broken links that ship in listings. An include
-      # failure on a rendered page is the body render's to report (once).
-      unless page.render && ex.is_a?(Content::Processors::Includes::IncludeError)
-        Logger.warn "Summary render failed for #{page.path} — falling back to plain Markdown: #{ex.message}"
-      end
-      fallback, _ = Processor::Markdown.render(rewrite_wikilinks(summary_md.to_s, page, site), use_highlight, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config)
-      pbp = (pages_by_path ||= begin
-        map = {} of String => Models::Page
-        link_targets.each { |p| map[p.path] ||= p }
-        Content::Processors::InternalLinkResolver.add_default_language_aliases(map, site.config)
-      end)
-      if site.config.links.broken_internal == "error"
-        misses = [] of {String, String}
-        fallback = Content::Processors::InternalLinkResolver.resolve(fallback, pbp, page.path, site.config.base_url, misses: misses)
-        unless misses.empty?
-          @broken_links_mutex.synchronize do
-            misses.each { |target, reason| @broken_internal_links << "#{page.path} → @/#{target} (#{reason})" }
+        shortcode_results = {} of String => String
+        summary_md = complete_summary_chunk(summary_md, page.raw_content, md_config.footnotes)
+        summary_md = expand_includes(summary_md, page, site)
+        processed = if content_may_contain_shortcodes?(summary_md)
+                      context = build_template_variables(page, site, "", "", "", global_vars: global_vars)
+                      process_shortcodes_jinja(summary_md, templates, context, shortcode_results)
+                    else
+                      summary_md
+                    end
+        processed = rewrite_wikilinks(processed, page, site)
+
+        html, _ = Processor::Markdown.render(processed, use_highlight, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config)
+        html = replace_shortcode_placeholders(html, shortcode_results)
+
+        pbp = (pages_by_path ||= begin
+          map = {} of String => Models::Page
+          link_targets.each { |p| map[p.path] ||= p }
+          Content::Processors::InternalLinkResolver.add_default_language_aliases(map, site.config)
+        end)
+        if site.config.links.broken_internal == "error"
+          # Strict mode must see summary links too: a `render: false` page
+          # never reaches the body render pass, yet its summary ships inside
+          # every listing that embeds `{{ p.summary }}`. Entries use the same
+          # "path → @/target (reason)" shape as the body pass, so pages that
+          # DO render report each link once (raise_… sort-uniqs).
+          misses = [] of {String, String}
+          html = Content::Processors::InternalLinkResolver.resolve(html, pbp, page.path, site.config.base_url, misses: misses)
+          unless misses.empty?
+            @broken_links_mutex.synchronize do
+              misses.each { |target, reason| @broken_internal_links << "#{page.path} → @/#{target} (#{reason})" }
+            end
           end
+        else
+          html = Content::Processors::InternalLinkResolver.resolve(html, pbp, page.path, site.config.base_url)
         end
-      else
-        fallback = Content::Processors::InternalLinkResolver.resolve(fallback, pbp, page.path, site.config.base_url)
+        html = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, site.config.base_url, site.config.base_path)
+
+        page.summary_html = html
+        recomputed_paths << page.path
+      rescue ex
+        # A broken shortcode in a summary must not abort the whole parse
+        # phase — fall back to plain-Markdown rendering (same config flags,
+        # critically including safe mode). Still resolve `@/` links: body
+        # render never sees render:false summaries, and strict mode would
+        # otherwise miss broken links that ship in listings. An include
+        # failure on a rendered page is the body render's to report (once).
+        unless page.render && ex.is_a?(Content::Processors::Includes::IncludeError)
+          Logger.warn "Summary render failed for #{page.path} — falling back to plain Markdown: #{ex.message}"
+        end
+        fallback, _ = Processor::Markdown.render(rewrite_wikilinks(summary_md.to_s, page, site), use_highlight, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config)
+        pbp = (pages_by_path ||= begin
+          map = {} of String => Models::Page
+          link_targets.each { |p| map[p.path] ||= p }
+          Content::Processors::InternalLinkResolver.add_default_language_aliases(map, site.config)
+        end)
+        if site.config.links.broken_internal == "error"
+          misses = [] of {String, String}
+          fallback = Content::Processors::InternalLinkResolver.resolve(fallback, pbp, page.path, site.config.base_url, misses: misses)
+          unless misses.empty?
+            @broken_links_mutex.synchronize do
+              misses.each { |target, reason| @broken_internal_links << "#{page.path} → @/#{target} (#{reason})" }
+            end
+          end
+        else
+          fallback = Content::Processors::InternalLinkResolver.resolve(fallback, pbp, page.path, site.config.base_url)
+        end
+        fallback = Content::Processors::InternalLinkResolver.prefix_root_relative_links(fallback, site.config.base_url, site.config.base_path)
+        page.summary_html = fallback
+        recomputed_paths << page.path
       end
-      fallback = Content::Processors::InternalLinkResolver.prefix_root_relative_links(fallback, site.config.base_url, site.config.base_path)
-      page.summary_html = fallback
-      recomputed_paths << page.path
     end
 
     # Drop Crinja values cached before the summaries above were assigned —

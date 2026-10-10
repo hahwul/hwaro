@@ -15,6 +15,12 @@
 require "colorize"
 require "./text_utils"
 
+class Fiber
+  # Warnings this fiber has printed for the page it renders; see
+  # `Logger.dedupe_warnings`.
+  property hwaro_warned : Set(String)? = nil
+end
+
 module Hwaro
   class Logger
     # Terminal stream that a vanished reader cannot turn into a failure.
@@ -175,11 +181,25 @@ module Hwaro
     # "[WARN] " prefix so scripts that grep for it keep working.
     def self.warn(message : String)
       return if @@level > Level::Warn
+      return if (seen = Fiber.current.hwaro_warned) && !seen.add?(message)
       clear_active_line
       if color_enabled?
         @@err_io.puts "#{glyph(:warn)} #{paint(message, Role::Warn)}"
       else
         @@err_io.puts "[WARN] #{message}"
+      end
+    end
+
+    # Inside the block, a warning already in `seen` is dropped. One page's
+    # Markdown is rendered by its summary pass and again by its body render;
+    # both share the page's set so each diagnostic prints once per page.
+    def self.dedupe_warnings(seen : Set(String), &)
+      previous = Fiber.current.hwaro_warned
+      Fiber.current.hwaro_warned = seen
+      begin
+        yield
+      ensure
+        Fiber.current.hwaro_warned = previous
       end
     end
 

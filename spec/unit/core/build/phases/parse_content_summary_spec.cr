@@ -44,3 +44,24 @@ describe "marker summary context" do
     summary.should contain("footnote-ref")
   end
 end
+
+# The summary passes render the page's Markdown before the body render does;
+# each diagnostic used to print once per pass.
+describe "summary pass diagnostics" do
+  it "prints each of a page's warnings once" do
+    body = "See [a](@/missing.md).\n\n## A {#dup}\n\n## B {#dup}\n\n{{ bad() }}\n\n<!-- more -->\n\nRest.\n"
+    {body, body.sub("<!-- more -->", "")}.each do |text|
+      log = with_captured_log do
+        build_site(
+          BASIC_CONFIG,
+          content_files: {"post.md" => "+++\ntitle = \"P\"\n+++\n#{text}"},
+          template_files: {"page.html" => "{{ page.summary }}{{ content }}", "section.html" => "{{ content }}",
+                           "shortcodes/bad.html" => "{% if x %}oops"},
+        ) { }
+      end
+      log.scan("could not be resolved").size.should eq(1)
+      log.scan("Duplicate explicit heading id").size.should eq(1)
+      log.scan("Template error in shortcode").size.should eq(1)
+    end
+  end
+end

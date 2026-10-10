@@ -127,103 +127,109 @@ module Hwaro::Core::Build::Phases::Render
     template_cache_override : Hash(UInt64, Crinja::Template)? = nil,
     profiler : Profiler? = nil,
   ) : {String, Array(Models::TocHeader), Hash(String, Crinja::Value)?}
-    # Only build shortcode context and process shortcodes if content actually
-    # contains shortcode syntax ({{ or {%).  This avoids the expensive
-    # build_template_variables call for the majority of pages that have no
-    # shortcodes.
-    shortcode_results = {} of String => String
-    raw = expanded_raw_content(page, site)
-    # Use accurate fence + inline-code aware pre-filter instead of naive includes?.
-    # This is the main D2 optimization for the shortcode hot path (#562):
-    # documentation pages full of example syntax no longer pay the cost of
-    # build_template_variables + full shortcode processing.
-    has_shortcodes = content_may_contain_shortcodes?(raw)
-    warn_hugo_shortcode_syntax(raw, page.path) if raw.includes?("{{<")
-    shortcode_context : Hash(String, Crinja::Value)? = nil
+    # Warnings the summary pass already printed for this page are not
+    # repeated; the set is emptied for the next build.
+    Logger.dedupe_warnings(page.warned_messages) do
+      # Only build shortcode context and process shortcodes if content actually
+      # contains shortcode syntax ({{ or {%).  This avoids the expensive
+      # build_template_variables call for the majority of pages that have no
+      # shortcodes.
+      shortcode_results = {} of String => String
+      raw = expanded_raw_content(page, site)
+      # Use accurate fence + inline-code aware pre-filter instead of naive includes?.
+      # This is the main D2 optimization for the shortcode hot path (#562):
+      # documentation pages full of example syntax no longer pay the cost of
+      # build_template_variables + full shortcode processing.
+      has_shortcodes = content_may_contain_shortcodes?(raw)
+      warn_hugo_shortcode_syntax(raw, page.path) if raw.includes?("{{<")
+      shortcode_context : Hash(String, Crinja::Value)? = nil
 
-    processed_content = if has_shortcodes
-                          shortcode_context = build_template_variables(page, site, "", "", "", global_vars: global_vars)
-                          # `warnings:` routes shortcode template errors into
-                          # page.build_warnings so the serve error overlay can
-                          # surface them (the render itself "succeeds").
-                          process_shortcodes_jinja(raw, templates, shortcode_context, shortcode_results,
-                            crinja_env_override: crinja_env_override, template_cache_override: template_cache_override,
-                            warnings: page.build_warnings)
-                        else
-                          raw
-                        end
-    processed_content = rewrite_wikilinks(processed_content, page, site)
+      processed_content = if has_shortcodes
+                            shortcode_context = build_template_variables(page, site, "", "", "", global_vars: global_vars)
+                            # `warnings:` routes shortcode template errors into
+                            # page.build_warnings so the serve error overlay can
+                            # surface them (the render itself "succeeds").
+                            process_shortcodes_jinja(raw, templates, shortcode_context, shortcode_results,
+                              crinja_env_override: crinja_env_override, template_cache_override: template_cache_override,
+                              warnings: page.build_warnings)
+                          else
+                            raw
+                          end
+      processed_content = rewrite_wikilinks(processed_content, page, site)
 
-    lazy_loading = site.config.markdown.lazy_loading
-    emoji = site.config.markdown.emoji
+      lazy_loading = site.config.markdown.lazy_loading
+      emoji = site.config.markdown.emoji
 
-    # Render-hook context — nil (the zero-cost default) when no
-    # templates/hooks/render-* template is configured, in which case
-    # Processor::Markdown.render below constructs the exact same
-    # HighlightingRenderer it always has.
-    hooks_ctx = if reg = Content::Processors::RenderHooks.registry
-                  build_hook_render_context(reg, page, site, crinja_env_override, template_cache_override)
-                end
+      # Render-hook context — nil (the zero-cost default) when no
+      # templates/hooks/render-* template is configured, in which case
+      # Processor::Markdown.render below constructs the exact same
+      # HighlightingRenderer it always has.
+      hooks_ctx = if reg = Content::Processors::RenderHooks.registry
+                    build_hook_render_context(reg, page, site, crinja_env_override, template_cache_override)
+                  end
 
-    # Use anchor links if enabled: page front matter (tri-state) overrides
-    # the site-wide `[markdown] insert_anchor_links` ("none"/"left"/"right";
-    # "before"/"after" accepted as internal-style aliases). A page-level
-    # `true` with config "none" keeps today's hard-coded "after" placement.
-    md_config = site.config.markdown
-    anchors_cfg = md_config.insert_anchor_links
-    anchors_on = page.insert_anchor_links.nil? ? anchors_cfg != "none" : page.insert_anchor_links
-    anchor_style = anchors_cfg.in?("left", "before") ? "before" : "after"
-    md_start = profiler ? Time.instant : nil
-    md_input_bytes = processed_content.bytesize.to_i64
-    html_content, toc_headers = if anchors_on
-                                  Processor::Markdown.render_with_anchors(processed_content, highlight, safe, anchor_style, lazy_loading, emoji, markdown_config: md_config, hooks: hooks_ctx)
-                                else
-                                  Processor::Markdown.render(processed_content, highlight, safe, lazy_loading, emoji, markdown_config: md_config, hooks: hooks_ctx)
-                                end
-    if profiler && md_start
-      md_elapsed = (Time.instant - md_start).total_milliseconds
-      profiler.record_markdown(page.path, md_input_bytes, md_elapsed)
-    end
-
-    # Replace shortcode placeholders with their rendered HTML content
-    html_content = replace_shortcode_placeholders(html_content, shortcode_results)
-
-    # Resolve internal @/ links to actual page URLs
-    if pages_by_path = @pages_by_path
-      collect_anchor_links(page, html_content, pages_by_path) unless site.config.links.broken_anchors == "ignore"
-      if site.config.links.broken_internal == "error"
-        # Strict mode: collect unresolved links in a local array, then fold
-        # them into the builder-wide accumulator under the mutex (render
-        # workers run this concurrently under -Dpreview_mt). The aggregated
-        # error is raised AFTER the fan-out so one bad link doesn't hide
-        # the others.
-        misses = [] of {String, String}
-        html_content = Content::Processors::InternalLinkResolver.resolve(html_content, pages_by_path, page.path, site.config.base_url, misses: misses)
-        unless misses.empty?
-          @broken_links_mutex.synchronize do
-            misses.each { |target, reason| @broken_internal_links << "#{page.path} → @/#{target} (#{reason})" }
-          end
-        end
-      else
-        html_content = Content::Processors::InternalLinkResolver.resolve(html_content, pages_by_path, page.path, site.config.base_url)
+      # Use anchor links if enabled: page front matter (tri-state) overrides
+      # the site-wide `[markdown] insert_anchor_links` ("none"/"left"/"right";
+      # "before"/"after" accepted as internal-style aliases). A page-level
+      # `true` with config "none" keeps today's hard-coded "after" placement.
+      md_config = site.config.markdown
+      anchors_cfg = md_config.insert_anchor_links
+      anchors_on = page.insert_anchor_links.nil? ? anchors_cfg != "none" : page.insert_anchor_links
+      anchor_style = anchors_cfg.in?("left", "before") ? "before" : "after"
+      md_start = profiler ? Time.instant : nil
+      md_input_bytes = processed_content.bytesize.to_i64
+      html_content, toc_headers = if anchors_on
+                                    Processor::Markdown.render_with_anchors(processed_content, highlight, safe, anchor_style, lazy_loading, emoji, markdown_config: md_config, hooks: hooks_ctx)
+                                  else
+                                    Processor::Markdown.render(processed_content, highlight, safe, lazy_loading, emoji, markdown_config: md_config, hooks: hooks_ctx)
+                                  end
+      if profiler && md_start
+        md_elapsed = (Time.instant - md_start).total_milliseconds
+        profiler.record_markdown(page.path, md_input_bytes, md_elapsed)
       end
+
+      # Replace shortcode placeholders with their rendered HTML content
+      html_content = replace_shortcode_placeholders(html_content, shortcode_results)
+
+      # Resolve internal @/ links to actual page URLs
+      if pages_by_path = @pages_by_path
+        collect_anchor_links(page, html_content, pages_by_path) unless site.config.links.broken_anchors == "ignore"
+        if site.config.links.broken_internal == "error"
+          # Strict mode: collect unresolved links in a local array, then fold
+          # them into the builder-wide accumulator under the mutex (render
+          # workers run this concurrently under -Dpreview_mt). The aggregated
+          # error is raised AFTER the fan-out so one bad link doesn't hide
+          # the others.
+          misses = [] of {String, String}
+          html_content = Content::Processors::InternalLinkResolver.resolve(html_content, pages_by_path, page.path, site.config.base_url, misses: misses)
+          unless misses.empty?
+            @broken_links_mutex.synchronize do
+              misses.each { |target, reason| @broken_internal_links << "#{page.path} → @/#{target} (#{reason})" }
+            end
+          end
+        else
+          html_content = Content::Processors::InternalLinkResolver.resolve(html_content, pages_by_path, page.path, site.config.base_url)
+        end
+      end
+
+      # Prefix plain root-relative content links (e.g. `[Posts](/posts/)`) with the
+      # base_url path so they resolve under a subpath deploy. No-op on root deploys;
+      # also keeps RSS `<content:encoded>` and the search index subpath-correct
+      # because both reuse `page.content` set below.
+      html_content = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html_content, site.config.base_url, site.config.base_path)
+
+      # Make content images responsive: when image_processing generated width
+      # variants for an <img>, add srcset/sizes so browsers pick an appropriate
+      # size instead of always loading the full-resolution source.
+      html_content = apply_responsive_images(html_content, page, site.config)
+
+      # Store rendered HTML in page.content for reuse by Feed/Search generators
+      # (avoids expensive re-rendering of Markdown in Generate phase)
+      page.content = html_content
+      {html_content, toc_headers, shortcode_context}
     end
-
-    # Prefix plain root-relative content links (e.g. `[Posts](/posts/)`) with the
-    # base_url path so they resolve under a subpath deploy. No-op on root deploys;
-    # also keeps RSS `<content:encoded>` and the search index subpath-correct
-    # because both reuse `page.content` set below.
-    html_content = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html_content, site.config.base_url, site.config.base_path)
-
-    # Make content images responsive: when image_processing generated width
-    # variants for an <img>, add srcset/sizes so browsers pick an appropriate
-    # size instead of always loading the full-resolution source.
-    html_content = apply_responsive_images(html_content, page, site.config)
-
-    # Store rendered HTML in page.content for reuse by Feed/Search generators
-    # (avoids expensive re-rendering of Markdown in Generate phase)
-    page.content = html_content
-    {html_content, toc_headers, shortcode_context}
+  ensure
+    page.warned_messages.clear
   end
 
   private def render_page(

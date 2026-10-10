@@ -167,6 +167,11 @@ module Hwaro
       # Build warnings collected during rendering (used for error overlay in serve mode)
       property build_warnings : Array(String)
 
+      # Warnings already logged for this page by its summary pass and body
+      # render (see `Logger.dedupe_warnings`); cleared when the summary pass
+      # starts and when the body render ends.
+      getter warned_messages = Set(String).new
+
       # Whether parsing (front-matter / markdown) failed for this page
       property parse_failed : Bool
 
