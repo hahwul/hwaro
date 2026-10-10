@@ -156,6 +156,19 @@ describe "warm --cache: pages rendering other pages" do
     end
   end
 
+  it "re-renders a nav printing a menu entry page's word count after a body edit" do
+    with_relations_site do
+      File.write("templates/navt.html", %(NAV={% for m in get_menu(name="main") %}{{ m.page.word_count }}{% endfor %}))
+      File.write("content/nav.md", "+++\ntitle = \"Nav\"\ntemplate = \"navt\"\n+++\n")
+      File.write("content/posts/b.md", File.read("content/posts/b.md").sub("series =", "menus = [\"main\"]\nseries ="))
+      relations_cached_build
+      File.read("public/nav/index.html").should contain("NAV=2")
+      File.write("content/posts/b.md", File.read("content/posts/b.md") + " three four")
+      relations_cached_build
+      File.read("public/nav/index.html").should contain("NAV=4")
+    end
+  end
+
   it "re-renders a page serializing a listing after a body edit" do
     with_relations_site do
       File.write("templates/dump.html", %(DUMP={{ get_section(path="posts/_index.md").pages | tojson }}))
