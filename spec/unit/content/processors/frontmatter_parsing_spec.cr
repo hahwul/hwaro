@@ -2281,4 +2281,30 @@ describe Hwaro::Content::Processors::Markdown do
       ex.message.to_s.should contain("nesting")
     end
   end
+
+  # `hwaro new` and the default archetype scaffold unlisted fields as
+  # `key = ""`. A blank value for these keys must read as absent: `image = ""`
+  # emitted the bare base URL as og:image, `path = ""` claimed `/`,
+  # `series = ""` grouped unrelated pages into one series.
+  describe "blank string values" do
+    it "treats blank optional string keys as absent" do
+      keys = %w[description image template slug path sort_by page_template redirect_to series]
+      raw = "+++\ntitle = \"T\"\n" + keys.map { |k| "#{k} = \"  \"\n" }.join + "+++\nBody\n"
+      result = processor.parse(raw, "post.md")
+      result[:description].should be_nil
+      result[:image].should be_nil
+      result[:template].should be_nil
+      result[:slug].should be_nil
+      result[:custom_path].should be_nil
+      result[:sort_by].should be_nil
+      result[:page_template].should be_nil
+      result[:redirect_to].should be_nil
+      result[:series].should be_nil
+      result[:front_matter_keys].should contain("image")
+    end
+
+    it "keeps an explicitly empty title" do
+      processor.parse("+++\ntitle = \"\"\n+++\nBody\n")[:title].should eq("")
+    end
+  end
 end

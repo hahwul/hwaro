@@ -544,12 +544,24 @@ module Hwaro
           nil
         end
 
-        # `fm_string?` for a value that becomes part of the page's URL and
+        # `fm_string?` where a blank value means "absent". `hwaro new` and the
+        # default archetype scaffold unlisted fields as `key = ""`, and a blank
+        # string is never a usable value for these keys: `image = ""` emitted
+        # the bare base URL as og:image/twitter:image, `series = ""` grouped
+        # every such page into one nameless series, `path = ""` claimed `/`
+        # (and could win the homepage over `index.md`), `slug = ""` collided
+        # with the section index, `description = ""` shipped empty JSON-LD /
+        # feed descriptions instead of falling back to the site's.
+        private def fm_value?(fm : TOML::Table | YAML::Any | JSON::Any, key : String, file_path : String = "") : String?
+          fm_string?(fm, key, file_path).presence
+        end
+
+        # `fm_value?` for a value that becomes part of the page's URL and
         # output path. A NUL (a valid TOML/JSON `\u0000` escape) makes every
         # `File`/`Path` call on that path raise, which aborted the build from
         # whichever output generator touched it first (AMP).
         private def fm_url_string?(fm : TOML::Table | YAML::Any | JSON::Any, key : String, file_path : String = "") : String?
-          str = fm_string?(fm, key, file_path)
+          str = fm_value?(fm, key, file_path)
           return str unless str && str.includes?('\0')
           Logger.warn "#{file_path}: `#{key}` contains a NUL byte — ignored." unless file_path.empty?
           nil
@@ -640,10 +652,10 @@ module Hwaro
           end
           {
             title:          fm_string?(fm, "title", file_path) || "Untitled",
-            description:    fm_string?(fm, "description", file_path),
-            image:          fm_string?(fm, "image", file_path),
+            description:    fm_value?(fm, "description", file_path),
+            image:          fm_value?(fm, "image", file_path),
             draft:          fm_bool(fm, "draft", false, file_path),
-            template:       fm_string?(fm, "template", file_path),
+            template:       fm_value?(fm, "template", file_path),
             in_sitemap:     fm_bool(fm, "in_sitemap", true, file_path),
             toc:            fm_bool(fm, "toc", false, file_path),
             date:           date,
@@ -659,17 +671,17 @@ module Hwaro
             # instead of silently rendering one unbounded page.
             paginate:            fm_int?(fm, "paginate", file_path) || fm_int?(fm, "paginate_by", file_path),
             pagination_enabled:  fm_bool?(fm, "pagination_enabled", file_path),
-            sort_by:             fm_string?(fm, "sort_by", file_path),
+            sort_by:             fm_value?(fm, "sort_by", file_path),
             reverse:             fm_bool?(fm, "reverse", file_path),
             authors:             authors,
             extra:               extra,
             in_search_index:     fm_bool(fm, "in_search_index", true, file_path),
             insert_anchor_links: fm_bool?(fm, "insert_anchor_links", file_path),
-            page_template:       fm_string?(fm, "page_template", file_path),
+            page_template:       fm_value?(fm, "page_template", file_path),
             paginate_path:       fm_paginate_path(fm, file_path),
-            redirect_to:         fm_string?(fm, "redirect_to", file_path),
+            redirect_to:         fm_value?(fm, "redirect_to", file_path),
             weight:              fm_int?(fm, "weight", file_path) || 0,
-            series:              fm_string?(fm, "series", file_path),
+            series:              fm_value?(fm, "series", file_path),
             series_weight:       fm_int?(fm, "series_weight", file_path) || 0,
             expires:             nil.as(Time?),
             front_matter_keys:   front_matter_keys,
