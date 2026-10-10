@@ -943,6 +943,11 @@ module Hwaro
             site.sections.reject! { |p| excluded_paths.includes?(p.path) }
             excluded_pages.each do |p|
               stale = old_output_paths[p.path]? || [get_output_path(p, output_dir)].compact
+              # Its bundle's `[content.files]` copies sit at their source
+              # path, not under the page URL (a slug splits the two).
+              p.assets.each do |asset|
+                stale << File.join(output_dir, asset) if publishes_content_file?(site.config, asset)
+              end
               prune_unclaimed_outputs(stale, output_dir)
             end
           end

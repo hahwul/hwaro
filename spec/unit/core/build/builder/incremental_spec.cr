@@ -186,3 +186,31 @@ describe "Builder#run_incremental version roots" do
     end
   end
 end
+
+describe "Builder#run_incremental drafting a bundle" do
+  it "unpublishes the bundle's [content.files] copies when a slug moved the page" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[content.files]\nallow_extensions = ["png"]\n))
+        FileUtils.mkdir_p("content/notes/p")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}")
+        File.write("content/notes/p/index.md", "+++\ntitle = \"P\"\nslug = \"sl\"\n+++\n")
+        File.write("content/notes/p/img0.png", "PNG")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/notes/p/index.md"], options)
+        File.exists?("public/notes/p/img0.png").should be_true
+        File.exists?("public/notes/sl/img0.png").should be_true
+
+        File.write("content/notes/p/index.md", "+++\ntitle = \"P\"\nslug = \"sl\"\ndraft = true\n+++\n")
+        builder.run_incremental(["content/notes/p/index.md"], options)
+        File.exists?("public/notes/sl/img0.png").should be_false
+        File.exists?("public/notes/p/img0.png").should be_false
+      end
+    end
+  end
+end
