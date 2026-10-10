@@ -684,6 +684,30 @@ describe Hwaro::Models::Page do
       end
     end
 
+    # Regression: raw `.json`/`.xml` publish without an allowlist entry, so
+    # a bundle keeps them too — otherwise a slugged bundle published its
+    # `data.json` only at the source path and a relative link from the page
+    # 404ed. The deny rules still apply.
+    it "keeps .json/.xml bundle files under an allowlist that omits them" do
+      Dir.mktmpdir do |dir|
+        bundle = File.join(dir, "post")
+        FileUtils.mkdir_p(bundle)
+        File.write(File.join(bundle, "index.md"), "# Post")
+        File.write(File.join(bundle, "d.json"), "{}")
+        File.write(File.join(bundle, "feed.xml"), "<a/>")
+        File.write(File.join(bundle, "secret.json"), "{}")
+
+        page = Hwaro::Models::Page.new("post/index.md")
+        page.is_index = true
+
+        content_files = Hwaro::Models::ContentFilesConfig.new
+        content_files.allow_extensions = Hwaro::Models::ContentFilesConfig.normalize_extensions(["png"])
+        content_files.disallow_paths = ["**/secret.json"]
+
+        page.collect_assets(dir, content_files).should eq(["post/d.json", "post/feed.xml"])
+      end
+    end
+
     # Regression: `content/index.md` is the homepage, not a bundle spanning the
     # whole site. Treating it as one republished every non-markdown file
     # anywhere under content/ into the output root — including files no

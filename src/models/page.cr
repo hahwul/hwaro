@@ -442,8 +442,14 @@ module Hwaro
 
           relative = Path[file].relative_to(content_dir).to_s
           # Honor [content.files] allow/disallow rules when configured so the
-          # bundle path can't bypass the user's publishing allowlist.
-          next if content_files && content_files.enabled? && !content_files.publish?(relative)
+          # bundle path can't bypass the user's publishing allowlist. Like the
+          # raw lane (ReadContent#publishes_content_file?), `.json`/`.xml`
+          # need no allowlist entry — dropping them here left a slugged
+          # bundle's `data.json` at its source path only, 404ing from the page.
+          if content_files && content_files.enabled?
+            ext = File.extname(relative).downcase
+            next unless (ext == ".json" || ext == ".xml") ? !content_files.denied?(relative) : content_files.publish?(relative)
+          end
 
           relative
         end
