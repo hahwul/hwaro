@@ -139,8 +139,9 @@ Access taxonomy terms and their pages:
 `items` is ordered by the taxonomy's
 [`terms_sort_by`](/writing/taxonomies/#sorting): `"name"` (the default,
 alphabetical) or `"count"` (page count descending, name-ascending
-tiebreak). Counts are site-wide across every language, matching the root
-taxonomy index page.
+tiebreak). Counts are site-wide across every language. On a multilingual
+site the root taxonomy index page counts only default-language pages, so
+its `"count"` order can differ.
 
 **Term Properties:**
 
@@ -171,6 +172,12 @@ Generate URL for a taxonomy term:
 | term | String | Term name |
 
 **Returns:** String (absolute URL)
+
+On a non-default-language page the URL is that language's term page
+(`/ko/tags/crystal/`) when it has one, else the root term page. The URL is
+built for any term, so it only names a written page when the term has a
+published page there: a taxonomy left out of the default language's
+`[languages.<code>] taxonomies` has no root term pages.
 
 ---
 

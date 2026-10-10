@@ -195,10 +195,10 @@ module Hwaro::Core::Build::Phases::Render
       # Term order matches the taxonomy's `terms_sort_by` as the ROOT index
       # page applies it: "name" = alphabetical (also the default for
       # unconfigured taxonomy names), "count" = page count descending,
-      # name-ascending tiebreak. Counts here are site-wide (all languages,
-      # like the root index); per-language index pages sort by their own
-      # language-filtered counts and may order differently — get_taxonomy
-      # is a site-wide view, so the root rule is the right parity target.
+      # name-ascending tiebreak. Counts here are site-wide (all languages);
+      # every index page (the root one included, on a multilingual site)
+      # sorts by its own language-filtered counts and may order differently
+      # — get_taxonomy is a site-wide view (documented in functions.md).
       tax_cfg = config.taxonomies.find { |t| t.name == name }
       sorted_term_names = if tax_cfg.try(&.terms_sort_by) == "count"
                             terms.keys.sort! do |a, b|
