@@ -52,4 +52,9 @@ describe "Crinja whitespace control (`-` delimiters)" do
   it "leaves text next to delimiters without `-` alone" do
     render_ws("a\n {% if true %}\n b\n {% endif %}\n c").should eq("a\n \n b\n \n c")
   end
+
+  it "trims only inside an empty block body, not the text before its opening tag" do
+    render_ws("A\n\n  {% if true %}{%- endif %}B").should eq("A\n\n  B")
+    render_ws("<head>\n  {% if true %}{%- endif %}\n</head>").should eq("<head>\n  \n</head>")
+  end
 end

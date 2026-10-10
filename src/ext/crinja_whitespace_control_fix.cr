@@ -31,6 +31,14 @@ class Crinja::Parser::TemplateParser
 
     AST::PrintStatement.new(expression).at(start_location, end_location)
   end
+
+  # A block body starts with no text sibling. Upstream kept the text BEFORE
+  # the opening tag as the sibling, so the `{%-` of an empty body's closer
+  # (`  {% if x %}{%- endif %}`) trimmed the text outside the block.
+  private def parse_node_list(block = false)
+    @last_sibling_fixed = nil
+    previous_def
+  end
 end
 
 # A `-` strips ALL whitespace on its side, newlines included. Upstream only
