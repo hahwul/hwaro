@@ -222,7 +222,10 @@ describe "Versioned docs: multilingual" do
       ko.should contain("URL=/ko/docs/v1/install/")
       ko.should contain("V=v1|1.x|false|/ko/docs/v1/")
       ko.should contain("LINKS=v2:/ko/docs/install/:true:false,v1:/ko/docs/v1/install/:true:true,")
-      ko.should contain("ALL=v2=/ko/docs/,v1=/ko/docs/v1/,")
+      # v2 has no Korean root (`/ko/docs/` is never written), so the list
+      # names the default-language root, like the switcher's fallback.
+      File.exists?("public/ko/docs/index.html").should be_false
+      ko.should contain("ALL=v2=/docs/,v1=/ko/docs/v1/,")
       # Korean old page canonicalizes to the Korean latest counterpart
       ko.should contain(%(<link rel="canonical" href="http://localhost/ko/docs/install/">))
       # English counterpart links are unaffected
