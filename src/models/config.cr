@@ -348,7 +348,10 @@ module Hwaro
 
         config.title = string_or_default(config.raw, "title", config.title)
         config.description = string_or_default(config.raw, "description", config.description)
-        if raw_base_url = config.raw["base_url"]?.try(&.as_s?)
+        # Mistyped scalars (`base_url = 7`, `default_language = 7`) warn like
+        # `title` does instead of being dropped in silence.
+        if config.raw.has_key?("base_url")
+          raw_base_url = string_or_default(config.raw, "base_url", config.base_url)
           begin
             validate_base_url!(raw_base_url)
           rescue ex : ArgumentError
@@ -360,7 +363,7 @@ module Hwaro
           end
           config.base_url = raw_base_url
         end
-        config.default_language = config.raw["default_language"]?.try(&.as_s?) || config.default_language
+        config.default_language = string_or_default(config.raw, "default_language", config.default_language)
 
         SECTION_LOADERS.each(&.load.call(config))
 

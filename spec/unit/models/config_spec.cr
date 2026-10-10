@@ -3071,6 +3071,17 @@ describe "Hwaro::Models::Config" do
       config.not_nil!.title.should eq(Hwaro::Models::Config.new.title)
     end
 
+    it "warns on a non-string base_url / default_language too" do
+      config = nil
+      log = with_captured_log do
+        config = load_config("base_url = 7\ndefault_language = 7")
+      end
+      log.should contain("Ignoring non-string config value base_url = 7")
+      log.should contain("Ignoring non-string config value default_language = 7")
+      config.not_nil!.default_language.should eq("en")
+      config.not_nil!.base_url.should eq("")
+    end
+
     it "does not warn when they are absent or strings" do
       log = with_captured_log do
         load_config(%(title = "My Site"))
