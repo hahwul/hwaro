@@ -703,7 +703,9 @@ module Hwaro
             needs_section: needs_section,
             needs_menu: needs_menu,
             needs_taxonomy: needs_taxonomy,
-            page: needs_page ? compute_page_set_fingerprint(site.pages, listing_page_fields(templates)) : "",
+            # Sections too, as the `--cache` page-set fingerprint does: a
+            # section's page list carries its child sections as entries.
+            page: needs_page ? compute_page_set_fingerprint(site.pages + site.sections, listing_page_fields(templates)) : "",
             section: needs_section ? compute_section_set_fingerprint(site.sections, !site.config.menus_auto_sections.nil?) : "",
             menu: needs_menu ? compute_menu_set_fingerprint(site) : "",
             taxonomy: needs_taxonomy ? compute_taxonomy_slug_fingerprint(site) : "",
@@ -738,7 +740,7 @@ module Hwaro
           before : ListingSetSnapshot,
         ) : Array(Models::Page)
           page_changed = before.needs_page &&
-                         compute_page_set_fingerprint(site.pages, listing_page_fields(templates)) != before.page
+                         compute_page_set_fingerprint(site.pages + site.sections, listing_page_fields(templates)) != before.page
           section_changed = before.needs_section &&
                             compute_section_set_fingerprint(site.sections, !site.config.menus_auto_sections.nil?) != before.section
           menu_changed = before.needs_menu &&

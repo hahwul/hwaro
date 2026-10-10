@@ -104,3 +104,36 @@ describe "Builder serve passes and site.authors" do
     end
   end
 end
+
+describe "Builder#run_incremental listing fan-out" do
+  it "refreshes sibling section.pages loops when a subsection's body changes" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content/blog/sub")
+        FileUtils.mkdir_p("templates")
+        listing = "{% for p in section.pages %}[{{ p.title }}:{{ p.summary }}]{% endfor %}"
+        File.write("templates/page.html", listing)
+        File.write("templates/section.html", listing)
+        File.write("content/blog/_index.md", "+++\ntitle = \"Blog\"\n+++\n")
+        File.write("content/blog/sub/_index.md", "+++\ntitle = \"Sub\"\n+++\nold\n")
+        File.write("content/blog/a.md", "+++\ntitle = \"A\"\n+++\na\n")
+        File.write("content/blog/b.md", "+++\ntitle = \"B\"\n+++\nb\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/blog/sub/_index.md"], options)
+        File.read("public/blog/a/index.html").should contain("<p>old</p>")
+
+        # Only the subsection's body moves: its title, URL and the section
+        # set are unchanged, so only the page-set projection can see it.
+        File.write("content/blog/sub/_index.md", "+++\ntitle = \"Sub\"\n+++\nnew\n")
+        builder.run_incremental(["content/blog/sub/_index.md"], options)
+        File.read("public/blog/a/index.html").should contain("<p>new</p>")
+        File.read("public/blog/b/index.html").should contain("<p>new</p>")
+      end
+    end
+  end
+end
