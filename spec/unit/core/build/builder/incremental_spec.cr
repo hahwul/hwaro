@@ -69,3 +69,38 @@ describe "Builder#run_incremental output collisions" do
     end
   end
 end
+
+# `site.authors` embeds each page's title and summary; only the full build's
+# Transform phase built it, so serve kept printing the pre-edit values.
+describe "Builder serve passes and site.authors" do
+  it "refreshes author page lists after a content edit and a shortcode edit" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content/blog")
+        FileUtils.mkdir_p("templates/shortcodes")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("templates/section.html", "A[{% for p in site.authors.ann.pages %}{{ p.title }}:{{ p.summary }}{% endfor %}]")
+        File.write("templates/shortcodes/sc.html", "one")
+        File.write("content/blog/_index.md", "+++\ntitle = \"B\"\n+++\n")
+        post = "+++\ntitle = \"Old\"\nauthors = [\"ann\"]\n+++\nIntro {{ sc() }}\n\n<!-- more -->\n\nRest.\n"
+        File.write("content/blog/post.md", post)
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/blog/post.md"], options)
+        File.read("public/blog/index.html").should eq("A[Old:<p>Intro one</p>\n]")
+
+        File.write("content/blog/post.md", post.sub("Old", "New").sub("Intro", "Lead"))
+        builder.run_incremental(["content/blog/post.md"], options)
+        File.read("public/blog/index.html").should eq("A[New:<p>Lead one</p>\n]")
+
+        File.write("templates/shortcodes/sc.html", "two")
+        builder.run_rerender(options)
+        File.read("public/blog/index.html").should eq("A[New:<p>Lead two</p>\n]")
+      end
+    end
+  end
+end

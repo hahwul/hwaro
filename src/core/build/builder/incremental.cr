@@ -235,6 +235,9 @@ module Hwaro
           # pages' paths so pages that listed a now-removed page as related drop it.
           related_pages_updated = recompute_related_posts_for_pages(site, changed_pages, excluded_paths)
           compute_backlinks(site) if site.config.backlinks
+          # `site.authors` embeds each page's title and summary (Transform
+          # builds it once per full build).
+          aggregate_site_authors(site)
 
           # Invalidate Crinja caches for affected pages/sections
           invalidate_caches_for_pages(changed_pages, affected_sections)
@@ -1148,6 +1151,7 @@ module Hwaro
               @section_pages_crinja_cache.clear
               @section_pages_url_index_cache.clear
             end
+            aggregate_site_authors(site)
             global_vars = build_global_vars(site, options.cache_busting)
             @render_global_vars = global_vars
           end
