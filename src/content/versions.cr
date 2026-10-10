@@ -66,9 +66,11 @@ module Hwaro
           page.version_links = versions.list.map do |other|
             target = by_key[{other.name, page.language, rel}]?
             target = nil if target && !target.render
+            # No root in the page's language (a partial translation): the
+            # default language's root, never the unwritten `/<lang>/…` URL.
             url = if target
                     target.url
-                  elsif root = roots[{other.name, page.language}]?
+                  elsif root = roots[{other.name, page.language}]? || roots[{other.name, nil}]?
                     root.url
                   else
                     versions.root_url(other, prefix)

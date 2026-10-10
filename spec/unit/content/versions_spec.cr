@@ -41,6 +41,37 @@ describe Hwaro::Content::Versions do
       v1_ko.version_links.find!(&.latest).exists.should be_false
     end
 
+    it "falls back to the default-language root when the page's language has none" do
+      config = load_config(<<-TOML)
+        title = "T"
+        base_url = "https://example.com"
+        default_language = "en"
+        [languages.en]
+        language_name = "English"
+        [languages.ko]
+        language_name = "Korean"
+        [[versions.list]]
+        name = "v2"
+        path = "docs/v2"
+        latest = true
+        [[versions.list]]
+        name = "v1"
+        path = "docs/v1"
+        TOML
+      v2_root = Hwaro::Models::Section.new("docs/v2/_index.md")
+      v2_root.section = "docs/v2"
+      v2_root.url = "/docs/"
+      v2_root.version = config.versions.for_path(v2_root.path)
+      # Only this page is translated: there is no /ko/docs/ to link to.
+      v1_ko = versioned_page(config, "docs/v1/install.ko.md", "/ko/docs/v1/install/", "ko")
+
+      Hwaro::Content::Versions.link!([v2_root, v1_ko] of Hwaro::Models::Page, config)
+
+      latest = v1_ko.version_links.find!(&.latest)
+      latest.url.should eq("/docs/")
+      latest.exists.should be_false
+    end
+
     it "keeps an undeclared suffix as part of the name on a single-language site" do
       config = load_config(<<-TOML)
         title = "T"

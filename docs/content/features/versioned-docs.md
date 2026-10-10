@@ -116,7 +116,7 @@ One entry per configured version, in config order. These are the switcher rows. 
 | `.name` | String | Version name |
 | `.label` | String | Display label |
 | `.latest` | Bool | Is the latest version |
-| `.url` | String | The **same page** in that version when it exists, else that version's root |
+| `.url` | String | The **same page** in that version when it exists, else that version's root (in the default language when the page's language has no root in that version) |
 | `.exists` | Bool | Whether the counterpart page exists (`false` → `url` is the version root) |
 | `.current` | Bool | Whether this row is the page's own version |
 
