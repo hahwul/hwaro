@@ -21,4 +21,19 @@ describe "Render global vars: bundle asset URLs" do
       html.should contain("[http://localhost/about/]")
     end
   end
+
+  it "resolves resize_image(path=asset) to the copy next to a slugged page" do
+    build_site(
+      "title = \"T\"\nbase_url = \"http://localhost\"\n",
+      content_files: {
+        "posts/my-post/index.md" => "+++\ntitle = \"P\"\nslug = \"renamed\"\n+++\nBody",
+        "posts/my-post/i.png"    => "png",
+      },
+      template_files: {
+        "page.html" => "{% for a in page.assets %}[{{ resize_image(path=a, width=64).url }}]{% endfor %}",
+      },
+    ) do
+      File.read("public/posts/renamed/index.html").should eq("[http://localhost/posts/renamed/i.png]")
+    end
+  end
 end

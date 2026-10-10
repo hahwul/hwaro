@@ -450,7 +450,7 @@ Returns a resized image variant. When [image processing](/features/image-process
 
 | Name | Type | Description |
 |------|------|-------------|
-| path | String | Image path (e.g., `/images/photo.jpg`) |
+| path | String | Image path (e.g., `/images/photo.jpg`), or a `page.assets` entry |
 | width | Int | Requested width in pixels (0 = original) |
 | height | Int | Requested height in pixels (0 = original) |
 | op | String | `fit` (default), `fill` or `crop` — see [Crop and Fill](/features/image-processing/#crop-and-fill) |

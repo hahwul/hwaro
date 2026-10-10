@@ -151,11 +151,8 @@ module Hwaro
           @env.functions["url_for"] = Crinja.function({path: ""}) do
             path = arguments["path"].to_s
             # A `page.assets` entry names the content file; it publishes next
-            # to its page (see Render#bundle_asset_urls).
-            assets = env.resolve("__bundle_asset_urls__").raw
-            if assets.is_a?(Hash) && (published = assets[path]?)
-              path = published.to_s
-            end
+            # to its page.
+            path = TemplateEngine.published_asset_url(env, path) || path
             base_url = env.resolve("base_url").to_s
             Crinja::Value.new(Filters::UrlFilters.absolutize(path, base_url))
           end
@@ -456,7 +453,7 @@ module Hwaro
             suffix_at = path.index(/[?#]/)
             suffix = suffix_at ? path[suffix_at..] : ""
             file_path = suffix_at ? path[0, suffix_at] : path
-            normalized = URI.decode(TemplateEngine.bundle_image_url(env, file_path) || (file_path.starts_with?("/") ? file_path : "/#{file_path}"))
+            normalized = URI.decode(TemplateEngine.bundle_image_url(env, file_path) || TemplateEngine.published_asset_url(env, file_path) || (file_path.starts_with?("/") ? file_path : "/#{file_path}"))
             normalized = Path.posix(normalized).normalize.to_s unless normalized.includes?('\0')
 
             if op != "fit"
@@ -530,6 +527,13 @@ module Hwaro
           wanted = dir == "." ? own : "#{dir}/#{own}"
           assets.each { |asset| return "#{url.rstrip('/')}/#{own}" if asset.to_s == wanted }
           nil
+        end
+
+        # The URL a `page.assets` entry (content path) is published at, next
+        # to its page (Render#bundle_asset_urls); nil for anything else.
+        def self.published_asset_url(env : Crinja, path : String) : String?
+          assets = env.resolve("__bundle_asset_urls__").raw
+          assets[path]?.try(&.to_s) if assets.is_a?(Hash)
         end
 
         # Inputs a render read from OUTSIDE the tracked tree, recorded so a

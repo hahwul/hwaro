@@ -450,7 +450,7 @@ base_url이 포함된 URL을 생성합니다.
 
 | 이름 | 타입 | 설명 |
 |------|------|-------------|
-| path | String | 이미지 경로(예: `/images/photo.jpg`) |
+| path | String | 이미지 경로(예: `/images/photo.jpg`) 또는 `page.assets` 항목 |
 | width | Int | 요청 너비(픽셀, 0 = 원본) |
 | height | Int | 요청 높이(픽셀, 0 = 원본) |
 | op | String | `fit`(기본값), `fill`, `crop` — [자르기와 채우기](/ko/features/image-processing/#자르기와-채우기) 참고 |
