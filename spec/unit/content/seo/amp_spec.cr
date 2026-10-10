@@ -173,6 +173,18 @@ describe Hwaro::Content::Seo::Amp do
       result.should contain("text")
     end
 
+    # Regression: the value ended at the first quote of EITHER kind, leaving
+    # `dialog').showModal()"` behind as a garbage attribute.
+    it "removes whole event handlers and styles whose values nest the other quote" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      html = %(<html><head></head><body><div class="c" onclick="this.querySelector('dialog').showModal()" ) +
+             %(style="font-family:'Foo'">x</div><p onmouseover='say("hi")'>y</p></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, Hwaro::Models::Config.new)
+      result.should contain(%(<div class="c">x</div>))
+      result.should contain(%(<p>y</p>))
+    end
+
     # Regression: `loading` is legal on <img>/<iframe> but is not an allowed
     # attribute on amp-img/amp-iframe/amp-video, so it fails AMP validation as
     # DISALLOWED_ATTR. hwaro emits it itself — `[markdown] lazy_loading`, the

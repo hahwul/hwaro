@@ -295,9 +295,12 @@ module Hwaro
           end
 
           # Remove style attributes and JS event handlers BEFORE element conversion
-          # (so that container divs added by amp-img conversion aren't affected)
-          result = result.gsub(/\s+style=["'][^"']*["']/i, "")
-          result = result.gsub(/\s+on\w+=["'][^"']*["']/i, "")
+          # (so that container divs added by amp-img conversion aren't affected).
+          # Each value runs to its OWN closing quote: `[^"']*` stopped at the
+          # first quote of either kind, so `onclick="f('x')"` lost only
+          # `onclick="f('` and left `x')"` behind as a garbage attribute.
+          result = result.gsub(/\s+style=(?:"[^"]*"|'[^']*')/i, "")
+          result = result.gsub(/\s+on\w+=(?:"[^"]*"|'[^']*')/i, "")
 
           # Convert <img> to <amp-img>. Quote-aware attribute scan (same
           # pattern as IMG_LAZY_REGEX in markdown.cr): a `>` inside a quoted
