@@ -1341,6 +1341,9 @@ module Hwaro
           @lifecycle.trigger(Lifecycle::HookPoint::BeforeRender, deferred_ctx)
 
           global_vars = build_global_vars(site, options.cache_busting)
+          if rerender_image_summaries((site.pages + site.sections).as(Array(Models::Page)), site, templates, highlight, global_vars)
+            global_vars = build_global_vars(site, options.cache_busting)
+          end
           # Keep the 404/taxonomy stash in sync (see run_incremental).
           @render_global_vars = global_vars
           @pages_by_path = build_pages_by_path(site)

@@ -35,7 +35,9 @@ module Hwaro::Core::Build::Phases::ParseContent
       # A full build reports each ambiguous wikilink again; serve rebuilds don't.
       @wikilink_warnings.clear
       refresh_wikilink_index(ctx.all_pages, site)
-      render_page_summaries(ctx.all_pages, site, templates, ctx.options.highlight && site.config.highlight.enabled)
+      # The image hooks have not run yet: rerender_image_summaries redoes
+      # the summaries they change once the resize map is filled.
+      render_page_summaries(ctx.all_pages, site, templates, ctx.options.highlight && site.config.highlight.enabled, images_ready: false)
     end
 
     Lifecycle::HookResult::Continue
@@ -62,6 +64,11 @@ module Hwaro::Core::Build::Phases::ParseContent
   # (run_rerender). When nil, build_template_variables self-heals by building
   # globals per shortcode-bearing page — cheap during the full-build call
   # (site.pages is still empty pre-Transform) but O(site) per page after.
+  #
+  # `images_ready` is false only before the BeforeRender `image:resize`
+  # hook has filled the resize map: `<img>` then get no srcset/dimensions
+  # (rerender_image_summaries redoes those pages). `rerender` keeps the
+  # warnings an earlier pass of this build already printed.
   private def render_page_summaries(
     pages : Array(Models::Page),
     site : Models::Site,
@@ -69,6 +76,8 @@ module Hwaro::Core::Build::Phases::ParseContent
     use_highlight : Bool,
     link_targets : Array(Models::Page) = pages,
     global_vars : Hash(String, Crinja::Value)? = nil,
+    images_ready : Bool = true,
+    rerender : Bool = false,
   )
     md_config = site.config.markdown
     pages_by_path : Hash(String, Models::Page)? = nil
@@ -81,7 +90,7 @@ module Hwaro::Core::Build::Phases::ParseContent
 
     pages.each do |page|
       # The body render shares the set, so each warning prints once per page.
-      page.warned_messages.clear
+      page.warned_messages.clear unless rerender
       Logger.dedupe_warnings(page.warned_messages) do
         recomputed_paths << page.path if recount_included_words(page, site)
         # parse_single_page already extracted the chunk into page.summary;
@@ -134,6 +143,7 @@ module Hwaro::Core::Build::Phases::ParseContent
           html = Content::Processors::InternalLinkResolver.resolve(html, pbp, page.path, site.config.base_url)
         end
         html = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, site.config.base_url, site.config.base_path)
+        html = apply_responsive_images(html, page, site.config) if images_ready
 
         page.summary_html = html
         recomputed_paths << page.path
@@ -144,7 +154,7 @@ module Hwaro::Core::Build::Phases::ParseContent
         # render never sees render:false summaries, and strict mode would
         # otherwise miss broken links that ship in listings. An include
         # failure on a rendered page is the body render's to report (once).
-        unless page.render && ex.is_a?(Content::Processors::Includes::IncludeError)
+        unless rerender || (page.render && ex.is_a?(Content::Processors::Includes::IncludeError))
           Logger.warn "Summary render failed for #{page.path} — falling back to plain Markdown: #{ex.message}"
         end
         fallback, _ = Processor::Markdown.render(rewrite_wikilinks(summary_md.to_s, page, site), use_highlight, md_config.safe, md_config.lazy_loading, md_config.emoji, markdown_config: md_config)
@@ -165,6 +175,7 @@ module Hwaro::Core::Build::Phases::ParseContent
           fallback = Content::Processors::InternalLinkResolver.resolve(fallback, pbp, page.path, site.config.base_url)
         end
         fallback = Content::Processors::InternalLinkResolver.prefix_root_relative_links(fallback, site.config.base_url, site.config.base_path)
+        fallback = apply_responsive_images(fallback, page, site.config) if images_ready
         page.summary_html = fallback
         recomputed_paths << page.path
       end
@@ -181,6 +192,43 @@ module Hwaro::Core::Build::Phases::ParseContent
         @section_pages_url_index_cache.clear
       end
     end
+  end
+
+  # Redo the ParseContent summaries the BeforeRender image hooks change:
+  # `<img>` that now get srcset/dimensions, and shortcodes whose
+  # `resize_image()` returned the original URL before the resize map was
+  # filled. Rebuilds the author lists that embedded the old summaries and
+  # drops every Crinja value cached since. True when anything was redone,
+  # so the caller rebuilds `global_vars`.
+  private def rerender_image_summaries(
+    pages : Array(Models::Page),
+    site : Models::Site,
+    templates : Hash(String, String),
+    use_highlight : Bool,
+    global_vars : Hash(String, Crinja::Value),
+  ) : Bool
+    image_cfg = site.config.image_processing
+    srcset = image_cfg.enabled || image_cfg.dimensions
+    resizes = templates.each_value.any?(&.includes?("resize_image"))
+    return false unless srcset || resizes
+    redo = pages.select do |page|
+      next false unless html = page.summary_html
+      (srcset && html.includes?("<img")) ||
+        (resizes && page.summary.try { |chunk| content_may_contain_shortcodes?(chunk) })
+    end
+    return false if redo.empty?
+
+    render_page_summaries(redo, site, templates, use_highlight,
+      link_targets: pages, global_vars: global_vars, rerender: true)
+    aggregate_site_authors(site)
+    @crinja_cache_mutex.synchronize do
+      @page_crinja_value_cache.clear
+      @section_pages_crinja_cache.clear
+      @section_pages_url_index_cache.clear
+      @series_crinja_cache.clear
+      @related_posts_crinja_cache.clear
+    end
+    true
   end
 
   # `page.word_count` / `reading_time` count the text the page renders, so a

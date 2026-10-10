@@ -132,6 +132,10 @@ module Hwaro::Core::Build::Phases::Render
     result = @lifecycle.run_phase(Lifecycle::Phase::Render, ctx) do
       Logger.status_phase(pages_to_build.size > 0 ? "render #{pages_to_build.size} pages" : "render")
       global_vars = build_global_vars(site, ctx.options.cache_busting)
+      # The BeforeRender image hooks just filled the resize map.
+      if rerender_image_summaries(all_pages, site, templates, use_highlight, global_vars)
+        global_vars = build_global_vars(site, ctx.options.cache_busting)
+      end
       # Stash for the Write phase's 404 page (see @render_global_vars).
       @render_global_vars = global_vars
       @pages_by_path = build_pages_by_path(site)
