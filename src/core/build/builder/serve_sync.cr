@@ -198,7 +198,7 @@ module Hwaro
           # raw bytes over a file the raw lane just minified.
           if site = @site
             changed = sources.map { |src_path| path_relative_to(src_path, "content") }.to_set
-            owners = (site.pages + site.sections).select { |page| page.assets.any? { |asset| changed.includes?(asset) } }
+            owners = (site.pages + site.sections).select { |page| !page.output_suppressed && page.assets.any? { |asset| changed.includes?(asset) } }
             unless owners.empty?
               process_assets(owners, output_dir, verbose, written)
               owners.each { |page| page.assets.each { |asset| copied << File.join("content", asset) if changed.includes?(asset) } }

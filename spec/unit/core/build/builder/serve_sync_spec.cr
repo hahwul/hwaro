@@ -41,4 +41,17 @@ describe "Builder#copy_changed_content_files" do
       File.exists?("public/private/secret.json").should be_false
     end
   end
+
+  it "does not count a collision loser's bundle file as copied" do
+    log = with_captured_log do
+      republish("title = \"T\"\nbase_url = \"http://localhost\"\n",
+        {"content/posts/a/index.md"  => "+++\ntitle = \"A\"\nslug = \"x\"\n+++\n",
+         "content/posts/x/index.md"  => "+++\ntitle = \"X\"\n+++\n",
+         "content/posts/x/xonly.png" => "1"},
+        {"content/posts/x/xonly.png" => "2"}) do
+        File.exists?("public/posts/x/xonly.png").should be_false
+      end
+    end
+    log.should_not contain("copied")
+  end
 end
