@@ -76,7 +76,7 @@ module Hwaro
 
         begin
           return Time.parse_rfc3339(str)
-        rescue Time::Format::Error | ArgumentError
+        rescue Time::Format::Error | Time::Error | ArgumentError
           # Time::Format::Error → not RFC 3339 at all. ArgumentError → the
           # shape is RFC 3339 but the value is impossible ("2024-02-30").
           # Either way, fall through to the lenient formats.
@@ -84,7 +84,7 @@ module Hwaro
 
         formats.each do |fmt|
           return Time.parse(str, fmt, Time::Location::UTC)
-        rescue Time::Format::Error | ArgumentError
+        rescue Time::Format::Error | Time::Error | ArgumentError
           next
         end
 
@@ -139,13 +139,19 @@ module Hwaro
 
         begin
           Time.parse(str, fmt, Time::Location.local)
-        rescue Time::Format::Error | ArgumentError
+        rescue Time::Format::Error | Time::Error | ArgumentError
           # Time::Format::Error  → string doesn't match the format at all.
           # ArgumentError        → format matches but the value is out of
           #   range (e.g. "2024-13-45", "2024-02-30"). Both mean "no usable
           #   date" — return nil so the caller can treat it as absent.
           nil
         end
+      rescue Time::Error
+        # A written offset past ±24h (`+99:00`) is no instant at all. Falling
+        # through to the zone-less formats would drop it and read the value
+        # as local time, so give up instead (the caller warns, as for any
+        # unrecognised date).
+        nil
       end
     end
   end

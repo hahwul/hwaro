@@ -410,7 +410,13 @@ module Hwaro::Core::Build::Phases::ParseContent
   private def expand_includes(content : String, page : Models::Page, site : Models::Site, chain : Array(String)? = nil) : String
     transclude = !@wikilink_index.nil? && Utils::ByteScan.includes?(content, "![[")
     return content unless transclude || Utils::ByteScan.includes?(content, "include_")
-    chain ||= [File.join("content", page.path)]
+    unless chain
+      chain = [File.join("content", page.path)]
+      # Per top-level expansion; nested calls always pass `chain`. On the
+      # fiber because the recursion threads no other state, and one page is
+      # expanded on one fiber without yielding to another page's expansion.
+      Fiber.current.hwaro_include_splices = 0
+    end
     math = transclude && site.config.markdown.math
     map_shortcode_chunks(content) do |chunk|
       masked, spans = mask_inline_code(chunk)
@@ -572,6 +578,9 @@ module Hwaro::Core::Build::Phases::ParseContent
   end
 
   private def check_include_chain(relative : String, chain : Array(String)) : Nil
+    if (Fiber.current.hwaro_include_splices += 1) > Content::Processors::Includes::MAX_SPLICES
+      raise Content::Processors::Includes::Error.new("include limit (#{Content::Processors::Includes::MAX_SPLICES} per page) exceeded at #{relative}")
+    end
     if chain.includes?(relative)
       raise Content::Processors::Includes::Error.new("include cycle: #{(chain + [relative]).join(" → ")}")
     end

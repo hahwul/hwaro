@@ -11,7 +11,7 @@ module Hwaro
         # before minification. `\x00` is illegal in XML, so the token
         # cannot collide with author content.
         private CDATA_COMMENT_RE  = /<!\[CDATA\[.*?\]\]>|<!--.*?-->/m
-        private PRESERVE_TOKEN_RE = /\x00HWXMLP(\d+)\x00/
+        private PRESERVE_TOKEN_RE = /\x00HWXMLP(\d{1,9})\x00/
 
         # A whitespace-only text node that spans a line break — the
         # pretty-printing between tags this minifier removes.

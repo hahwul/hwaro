@@ -15,6 +15,12 @@ require "../../utils/errors"
 require "../../utils/path_utils"
 require "../../utils/text_utils"
 
+class Fiber
+  # Splices the page expansion running on this fiber has made; see
+  # `Includes::MAX_SPLICES` and `Phases::ParseContent#expand_includes`.
+  property hwaro_include_splices : Int32 = 0
+end
+
 module Hwaro
   module Content
     module Processors
@@ -41,6 +47,11 @@ module Hwaro
         end
 
         MAX_DEPTH = 8
+        # Splices (includes + transclusions) one page may expand in total.
+        # MAX_DEPTH bounds the chain, not the fan-out: ten includes per file,
+        # eight deep, is 10^8 splices from nine tiny files — a build that
+        # never finishes. Far above what any real page includes.
+        MAX_SPLICES = 10_000
 
         # `#region name` / `#endregion name` after any comment leader (`//`,
         # `#`, `--`, `<!--`, `/*`, `;`). A name is a word run that may hold
@@ -296,7 +307,7 @@ module Hwaro
           text = text.gsub(/!\[([^\]]*)\]\([^)]*\)/, "\\1")
             .gsub(/\[([^\]]+)\](?:\([^)]*\)|\[[^\]]*\])/, "\\1")
             .gsub(/<(?:([A-Za-z][A-Za-z0-9+.-]*:[^\s<>]*)|\/?[A-Za-z][^<>]*)>/) { $1? || "" }
-          HTML.unescape(text).gsub(/\x{E000}(\d+)\x{E001}/) { codes[$1.to_i] }
+          HTML.unescape(text).gsub(/\x{E000}(\d{1,9})\x{E001}/) { codes[$1.to_i]? || $0 }
         end
       end
     end

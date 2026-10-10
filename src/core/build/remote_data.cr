@@ -83,7 +83,7 @@ module Hwaro
             format = resolve_format(entry.format, content_type, final_url) ||
                      raise FetchError.new("cannot infer the payload format (Content-Type #{content_type.inspect}, no recognized URL extension); set format = \"json\" | \"toml\" | \"yaml\" | \"csv\" on the [[data.remote]] entry")
             value = parse_body(body, format)
-          rescue ex : FetchError | Socket::Error | IO::Error | OpenSSL::SSL::Error | URI::Error | Compress::Gzip::Error | Compress::Deflate::Error | JSON::ParseException | YAML::ParseException | TOML::ParseException | CSV::MalformedCSVError | ArgumentError | InvalidByteSequenceError
+          rescue ex : FetchError | Socket::Error | IO::Error | OpenSSL::SSL::Error | URI::Error | Compress::Gzip::Error | Compress::Deflate::Error | JSON::ParseException | YAML::ParseException | TOML::ParseException | CSV::MalformedCSVError | ArgumentError | InvalidByteSequenceError | Utils::Nesting::TooDeep
             return handle_failure(entry, cache_dir, digest, ex.message || ex.class.name)
           end
 
@@ -264,7 +264,8 @@ module Hwaro
         private def read_meta(cache_dir : String, key : String) : {url_digest: String, fetched_at: Time, format: String?}?
           path = meta_path(cache_dir, key)
           return unless File.file?(path)
-          json = JSON.parse(File.read(path))
+          # A root that is not an object makes `JSON::Any#[]?` raise.
+          json = JSON.parse(File.read(path)).as_h? || return
           url_digest = json["url_digest"]?.try(&.as_s?)
           fetched_at = json["fetched_at"]?.try(&.as_i64?)
           return unless url_digest && fetched_at

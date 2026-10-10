@@ -126,7 +126,7 @@ module Hwaro::Core::Build::Phases::Render
   # name alphabet), so a masked call covers exactly what that pass would
   # otherwise have rewritten.
   private TEMPLATE_CALL_RE        = /\{\{\s*([a-zA-Z_][\w\-]*)\s*\(.*?\)\s*\}\}/
-  private TEMPLATE_MASK_RE        = /\x00HWARO-TEMPLATE-LITERAL-(\d+)\x00/
+  private TEMPLATE_MASK_RE        = /\x00HWARO-TEMPLATE-LITERAL-(\d{1,9})\x00/
   private TEMPLATE_IMPORT_NAME_RE = /\A[a-zA-Z_]\w*\z/
 
   # Masked form of a layout source, from the per-build cache when possible.

@@ -177,7 +177,13 @@ module Hwaro
         dialect, block = fm
         first = source[0, source.index(block) || 0].count('\n') + 1
         quoted = Regex.escape(key)
-        key_re = /\A(?:#{quoted}|"#{quoted}"|'#{quoted}'|#{Regex.escape(key.to_json)})\s*[=:]/
+        key_re = begin
+          /\A(?:#{quoted}|"#{quoted}"|'#{quoted}'|#{Regex.escape(key.to_json)})\s*[=:]/
+        rescue ArgumentError
+          # A key long enough (~10k chars) that PCRE2 refuses to compile the
+          # pattern. The line number is only a hint; report without it.
+          return
+        end
         top_line = extra_line = nil
         scope = ""         # "" top level, "extra", or another table
         top_indent = nil   # YAML/JSON: the top-level keys' indentation

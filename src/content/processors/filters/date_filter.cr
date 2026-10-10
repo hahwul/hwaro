@@ -43,7 +43,7 @@ module Hwaro
 
           private def self.try_parse(value : String, format : String) : Time?
             Time.parse(value, format, Time::Location::UTC)
-          rescue Time::Format::Error | ArgumentError
+          rescue Time::Format::Error | Time::Error | ArgumentError
             nil
           end
 

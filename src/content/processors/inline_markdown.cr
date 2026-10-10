@@ -54,7 +54,7 @@ module Hwaro
         # A backslash before ASCII punctuation (shown HTML-escaped, so `\"`
         # is `\&quot;`) is a CommonMark escape: the character is literal.
         ESCAPE_RE       = /\\(&(?:amp|lt|gt|quot|#39);|[!#$%()*+,\-.\/:;=?@\[\\\]^_`{|}~])/
-        ESCAPE_TOKEN_RE = /\x00ESC(\d+)\x00/
+        ESCAPE_TOKEN_RE = /\x00ESC(\d{1,9})\x00/
         # CommonMark allows 32 levels of balanced parentheses in a destination.
         MAX_DEST_PAREN_DEPTH = 32
         # ponytail: a title longer than this is not read (keeps a run of
@@ -134,10 +134,10 @@ module Hwaro
         # find — leaking the escaped comment into table cells, definition
         # bodies, and footnotes.
         SHORTCODE_PLACEHOLDER_RE = /<!--HWARO-SHORTCODE-PLACEHOLDER-\d+-->/
-        SCPH_TOKEN_RE            = /\x00SCPH(\d+)\x00/
-        MATHSPAN_TOKEN_RE        = /\x00MATHSPAN(\d+)\x00/
-        CODESPAN_TOKEN_RE        = /\x00CODESPAN(\d+)\x00/
-        LINK_TAG_TOKEN_RE        = /\x00IMTAG(\d+)\x00/
+        SCPH_TOKEN_RE            = /\x00SCPH(\d{1,9})\x00/
+        MATHSPAN_TOKEN_RE        = /\x00MATHSPAN(\d{1,9})\x00/
+        CODESPAN_TOKEN_RE        = /\x00CODESPAN(\d{1,9})\x00/
+        LINK_TAG_TOKEN_RE        = /\x00IMTAG(\d{1,9})\x00/
 
         # Render a small inline-markdown subset over already-HTML-escaped or
         # raw text. Code spans are extracted first so their content survives

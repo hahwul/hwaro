@@ -412,8 +412,10 @@ module Hwaro
           # Also check faq_questions / faq_answers parallel arrays
           if questions = extra_string_array(page, "faq_questions")
             if answers = extra_string_array(page, "faq_answers")
-              questions.zip(answers).each do |q, a|
-                items << {question: q, answer: a}
+              # `zip` raises IndexError when `answers` is shorter; pair what
+              # lines up and drop the unanswered tail.
+              questions.zip?(answers).each do |q, a|
+                items << {question: q, answer: a} if a
               end
             end
           end
@@ -445,8 +447,8 @@ module Hwaro
           # Also check howto_names / howto_texts parallel arrays
           if names = extra_string_array(page, "howto_names")
             if texts = extra_string_array(page, "howto_texts")
-              names.zip(texts).each do |n, t|
-                steps << {name: n, text: t}
+              names.zip?(texts).each do |n, t|
+                steps << {name: n, text: t} if t
               end
             end
           end
