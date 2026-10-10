@@ -142,6 +142,9 @@ module Hwaro::Core::Build::Phases::ParseContent
         else
           html = Content::Processors::InternalLinkResolver.resolve(html, pbp, page.path, site.config.base_url)
         end
+        # Listings and other pages print the summary too: a bundle's
+        # `![](photo.jpg)` must not resolve against THEIR URL.
+        html = Content::Processors::InternalLinkResolver.absolutize_links(html, page.url, document_relative_only: true)
         html = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, site.config.base_url, site.config.base_path)
         html = apply_responsive_images(html, page, site.config) if images_ready
 
@@ -174,6 +177,7 @@ module Hwaro::Core::Build::Phases::ParseContent
         else
           fallback = Content::Processors::InternalLinkResolver.resolve(fallback, pbp, page.path, site.config.base_url)
         end
+        fallback = Content::Processors::InternalLinkResolver.absolutize_links(fallback, page.url, document_relative_only: true)
         fallback = Content::Processors::InternalLinkResolver.prefix_root_relative_links(fallback, site.config.base_url, site.config.base_path)
         fallback = apply_responsive_images(fallback, page, site.config) if images_ready
         page.summary_html = close_open_elements(fallback)

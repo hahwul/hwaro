@@ -106,6 +106,24 @@ describe "summary pass diagnostics" do
   end
 end
 
+# Listings print a summary at THEIR URL: a bundle's relative `photo.png`
+# resolved against the listing and 404'd.
+describe "marker summary relative links" do
+  it "roots document-relative links at the page URL, subpath included" do
+    build_site(
+      "title = \"T\"\nbase_url = \"http://x.test/sub\"\n",
+      content_files: {"blog/_index.md"    => "+++\ntitle = \"B\"\n+++\n",
+                      "blog/bun/index.md" => "+++\ntitle = \"P\"\n+++\nSee ![p](pic.png) [n](./notes/) [a](#top).\n\n<!-- more -->\n\nRest.\n"},
+      template_files: {"page.html" => "{{ content }}", "section.html" => "{% for p in section.pages %}L[{{ p.summary }}]{% endfor %}"},
+    ) do |dir|
+      html = File.read(File.join(dir, "public", "blog", "index.html"))
+      html.should contain(%(src="/sub/blog/bun/pic.png"))
+      html.should contain(%(href="/sub/blog/bun/notes/"))
+      html.should contain(%(href="#top"))
+    end
+  end
+end
+
 describe "marker summary inside a raw HTML block" do
   it "closes the elements the marker leaves open" do
     summary = summary_of("<details>\n<summary>Click</summary>\n\n<div class=\"x\">\n\nHidden <span>a<br>b.\n\n<!-- more -->\n\nMore.</span>\n\n</div>\n</details>\n")
