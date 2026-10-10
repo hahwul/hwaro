@@ -72,6 +72,7 @@ module Hwaro
           # labels like link labels, so `[^Note]` finds `[^note]:`.
           labels = {} of String => String
           pending_key = nil.as(String?)
+          pending_store = footnotes
           pending_blank = false
           cleaned = String.build do |io|
             tracker = FenceTracker.new
@@ -90,8 +91,8 @@ module Hwaro
                   next
                 elsif line.starts_with?("    ") || line.starts_with?('\t')
                   # A bare `[^1]:` starts its body here, with no separator.
-                  footnotes[key] += pending_blank ? "\n\n" : "\n" unless footnotes[key].empty?
-                  footnotes[key] += line.strip
+                  pending_store[key] += pending_blank ? "\n\n" : "\n" unless pending_store[key].empty?
+                  pending_store[key] += line.strip
                   pending_blank = false
                   io << "\n"
                   next
@@ -106,8 +107,11 @@ module Hwaro
               end
 
               if m = line.match(FOOTNOTE_DEF_RE)
+                # The first definition of a key wins (cmark-gfm); a later
+                # one is still consumed, with its continuation lines.
+                pending_store = footnotes.has_key?(m[1]) ? {} of String => String : footnotes
                 # rstrip: on CRLF content the captured text carries a trailing \r
-                footnotes[m[1]] = m[2].rstrip
+                pending_store[m[1]] = m[2].rstrip
                 labels[footnote_label(m[1])] ||= m[1]
                 pending_key = m[1]
                 io << "\n"

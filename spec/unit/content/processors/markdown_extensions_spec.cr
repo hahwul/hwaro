@@ -1299,6 +1299,14 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
   end
 
   describe "multi-line footnotes" do
+    it "keeps the first of duplicate definitions and drops the rest" do
+      cfg = make_config(footnotes: true)
+      html, _ = Hwaro::Processor::Markdown.render("a[^1]\n\n[^1]: first\n[^1]: second\n    more\n", markdown_config: cfg)
+      html.should contain("<p>first <a href")
+      html.should_not contain("second")
+      html.should_not contain("more")
+    end
+
     it "starts a bare `[^1]:` body on the next line without a leading newline" do
       cfg = make_config(footnotes: true)
       html, _ = Hwaro::Processor::Markdown.render("a[^1] b[^2]\n\n[^1]:\n    one\n\n[^2]: \n\n    two", markdown_config: cfg)
