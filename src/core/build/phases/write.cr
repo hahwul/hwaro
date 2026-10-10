@@ -25,7 +25,8 @@ module Hwaro::Core::Build::Phases::Write
         ctx.raw_files.reject! { |raw| withheld_content_file?(raw.relative_path, withheld) }
       end
       written_raw = Set(String).new
-      raw_count = process_raw_files(ctx.raw_files, output_dir, minify, verbose, written_raw)
+      shadowed = content_copy_shadowed_outputs(output_dir)
+      raw_count = process_raw_files(ctx.raw_files, output_dir, minify, verbose, written_raw, shadowed)
       ctx.stats.raw_files_processed = raw_count
 
       # Process co-located assets (images, etc. in page bundles). A `.json`/
@@ -33,7 +34,7 @@ module Hwaro::Core::Build::Phases::Write
       # written above — as MINIFIED output under `--minify`. Copying the raw
       # source over it here silently undid the minification, so the
       # destinations just written are passed in and skipped.
-      process_assets(ctx.all_pages, output_dir, verbose, written_raw)
+      process_assets(ctx.all_pages, output_dir, verbose, written_raw, shadowed)
     end
     profiler.end_phase
     result
@@ -108,19 +109,54 @@ module Hwaro::Core::Build::Phases::Write
     false
   end
 
+  # Output files a page render or a generator writes (the feed, sitemap,
+  # robots, 404, taxonomy pages, alias stubs...), absolute. The Write phase
+  # copies content files AFTER those, so a `[content.files]` copy or bundle
+  # asset at one of these paths silently replaced the rendered page or the
+  # generated feed — the opposite of `static/`, which they beat — and serve,
+  # re-rendering the page on an edit, disagreed with the build. They lose
+  # now, as a static file does (see `copy_changed_static`).
+  def content_copy_shadowed_outputs(output_dir : String) : Set(String)
+    cwd = Dir.current
+    shadowed = owned_output_paths(output_dir).map { |path| File.expand_path(path, cwd) }.to_set
+    copies = @generated_claims_mutex.synchronize { @content_copy_claims.map { |path| File.expand_path(path, cwd) }.to_set }
+    generated_output_paths(output_dir).each do |path|
+      full = File.expand_path(path, cwd)
+      shadowed << full unless copies.includes?(full)
+    end
+    # A `--cache` hit renders nothing, so its alias stubs and `/page/N/`
+    # pages are on record only in its cache entry.
+    if (cache = @cache) && cache.enabled? && (site = @site)
+      rendered = @page_derived_mutex.synchronize { @derived_outputs_this_pass.keys.to_set }
+      (site.pages + site.sections).each do |page|
+        next if rendered.includes?(page.path)
+        cache.derived_paths_for(cache_paths_for(page, output_dir)[0]).each { |path| shadowed << File.expand_path(path, cwd) }
+      end
+    end
+    shadowed
+  end
+
+  # True (after warning) when a content copy of `source` to `dest` would
+  # replace a page or generated output — see `content_copy_shadowed_outputs`.
+  private def content_copy_shadowed?(source : String, dest : String, shadowed : Set(String)) : Bool
+    return false unless shadowed.includes?(File.expand_path(dest))
+    Logger.warn "Not publishing #{source}: #{dest} is a page or generated output, which takes precedence."
+    true
+  end
+
   # Process raw files (JSON, XML) with minification
-  private def process_raw_files(raw_files : Array(Lifecycle::RawFile), output_dir : String, minify : Bool, verbose : Bool, written : Set(String)) : Int32
+  private def process_raw_files(raw_files : Array(Lifecycle::RawFile), output_dir : String, minify : Bool, verbose : Bool, written : Set(String), shadowed : Set(String)) : Int32
     count = 0
 
     raw_files.each do |raw_file|
-      next unless output_path = publish_raw_file(raw_file.source_path, raw_file.relative_path, output_dir, minify)
+      next unless output_path = publish_raw_file(raw_file.source_path, raw_file.relative_path, output_dir, minify, shadowed)
 
       written << File.expand_path(output_path)
       # A raw/content file has no cache entry, so nothing else remembers that
       # this build published it — and a `--cache` build never wipes the
       # output directory. Claiming it lets Finalize delete the copy when its
       # source is removed (see Phases::Finalize#stale_generated_outputs).
-      claim_generated_output(output_path)
+      claim_generated_output(output_path, content_copy: true)
       Logger.action :create, output_path if verbose
       count += 1
     end
@@ -131,8 +167,9 @@ module Hwaro::Core::Build::Phases::Write
   # Publish one raw / `[content.files]` file to `output_dir/<relative_path>`,
   # minifying JSON / XML when `minify` is on. The destination, or nil when the
   # file was refused. Shared with serve's content-file republish so an edited
-  # file gets the bytes a full build would write.
-  def publish_raw_file(source_path : String, relative_path : String, output_dir : String, minify : Bool) : String?
+  # file gets the bytes a full build would write. `shadowed` defaults to a
+  # fresh `content_copy_shadowed_outputs`.
+  def publish_raw_file(source_path : String, relative_path : String, output_dir : String, minify : Bool, shadowed : Set(String)? = nil) : String?
     output_path = File.join(output_dir, relative_path)
 
     # Validate output path stays within output directory
@@ -140,6 +177,9 @@ module Hwaro::Core::Build::Phases::Write
       Logger.warn "Skipping raw file outside output directory: #{relative_path}"
       return
     end
+    # ponytail: serve's per-file republish recomputes the O(pages) set per
+    # file; pass one in if a mass content edit ever makes that show.
+    return if content_copy_shadowed?(source_path, output_path, shadowed || content_copy_shadowed_outputs(output_dir))
 
     # The copy below (and File.read) follows symlinks, so a raw-file symlink
     # whose target escapes the project would publish a file from outside
@@ -204,8 +244,9 @@ module Hwaro::Core::Build::Phases::Write
   end
 
   # Process co-located assets for pages
-  private def process_assets(pages : Array(Models::Page), output_dir : String, verbose : Bool, already_written : Set(String) = Set(String).new)
+  private def process_assets(pages : Array(Models::Page), output_dir : String, verbose : Bool, already_written : Set(String) = Set(String).new, shadowed : Set(String)? = nil)
     now = Time.utc.to_unix_ms
+    shadowed ||= content_copy_shadowed_outputs(output_dir)
     pages.each do |page|
       next if page.assets.empty?
       # A collision loser's URL directory belongs to the winner (see
@@ -246,11 +287,14 @@ module Hwaro::Core::Build::Phases::Write
         # Already emitted by process_raw_files (possibly minified) — a plain
         # copy here would overwrite the processed output with the source.
         next if already_written.includes?(File.expand_path(dest_path))
+        # A bundle's `index.html` sibling is an asset whose destination IS
+        # the page's own output.
+        next if content_copy_shadowed?(source_path, dest_path, shadowed)
 
         # Claimed even when the copy below is skipped as unchanged: the claim
         # list is "what this build publishes", and a file missing from it is
         # deleted by the next `--cache` build (see Phases::Finalize).
-        claim_generated_output(dest_path)
+        claim_generated_output(dest_path, content_copy: true)
 
         # Skip unchanged assets. The Write phase runs on every build with a
         # surviving output dir (serve rebuilds, --preserve-output), so

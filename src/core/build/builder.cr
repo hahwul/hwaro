@@ -412,6 +412,12 @@ module Hwaro
         # when an edit lands on one (see `copy_changed_static`). Reset with
         # the claims; guarded by @generated_claims_mutex.
         @generator_output_claims : Set(String) = Set(String).new
+        # The generator claims above that are the Write phase's own content
+        # copies (`[content.files]`/raw files, bundle assets): those lose to a
+        # page or a real generator at the same path, so they must not count as
+        # one (see `content_copy_shadowed_outputs`). Reset with the claims;
+        # guarded by @generated_claims_mutex.
+        @content_copy_claims : Set(String) = Set(String).new
         # True while @generated_output_claims is the running full build's own
         # set (reset by the Initialize phase); false once an incremental serve
         # pass starts, which re-claims nothing — so the set then still names
@@ -531,11 +537,13 @@ module Hwaro
         #
         # `static_copy` marks the Initialize phase's copy of `static/`: it is
         # a claim like any other, but not a generator's (see
-        # `@generator_output_claims`).
-        def claim_generated_output(path : String, static_copy : Bool = false) : Nil
+        # `@generator_output_claims`); `content_copy` marks the Write phase's
+        # content copies (see `@content_copy_claims`).
+        def claim_generated_output(path : String, static_copy : Bool = false, content_copy : Bool = false) : Nil
           @generated_claims_mutex.synchronize do
             @generated_output_claims << path
             @generator_output_claims << path unless static_copy
+            @content_copy_claims << path if content_copy
             @taxonomy_pass_outputs.try(&.<<(path))
           end
         end
@@ -550,6 +558,7 @@ module Hwaro
             @previous_generated_claims = @carry_prune_baselines ? @previous_generated_claims | @generated_output_claims : @generated_output_claims
             @generated_output_claims = Set(String).new
             @generator_output_claims = Set(String).new
+            @content_copy_claims = Set(String).new
           end
           @generated_claims_current = true
         end

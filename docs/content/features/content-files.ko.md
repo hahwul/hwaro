@@ -55,6 +55,10 @@ content/
 
 `content/` 아래의 `.json`과 `.xml` 파일은 `allow_extensions`에 없어도 원본 파일로 게시됩니다(`--minify` 시 축소). 다만 아래의 차단 규칙(`disallow_extensions`, `disallow_paths`)과 위의 게시되지 않는 번들 규칙은 그대로 적용됩니다.
 
+### 출력 경로 충돌
+
+콘텐츠 파일은 페이지나 생성된 파일을 덮어쓰지 않습니다. 렌더링된 페이지(`content/about.md` 옆의 `content/about/index.html`), 별칭 리다이렉트, 피드, 사이트맵, `robots.txt` 등 생성된 파일과 같은 출력 경로에 놓이게 되면 생성된 출력이 유지되고, 빌드는 `Not publishing content/…` 경고를 출력합니다. `static/`의 파일도 같은 규칙을 따릅니다.
+
 ## 확장자 매칭
 
 ### 허용 목록

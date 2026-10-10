@@ -55,6 +55,10 @@ Files inside a page bundle whose page is not published are not copied either: a 
 
 `.json` and `.xml` files under `content/` are published as raw files even without an `allow_extensions` entry (and minified with `--minify`). The deny rules below — `disallow_extensions` and `disallow_paths` — and the unpublished-bundle rule above still apply to them.
 
+### Output path conflicts
+
+A content file never replaces a page or a generated file. When one would land on the same output path as a rendered page (`content/about/index.html` beside `content/about.md`), an alias redirect, the feed, the sitemap, `robots.txt` or another generated file, the generated output is kept and the build warns `Not publishing content/…`. Files in `static/` follow the same rule.
+
 ## Extension Matching
 
 ### Allow List
