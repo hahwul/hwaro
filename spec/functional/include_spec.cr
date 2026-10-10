@@ -401,6 +401,19 @@ describe "include and transclusion edge cases" do
     end
   end
 
+  it "keeps that fence literal when a line in it holds a backtick" do
+    in_include_project({
+      "templates/shortcodes/box.html" => "<div class=\"box\">{{ body }}</div>",
+      "snippets/a.md"                 => "SNIPPET-TEXT\n",
+      "content/p.md"                  => page(%({% box() %}\n```md\nUse `code` then:\n{{ include_md(path="snippets/a.md") }}\n```\n{% end %})),
+    }) do
+      include_build.should be_true
+      html = File.read("public/p/index.html")
+      html.should_not contain("SNIPPET-TEXT")
+      html.should contain(%({{ include_md(path="snippets/a.md") }}))
+    end
+  end
+
   it "leaves calls in a {% raw %} region literal" do
     in_include_project({"content/p.md" => page(%({% raw %}{{ include_code(path="nope") }}{% endraw %}))}) do
       include_build.should be_true

@@ -423,7 +423,10 @@ module Hwaro::Core::Build::Phases::ParseContent
     end
     math = transclude && site.config.markdown.math
     map_shortcode_chunks(content) do |chunk|
-      masked, spans = mask_inline_code(chunk)
+      # Fences inside a block-shortcode body are masked before code spans:
+      # a span may start on a fence line and hide it from the fence walk.
+      spans = [] of String
+      masked, spans = mask_inline_code(mask_body_fences(chunk, spans), spans)
       masked = mask_raw_blocks(masked, spans)
       # With `[markdown] math`, math is stashed out first, as the wikilink
       # walk does, so an embed inside display math stays literal.
@@ -442,20 +445,13 @@ module Hwaro::Core::Build::Phases::ParseContent
   # as `math_sources` when on; include calls see the math restored).
   private def expand_include_lines(text : String, math_sources : Array(String), spans : Array(String), transclude : Bool,
                                    page : Models::Page, site : Models::Site, chain : Array(String)) : String
-    # The chunk walk does not split at a fence inside a block-shortcode
-    # body; this tracker sees only body lines and keeps those literal.
-    body_lines = block_body_lines(text)
-    body_fences = Content::Processors::FenceTracker.new(raw_html_code: false)
     # What the wikilink rewrite leaves alone: raw HTML blocks (and code).
     verbatim_lines = Content::Processors::FenceTracker.new
     String.build(text.bytesize) do |io|
-      text.each_line(chomp: false).with_index do |line, i|
-        fenced = (body_lines[i]? || false) && body_fences.fence_line?(line)
+      text.each_line(chomp: false) do |line|
         verbatim = verbatim_lines.fence_line?(line) || verbatim_lines.html_block_line?
-        if fenced
-          io << line
-        elsif transclude && !verbatim && (m = TRANSCLUDE_LINE_RE.match(line)) &&
-              (spliced = transclusion(m[2], m[1], page, site, chain))
+        if transclude && !verbatim && (m = TRANSCLUDE_LINE_RE.match(line)) &&
+           (spliced = transclusion(m[2], m[1], page, site, chain))
           io << spliced
           io << '\n' if line.ends_with?('\n')
         else
