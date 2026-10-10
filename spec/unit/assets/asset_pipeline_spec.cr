@@ -1103,6 +1103,28 @@ describe Hwaro::Assets::Pipeline do
     end
   end
 
+  describe "#process — @import in a later CSS entry" do
+    it "warns when an entry after the first carries an @import" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("static/css")
+          File.write("static/css/a.css", "@import url(x.css);\n.a{color:red}")
+          File.write("static/css/b.css", "/* @import none */ .b{content:\"@import\"}")
+          File.write("static/css/c.css", "@IMPORT url(https://fonts.example/f.css);\n.c{color:blue}")
+
+          config = make_config
+          config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "main.css", files: ["css/a.css", "css/b.css"])
+          config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "late.css", files: ["css/b.css", "css/c.css"])
+          log = with_captured_log { Hwaro::Assets::Pipeline.new(config).process("public") }
+
+          log.should_not contain("'css/a.css' has an @import")
+          log.should_not contain("'css/b.css' has an @import")
+          log.should contain("'css/c.css' has an @import")
+        end
+      end
+    end
+  end
+
   # Regression: a bundle is published under `[assets] output_dir`, but a
   # stylesheet's relative `url(...)` resolves against the stylesheet's own
   # directory — `url(img/x.png)` from `static/css/a.css` pointed at
