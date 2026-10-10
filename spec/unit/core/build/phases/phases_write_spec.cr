@@ -675,3 +675,36 @@ describe "Phases::Write shadowed-output scan cost" do
     end
   end
 end
+
+# Plays the other render worker: between this worker's failed mkdir and its
+# walk for the stale file, the rival deletes the file and makes its own
+# directory under the freed path.
+private class RivalWorkerBuilder < Hwaro::Core::Build::Builder
+  def initialize(kept_output_dir : String)
+    super()
+    @kept_output_dir = kept_output_dir
+  end
+
+  def test_mkdir_output(dir : String)
+    mkdir_output(dir)
+  end
+
+  private def remove_stale_file_in_the_way(dir : String) : Bool
+    File.delete("public/blog")
+    Hwaro::Utils::FileSafe.mkdir_p("public/blog/b")
+    super
+  end
+end
+
+describe "Phases::Write mkdir_output under parallel render" do
+  it "creates the directory when a rival worker already removed the stale file" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("public")
+        File.write("public/blog", "previous build's file")
+        RivalWorkerBuilder.new("public").test_mkdir_output("public/blog/a")
+        Dir.exists?("public/blog/a").should be_true
+      end
+    end
+  end
+end

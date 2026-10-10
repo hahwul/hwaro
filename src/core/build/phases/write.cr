@@ -419,11 +419,19 @@ module Hwaro::Core::Build::Phases::Write
   # cold build starts empty, so the previous build's leftover is removed; a
   # file THIS build wrote is a real collision and still fails, as it does
   # cold.
+  #
+  # Render workers call this in parallel, unlocked: another worker may have
+  # removed the file (and made its own directory) since mkdir failed here,
+  # so whether the walk found anything, the retry decides.
   private def mkdir_output(dir : String) : Nil
     Hwaro::Utils::FileSafe.mkdir_p(dir)
   rescue ex : File::AlreadyExistsError
-    raise ex unless remove_stale_file_in_the_way(dir)
-    Hwaro::Utils::FileSafe.mkdir_p(dir)
+    remove_stale_file_in_the_way(dir)
+    begin
+      Hwaro::Utils::FileSafe.mkdir_p(dir)
+    rescue File::AlreadyExistsError
+    end
+    raise ex unless Dir.exists?(dir)
   end
 
   # Delete the regular file standing at `dir` or one of its ancestors, when
@@ -438,7 +446,11 @@ module Hwaro::Core::Build::Phases::Write
         target = File.expand_path(path)
         return false if written_this_build?(path) || generated_output_claims.any? { |claim| File.expand_path(claim) == target }
         return false unless Utils::OutputGuard.safe_to_delete_file?(path, kept)
-        File.delete(path)
+        begin
+          File.delete(path)
+        rescue File::NotFoundError
+          # A parallel render worker removed it first.
+        end
         return true
       end
       parent = File.dirname(path)
