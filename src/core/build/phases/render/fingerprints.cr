@@ -6,9 +6,11 @@
 module Hwaro::Core::Build::Phases::Render
   # Markers in a page's resolved template closure that mean it renders content
   # derived from the global page/section set, so it must re-render when that set
-  # changes (not only when its own source changes).
+  # changes (not only when its own source changes). Version URLs
+  # (`page.version`, `page.version_links`, `versions`) name the version root
+  # sections the set actually holds (Versions.root_url).
   PAGE_SET_MARKERS    = ["site.pages", "__all_pages__", ".pages", "paginate", "site.taxonomies", "__taxonomies__", "get_taxonomy", "site.menus", "get_menu", "__menus__", "version_links", "versions"]
-  SECTION_SET_MARKERS = ["site.sections", "__all_sections__", "get_section", "site.menus", "get_menu", "__menus__"]
+  SECTION_SET_MARKERS = ["site.sections", "__all_sections__", "get_section", "site.menus", "get_menu", "__menus__", "page.version", "versions"]
 
   # The same markers split into the PROJECTIONS of the page set they actually
   # read. `filter_changed_pages` already distinguishes two (pages vs

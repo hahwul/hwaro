@@ -507,3 +507,36 @@ describe "warm --cache: pages printing the clock" do
     end
   end
 end
+
+describe "warm --cache: version root URLs" do
+  it "re-renders page.version.url when a translated version root appears" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", <<-TOML)
+          title = "T"
+          base_url = "http://localhost"
+          default_language = "en"
+          [languages.en]
+          language_name = "English"
+          [languages.ko]
+          language_name = "Korean"
+          [[versions.list]]
+          name = "v1"
+          path = "docs/v1"
+          latest = true
+          TOML
+        FileUtils.mkdir_p("content/docs/v1")
+        FileUtils.mkdir_p("templates")
+        File.write("content/docs/v1/_index.md", "+++\ntitle = \"V1\"\n+++\n")
+        File.write("content/docs/v1/intro.ko.md", "+++\ntitle = \"Intro\"\n+++\nx")
+        File.write("templates/page.html", "VER={{ page.version.url }}")
+        relations_cached_build
+        # No Korean root yet: the default language's root.
+        File.read("public/ko/docs/intro/index.html").should eq("VER=/docs/")
+        File.write("content/docs/v1/_index.ko.md", "+++\ntitle = \"V1 ko\"\n+++\n")
+        relations_cached_build
+        File.read("public/ko/docs/intro/index.html").should eq("VER=/ko/docs/")
+      end
+    end
+  end
+end
