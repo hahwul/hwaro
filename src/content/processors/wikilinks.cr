@@ -402,7 +402,7 @@ module Hwaro
         QUOTE_PREFIX_RE = /\A {0,3}> ?/
         # A footnote definition starts a new block, as a list item does. Same
         # shape preprocess_footnotes extracts (`FOOTNOTE_DEF_RE` there).
-        FOOTNOTE_DEF_RE = /\A\[\^[^\]]+\]:[^\n]/
+        FOOTNOTE_DEF_RE = /\A {0,3}\[\^[^\]]+\]:[^\n]/
         # The blockquote markers a line opens with.
         QUOTE_MARKERS_RE = /\A(?: {0,3}>[ \t]?)*/
 

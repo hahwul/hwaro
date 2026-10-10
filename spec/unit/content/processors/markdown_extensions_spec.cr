@@ -318,6 +318,14 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
   end
 
   describe "footnotes (extended)" do
+    it "extracts definitions indented by up to three spaces" do
+      md = "A[^a] B[^b]\n\n   [^a]: three spaces\n\nText.\n\n    [^b]: four is code"
+      html, _ = Hwaro::Processor::Markdown.render(md, markdown_config: make_config(footnotes: true))
+      html.should contain(%(<li id="fn-a">\n<p>three spaces <a))
+      html.should contain(%(B[^b]))
+      html.should contain(%(<pre><code>[^b]: four is code))
+    end
+
     it "matches footnote labels case-insensitively, exact keys first" do
       md = "A[^Note] B[^my  key] C[^x] D[^X]\n\n[^note]: folded\n[^My Key]: spaced\n[^x]: lower\n[^X]: upper"
       html, _ = Hwaro::Processor::Markdown.render(md, markdown_config: make_config(footnotes: true))

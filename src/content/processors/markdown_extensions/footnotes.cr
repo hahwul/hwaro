@@ -10,7 +10,7 @@ module Hwaro
       module MarkdownExtensions
         # --- Footnotes ---
         # Pre-processing: extract footnote definitions and replace references with placeholders
-        FOOTNOTE_DEF_RE = /^\[\^([^\]]+)\]:\s*(.+?)$/m
+        FOOTNOTE_DEF_RE = /^ {0,3}\[\^([^\]]+)\]:\s*(.+?)$/m
         FOOTNOTE_REF_RE = /\[\^([^\]]+)\]/
         # Occurrence count rides on the number field as `NUM.OCC` (e.g. `1.3`).
         # The `.` separator can't appear in the legacy 3-field `NUM:` form, so a
