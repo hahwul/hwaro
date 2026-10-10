@@ -174,6 +174,19 @@ module Hwaro
               fields["expires"] = expires
             end
 
+            # A Hugo page with no output — `headless = true`, or `build` /
+            # `_build` with `render = "never"`/`"link"` (`false` in older
+            # Hugo) — is hwaro's `render = false`; carried into [extra] only,
+            # the page was published. `sitemap.disable = true` is
+            # `in_sitemap = false`. The inverse of `tool export hugo`.
+            build_render = (data["build"]? || data["_build"]?).try(&.as_h?).try(&.["render"]?).try(&.raw)
+            if data["headless"]?.try(&.raw) == true || build_render.in?("never", "link", false)
+              fields["render"] = false
+            end
+            if data["sitemap"]?.try(&.as_h?).try(&.["disable"]?).try(&.raw) == true
+              fields["in_sitemap"] = false
+            end
+
             # Hugo's `layout` picks the page template, hwaro's `template` —
             # the Jekyll importer's mapping. An authored `template` wins.
             if (layout = string_value(data, "layout")) && !data.has_key?("template")

@@ -695,3 +695,30 @@ describe "Hugo import: scheduled publishDate" do
     end
   end
 end
+
+private def hugo_import_fm(output_dir : String, name : String) : TOML::Table
+  TOML.parse(File.read(File.join(output_dir, "posts", name)).split("+++")[1])
+end
+
+describe "Hugo import: headless pages and sitemap opt-out" do
+  it "maps headless / build.render = never to render = false and sitemap.disable to in_sitemap = false" do
+    Dir.mktmpdir do |tmpdir|
+      hugo_dir = File.join(tmpdir, "hugo_site")
+      posts = File.join(hugo_dir, "content", "posts")
+      FileUtils.mkdir_p(posts)
+      File.write(File.join(posts, "a.md"), "---\ntitle: A\nheadless: true\n---\nA.\n")
+      File.write(File.join(posts, "b.md"), %(+++\ntitle = "B"\n[_build]\nrender = "never"\nlist = "never"\n+++\nB.\n))
+      File.write(File.join(posts, "c.md"), "---\ntitle: C\nsitemap:\n  disable: true\n---\nC.\n")
+      File.write(File.join(posts, "d.md"), %(+++\ntitle = "D"\n[build]\nrender = "always"\n+++\nD.\n))
+      output_dir = File.join(tmpdir, "out")
+
+      Hwaro::Services::Importers::HugoImporter.new.run(
+        Hwaro::Config::Options::ImportOptions.new(source_type: "hugo", path: hugo_dir, output_dir: output_dir))
+
+      hugo_import_fm(output_dir, "a.md")["render"].as_bool.should be_false
+      hugo_import_fm(output_dir, "b.md")["render"].as_bool.should be_false
+      hugo_import_fm(output_dir, "c.md")["in_sitemap"].as_bool.should be_false
+      hugo_import_fm(output_dir, "d.md").has_key?("render").should be_false
+    end
+  end
+end
