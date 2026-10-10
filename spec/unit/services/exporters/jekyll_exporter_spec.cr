@@ -763,3 +763,21 @@ describe "Jekyll export: headless pages" do
     end
   end
 end
+
+describe "Jekyll export: in_sitemap" do
+  it "maps in_sitemap = false to sitemap: false" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(content_dir)
+      File.write(File.join(content_dir, "hidden.md"), "+++\ntitle = \"Hidden\"\nin_sitemap = false\n+++\nBody\n")
+
+      Hwaro::Services::Exporters::JekyllExporter.new.run(
+        Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir))
+
+      fm = YAML.parse(File.read(File.join(output_dir, "hidden.md")).split("---")[1])
+      fm["sitemap"].as_bool.should be_false
+      fm["in_sitemap"]?.should be_nil
+    end
+  end
+end

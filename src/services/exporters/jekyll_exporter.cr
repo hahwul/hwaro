@@ -192,6 +192,13 @@ module Hwaro
             handled << "image"
           end
 
+          # jekyll-sitemap leaves out a page marked `sitemap: false`; the
+          # bare `in_sitemap` key was ignored and the page was listed again.
+          if fields["in_sitemap"]?.try(&.raw) == false && fields["sitemap"]?.try(&.raw).nil?
+            yaml_lines << "sitemap: false"
+            handled << "in_sitemap"
+          end
+
           # The inverse of the Jekyll importer's mappings. Passed through
           # under hwaro's names, Jekyll ignored all three: the page moved off
           # its `path`, its `aliases` stopped redirecting, and its

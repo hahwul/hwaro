@@ -146,6 +146,14 @@ module Hwaro
               else
                 hugo_fields[key] = value
               end
+            when "in_sitemap"
+              # Hugo leaves a page out of its sitemap via `sitemap.disable`;
+              # the bare param was ignored and the page was listed again.
+              if value.raw == false && !authored?(flattened, "sitemap")
+                hugo_fields["sitemap"] = YAML::Any.new({YAML::Any.new("disable") => YAML::Any.new(true)})
+              else
+                hugo_fields[key] = value
+              end
             when "path"
               # hwaro's `path` is the page's whole published path (served at
               # `/<path>/`); Hugo spells that `url` and ignores an unknown

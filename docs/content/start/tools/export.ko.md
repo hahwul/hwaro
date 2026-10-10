@@ -99,6 +99,7 @@ Hugo는 `index.md`/`_index.md` 옆의 파일을 번들 리소스로 읽습니다
 | expires | expiryDate |
 | weight | weight |
 | path | url (`/<path>/`) |
+| in_sitemap = false | sitemap = { disable = true } |
 | [taxonomies] 테이블 | 최상위 `tags` / `categories` / … 로 승격 |
 
 그 외 프론트 매터 키는 Hugo 페이지 파라미터로 그대로 전달됩니다.
@@ -124,6 +125,7 @@ Hugo는 `index.md`/`_index.md` 옆의 파일을 번들 리소스로 읽습니다
 | path | permalink (`/<path>/`) |
 | aliases | redirect_from (jekyll-redirect-from. 빌드가 건너뛰는 alias는 제외) |
 | updated | last_modified_at |
+| in_sitemap = false | sitemap: false (jekyll-sitemap) |
 | [taxonomies] 테이블 | 최상위 `tags` / `categories` / … 로 승격 |
 
 출력 규칙:

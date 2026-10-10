@@ -100,6 +100,7 @@ so they are named in a warning instead.
 | expires | expiryDate |
 | weight | weight |
 | path | url (`/<path>/`) |
+| in_sitemap = false | sitemap = { disable = true } |
 | [taxonomies] table | flattened to top-level `tags` / `categories` / … |
 
 Every other front-matter key is passed through as a Hugo page param.
@@ -125,6 +126,7 @@ keep their name.
 | path | permalink (`/<path>/`) |
 | aliases | redirect_from (jekyll-redirect-from; aliases the build skips are dropped) |
 | updated | last_modified_at |
+| in_sitemap = false | sitemap: false (jekyll-sitemap) |
 | [taxonomies] table | flattened to top-level `tags` / `categories` / … |
 
 Output conventions:
