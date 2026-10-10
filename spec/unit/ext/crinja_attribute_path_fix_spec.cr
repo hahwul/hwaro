@@ -37,4 +37,9 @@ describe "Crinja dotted attribute paths in filters" do
   it "keeps equal items in order when sorting in reverse" do
     render_attr("{{ ['b', 'A', 'c', 'a'] | sort(reverse=true) }}").should eq("['c', 'b', 'A', 'a']")
   end
+
+  it "indexes a dotted path only on all-digit parts" do
+    items = Crinja.value([{"tags" => ["a", "b"]}])
+    Crinja.new.from_string(%({{ items | map(attribute="tags.1") | join }}|{{ items | map(attribute="tags.-1") | join }})).render({"items" => items}).should eq("b|")
+  end
 end

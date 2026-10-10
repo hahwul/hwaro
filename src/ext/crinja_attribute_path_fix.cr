@@ -16,7 +16,7 @@ module Crinja::Filter
     name.split('.').reduce(item) do |value, part|
       break value if value.undefined?
       resolved = Resolver.resolve_getattr(part, value)
-      if resolved.undefined? && value.indexable? && (index = part.to_i?)
+      if resolved.undefined? && value.indexable? && part.each_char.all?(&.ascii_number?) && (index = part.to_i?)
         value[index]?.try { |found| resolved = found }
       end
       resolved
