@@ -519,3 +519,32 @@ describe Hwaro::Core::Build::Builder do
     end
   end
 end
+
+describe "Builder#run on a kept output directory" do
+  it "removes the output-format files of a format the config turned off" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n\n[outputs]\npage = ["json"]\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}")
+        File.write("templates/page.json.jinja", "{}")
+        File.write("content/about.md", "+++\ntitle = \"About\"\n+++\n")
+
+        # What `hwaro serve` runs on a config edit: a full rebuild over the
+        # previous output.
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run(options).should be_true
+        File.exists?("public/about/index.json").should be_true
+
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n))
+        builder.run(options).should be_true
+        File.exists?("public/about/index.html").should be_true
+        File.exists?("public/about/index.json").should be_false
+      end
+    end
+  end
+end

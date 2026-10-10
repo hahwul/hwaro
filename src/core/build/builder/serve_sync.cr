@@ -325,11 +325,11 @@ module Hwaro
         # rebuild: a source deleted and re-created under a different path in
         # one changeset (foo.md → foo/index.md) maps to the same output file,
         # which the rebuild just rewrote and must not be deleted.
-        def owned_output_paths(output_dir : String) : Set(String)
+        def owned_output_paths(output_dir : String, config : Models::Config? = @config) : Set(String)
           owned = Set(String).new
           if site = @site
             (site.pages + site.sections).each do |page|
-              collect_page_output_paths(page, output_dir).each { |path| owned << path }
+              collect_page_output_paths(page, output_dir, config).each { |path| owned << path }
             end
           end
           owned
@@ -338,12 +338,12 @@ module Hwaro
         # Primary output file plus output-format siblings for a page — used
         # to prune the old files when an edit relocates the page's URL or
         # excludes the page from the site.
-        private def collect_page_output_paths(page : Models::Page, output_dir : String) : Array(String)
+        private def collect_page_output_paths(page : Models::Page, output_dir : String, config : Models::Config? = @config) : Array(String)
           # A `render = false` page writes nothing, so it owns nothing: an
           # edit that turns rendering off must orphan the file it wrote.
           return [] of String unless page.render
           paths = [get_output_path(page, output_dir)].compact
-          if cfg = @config
+          if cfg = config
             paths.concat(format_output_paths(page, output_dir, effective_output_formats(page, cfg)))
             if mirror = Content::Seo::Amp.mirror_output_for(page, cfg, output_dir)
               paths << mirror

@@ -764,6 +764,7 @@ module Hwaro
           # for missing files and TOML parse failures, so callers (and
           # `--json` consumers) can branch on HWARO_E_CONFIG without the
           # build pipeline rewrapping the exception.
+          previous_config = @config
           config = Models::Config.load(env: options.env)
           @config = config
           # `[build]` supplies output_dir/drafts/parallel/cache for anything the
@@ -813,7 +814,10 @@ module Hwaro
           # Reset internal caches (preserve @config loaded above)
           @carry_prune_baselines = @prune_baselines_pending
           @prune_baselines_pending = true
-          current_outputs = @site ? owned_output_paths(options.output_dir) : Set(String).new
+          # Shaped by the config the previous site was BUILT with: a config
+          # edit that turned an `[outputs]` format or AMP off must still
+          # prune the files those wrote.
+          current_outputs = @site ? owned_output_paths(options.output_dir, previous_config) : Set(String).new
           @previous_page_outputs = @carry_prune_baselines ? @previous_page_outputs | current_outputs : current_outputs
           @site = nil
           @templates = nil
