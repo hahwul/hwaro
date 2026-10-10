@@ -91,6 +91,13 @@ module Hwaro::Core::Build::Phases::Render
     # alias collisions) — under parallel render the colliding file's bytes
     # used to be whichever worker finished last, flapping run-to-run.
     @output_url_winners = compute_output_url_winners(all_pages)
+    # Transform built site.taxonomies before these verdicts; a collision
+    # loser is never written and the generator keeps it off its term page
+    # (Taxonomies.build_taxonomy_index), so get_taxonomy must not count it.
+    site.taxonomies.each_value do |terms|
+      terms.each_value(&.reject!(&.output_suppressed))
+      terms.reject! { |_, term_pages| term_pages.empty? }
+    end
 
     # Fast-start mode: render only homepage + most recent N pages on this
     # pass and stash the rest on the Builder so a background fiber in

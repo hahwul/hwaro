@@ -152,4 +152,24 @@ describe "Render output paths: authored vs generated collisions" do
     end
     log.should contain(%(`redirect_to` "@/nope.md" in 'missing.md' could not be resolved))
   end
+
+  # Regression: get_taxonomy counted a collision loser (and listed a term
+  # only it carried, linking an unwritten term page) while the term page
+  # left it out.
+  it "keeps a collision loser out of get_taxonomy" do
+    build_site(
+      "title = \"T\"\nbase_url = \"http://localhost\"\n\n[[taxonomies]]\nname = \"tags\"\n",
+      content_files: {
+        "index.md" => "+++\ntitle = \"H\"\n+++\n",
+        "a.md"     => "+++\ntitle = \"A\"\ntags = [\"x\"]\n+++\nA",
+        "b.md"     => "+++\ntitle = \"B\"\nslug = \"a\"\ntags = [\"x\", \"lost\"]\n+++\nB",
+      },
+      template_files: {
+        "index.html" => "{% for t in get_taxonomy(kind='tags').items %}[{{ t.name }}={{ t.pages | length }}]{% endfor %}",
+        "page.html"  => "{{ content }}",
+      },
+    ) do
+      File.read("public/index.html").should eq("[x=1]")
+    end
+  end
 end
