@@ -70,6 +70,20 @@ describe RenderHooks do
     RenderHooks.configure({} of String => String, {} of String => String)
   end
 
+  describe ".page_vars" do
+    it "reports the default language for a default-language page, as templates do" do
+      config = Hwaro::Models::Config.new
+      config.default_language = "fr"
+      page = Hwaro::Models::Page.new("about.md")
+      lang = RenderHooks.page_vars(page, config)["page"].raw.as(Hash)["language"]
+      lang.to_s.should eq("fr")
+
+      page.language = "ko"
+      lang = RenderHooks.page_vars(page, config)["page"].raw.as(Hash)["language"]
+      lang.to_s.should eq("ko")
+    end
+  end
+
   describe ".configure" do
     it "builds a registry entry per recognized hook and leaves the rest nil" do
       RenderHooks.configure(
