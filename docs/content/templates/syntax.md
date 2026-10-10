@@ -53,6 +53,15 @@ With elif:
 {% endif %}
 ```
 
+Inline, as an expression (the `else` part is optional and renders empty when left out):
+
+```jinja
+<a href="{{ item.url }}" class="{{ 'active' if item.url == page.url else '' }}">{{ item.name }}</a>
+{% set label = page.title if page.title else "Untitled" %}
+```
+
+`a or b` returns `a` when it is truthy and `b` otherwise, so it works as a fallback: `{{ page.description or site.description }}`.
+
 ## Loops
 
 ```jinja
@@ -78,7 +87,12 @@ Loop variables:
 | loop.index0 | Current iteration (0-based) |
 | loop.first | True on first iteration |
 | loop.last | True on last iteration |
-| loop.length | Total items |
+| loop.length | Total items (also in a filtered `{% for x in xs if … %}` loop) |
+| loop.revindex | Iterations left, counting this one (`loop.revindex0`: not counting it) |
+| loop.previtem / loop.nextitem | The previous / next item (empty at the ends) |
+| loop.changed(value) | True when `value` differs from the previous call's |
+| loop.cycle(a, b, …) | Cycles through the given values |
+| loop.depth | Nesting depth in a `recursive` loop (1 at the top; `loop.depth0` starts at 0) |
 
 ## Template Inheritance
 

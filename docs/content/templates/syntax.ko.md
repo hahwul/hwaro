@@ -53,6 +53,15 @@ elif와 함께:
 {% endif %}
 ```
 
+표현식 안에서 인라인으로 쓸 수도 있습니다(`else` 부분은 생략할 수 있으며, 생략하면 빈 값으로 렌더링됩니다).
+
+```jinja
+<a href="{{ item.url }}" class="{{ 'active' if item.url == page.url else '' }}">{{ item.name }}</a>
+{% set label = page.title if page.title else "Untitled" %}
+```
+
+`a or b`는 `a`가 참이면 `a`를, 아니면 `b`를 반환하므로 대체값으로 쓸 수 있습니다: `{{ page.description or site.description }}`.
+
 ## 반복문
 
 ```jinja
@@ -78,7 +87,12 @@ elif와 함께:
 | loop.index0 | 현재 반복 횟수(0부터 시작) |
 | loop.first | 첫 반복에서 true |
 | loop.last | 마지막 반복에서 true |
-| loop.length | 전체 항목 수 |
+| loop.length | 전체 항목 수(`{% for x in xs if … %}`처럼 걸러낸 반복에서도) |
+| loop.revindex | 현재를 포함해 남은 반복 횟수(`loop.revindex0`: 현재 제외) |
+| loop.previtem / loop.nextitem | 이전 / 다음 항목(양 끝에서는 빈 값) |
+| loop.changed(value) | `value`가 직전 호출과 다르면 true |
+| loop.cycle(a, b, …) | 주어진 값을 차례로 반복 |
+| loop.depth | `recursive` 반복의 중첩 깊이(최상위가 1, `loop.depth0`은 0부터) |
 
 ## 템플릿 상속
 
