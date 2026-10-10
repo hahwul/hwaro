@@ -741,3 +741,25 @@ describe "Jekyll export: summary marker" do
     end
   end
 end
+
+# Regression: `render = false` passed through as a key Jekyll ignores, so a
+# headless page the build never writes was published by Jekyll.
+describe "Jekyll export: headless pages" do
+  it "exports render = false as published: false" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(content_dir)
+      File.write(File.join(content_dir, "a.md"), "+++\ntitle = \"A\"\nrender = false\n+++\na\n")
+      File.write(File.join(content_dir, "b.md"), "+++\ntitle = \"B\"\nrender = false\ndraft = true\n+++\nb\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir, drafts: true)
+      Hwaro::Services::Exporters::JekyllExporter.new.run(options).success.should be_true
+
+      a = File.read(File.join(output_dir, "a.md"))
+      a.should contain("published: false")
+      a.should_not contain("render")
+      File.read(File.join(output_dir, "b.md")).scan("published:").size.should eq(1)
+    end
+  end
+end

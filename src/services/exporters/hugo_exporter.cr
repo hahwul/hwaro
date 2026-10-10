@@ -136,6 +136,16 @@ module Hwaro
               else
                 hugo_fields["layout"] = value
               end
+            when "render"
+              # A headless page (`render = false`: no output, kept out of
+              # listings) is Hugo's `build` options; the bare param is
+              # ignored and Hugo published the page.
+              if value.raw == false && !authored?(flattened, "build") && !authored?(flattened, "_build")
+                never = YAML::Any.new("never")
+                hugo_fields["build"] = YAML::Any.new({YAML::Any.new("render") => never, YAML::Any.new("list") => never})
+              else
+                hugo_fields[key] = value
+              end
             when "path"
               # hwaro's `path` is the page's whole published path (served at
               # `/<path>/`); Hugo spells that `url` and ignores an unknown

@@ -151,7 +151,12 @@ module Hwaro
           # `published`: letting an authored `published: true` pass through
           # would duplicate the key and (under Jekyll's last-wins loader)
           # publish the draft.
-          if is_draft
+          # A headless page (`render = false`: no output, kept out of
+          # listings) is unpublished in Jekyll terms; the bare `render` key
+          # was ignored and Jekyll published the page.
+          headless = fields["render"]?.try(&.raw) == false
+          handled << "render" if headless
+          if is_draft || (headless && fields["published"]?.try(&.raw).nil?)
             yaml_lines << "published: false"
             handled << "published"
           end

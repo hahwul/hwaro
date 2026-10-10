@@ -617,3 +617,23 @@ describe "Hugo export: template" do
     end
   end
 end
+
+# Regression: `render = false` passed through as a param Hugo ignores, so a
+# headless page the build never writes was published by Hugo.
+describe "Hugo export: headless pages" do
+  it "exports render = false as never-render, never-list build options" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(content_dir)
+      File.write(File.join(content_dir, "a.md"), "+++\ntitle = \"A\"\nrender = false\n+++\na\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "hugo", content_dir: content_dir, output_dir: output_dir)
+      Hwaro::Services::Exporters::HugoExporter.new.run(options).success.should be_true
+
+      fm = TOML.parse(File.read(File.join(output_dir, "content", "a.md")).split("+++")[1])
+      fm["build"].as_h.transform_values(&.as_s).should eq({"render" => "never", "list" => "never"})
+      fm.has_key?("render").should be_false
+    end
+  end
+end
