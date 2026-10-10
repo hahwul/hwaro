@@ -161,6 +161,11 @@ module Hwaro
 
           frontmatter = generate_toml_frontmatter(hugo_fields)
           body = rewrite_internal_links(body)
+          # Hugo splits the summary only at a literal `<!--more-->`; the
+          # build's spaced/any-case form was exported as a plain comment.
+          if (marker = summary_marker(body)) && marker[0] != "<!--more-->"
+            body = "#{marker.pre_match}<!--more-->#{marker.post_match}"
+          end
 
           # Preserve directory structure
           relative = file_path.sub(content_dir, "").lstrip('/')

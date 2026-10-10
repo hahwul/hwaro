@@ -720,3 +720,24 @@ describe "Jekyll export: slugged posts" do
     end
   end
 end
+
+# Regression: Jekyll's excerpt is the first paragraph unless the page names
+# its separator, so the build's `<!-- more -->` summary was lost on export.
+describe "Jekyll export: summary marker" do
+  it "names the build's summary marker as the excerpt separator" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(File.join(content_dir, "posts"))
+      File.write(File.join(content_dir, "posts", "a.md"), "+++\ntitle = \"A\"\ndate = 2024-01-15\n+++\nOne\n\nTwo\n\n<!-- more -->\n\nRest\n")
+      File.write(File.join(content_dir, "posts", "b.md"), "+++\ntitle = \"B\"\ndate = 2024-01-16\n+++\n`<!-- more -->`\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+      Hwaro::Services::Exporters::JekyllExporter.new.run(options).success.should be_true
+
+      posts = File.join(output_dir, "_posts")
+      File.read(File.join(posts, "2024-01-15-a.md")).should contain(%(excerpt_separator: "<!-- more -->"))
+      File.read(File.join(posts, "2024-01-16-b.md")).should_not contain("excerpt_separator")
+    end
+  end
+end

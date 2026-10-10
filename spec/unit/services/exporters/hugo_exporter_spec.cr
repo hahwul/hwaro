@@ -572,3 +572,23 @@ describe "Hugo export: links to moved pages" do
     end
   end
 end
+
+# Regression: Hugo splits the summary only at a literal `<!--more-->`, so the
+# build's `<!-- more -->` exported as an inert comment and the summary was lost.
+describe "Hugo export: summary marker" do
+  it "rewrites the build's summary marker to Hugo's divider, leaving code alone" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(content_dir)
+      File.write(File.join(content_dir, "a.md"),
+        "+++\ntitle = \"A\"\n+++\n```\n<!-- more -->\n```\nIntro\n\n<!-- More -->\n\nRest <!-- more -->\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "hugo", content_dir: content_dir, output_dir: output_dir)
+      Hwaro::Services::Exporters::HugoExporter.new.run(options).success.should be_true
+
+      File.read(File.join(output_dir, "content", "a.md")).should end_with(
+        "```\n<!-- more -->\n```\nIntro\n\n<!--more-->\n\nRest <!-- more -->\n")
+    end
+  end
+end

@@ -222,6 +222,12 @@ module Hwaro
             handled << "updated"
           end
 
+          # Jekyll's excerpt is the first paragraph unless the page names its
+          # separator, so the build's `<!-- more -->` summary was lost.
+          if fields["excerpt_separator"]?.try(&.raw).nil? && (marker = summary_marker(body))
+            yaml_lines << "excerpt_separator: #{Hwaro::Utils::FrontmatterWriter.yaml_scalar(marker[0])}"
+          end
+
           if passthrough = passthrough_yaml(fields, handled)
             yaml_lines << passthrough
           end

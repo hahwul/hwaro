@@ -577,6 +577,19 @@ module Hwaro
         # indented code blocks (per the build's own FenceTracker) and inline
         # code spans — a backtick run closed by a run of the same length on
         # the same line.
+        # The `<!-- more -->` marker the build splits the summary at — the
+        # first one outside code (`Page#extract_summary`) — as the
+        # MatchData over `body`, or nil when there is none.
+        protected def summary_marker(body : String) : Regex::MatchData?
+          return unless body.includes?("<!--")
+          code = code_byte_ranges(body)
+          pos = 0
+          while match = body.match(Models::Page::MORE_MARKER_REGEX, pos)
+            return match unless code.any?(&.includes?(match.byte_begin(0)))
+            pos = match.end(0)
+          end
+        end
+
         private def code_byte_ranges(body : String) : Array(Range(Int32, Int32))
           ranges = [] of Range(Int32, Int32)
           tracker = Content::Processors::FenceTracker.new
