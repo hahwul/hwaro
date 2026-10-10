@@ -105,4 +105,23 @@ describe "Render output paths: authored vs generated collisions" do
     err.code.should eq(Hwaro::Errors::HWARO_E_IO)
     err.message.to_s.should contain("a directory already exists at that path")
   end
+
+  # A query or fragment is not part of the path a static host serves:
+  # `/old/a?x=1` became the directory `public/old/a?x=1/` (and a Windows
+  # build failure, `?` being illegal there).
+  it "skips an alias carrying a ?query or #fragment with a warning" do
+    log = with_captured_log do
+      build_site(
+        "title = \"T\"\nbase_url = \"http://localhost\"\n",
+        content_files: {"p.md" => "+++\ntitle = \"P\"\naliases = [\"/old/a?x=1\", \"/old/b#frag\", \"/old/c/\"]\n+++\nP"},
+        template_files: {"page.html" => "{{ content }}"},
+      ) do
+        Dir.exists?("public/old/a?x=1").should be_false
+        Dir.exists?("public/old/b#frag").should be_false
+        File.exists?("public/old/c/index.html").should be_true
+      end
+    end
+    log.should contain(%(Skipping alias "/old/a?x=1" on p.md))
+    log.should contain(%(Skipping alias "/old/b#frag" on p.md))
+  end
 end

@@ -202,13 +202,26 @@ module Hwaro
         trimmed.starts_with?("//") || ALIAS_SCHEME_RE.matches?(trimmed.scrub)
       end
 
+      # Why the parse phase drops `value` from a page's aliases, or nil.
+      # Besides external URLs: a `?query` or `#fragment` is not part of the
+      # path a static host maps to a file, so `/old/a?x=1` became the
+      # directory `public/old/a?x=1/` — unreachable on every host, and an
+      # illegal filename on Windows.
+      def unpublishable_alias(value : String) : String?
+        if external_alias?(value)
+          "an alias is a path on this site, not an absolute or protocol-relative URL"
+        elsif value.includes?('?') || value.includes?('#')
+          "a `?query` or `#fragment` is not part of a path a static host serves (drop it)"
+        end
+      end
+
       # Why a build would not publish `value` as an alias, or nil when it
       # would: external URLs are dropped at parse time, and a path segment
       # that would traverse (`..`, `.`) is refused when the redirect stub is
       # written (`url_output_path` in the render phase).
       def alias_refusal(value : String) : String?
-        if external_alias?(value)
-          return "an alias is a path on this site, not an absolute or protocol-relative URL"
+        if reason = unpublishable_alias(value)
+          return reason
         end
         _, refused = split_safe_segments(value.lchop("/"))
         "a path segment would escape the output directory" if refused
