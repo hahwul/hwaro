@@ -102,7 +102,7 @@ templates/
 
 ```jinja
 {# templates/hooks/render-codeblock.html #}
-<pre><code{% if lang is present %} class="language-{{ lang }} hljs"{% endif %}>{% if highlighted is present %}{{ highlighted }}{% else %}{{ code }}{% endif %}</code></pre>
+{% if name is present %}<div class="code-block"><div class="code-filename">{{ name }}</div>{% endif %}<pre{% if copy is present %} data-copy="true"{% endif %}><code{% if lang is present %} class="language-{{ lang }} hljs"{% endif %}>{% if highlighted is present %}{{ highlighted }}{% else %}{{ code }}{% endif %}</code></pre>{% if name is present %}</div>{% endif %}
 ```
 
 ```jinja
@@ -116,9 +116,9 @@ templates/
 {{ html }}
 ```
 
-`{% if title %}`이 아니라 `{% if title is present %}`인 점에 주의합니다. Crinja의 참/거짓 판정은 `false`/`0`/nil만 거짓으로 보기 때문에, 그냥 `{% if title %}`을 쓰면 title이 없을 때도 `title=""`이 렌더링됩니다. 커스텀 `is present`/`is empty` 테스트(hwaro 자체 템플릿 전반에서도 사용)가 이를 올바르게 확인합니다.
+`title`, `lang`, `name`, `copy`는 값이 없으면 빈 문자열이므로, `{% if title is present %}`(hwaro 자체 템플릿이 쓰는 관용구)와 그냥 `{% if title %}`은 여기서 똑같이 동작합니다.
 
-codeblock 템플릿의 ` hljs` 클래스는 기본 설정(`[highlight] enabled = true`. 대부분의 Highlight.js 테마가 이 클래스를 기준으로 기본 스타일을 적용)에서의 기본 출력과 일치합니다. 강조를 완전히 껐다면 기본 출력은 ` hljs` 없이 `class="language-{{ lang }}"`을 내보내므로, 바이트 단위로 동일하게 맞추려면 훅에서도 빼면 됩니다.
+codeblock 템플릿의 ` hljs` 클래스는 기본 설정(`[highlight] enabled = true`. 대부분의 Highlight.js 테마가 이 클래스를 기준으로 기본 스타일을 적용)에서의 기본 출력과 일치합니다. 강조를 완전히 껐다면 기본 출력은 ` hljs` 없이 `class="language-{{ lang }}"`을 내보내므로, 바이트 단위로 동일하게 맞추려면 훅에서도 빼면 됩니다. 줄 번호와 강조 줄(`linenos`, `hl_lines`)은 `highlighted`에 들어 있지 않으므로, 필요하면 훅이 `options`를 읽어 줄 마크업을 직접 붙여야 합니다.
 
 ## 예시: figure로 감싼 이미지
 
