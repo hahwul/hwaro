@@ -95,8 +95,10 @@ module Hwaro
             next if lang_cfg.taxonomies.empty?
 
             # Build a filtered view of taxonomies for just this language's pages
+            # No early exit on an empty map: like the root, a configured
+            # taxonomy writes its (empty) index so `/<lang>/tags/` links
+            # never 404 on a site with no terms yet.
             lang_taxonomies = build_language_taxonomies(site, lang_cfg.taxonomies)
-            next if lang_taxonomies.empty?
 
             lang_taxonomy_configs = config.taxonomies.select { |t| lang_cfg.taxonomies.includes?(t.name) }
             generate_taxonomies_for_language(lang_taxonomy_configs, site, output_dir, templates, builder, verbose, global_vars, collected,

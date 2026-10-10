@@ -506,6 +506,27 @@ describe Hwaro::Content::Taxonomies do
       end
     end
 
+    it "writes a language's empty taxonomy index on a site with no terms yet" do
+      # The root wrote /tags/ with zero terms, /ko/tags/ was skipped: a
+      # language-prefixed taxonomy link 404ed until some page had a term.
+      config = <<-TOML
+        title = "T"
+        base_url = "https://example.com"
+        default_language = "en"
+        [[taxonomies]]
+        name = "tags"
+        [languages.en]
+        language_name = "English"
+        [languages.ko]
+        language_name = "Korean"
+        TOML
+      page = "+++\ntitle = \"A\"\n+++\nbody\n"
+      build_site(config, content_files: {"a.md" => page, "a.ko.md" => page}, template_files: {"taxonomy.html" => "TAX"}) do |dir|
+        File.exists?(File.join(dir, "public", "tags", "index.html")).should be_true
+        File.exists?(File.join(dir, "public", "ko", "tags", "index.html")).should be_true
+      end
+    end
+
     it "disambiguates slugs within one language, not across languages" do
       # `Zeta` (ko only) used to take the base slug site-wide and push the
       # English `zeta` to `/tags/zeta-2/`, although no root `Zeta` page exists.
