@@ -39,6 +39,16 @@ describe Hwaro::Content::Processors::Wikilinks do
       wl_rewrite("[[My Note.md]]", src, index).should eq("[My Note\\.md](@/notes/My%20Note.md)")
     end
 
+    it "links a heading with a custom id to that id" do
+      note = wl_page("notes/Ids.md")
+      note.raw_content = "```\n## Setup {#fenced}\n```\n\n## Setup {#install .wide}\n\n## Plain\n"
+      local = wl_page("notes/local.md")
+      local.raw_content = "## Here {#here-id}\n"
+      idx = wl_index([local, note])
+      wl_rewrite("[[Ids#Setup|s]] [[Ids#Plain|p]]", local, idx).should eq("[s](@/notes/Ids.md#install) [p](@/notes/Ids.md#plain)")
+      wl_rewrite("[[#Here]]", local, idx).should eq("[Here](#here-id)")
+    end
+
     it "links a block ref to the page without the fragment" do
       wl_rewrite("[[My Note#^abc123]]", src, index).should eq("[My Note](@/notes/My%20Note.md)")
     end

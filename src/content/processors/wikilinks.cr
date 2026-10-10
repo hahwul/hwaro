@@ -12,6 +12,7 @@
 
 require "html"
 require "./fence_tracker"
+require "./includes"
 require "./markdown_extensions"
 require "./table_parser"
 require "../../models/page"
@@ -294,10 +295,10 @@ module Hwaro
               return image(link, url, inline)
             end
           elsif link.target.empty?
-            return "[#{text(link.text, inline)}](##{encode(slug(link.heading))})"
+            return "[#{text(link.text, inline)}](##{encode(fragment(source, link.heading))})"
           elsif page = index.resolve(link.target, source)
             dest = "@/#{encode(page.path)}"
-            dest += "##{encode(slug(link.heading))}" if link.heading
+            dest += "##{encode(fragment(page, link.heading))}" if link.heading
             return "[#{text(link.text, inline)}](#{dest})"
           elsif link.file? && (url = index.resolve_file(link.target, source))
             # An attachment (`[[doc.pdf]]`, `![[doc.pdf]]`): a plain link.
@@ -327,6 +328,12 @@ module Hwaro
               io << '}'
             end
           end
+        end
+
+        # The id `heading` gets on `page`: its custom `{#id}` when the
+        # source declares one, else the slug.
+        private def fragment(page : Models::Page, heading : String?) : String
+          heading.try { |h| Includes.heading_id(page.raw_content, h) } || slug(heading)
         end
 
         # Same rule HeadingIds applies to a rendered heading, so the
