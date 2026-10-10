@@ -103,8 +103,11 @@ module Hwaro
         # covers author-written uppercase tags.
          "<#{tag}",
          Regex.new("<#{tag}", Regex::Options::IGNORE_CASE),
+         # `(?![\w-])`, not `\b`: a custom element such as `<pre-view>`
+         # or `<math-field>` is not the protected tag, and `\b` matched it
+         # and sealed everything up to the next real `</pre>` as one block.
          Regex.new(
-           "<#{tag}\\b[^>]*>.*?</#{tag}\\s*>",
+           "<#{tag}(?![\\w-])[^>]*>.*?</#{tag}\\s*>",
            Regex::Options::IGNORE_CASE | Regex::Options::MULTILINE
          )}
       end

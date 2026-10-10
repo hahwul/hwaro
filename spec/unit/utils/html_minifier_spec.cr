@@ -254,6 +254,14 @@ describe Hwaro::Utils::HtmlMinifier do
         result.should contain("<pre>third</pre>")
       end
 
+      it "does not mistake a custom element for a protected tag" do
+        # `<pre-view>` is an inline custom element, not <pre>: the space
+        # before it is visible and must survive.
+        html = "<p><b>a</b> <pre-view>x</pre-view></p>\n<pre>y</pre>"
+        Hwaro::Utils::HtmlMinifier.minify(html)
+          .should eq("<p><b>a</b> <pre-view>x</pre-view></p><pre>y</pre>")
+      end
+
       it "does not let a literal <script> string inside <style> derail extraction" do
         # `<style>` is extracted before `<script>` precisely so the
         # script pass cannot mis-pair a real `</script>` elsewhere
