@@ -383,11 +383,11 @@ Rendered HTML content is available as the top-level `content` variable.
 | Variable | Equivalent |
 |----------|------------|
 | page_title | page.title |
-| page_description | page.description |
+| page_description | page.description, else site.description |
 | page_url | page.url |
 | page_section | page.section |
 | page_date | page.date |
-| page_image | page.image |
+| page_image | page.image, else `[og] default_image` |
 | page_summary | page.summary |
 | page_word_count | page.word_count |
 | page_reading_time | page.reading_time |
@@ -663,7 +663,7 @@ Only available when `toc = true` in front matter.
 | toc_obj.headers[].level | Int | Heading level (2-6) |
 | toc_obj.headers[].id | String | Anchor ID |
 | toc_obj.headers[].title | String | Heading text |
-| toc_obj.headers[].permalink | String | Full anchor permalink |
+| toc_obj.headers[].permalink | String | Fragment link to the heading (`#id`) |
 | toc_obj.headers[].children | Array | Nested child headers (same structure) |
 
 ```jinja

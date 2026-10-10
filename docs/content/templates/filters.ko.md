@@ -63,7 +63,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 | 필터 | 설명 | 예시 |
 |--------|-------------|---------|
 | unique | 서로 다른 값의 타입은 구분해 중복 제거 | {{ items \| unique }} |
-| flatten | 중첩 배열 평탄화 | {{ nested \| flatten }} |
+| flatten | 중첩 배열을 한 단계 평탄화 | {{ nested \| flatten }} |
 | compact | nil/빈 값 제거 | {{ items \| compact }} |
 
 ## 수학 필터

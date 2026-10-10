@@ -383,11 +383,11 @@ john-doe:
 | 변수 | 동일 표현 |
 |----------|------------|
 | page_title | page.title |
-| page_description | page.description |
+| page_description | page.description, 없으면 site.description |
 | page_url | page.url |
 | page_section | page.section |
 | page_date | page.date |
-| page_image | page.image |
+| page_image | page.image, 없으면 `[og] default_image` |
 | page_summary | page.summary |
 | page_word_count | page.word_count |
 | page_reading_time | page.reading_time |
@@ -660,7 +660,7 @@ pros = ["Fast", "Reliable"]
 | toc_obj.headers[].level | Int | 헤딩 레벨(2-6) |
 | toc_obj.headers[].id | String | 앵커 ID |
 | toc_obj.headers[].title | String | 헤딩 텍스트 |
-| toc_obj.headers[].permalink | String | 전체 앵커 퍼머링크 |
+| toc_obj.headers[].permalink | String | 헤딩으로 가는 프래그먼트 링크(`#id`) |
 | toc_obj.headers[].children | Array | 중첩된 자식 헤더(같은 구조) |
 
 ```jinja

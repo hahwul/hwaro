@@ -63,7 +63,7 @@ same text renders in page bodies. The rest of the extension pipeline
 | Filter | Description | Example |
 |--------|-------------|---------|
 | unique | Remove duplicates while keeping distinct value types | {{ items \| unique }} |
-| flatten | Flatten nested arrays | {{ nested \| flatten }} |
+| flatten | Flatten nested arrays one level | {{ nested \| flatten }} |
 | compact | Remove nil/empty values | {{ items \| compact }} |
 
 ## Math Filters

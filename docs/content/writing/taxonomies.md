@@ -42,7 +42,7 @@ term pages, in `term.pages` from `get_taxonomy()`, and in per-term
 pagination. The semantics match section sorting exactly:
 
 - `"date"` (default): newest first; `reverse = true` gives oldest first.
-- `"title"` — alphabetical ascending; `reverse = true` descends.
+- `"title"` — ascending by title, compared byte by byte (uppercase before lowercase); `reverse = true` descends.
 - `"weight"` — lowest weight first; `reverse = true` descends.
 
 An invalid `sort_by` value logs a warning and keeps the `"date"` default.
@@ -50,7 +50,7 @@ An invalid `sort_by` value logs a warning and keeps the `"date"` default.
 `terms_sort_by` controls the order of the terms list, on the taxonomy
 index page and in `get_taxonomy().items`:
 
-- `"name"` (default): alphabetical ascending.
+- `"name"` (default): ascending by term name, compared byte by byte, so `Zebra` sorts before `apple`.
 - `"count"` — page count descending, name-ascending tiebreak. On a
   multilingual site, each language's index uses that language's own page
   counts.

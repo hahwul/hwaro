@@ -138,7 +138,7 @@ Access taxonomy terms and their pages:
 
 `items` is ordered by the taxonomy's
 [`terms_sort_by`](/writing/taxonomies/#sorting): `"name"` (the default,
-alphabetical) or `"count"` (page count descending, name-ascending
+byte order, so uppercase sorts first) or `"count"` (page count descending, name-ascending
 tiebreak). Counts are site-wide across every language. On a multilingual
 site the root taxonomy index page counts only default-language pages, so
 its `"count"` order can differ.
