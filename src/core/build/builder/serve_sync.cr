@@ -553,11 +553,15 @@ module Hwaro
           outputs
         end
 
-        # The `[content.files]` copies of `page`'s bundle assets. They sit at
-        # their source path, not under the page URL: a slug splits the two.
-        private def page_content_copies(page : Models::Page, output_dir : String) : Array(String)
-          return [] of String unless config = @config
-          page.assets.select { |asset| publishes_content_file?(config, asset) }.map { |asset| File.join(output_dir, asset) }
+        # The raw-lane copies (`[content.files]`, JSON/XML) the last full
+        # build published from bundles the build now withholds — a drafted
+        # page, a collision loser. They sit at their source path, not under
+        # the page URL, so pruning the page's own outputs misses them.
+        private def withheld_raw_outputs(output_dir : String) : Array(String)
+          return [] of String unless ctx = @context
+          withheld = withheld_bundle_dirs
+          return [] of String if withheld.empty?
+          ctx.raw_files.compact_map { |raw| File.join(output_dir, raw.relative_path) if withheld_content_file?(raw.relative_path, withheld) }
         end
 
         # One page's share of `bundle_asset_outputs`. Not gated on `render`:

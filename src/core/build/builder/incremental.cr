@@ -952,8 +952,9 @@ module Hwaro
             site.sections.reject! { |p| excluded_paths.includes?(p.path) }
             excluded_pages.each do |p|
               stale = old_output_paths[p.path]? || [get_output_path(p, output_dir)].compact
-              prune_unclaimed_outputs(stale + page_content_copies(p, output_dir), output_dir)
+              prune_unclaimed_outputs(stale, output_dir)
             end
+            prune_unclaimed_outputs(withheld_raw_outputs(output_dir), output_dir)
           end
 
           relocated = [] of String
@@ -979,7 +980,7 @@ module Hwaro
           process_assets(regained, output_dir, false) unless regained.empty?
           lost = all_pages.select(&.output_suppressed) - previously_suppressed
           unless lost.empty?
-            stale = lost.flat_map { |p| page_asset_outputs(p, output_dir) + page_content_copies(p, output_dir) }
+            stale = lost.flat_map { |p| page_asset_outputs(p, output_dir) } + withheld_raw_outputs(output_dir)
             prune_unclaimed_outputs(stale, output_dir)
           end
           regained

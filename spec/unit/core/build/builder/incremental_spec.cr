@@ -213,6 +213,32 @@ describe "Builder#run_incremental drafting a bundle" do
       end
     end
   end
+
+  it "unpublishes the bundle's raw JSON and XML files" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[content.files]\nallow_extensions = ["png"]\n))
+        FileUtils.mkdir_p("content/notes/p")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}")
+        File.write("content/notes/p/index.md", "+++\ntitle = \"P\"\n+++\n")
+        File.write("content/notes/p/data.json", %({"a": 1}))
+        File.write("content/notes/p/feed.xml", "<x/>")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/notes/p/index.md"], options)
+        File.exists?("public/notes/p/data.json").should be_true
+
+        File.write("content/notes/p/index.md", "+++\ntitle = \"P\"\ndraft = true\n+++\n")
+        builder.run_incremental(["content/notes/p/index.md"], options)
+        File.exists?("public/notes/p/data.json").should be_false
+        File.exists?("public/notes/p/feed.xml").should be_false
+      end
+    end
+  end
 end
 
 describe "Builder#run_incremental section edits" do
