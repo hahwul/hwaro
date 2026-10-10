@@ -202,14 +202,13 @@ module Hwaro
           # Add AMP boilerplate to <html> tag
           result = result.sub(/<html([^>]*)>/i, %(<html amp\\1>))
 
-          # Remove disallowed tags: <script> (except application/ld+json and amp scripts)
-          # Use [\s\S]*? instead of .*? to match across newlines
-          # The `async`/`custom-element` exceptions must be anchored to real
-          # attribute boundaries (preceded by whitespace, followed by a value /
-          # tag terminator); otherwise a substring match like `id="async"` would
-          # cause an author `<script>` to survive into the AMP page. The
-          # cdn.ampproject.org src allowlist stays in its own lookahead.
-          result = result.gsub(/<script(?![^>]*type=["']application\/ld\+json["'])(?![^>]*\s(?:async|custom-element)(?:\s|=|>|\/))(?![^>]*src=["']https:\/\/cdn\.ampproject\.org)[^>]*>[\s\S]*?<\/script>/mi, "")
+          # Remove disallowed tags: <script> (except application/ld+json and
+          # the AMP runtime/extension scripts, which all load from
+          # cdn.ampproject.org). Use [\s\S]*? instead of .*? to match across
+          # newlines. An `async` attribute is NOT an exemption: it let every
+          # third-party async script (analytics, the tweet shortcode's
+          # widgets.js) through, and AMP forbids all of them.
+          result = result.gsub(/<script(?![^>]*type=["']application\/ld\+json["'])(?![^>]*src=["']https:\/\/cdn\.ampproject\.org)[^>]*>[\s\S]*?<\/script>/mi, "")
 
           # Remove disallowed external stylesheets. AMP forbids
           # `<link rel="stylesheet">` except from allowlisted font providers;

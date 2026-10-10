@@ -302,6 +302,20 @@ describe Hwaro::Content::Seo::Amp do
       result.should contain("application/ld+json")
     end
 
+    # Regression: any `async` script survived (analytics, the tweet
+    # shortcode's widgets.js), which AMP forbids.
+    it "removes third-party async scripts but keeps AMP's own" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      amp_ext = %(<script async custom-element="amp-bind" src="https://cdn.ampproject.org/v0/amp-bind-0.1.js"></script>)
+      html = %(<html><head><script async src="https://www.googletagmanager.com/gtag/js?id=G-1"></script>#{amp_ext}</head>) +
+             %(<body><script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, Hwaro::Models::Config.new)
+      result.should_not contain("googletagmanager")
+      result.should_not contain("platform.twitter.com")
+      result.should contain(amp_ext)
+    end
+
     it "converts iframe to amp-iframe" do
       page = Hwaro::Models::Page.new("test.md")
       page.url = "/test/"
