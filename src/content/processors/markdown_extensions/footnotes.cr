@@ -89,7 +89,8 @@ module Hwaro
                   io << line
                   next
                 elsif line.starts_with?("    ") || line.starts_with?('\t')
-                  footnotes[key] += pending_blank ? "\n\n" : "\n"
+                  # A bare `[^1]:` starts its body here, with no separator.
+                  footnotes[key] += pending_blank ? "\n\n" : "\n" unless footnotes[key].empty?
                   footnotes[key] += line.strip
                   pending_blank = false
                   io << "\n"
