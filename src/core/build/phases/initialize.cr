@@ -527,6 +527,12 @@ module Hwaro::Core::Build::Phases::Initialize
     config = ParallelConfig.new(enabled: true)
     worker_count = config.calculate_workers(files_to_copy.size)
 
+    # The first copy failure, re-raised once every copy has drained: only
+    # logging it let the build exit 0 and deploy a site missing the file,
+    # where an unreadable page-bundle asset fails the build.
+    failure : Exception? = nil
+    failure_mutex = Mutex.new
+
     ParallelHelper.each_concurrently(files_to_copy, worker_count) do |(src, dest, src_mtime), _worker_id|
       FileUtils.cp(src, dest)
       # A page can render to this very path; the render runs after this
@@ -553,7 +559,9 @@ module Hwaro::Core::Build::Phases::Initialize
       end
     rescue ex
       Logger.error "Copy failed #{src} -> #{dest}: #{ex.message}"
+      failure_mutex.synchronize { failure ||= ex }
     end
+    failure.try { |ex| raise ex }
   end
 
   private def load_templates : Hash(String, String)

@@ -129,6 +129,28 @@ describe Hwaro::Core::Build::Phases::Initialize do
       end
     end
 
+    it "raises instead of publishing without a static file it could not copy" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("static")
+          File.write("static/ok.css", "ok")
+          File.write("static/locked.css", "secret")
+          File.chmod("static/locked.css", 0o000)
+          FileUtils.mkdir_p("public")
+          begin
+            # Root reads it anyway; nothing to assert there.
+            next if File.readable?("static/locked.css")
+            expect_raises(File::Error, /locked\.css/) do
+              Hwaro::Core::Build::Builder.new.test_copy_static_files("public")
+            end
+            File.read("public/ok.css").should eq("ok")
+          ensure
+            File.chmod("static/locked.css", 0o644)
+          end
+        end
+      end
+    end
+
     it "copies all files in non-incremental mode" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
