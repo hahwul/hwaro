@@ -90,8 +90,13 @@ module Hwaro
             end
 
             # date (falling back to Hugo's publishDate so a page dated only
-            # via publishDate doesn't lose its date entirely)
-            if date = date_string(data, "date", local_keys) || date_string(data, "publishdate", local_keys)
+            # via publishDate doesn't lose its date entirely). Hugo withholds
+            # a page until its publishDate; hwaro withholds a future `date`,
+            # so a post scheduled with a future publishDate (and a past date)
+            # takes publishDate as its date — keeping `date` published it
+            # immediately.
+            date_key = time_value(data, "publishdate").try { |t| t > Time.utc } ? "publishdate" : "date"
+            if date = date_string(data, date_key, local_keys) || date_string(data, "publishdate", local_keys)
               fields["date"] = date
             end
 

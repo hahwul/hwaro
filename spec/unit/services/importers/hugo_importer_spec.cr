@@ -675,3 +675,23 @@ describe "Hugo import: unmapped front matter" do
     end
   end
 end
+
+describe "Hugo import: scheduled publishDate" do
+  it "keeps a post with a future publishDate unpublished" do
+    Dir.mktmpdir do |tmpdir|
+      hugo_dir = File.join(tmpdir, "hugo_site")
+      posts = File.join(hugo_dir, "content", "posts")
+      FileUtils.mkdir_p(posts)
+      File.write(File.join(posts, "later.md"), "---\ntitle: Later\ndate: 2024-01-01\npublishDate: 2999-01-01\n---\nLater.\n")
+      File.write(File.join(posts, "past.md"), "---\ntitle: Past\ndate: 2024-01-01\npublishDate: 2024-02-02\n---\nPast.\n")
+      output_dir = File.join(tmpdir, "out")
+
+      Hwaro::Services::Importers::HugoImporter.new.run(
+        Hwaro::Config::Options::ImportOptions.new(source_type: "hugo", path: hugo_dir, output_dir: output_dir))
+
+      File.read(File.join(output_dir, "posts", "later.md")).should contain(%(date = "2999-01-01"))
+      # An already-published post keeps the date Hugo displays.
+      File.read(File.join(output_dir, "posts", "past.md")).should contain(%(date = "2024-01-01"))
+    end
+  end
+end
