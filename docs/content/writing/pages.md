@@ -353,6 +353,8 @@ Use `@/` to link to other content pages by their source path. Hwaro resolves the
 
 This is useful because you don't need to know the final URL, because Hwaro calculates it from the content path. If the target page doesn't exist, the link is left unchanged and a warning is logged during build.
 
+`@/` links are resolved in page content only (Markdown, and HTML or shortcode output inside it). Templates are not rewritten, so `<a href="@/about.md">` in `page.html` is emitted as-is; in a template use `{{ get_page(path="about.md").url }}` instead.
+
 | Syntax | Resolved URL |
 |--------|-------------|
 | `@/blog/post.md` | `/blog/post/` |
