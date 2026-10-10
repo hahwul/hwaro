@@ -55,3 +55,20 @@ Crinja.filter(:urlencode) do
     Crinja::Filter.__url_quote(target.to_s, false)
   end
 end
+
+# `indent(width=4, first=false, blank=false)` as in Jinja2: blank lines are
+# not indented unless `blank=true`, `first=true` indents the first line
+# (upstream only knew the old `indentfirst` name, still accepted), and a
+# string width is used as the indent itself.
+Crinja.filter({width: 4, first: false, blank: false, indentfirst: false}, :indent) do
+  width = arguments["width"]
+  indention = width.string? ? width.as_s : " " * Math.max(width.to_i, 0)
+  lines = (target.to_s + "\n").lines
+
+  result = if arguments["blank"].truthy?
+             lines.join("\n" + indention)
+           else
+             lines.map_with_index { |line, i| i == 0 || line.empty? ? line : indention + line }.join("\n")
+           end
+  arguments["first"].truthy? || arguments["indentfirst"].truthy? ? indention + result : result
+end

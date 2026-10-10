@@ -24,4 +24,17 @@ describe "Crinja built-in filter fixes" do
       render_filter("{{ {'a': 'b c', 'x': '/~*'} | urlencode }}").should eq("a=b+c&x=%2F~%2A")
     end
   end
+
+  describe "indent" do
+    it "leaves blank lines and the trailing newline unindented" do
+      render_filter("{{ 'a\\n\\nb\\n' | indent(2) }}").should eq("a\n\n  b\n")
+      render_filter("{{ 'a\\n  \\nb' | indent(2, blank=true) }}").should eq("a\n    \n  b")
+    end
+
+    it "supports first= and a string width" do
+      render_filter("{{ 'a\\nb' | indent(width=3, first=true) }}").should eq("   a\n   b")
+      render_filter("{{ 'a\\nb' | indent('> ') }}").should eq("a\n> b")
+      render_filter("{{ 'a\\nb' | indent(2, true) }}").should eq("  a\n  b")
+    end
+  end
 end
