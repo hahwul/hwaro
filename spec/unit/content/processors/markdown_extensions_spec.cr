@@ -252,6 +252,13 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_task_lists("")
       result.should eq("")
     end
+
+    it "keeps a list item that opens with a link labelled x" do
+      html, _ = Hwaro::Processor::Markdown.render("- [x](https://x.com) link\n- [ ] todo\n- [X]", markdown_config: make_config(task_lists: true))
+      html.should contain(%(<li><a href="https://x.com">x</a> link</li>))
+      html.should contain(%(<li><input type="checkbox" disabled> todo</li>))
+      html.should contain(%(<input type="checkbox" checked disabled>))
+    end
   end
 
   describe "definition lists (extended)" do
