@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Build an Obsidian vault or wiki-style notes as is: wikilinks, image embeds, note transclusion, foldable callouts and page.backlinks">
+  <title>Wikilinks &amp; Backlinks - Hwaro</title>
+  <meta property="og:title" content="Wikilinks &amp; Backlinks">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/writing/obsidian/">
+  <meta property="og:description" content="Build an Obsidian vault or wiki-style notes as is: wikilinks, image embeds, note transclusion, foldable callouts and page.backlinks">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/writing-obsidian.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Wikilinks &amp; Backlinks">
+  <meta name="twitter:description" content="Build an Obsidian vault or wiki-style notes as is: wikilinks, image embeds, note transclusion, foldable callouts and page.backlinks">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/writing-obsidian.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/writing/obsidian/">
+  <link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/writing/obsidian/">
+<link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/writing/obsidian/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=cbccac98">
+</head>
+<body data-section="writing">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/start/">Start</a>
+    <a href="https://hwaro.hahwul.com/writing/" class="active">Writing</a>
+    <a href="https://hwaro.hahwul.com/templates/">Templates</a>
+    <a href="https://hwaro.hahwul.com/features/">Features</a>
+    <a href="https://hwaro.hahwul.com/deploy/">Deploy</a>
+    <a href="https://hwaro.hahwul.com/integrations/">Integrations</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="Search documentation">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">Search</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">Examples</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="Change language">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">EN</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/writing/obsidian/" lang="en" hreflang="en" class="current" aria-current="true">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/writing/obsidian/" lang="ko" hreflang="ko">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Start</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/installation/">Installation</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/first-site/">First Site</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/tools/">Tools & Completion</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Writing</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/pages/">Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/sections/">Sections</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/taxonomies/">Taxonomies</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/shortcodes/">Shortcodes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/archetypes/">Archetypes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/schema/">Front Matter Schema</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/obsidian/" class="active">Wikilinks & Backlinks</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Templates</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/syntax/">Syntax</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/data-model/">Data Model</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/functions/">Functions</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/filters/">Filters</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/render-hooks/">Render Hooks</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Features</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/features/">Overview</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO & Discovery</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/structured-data/">Structured Data</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/og-images/">Auto OG Images</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Content</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/search/">Search</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pagination/">Pagination</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/">Syntax Highlighting</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/">Markdown Extensions</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/series/">Series</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/related-posts/">Related Posts</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/menus/">Menus</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/output-formats/">Output Formats</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/git-info/">Git Metadata</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Build & Performance</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/incremental-build/">Incremental Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/streaming-build/">Streaming Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/build-hooks/">Build Hooks</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/asset-pipeline/">Asset Pipeline</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/cache-busting/">Cache Busting</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Files & Environment</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-variables/">Environment Variables</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-config/">Env-Specific Config</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/auto-includes/">Auto Includes</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/content-files/">Content Files</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/remote-data/">Remote Data Sources</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/content-generation/">Content Generation</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/dated-report-pages/">Dated Report Pages</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Platform</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/multilingual/">Multilingual</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/versioned-docs/">Versioned Docs</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/image-processing/">Image Processing</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/deployment/">Deployment</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/privacy/">Privacy Mode</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/csp/">Content Security Policy</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Deploy</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Integrations</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/">Home</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/writing/">Writing</a></li>
+    
+    <li aria-current="page">Wikilinks & Backlinks</li>
+  </ol>
+</nav>
+    <h1>Wikilinks & Backlinks</h1>
+    <p>Hwaro can build a folder of Obsidian-style notes without converting it first. Two switches, both off by default:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>markdown<span class="hljs-punctuation">]</span>
+wikilinks <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>   <span class="hljs-comment"># [[links]], ![[embeds]], foldable callouts</span>
+
+<span class="hljs-punctuation">[</span>content<span class="hljs-punctuation">]</span>
+backlinks <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>   <span class="hljs-comment"># page.backlinks</span>
+</code></pre>
+<p>To convert a vault into plain Markdown once instead, use <a href="/start/tools/import/"><code>hwaro tool import obsidian</code></a>.</p>
+<h2 id="wikilinks">Wikilinks</h2>
+<table>
+<thead>
+<tr>
+<th>Syntax</th>
+<th>Links to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>[[Page]]</code></td>
+<td>the page named <code>Page</code></td>
+</tr>
+<tr>
+<td><code>[[Page|text]]</code></td>
+<td>the same page, shown as <code>text</code></td>
+</tr>
+<tr>
+<td><code>[[Page#Heading]]</code></td>
+<td>a heading on that page</td>
+</tr>
+<tr>
+<td><code>[[Page#Heading|text]]</code></td>
+<td>a heading, with custom text</td>
+</tr>
+<tr>
+<td><code>[[#Heading]]</code></td>
+<td>a heading on the current page</td>
+</tr>
+</tbody>
+</table>
+<p>Without an alias, the link text is the target as written (<code>[[Page#Heading]]</code> shows <code>Page &gt; Heading</code>). Inside a table, escape the alias pipe as <code>\|</code>. A block reference (<code>[[Page#^id]]</code>) links to the page itself.</p>
+<h3 id="how-a-target-is-found">How a target is found</h3>
+<p>A target matches a page, case-insensitively, by:</p>
+<ul>
+<li>its file name without the extension and language suffix (<code>about.ko.md</code> answers to <code>about</code>);</li>
+<li>its directory name, for a bundle (<code>setup/index.md</code>) or section (<code>guides/_index.md</code>);</li>
+<li>its content path (<code>[[docs/setup]]</code>), when the target contains a <code>/</code>.</li>
+</ul>
+<p>Titles are not used. When several pages match, Hwaro prefers, in order: a page in the linking page's language, a page in the same directory, the shortest path, then the first path alphabetically. If more than one page in the same language matches, the build warns once per link and names every candidate.</p>
+<p><code>#Heading</code> becomes the same id the build gives that heading, so <code>[links] broken_anchors</code> checks it like any other fragment link.</p>
+<h3 id="what-gets-rewritten">What gets rewritten</h3>
+<p>A resolved wikilink turns into an ordinary internal link (<code>[text](@/path.md#heading)</code>) before Markdown rendering. Render hooks, <code>base_path</code>, the external-link policy and the <code>[links]</code> checks therefore treat it exactly like an <code>@/</code> link.</p>
+<p>A wikilink is left as written wherever Markdown would not make a link either: fenced or indented code, inline code (including a code span over two lines), raw HTML blocks, HTML tags and their attributes, autolinks and link destinations (<code>&lt;https://x.example/[[a]]&gt;</code>, <code>[x](/a/[[b]])</code>), HTML comments, math (<code>$…$</code>, <code>$$…$$</code> and <code>\(…\)</code> with <code>[markdown] math</code> on), and after a backslash (<code>\[[not a link]]</code>). Wikilinks inside a shortcode call or body are not rewritten either.</p>
+<p>A target with a file extension other than <code>.md</code> (<code>[[report.pdf]]</code>, <code>![[report.pdf]]</code>) links to that published file, found the same way as an <a href="#image-embeds">image embed</a>.</p>
+<p>A target that matches no page or file renders as <code>&lt;span class=&quot;wikilink wikilink-missing&quot;&gt;text&lt;/span&gt;</code> and goes through <code>[links] broken_internal</code>: a warning by default, or a build error with <code>broken_internal = &quot;error&quot;</code>.</p>
+<h2 id="image-embeds">Image Embeds</h2>
+<table>
+<thead>
+<tr>
+<th>Syntax</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>![[photo.png]]</code></td>
+<td>the image, with the file name as alt text</td>
+</tr>
+<tr>
+<td><code>![[photo.png|300]]</code></td>
+<td>300 pixels wide</td>
+</tr>
+<tr>
+<td><code>![[photo.png|300x200]]</code></td>
+<td>300 × 200</td>
+</tr>
+<tr>
+<td><code>![[photo.png|A view]]</code></td>
+<td>alt text <code>A view</code></td>
+</tr>
+</tbody>
+</table>
+<p>Hwaro looks for the file first among the page's own bundle files, then by name among every published file: bundle files of published pages, <code>[content.files]</code> and <code>static/</code>. A file in a draft or otherwise unpublished bundle is not found. Ambiguous names follow the same rules as page links.</p>
+<p>An embed becomes a Markdown image (with a <code>{width=… height=…}</code> attribute block for a size), so render-image hooks, responsive <code>srcset</code> and <code>[image_processing] dimensions</code> apply. An explicit width keeps the automatic dimensions from overriding it.</p>
+<p>Turning on <code>wikilinks</code> also enables <code>{…}</code> attribute blocks on ordinary Markdown images, as <code>[markdown] attributes</code> does (<code>![alt](x.png){.wide}</code>).</p>
+<h2 id="note-embeds-transclusion">Note Embeds (Transclusion)</h2>
+<p>A note embed on a line of its own pulls the note's Markdown into the page:</p>
+<table>
+<thead>
+<tr>
+<th>Syntax</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>![[note]]</code></td>
+<td>the whole note body</td>
+</tr>
+<tr>
+<td><code>![[note#Setup]]</code></td>
+<td>the <code>Setup</code> heading (ATX or underlined) through the line before the next heading of the same or a higher level</td>
+</tr>
+</tbody>
+</table>
+<p>The text is rendered as if written in place, like <a href="/writing/shortcodes/#include-md"><code>include_md</code></a>: shortcodes in it expand and its headings join the page's table of contents. It is wrapped in <code>&lt;div class=&quot;transclusion&quot; data-source=&quot;/note/&quot;&gt;…&lt;/div&gt;</code>, where <code>data-source</code> is the note's URL. A note can embed others, including another heading of itself, up to 8 levels deep; a cycle is a build error. Footnote labels (<code>[^1]</code>) and reference-link labels (<code>[ref]</code>) belong to the whole page, so two embedded notes that define the same label collide, and one definition is used for every reference; the build warns when that happens, so use distinct labels.</p>
+<p>An embed that is not alone on its line, or names a heading the note does not have, renders as a link to the note. An embed inside display math (<code>$$</code>) or a raw HTML block is left as it is. A target that matches no note is handled like any <a href="#wikilinks">unresolved wikilink</a>. The embedding page is re-rendered when the note changes, on a warm <code>--cache</code> build and in <code>hwaro serve</code>.</p>
+<h2 id="foldable-callouts">Foldable Callouts</h2>
+<p>With <code>wikilinks</code> on, an <a href="/features/markdown-extensions/">admonition</a> with a fold marker renders as a <code>&lt;details&gt;</code> element:</p>
+<pre><code class="language-markdown hljs"><span class="hljs-keyword">&gt; </span><span class="hljs-emphasis">[!TIP]- Collapsed by default
+</span><span class="hljs-keyword">&gt; </span><span class="hljs-emphasis">Hidden until opened.
+</span><span class="hljs-keyword">
+&gt; </span><span class="hljs-emphasis">[!NOTE]+ Open by default
+</span><span class="hljs-keyword">&gt; </span><span class="hljs-emphasis">Shown, and can be closed.
+</span></code></pre>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">details</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;admonition admonition-tip&quot;</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">summary</span> <span class="hljs-attr">class</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;admonition-title&quot;</span><span class="hljs-punctuation">&gt;</span>Collapsed by default<span class="hljs-punctuation">&lt;/</span><span class="hljs-name">summary</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;</span><span class="hljs-name">p</span><span class="hljs-punctuation">&gt;</span>Hidden until opened.<span class="hljs-punctuation">&lt;/</span><span class="hljs-name">p</span><span class="hljs-punctuation">&gt;</span>
+<span class="hljs-punctuation">&lt;/</span><span class="hljs-name">details</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<p>The classes are the admonition classes, so existing admonition CSS styles both. A callout without <code>+</code> or <code>-</code> renders as before.</p>
+<h2 id="backlinks">Backlinks</h2>
+<p><code>page.backlinks</code> lists the published pages, in the same language, that link to the page. The newest page comes first (pages without a date last), then by path. A page's links to itself are ignored, and each linking page appears once.</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page.backlinks</span> <span class="hljs-meta">%}</span>
+&lt;aside class=&quot;backlinks&quot;&gt;
+  &lt;h2&gt;Linked from&lt;/h2&gt;
+  &lt;ul&gt;
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">for</span> <span class="hljs-variable">p</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">page.backlinks</span> <span class="hljs-meta">%}</span>
+    &lt;li&gt;&lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">p.url</span> <span class="hljs-meta">}}</span>&quot;&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">p.title</span> <span class="hljs-meta">}}</span>&lt;/a&gt;&lt;/li&gt;
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">endfor</span> <span class="hljs-meta">%}</span>
+  &lt;/ul&gt;
+&lt;/aside&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<p>Links are read from each page's Markdown source:</p>
+<ul>
+<li><code>@/path.md</code> links;</li>
+<li>wikilinks (when <code>[markdown] wikilinks</code> is on);</li>
+<li>Markdown and HTML links whose URL is a page's URL (<code>[x](/docs/setup/)</code>, <code>href=&quot;../setup/&quot;</code>), including reference-style links (<code>[x][ref]</code> with <code>[ref]: /docs/setup/</code>) and links in raw HTML blocks.</li>
+</ul>
+<p>Links produced by shortcodes or templates are not counted, and neither are links written inside a shortcode call or body (they are not rewritten, so they are not counted either).</p>
+<p><code>--cache</code> builds and <code>hwaro serve</code> re-render a page when its backlinks change, for example when another page adds or removes a link to it.</p>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/writing/schema/" rel="prev">
+    <span class="pn-label">Previous</span>
+    <span class="pn-title">Front Matter Schema</span>
+    <span class="pn-desc">Declare the front matter each section requires, with types, enums, bounds and defaults</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/templates/" rel="next">
+    <span class="pn-label">Next</span>
+    <span class="pn-title">Templates</span>
+    <span class="pn-desc">Design your site with Jinja2 templates</span>
+  </a>
+  
+</nav>
+
+    
+<footer class="site-footer">
+  <p class="footer-meta">
+    <a class="footer-sig" href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul, Built with Love">
+      <span class="hahwul-img" aria-hidden="true"></span>
+      <span class="footer-love">Built with Love</span>
+    </a>
+    <span aria-hidden="true">·</span>
+    <span>MIT · © HAHWUL</span>
+  </p>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#wikilinks">Wikilinks</a><ul><li><a href="#how-a-target-is-found">How a target is found</a></li><li><a href="#what-gets-rewritten">What gets rewritten</a></li></ul></li><li><a href="#image-embeds">Image Embeds</a></li><li><a href="#note-embeds-transclusion">Note Embeds (Transclusion)</a></li><li><a href="#foldable-callouts">Foldable Callouts</a></li><li><a href="#backlinks">Backlinks</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=cbccac98"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=cbccac98"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=cbccac98"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=cbccac98"></script>
+</body>
+</html>

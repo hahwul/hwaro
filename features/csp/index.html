@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Generate a strict CSP from each page&#39;s inline script and style hashes">
+  <title>Content Security Policy - Hwaro</title>
+  <meta property="og:title" content="Content Security Policy">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/features/csp/">
+  <meta property="og:description" content="Generate a strict CSP from each page&apos;s inline script and style hashes">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/features-csp.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Content Security Policy">
+  <meta name="twitter:description" content="Generate a strict CSP from each page&apos;s inline script and style hashes">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/features-csp.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/features/csp/">
+  <link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/csp/">
+<link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/csp/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=cbccac98">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/start/">Start</a>
+    <a href="https://hwaro.hahwul.com/writing/">Writing</a>
+    <a href="https://hwaro.hahwul.com/templates/">Templates</a>
+    <a href="https://hwaro.hahwul.com/features/" class="active">Features</a>
+    <a href="https://hwaro.hahwul.com/deploy/">Deploy</a>
+    <a href="https://hwaro.hahwul.com/integrations/">Integrations</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="Search documentation">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">Search</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">Examples</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="Change language">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">EN</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/features/csp/" lang="en" hreflang="en" class="current" aria-current="true">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/features/csp/" lang="ko" hreflang="ko">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Start</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/installation/">Installation</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/first-site/">First Site</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/tools/">Tools & Completion</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Writing</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/pages/">Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/sections/">Sections</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/taxonomies/">Taxonomies</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/shortcodes/">Shortcodes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/archetypes/">Archetypes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/schema/">Front Matter Schema</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/obsidian/">Wikilinks & Backlinks</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Templates</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/syntax/">Syntax</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/data-model/">Data Model</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/functions/">Functions</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/filters/">Filters</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/render-hooks/">Render Hooks</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Features</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/features/">Overview</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO & Discovery</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/structured-data/">Structured Data</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/og-images/">Auto OG Images</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Content</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/search/">Search</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pagination/">Pagination</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/">Syntax Highlighting</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/">Markdown Extensions</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/series/">Series</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/related-posts/">Related Posts</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/menus/">Menus</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/output-formats/">Output Formats</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/git-info/">Git Metadata</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Build & Performance</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/incremental-build/">Incremental Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/streaming-build/">Streaming Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/build-hooks/">Build Hooks</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/asset-pipeline/">Asset Pipeline</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/cache-busting/">Cache Busting</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Files & Environment</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-variables/">Environment Variables</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-config/">Env-Specific Config</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/auto-includes/">Auto Includes</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/content-files/">Content Files</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/remote-data/">Remote Data Sources</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/content-generation/">Content Generation</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/dated-report-pages/">Dated Report Pages</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup" open>
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Platform</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/multilingual/">Multilingual</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/versioned-docs/">Versioned Docs</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/image-processing/">Image Processing</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/deployment/">Deployment</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/privacy/">Privacy Mode</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/csp/" class="active">Content Security Policy</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Deploy</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Integrations</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/">Home</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/features/">Features</a></li>
+    
+    <li aria-current="page">Content Security Policy</li>
+  </ol>
+</nav>
+    <h1>Content Security Policy</h1>
+    <p><code>[csp]</code> writes a Content-Security-Policy for every page Hwaro builds. It
+hashes each inline <code>&lt;script&gt;</code> and <code>&lt;style&gt;</code> in the final HTML and lists the
+hashes in the policy, so the site can drop <code>'unsafe-inline'</code> and still run
+its own inline code. A script injected into a page later (an XSS payload, a
+compromised third-party tag) has no matching hash and is blocked.</p>
+<h2 id="quick-start">Quick Start</h2>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>csp<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+</code></pre>
+<p>This writes a <code>_headers</code> file to the output root, with one rule per page:</p>
+<pre><code>/blog/hello/
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-hI0C…='; style-src 'self' 'sha256-G7+h…='; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'
+</code></pre>
+<p>Netlify and Cloudflare Pages read this file. On any other host, use
+<code>mode = &quot;meta&quot;</code>, which puts the policy in each page instead.</p>
+<h2 id="configuration">Configuration</h2>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>csp<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">false</span>                  <span class="hljs-comment"># default off</span>
+mode <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;headers&quot;</span>                 <span class="hljs-comment"># headers | meta</span>
+headers_file <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;_headers&quot;</span>        <span class="hljs-comment"># headers mode: path under the output root</span>
+report_only <span class="hljs-punctuation">=</span> <span class="hljs-literal">false</span>              <span class="hljs-comment"># headers mode: Content-Security-Policy-Report-Only</span>
+
+<span class="hljs-punctuation">[</span>csp<span class="hljs-punctuation">.</span>directives<span class="hljs-punctuation">]</span>                 <span class="hljs-comment"># merged over the defaults below</span>
+img-src <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;&#39;self&#39; data: https://images.example.com&quot;</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code></td>
+<td><code>false</code></td>
+<td>Turn CSP generation on. When it is off the output is unchanged.</td>
+</tr>
+<tr>
+<td><code>mode</code></td>
+<td><code>&quot;headers&quot;</code></td>
+<td><code>headers</code> writes a <a href="#headers-mode"><code>_headers</code> file</a>; <code>meta</code> injects a <a href="#meta-mode"><code>&lt;meta&gt;</code> tag</a> into each page.</td>
+</tr>
+<tr>
+<td><code>headers_file</code></td>
+<td><code>&quot;_headers&quot;</code></td>
+<td>The headers file, relative to the output directory.</td>
+</tr>
+<tr>
+<td><code>report_only</code></td>
+<td><code>false</code></td>
+<td>Send <code>Content-Security-Policy-Report-Only</code> instead, so violations are reported but not blocked. Headers mode only: browsers ignore a report-only policy in <code>&lt;meta&gt;</code>, so <code>report_only</code> with <code>mode = &quot;meta&quot;</code> is a config error.</td>
+</tr>
+<tr>
+<td><code>[csp.directives]</code></td>
+<td>see below</td>
+<td>Directive name = source list, as one string.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="directives">Directives</h3>
+<p>Without <code>[csp.directives]</code> every page gets:</p>
+<table>
+<thead>
+<tr>
+<th>Directive</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>default-src</code></td>
+<td><code>&#39;self&#39;</code></td>
+</tr>
+<tr>
+<td><code>script-src</code></td>
+<td><code>&#39;self&#39;</code> + the page&#39;s script hashes</td>
+</tr>
+<tr>
+<td><code>style-src</code></td>
+<td><code>&#39;self&#39;</code> + the page&#39;s style hashes</td>
+</tr>
+<tr>
+<td><code>img-src</code></td>
+<td><code>&#39;self&#39; data:</code></td>
+</tr>
+<tr>
+<td><code>font-src</code></td>
+<td><code>&#39;self&#39;</code></td>
+</tr>
+<tr>
+<td><code>connect-src</code></td>
+<td><code>&#39;self&#39;</code></td>
+</tr>
+<tr>
+<td><code>object-src</code></td>
+<td><code>&#39;none&#39;</code></td>
+</tr>
+<tr>
+<td><code>base-uri</code></td>
+<td><code>&#39;self&#39;</code></td>
+</tr>
+<tr>
+<td><code>frame-ancestors</code></td>
+<td><code>&#39;self&#39;</code></td>
+</tr>
+</tbody>
+</table>
+<p>A directive you set replaces the default. For <code>script-src</code> and <code>style-src</code>
+your value is kept and the page's hashes are added after it. An empty string
+removes a default directive (<code>frame-ancestors = &quot;&quot;</code>); any other directive with
+an empty value is written without sources, which is how you add
+<code>upgrade-insecure-requests = &quot;&quot;</code>. Values may not contain <code>;</code> or <code>,</code>.</p>
+<h3 id="allowing-inline-code-hwaro-cannot-hash">Allowing Inline Code Hwaro Cannot Hash</h3>
+<p>Browsers ignore <code>'unsafe-inline'</code> in a directive that also lists a hash. So
+when your <code>script-src</code> or <code>style-src</code> contains <code>'unsafe-inline'</code>, Hwaro adds
+no hashes to that directive; with <code>'unsafe-inline'</code> in <code>style-src</code> it also
+writes no <code>style-src-attr</code>. This is the opt-out for features that create
+styles while the page runs, which no hash can cover: Mermaid, MathJax and the
+<code>gist</code> and <code>tweet</code> shortcodes.</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>csp<span class="hljs-punctuation">.</span>directives<span class="hljs-punctuation">]</span>
+style-src <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;&#39;self&#39; &#39;unsafe-inline&#39;&quot;</span>
+</code></pre>
+<p>Only styles are relaxed here; inline scripts still need their hashes.</p>
+<h2 id="what-gets-hashed">What Gets Hashed</h2>
+<p>Hwaro reads every HTML page it wrote, after all other output processing:
+<code>--minify</code>, the <a href="/features/privacy/"><code>[privacy]</code></a> rewrite, AMP links, taxonomy
+pages, the 404 page and alias redirects. The hash is <code>sha256</code> over the bytes
+between the tags, exactly as the browser will hash them. Each page gets only
+its own hashes.</p>
+<ul>
+<li><strong><code>&lt;script&gt;</code></strong> without a <code>src</code>, whose <code>type</code> is absent, empty, a
+JavaScript MIME type, <code>module</code>, <code>importmap</code> or <code>speculationrules</code>. These
+are the types the browser checks against <code>script-src</code>.</li>
+<li><strong>JSON-LD and other data blocks</strong> (<code>application/ld+json</code>,
+<code>text/template</code>, …) are not executed, so they get no hash and need none.</li>
+<li><strong><code>&lt;style&gt;</code></strong> bodies, in <code>style-src</code>.</li>
+<li><strong><code>style=&quot;…&quot;</code> attributes.</strong> A hash allows an attribute only together with
+<code>'unsafe-hashes'</code>, so a page with style attributes gets a
+<code>style-src-attr 'unsafe-hashes' 'sha256-…'</code> directive that lists them. The
+<code>style-src</code> directive for elements stays strict.</li>
+<li><strong>Event handler attributes</strong> (<code>onclick=&quot;…&quot;</code>, <code>onload=&quot;…&quot;</code>) cannot be
+allowed by a hash-based policy. Hwaro prints a warning that names the
+pages that have them. Move the code into a script and attach it with
+<code>addEventListener</code>. Hwaro's own templates and the <code>hwaro init</code> scaffolds
+contain none.</li>
+</ul>
+<p>Content inside HTML comments, <code>&lt;textarea&gt;</code> and <code>&lt;title&gt;</code> is not markup to the
+browser, so nothing in it is hashed. <code>&lt;noscript&gt;</code> content is hashed: with
+JavaScript off, its styles apply and the policy still checks them.</p>
+<h2 id="hosts-for-hwaros-features">Hosts for Hwaro's Features</h2>
+<p>When a page uses a feature that loads from another host, that host is added
+to the page's policy. A host is added only when its URL is in the page's
+final HTML, so a CDN that <a href="/features/privacy/"><code>[privacy]</code></a> moved to your
+own site, or a shortcode the page does not use, adds nothing.</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Added</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>[highlight]</code> with <code>use_cdn = true</code> (cdnjs)</td>
+<td><code>script-src</code>, <code>style-src</code> <code>https://cdnjs.cloudflare.com</code></td>
+</tr>
+<tr>
+<td><code>[markdown] math</code>, KaTeX</td>
+<td><code>script-src</code>, <code>style-src</code>, <code>font-src</code> <code>https://cdn.jsdelivr.net</code></td>
+</tr>
+<tr>
+<td><code>[markdown] math</code>, MathJax</td>
+<td><code>script-src</code>, <code>font-src</code> <code>https://cdn.jsdelivr.net</code></td>
+</tr>
+<tr>
+<td><code>[markdown] mermaid</code></td>
+<td><code>script-src</code> <code>https://cdn.jsdelivr.net</code></td>
+</tr>
+<tr>
+<td><code>youtube</code> shortcode</td>
+<td><code>frame-src</code> <code>https://www.youtube.com</code></td>
+</tr>
+<tr>
+<td><code>vimeo</code> shortcode</td>
+<td><code>frame-src</code> <code>https://player.vimeo.com</code></td>
+</tr>
+<tr>
+<td><code>gist</code> shortcode</td>
+<td><code>script-src</code> <code>https://gist.github.com</code>, <code>style-src</code> <code>https://github.githubassets.com</code>, <code>img-src</code> <code>https://gist.github.com</code> <code>https://gist.githubusercontent.com</code></td>
+</tr>
+<tr>
+<td><code>tweet</code> shortcode</td>
+<td><code>script-src</code>, <code>frame-src</code> <code>https://platform.twitter.com</code></td>
+</tr>
+<tr>
+<td><code>codepen</code> shortcode</td>
+<td><code>frame-src</code> <code>https://codepen.io</code></td>
+</tr>
+</tbody>
+</table>
+<p>The <code>gist</code> and <code>tweet</code> rows also match the shortcode's own markup
+(<code>class=&quot;sc-gist&quot;</code>, <code>class=&quot;twitter-tweet&quot;</code>). <code>[privacy]</code> can localize their
+scripts, but those scripts still load styles and frames from the original
+host at run time.</p>
+<p>Mermaid, MathJax, <code>gist</code> and <code>tweet</code> also add styles at run time, so they need
+the <a href="#allowing-inline-code-hwaro-cannot-hash">style opt-out</a>.</p>
+<p>A directive that is not set starts from the value the browser would have
+fallen back to (<code>frame-src</code> from <code>child-src</code>, then <code>default-src</code>), so adding a
+frame host keeps <code>'self'</code>.</p>
+<p>Anything else your templates load from another host needs its own entry in
+<code>[csp.directives]</code>.</p>
+<h2 id="headers-mode">Headers Mode</h2>
+<p><code>mode = &quot;headers&quot;</code> writes one rule per page to <code>headers_file</code>, in the
+format Netlify and Cloudflare Pages read. Paths are the page URLs and include
+the <code>base_url</code> subpath: <code>/</code>, <code>/blog/hello/</code>, <code>/404.html</code>. They are encoded
+exactly like the page's URL in the sitemap, as browsers request them: <code>#</code>
+becomes <code>%23</code>, <code>?</code> becomes <code>%3F</code>, and spaces and non-ASCII characters are
+percent-encoded.</p>
+<p>If <code>static/_headers</code> exists, it is not replaced. Hwaro writes your file
+first, unchanged, and appends its own rules after a
+<code># Content-Security-Policy generated by Hwaro ([csp])</code> comment. When your
+file already has a block for a page's path that sets
+<code>Content-Security-Policy</code> (or <code>Content-Security-Policy-Report-Only</code> with
+<code>report_only</code>), your block wins and Hwaro writes no rule for that path.</p>
+<p>Hwaro logs each path where your block replaced its rule.</p>
+<p>Hosts combine every rule that matches a request. A <code>/*</code> rule of your own that
+also sets <code>Content-Security-Policy</code> is therefore sent as a second policy,
+and the browser enforces both, so do not set one alongside <code>[csp]</code>. Hwaro
+warns when your file has a CSP block on a path with <code>*</code> or <code>:</code>.</p>
+<p>No rule can match some paths. Hosts read <code>:name</code> in a path as a placeholder
+and <code>*</code> as a wildcard, a control character breaks the file, and a <code>%</code> in a
+file name does not tell which URL the page has (<code>a%b</code> is published for both
+<code>/a%b/</code> and <code>/a%25b/</code>). Such a page gets its policy as a
+<a href="#meta-mode"><code>&lt;meta&gt;</code> tag</a> instead, without <code>frame-ancestors</code>, <code>report-uri</code>
+and <code>sandbox</code>, and Hwaro warns and names it. Rename it to get a rule.</p>
+<p>Rules are per page because the format cannot list several paths in one rule.
+On this documentation site (about 160 pages in two languages) the file is about
+50 KB. Cloudflare Pages reads at most 100 rules; Hwaro warns when the file
+has more. Netlify has no such limit. For larger sites on Cloudflare, use meta
+mode.</p>
+<p>Cloudflare Pages also limits a single header to 2000 characters. Each hash
+adds about 54, so Hwaro warns about pages whose policy is longer.</p>
+<p>A host serves <code>404.html</code> at the missing URL, where no rule matches, so the
+404 page gets no policy in headers mode. Likewise, Cloudflare Pages redirects
+<code>/page.html</code> to <code>/page</code>, so a rule for a page published as a file
+(<code>/404.html</code>, or an alias such as <code>aliases = [&quot;/old.html&quot;]</code>) may never match there and the page gets no
+policy. Use meta mode if those pages matter.</p>
+<h2 id="meta-mode">Meta Mode</h2>
+<p><code>mode = &quot;meta&quot;</code> injects the policy into each page as the first child of
+<code>&lt;head&gt;</code>. When a charset declaration (<code>&lt;meta charset&gt;</code> or
+<code>&lt;meta http-equiv=&quot;Content-Type&quot;&gt;</code>) comes before any script, style or link,
+the policy goes right after it, because the declaration must stay within the
+first 1024 bytes:</p>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">head</span><span class="hljs-punctuation">&gt;&lt;</span><span class="hljs-name">meta</span> <span class="hljs-attr">charset</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;utf-8&quot;</span><span class="hljs-punctuation">&gt;&lt;</span><span class="hljs-name">meta</span> <span class="hljs-attr">http-equiv</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;Content-Security-Policy&quot;</span> <span class="hljs-attr">content</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;default-src &amp;apos;self&amp;apos;; …&quot;</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<p>Browsers ignore <code>frame-ancestors</code>, <code>report-uri</code> and <code>sandbox</code> in a <code>&lt;meta&gt;</code>
+policy, so Hwaro leaves them out, and warns when you set one of them
+yourself. Pages without a <code>&lt;head&gt;</code> get no policy, and Hwaro warns about them.</p>
+<p>Hwaro treats a <code>&lt;meta http-equiv=&quot;Content-Security-Policy&quot;&gt;</code> at that position
+as its own and replaces it on every build. Do not add a CSP <code>&lt;meta&gt;</code> of your
+own to templates while <code>[csp]</code> is on.</p>
+<h2 id="builds-cache-and-serve">Builds, Cache and Serve</h2>
+<ul>
+<li><strong><code>--cache</code>.</strong> A cached page is hashed from the HTML already on disk, so
+a warm build writes the same <code>_headers</code> file and the same pages as a cold
+build.</li>
+<li><strong><code>[build] hooks.post</code>.</strong> The policy is computed before post-build hooks
+run. If a hook changes a page's inline scripts or styles, Hwaro warns that
+the page's policy no longer matches and names the page. Change the HTML in a template or in
+<code>hooks.pre</code> instead.</li>
+<li><strong><code>hwaro serve</code>.</strong> No policy is written. The live-reload client and the
+error overlay are inline and dev-only.</li>
+<li><strong><code>static/</code>, <code>[content.files]</code> and page-bundle HTML</strong> are your files, published
+unchanged, and get no policy.</li>
+<li><strong>AMP pages</strong> are skipped: the AMP runtime adds styles while the page runs,
+and a hash-based policy would block them.</li>
+<li><strong>KaTeX.</strong> With <code>[csp]</code> on, <code>{{ math_tags }}</code> starts KaTeX from a small
+inline script instead of an <code>onload</code> attribute, so it can be hashed.</li>
+</ul>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li>Styles that a script creates at run time (a <code>&lt;style&gt;</code> element, or a
+<code>style</code> attribute set through <code>setAttribute</code> or <code>innerHTML</code>) are blocked
+unless you <a href="#allowing-inline-code-hwaro-cannot-hash">opt out</a>. Mermaid,
+MathJax and the <code>gist</code> and <code>tweet</code> embeds do this; KaTeX does not. Setting
+<code>element.style.color</code> from a script is allowed.</li>
+<li>A <code>&lt;style&gt;</code> or <code>&lt;script&gt;</code> inside inline <code>&lt;svg&gt;</code> or <code>&lt;math&gt;</code> whose content
+uses <code>&lt;![CDATA[…]]&gt;</code> or character references (<code>&amp;amp;</code>) is blocked: the
+browser hashes the decoded text there, Hwaro hashes the bytes. SVG icons
+exported from design tools often carry CDATA; remove it, or move the styles
+into a stylesheet.</li>
+<li><code>javascript:</code> URLs are blocked like event handler attributes.</li>
+<li>The feature host table covers Hwaro's own features. Embeds in your own
+templates or Markdown need their hosts in <code>[csp.directives]</code>.</li>
+<li>Pages that use the same policy still get a rule each in headers mode.</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/features/privacy/" rel="prev">
+    <span class="pn-label">Previous</span>
+    <span class="pn-title">Privacy Mode</span>
+    <span class="pn-desc">Self-host third-party fonts, scripts and images at build time</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/deploy/" rel="next">
+    <span class="pn-label">Next</span>
+    <span class="pn-title">Deploy</span>
+    <span class="pn-desc">Build and deploy your site to production</span>
+  </a>
+  
+</nav>
+
+    
+<footer class="site-footer">
+  <p class="footer-meta">
+    <a class="footer-sig" href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul, Built with Love">
+      <span class="hahwul-img" aria-hidden="true"></span>
+      <span class="footer-love">Built with Love</span>
+    </a>
+    <span aria-hidden="true">·</span>
+    <span>MIT · © HAHWUL</span>
+  </p>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#quick-start">Quick Start</a></li><li><a href="#configuration">Configuration</a><ul><li><a href="#directives">Directives</a></li><li><a href="#allowing-inline-code-hwaro-cannot-hash">Allowing Inline Code Hwaro Cannot Hash</a></li></ul></li><li><a href="#what-gets-hashed">What Gets Hashed</a></li><li><a href="#hosts-for-hwaros-features">Hosts for Hwaro's Features</a></li><li><a href="#headers-mode">Headers Mode</a></li><li><a href="#meta-mode">Meta Mode</a></li><li><a href="#builds-cache-and-serve">Builds, Cache and Serve</a></li><li><a href="#limitations">Limitations</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=cbccac98"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=cbccac98"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=cbccac98"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=cbccac98"></script>
+</body>
+</html>

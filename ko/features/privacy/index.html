@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="외부 폰트, 스크립트, 이미지를 빌드 시 직접 호스팅하기">
+  <title>프라이버시 모드 - Hwaro</title>
+  <meta property="og:title" content="프라이버시 모드">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/ko/features/privacy/">
+  <meta property="og:description" content="외부 폰트, 스크립트, 이미지를 빌드 시 직접 호스팅하기">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/ko-features-privacy.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="프라이버시 모드">
+  <meta name="twitter:description" content="외부 폰트, 스크립트, 이미지를 빌드 시 직접 호스팅하기">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/ko-features-privacy.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/ko/features/privacy/">
+  <link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/features/privacy/">
+<link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/features/privacy/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=cbccac98">
+</head>
+<body data-section="features">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="탐색 메뉴 열기" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/ko/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/ko/start/">시작하기</a>
+    <a href="https://hwaro.hahwul.com/ko/writing/">콘텐츠 작성</a>
+    <a href="https://hwaro.hahwul.com/ko/templates/">템플릿</a>
+    <a href="https://hwaro.hahwul.com/ko/features/" class="active">기능</a>
+    <a href="https://hwaro.hahwul.com/ko/deploy/">배포</a>
+    <a href="https://hwaro.hahwul.com/ko/integrations/">연동</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="문서 검색">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">검색</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">예제</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="언어 변경">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">KO</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/features/privacy/" lang="en" hreflang="en">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/features/privacy/" lang="ko" hreflang="ko" class="current" aria-current="true">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">시작하기</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/installation/">설치</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/first-site/">첫 사이트 만들기</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/start/tools/">도구와 자동 완성</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">콘텐츠 작성</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/pages/">페이지</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/sections/">섹션</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/taxonomies/">택소노미</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/shortcodes/">숏코드</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/archetypes/">아키타입</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/schema/">프론트 매터 스키마</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/writing/obsidian/">위키링크와 백링크</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">템플릿</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/syntax/">문법</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/data-model/">데이터 모델</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/functions/">함수</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/filters/">필터</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/templates/render-hooks/">렌더 훅</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">기능</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/features/">개요</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO와 검색 노출</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/structured-data/">구조화된 데이터</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/og-images/">자동 OG 이미지</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">콘텐츠</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/search/">검색</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pagination/">페이지네이션</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/syntax-highlighting/">구문 강조</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/markdown-extensions/">마크다운 확장</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/series/">시리즈</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/related-posts/">관련 글</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/menus/">메뉴</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/output-formats/">출력 포맷</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/git-info/">Git 메타데이터</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">빌드와 성능</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/incremental-build/">증분 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/streaming-build/">스트리밍 빌드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/build-hooks/">빌드 훅</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/asset-pipeline/">에셋 파이프라인</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/cache-busting/">캐시 버스팅</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">파일과 환경</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-variables/">환경 변수</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/env-config/">환경별 설정</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/auto-includes/">자동 인클루드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/content-files/">콘텐츠 파일</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/remote-data/">원격 데이터 소스</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/content-generation/">콘텐츠 생성</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/dated-report-pages/">날짜별 리포트 페이지</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup" open>
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">플랫폼</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/multilingual/">다국어</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/versioned-docs/">버전별 문서</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/image-processing/">이미지 처리</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/deployment/">배포 명령</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/privacy/" class="active">프라이버시 모드</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/ko/features/csp/">콘텐츠 보안 정책(CSP)</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">배포</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/config/">설정</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">연동</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/">개요</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/ko/integrations/skills/">에이전트 스킬</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/ko/">홈</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/ko/features/">기능</a></li>
+    
+    <li aria-current="page">프라이버시 모드</li>
+  </ol>
+</nav>
+    <h1>프라이버시 모드</h1>
+    <p><code>[privacy]</code>는 페이지가 불러오는 외부 에셋(웹 폰트, CDN 스타일시트와
+스크립트, 원격 이미지)을 빌드할 때 내려받아 사이트에서 직접 제공합니다.
+그러면 방문자의 브라우저가 그 에셋 때문에 외부 호스트에 접속하지 않습니다.
+<a href="#%EB%A1%9C%EC%BB%AC%EB%A1%9C-%EC%98%AE%EA%B8%B0%EB%8A%94-%EB%8C%80%EC%83%81">로컬로 옮기는 대상</a>에 나열된 태그만 해당하며, 그 밖에
+페이지나 스크립트가 불러오는 것(<a href="#%EC%A0%9C%ED%95%9C-%EC%82%AC%ED%95%AD">제한 사항</a> 참고)은 여전히 원래
+호스트에서 받습니다.</p>
+<p>주된 이유는 GDPR입니다. <code>fonts.googleapis.com</code>에서 Google Fonts를 불러오면
+방문자마다 IP 주소가 Google로 전송되며, 독일 법원은 이에 동의가 필요하다고
+판결했습니다. 폰트를 직접 호스팅하면 이 요청이 사라지고, 동의를 받을 필요도
+없어집니다.</p>
+<h2 id="빠른-시작">빠른 시작</h2>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>privacy<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">true</span>
+</code></pre>
+<p>이렇게 설정하면 템플릿의 Google Fonts 태그</p>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">link</span> <span class="hljs-attr">rel</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;stylesheet&quot;</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;https://fonts.googleapis.com/css2?family=Inter&amp;display=swap&quot;</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<p>는 다음과 같이 출력됩니다.</p>
+<pre><code class="language-html hljs"><span class="hljs-punctuation">&lt;</span><span class="hljs-name">link</span> <span class="hljs-attr">rel</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;stylesheet&quot;</span> <span class="hljs-attr">href</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/assets/external/3f2a9c01b7de-css2.css&quot;</span><span class="hljs-punctuation">&gt;</span>
+</code></pre>
+<p>로컬 스타일시트는 사용하는 <code>.woff2</code> 파일의 로컬 사본을 가리킵니다.</p>
+<h2 id="설정">설정</h2>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>privacy<span class="hljs-punctuation">]</span>
+enabled <span class="hljs-punctuation">=</span> <span class="hljs-literal">false</span>                 <span class="hljs-comment"># 기본값은 꺼짐</span>
+include <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[]</span>                    <span class="hljs-comment"># 로컬로 옮길 호스트, 비우면 모든 외부 호스트</span>
+exclude <span class="hljs-punctuation">=</span> <span class="hljs-punctuation">[]</span>                    <span class="hljs-comment"># 절대 옮기지 않을 호스트, 예: [&quot;www.youtube.com&quot;]</span>
+output_dir <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;assets/external&quot;</span>  <span class="hljs-comment"># 빌드 출력 안의 디렉터리</span>
+cache_ttl <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;7d&quot;</span>                <span class="hljs-comment"># 요청 없이 다운로드를 재사용하는 기간</span>
+on_error <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;warn-and-keep&quot;</span>      <span class="hljs-comment"># warn-and-keep | fail</span>
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>키</th>
+<th>기본값</th>
+<th>의미</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code></td>
+<td><code>false</code></td>
+<td>프라이버시 모드를 켭니다. 꺼져 있으면 출력이 바뀌지 않습니다.</td>
+</tr>
+<tr>
+<td><code>include</code></td>
+<td><code>[]</code></td>
+<td>로컬로 옮길 호스트. 정확히 일치해야 합니다(<code>fonts.googleapis.com</code>). 비우면 모든 외부 호스트가 대상입니다. 여기 적은 호스트는 네트워크 검사에서도 신뢰합니다(<a href="#네트워크-안전">네트워크 안전</a> 참고).</td>
+</tr>
+<tr>
+<td><code>exclude</code></td>
+<td><code>[]</code></td>
+<td>외부에 그대로 둘 호스트. <code>include</code>보다 우선합니다.</td>
+</tr>
+<tr>
+<td><code>output_dir</code></td>
+<td><code>&quot;assets/external&quot;</code></td>
+<td>내려받은 파일을 게시할 위치. URL에는 <code>base_url</code>의 하위 경로가 붙습니다.</td>
+</tr>
+<tr>
+<td><code>cache_ttl</code></td>
+<td><code>&quot;7d&quot;</code></td>
+<td>다운로드 캐시 수명. <code>[[data.remote]]</code>와 같은 기간 문법(<code>&quot;90s&quot;</code>, <code>&quot;12h&quot;</code>, <code>&quot;7d&quot;</code>)을 씁니다.</td>
+</tr>
+<tr>
+<td><code>on_error</code></td>
+<td><code>&quot;warn-and-keep&quot;</code></td>
+<td>캐시 사본 없이 다운로드가 실패했을 때: <code>warn-and-keep</code>은 경고 후 외부 URL을 그대로 두고, <code>fail</code>은 빌드를 멈춥니다.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="로컬로-옮기는-대상">로컬로 옮기는 대상</h2>
+<p>모든 페이지, 섹션, 페이지네이션 페이지, 택소노미 페이지, 404 페이지에서
+다음 속성을 다시 씁니다.</p>
+<ul>
+<li><code>rel</code>이 <code>stylesheet</code>, <code>preload</code>, <code>modulepreload</code>인 <code>&lt;link href&gt;</code></li>
+<li><code>&lt;script src&gt;</code></li>
+<li><code>&lt;img src&gt;</code>, <code>&lt;img srcset&gt;</code>, <code>&lt;source src&gt;</code>, <code>&lt;source srcset&gt;</code></li>
+<li><code>&lt;video src&gt;</code>, <code>&lt;video poster&gt;</code>, <code>&lt;audio src&gt;</code></li>
+</ul>
+<p>다른 호스트를 가리키는 절대 <code>http(s)://</code> URL과 프로토콜 상대 <code>//</code> URL만
+바꿉니다. 상대 URL, <code>data:</code> URL, <code>base_url</code> 호스트의 URL은 그대로 둡니다.
+HTML 주석과 인라인 <code>&lt;script&gt;</code>, <code>&lt;style&gt;</code> 본문도 바꾸지 않습니다.</p>
+<p>내려받은 스타일시트도 다시 씁니다. <code>@import</code>와 <code>url(...)</code> 참조를 스타일시트
+자신의 URL 기준으로 해석해 로컬로 옮기며, 네 단계까지 중첩을 따라갑니다.
+이 참조는 스타일시트에 필요하므로 <code>include</code>와 상관없이 따라가지만,
+<code>exclude</code>는 그대로 적용됩니다. 외부에 남는 참조는 절대 URL로 다시 씁니다.
+<code>image-set(...)</code> 안의 문자열도 <code>url(...)</code>과 같이 처리합니다.</p>
+<p>에셋을 로컬에서 제공하게 된 호스트로 향하는 <code>&lt;link rel=&quot;preconnect&quot;&gt;</code>와
+<code>&lt;link rel=&quot;dns-prefetch&quot;&gt;</code> 힌트는 지웁니다. 남겨 두면 브라우저가 여전히 그
+호스트에 연결하기 때문입니다.</p>
+<h3 id="파일-형식">파일 형식</h3>
+<p>파일은 그 파일을 불러오는 태그에 맞는 확장자로만 게시하며, 확장자는 응답의
+<code>Content-Type</code>(일반적인 형식이면 URL 경로)에서 정합니다. <code>&lt;img&gt;</code>, <code>&lt;source&gt;</code>,
+<code>poster</code>는 이미지, <code>&lt;video&gt;</code>와 <code>&lt;audio&gt;</code>는 오디오와 비디오, 스타일시트는 CSS,
+스크립트는 JavaScript, 스타일시트 안의 참조는 폰트, 이미지(SVG 제외), CSS입니다. 그 밖의
+경우(예: HTML로 응답한 <code>&lt;img&gt;</code>)는 경고와 함께 외부 URL을 그대로 둡니다. HTML이나
+XML은 절대 게시하지 않습니다.</p>
+<p>SVG는 <code>&lt;img&gt;</code> 계열 태그에서만 게시하며 경고를 출력합니다. SVG를 사이트에서
+직접 열면 스크립트가 실행될 수 있습니다. 믿을 수 없는 호스트라면 <code>exclude</code>에
+추가하세요. 스타일시트가 참조하는 SVG(<code>background: url(icon.svg)</code>)는 게시하지
+않으며, 계속 원래 호스트에서 불러옵니다.</p>
+<h3 id="hwaro가-출력하는-태그">Hwaro가 출력하는 태그</h3>
+<p><code>[markdown] math = &quot;mathjax&quot;</code>는 <code>cdn.jsdelivr.net</code>에서 MathJax를 불러오는데,
+MathJax는 폰트와 확장을 자기 URL 기준으로 불러오므로 외부에 그대로 둡니다.
+Mermaid(<code>[markdown] mermaid = true</code>)는 인라인 모듈 <code>import</code>로 불러오며, 프라이버시
+모드는 이를 다시 쓰지 않습니다. KaTeX와 highlight.js는 그대로 로컬로 옮깁니다.</p>
+<p>게시되는 파일 이름은 <code>&lt;해시&gt;-&lt;이름&gt;.&lt;확장자&gt;</code>이며, 해시는 바이트의 SHA-256
+앞 12자리입니다. 같은 파일은 한 번만 저장되고, 원본이 바뀌면 이름도 바뀌므로
+브라우저가 오래된 사본을 쓰지 않습니다.</p>
+<h3 id="user-agent">User-Agent</h3>
+<p>다운로드에는 데스크톱 브라우저 <code>User-Agent</code>를 보냅니다. Google Fonts는 이
+값으로 폰트 형식을 고르는데, 알 수 없는 클라이언트에는 woff2 대신 훨씬 큰
+TrueType을 보냅니다. 쿠키나 인증 정보는 보내지 않습니다.</p>
+<h3 id="네트워크-안전">네트워크 안전</h3>
+<p>프라이버시 모드가 내려받는 URL이 모두 직접 작성한 것은 아닙니다. 리다이렉트와
+내려받은 스타일시트 안의 <code>url(...)</code> 참조는 외부에서 정합니다. 그래서 모든 요청과
+모든 리다이렉트 단계를 먼저 검사합니다. 루프백, 사설(10/8, 172.16/12,
+192.168/16, fc00::/7, 사이트 로컬 fec0::/10), 링크 로컬(169.254/16, fe80::/10),
+CGNAT(100.64/10), IETF 예약(192.0.0.0/24), 미지정, 멀티캐스트 주소로 해석되는
+호스트는 거부하며, 이런 주소를 감싼 NAT64(64:ff9b::/96)나 IPv4 매핑 주소도
+마찬가지입니다. 거부는 <code>on_error</code>를 따릅니다. 이렇게 해서 외부가 빌드에게 내부 서비스나 클라우드 메타데이터를 읽게
+하고 그 응답을 사이트에 게시하게 만드는 것을 막습니다. 연결은 검사한 주소에
+고정됩니다.</p>
+<p><code>include</code>에 적은 호스트는 이 검사를 건너뜁니다. 사내 CDN이나 로컬 테스트
+서버는 이렇게 허용하세요. <code>include</code>는 두 가지 역할을 함께 합니다. 호스트를 하나라도
+적으면 적은 호스트만 로컬로 옮깁니다. CDN 이름이 사설 주소로 해석되는 split-horizon
+DNS 환경이라면 필요한 호스트를 모두 적어야 하며, 스타일시트가 불러오는 호스트도
+포함해야 합니다(Google Fonts CSS는 <code>fonts.gstatic.com</code>에서 불러옵니다).</p>
+<p>실패한 다운로드는 같은 프로세스에서 10분 동안 다시 시도하지 않으므로, 응답하지
+않는 호스트가 <code>hwaro serve</code>를 느리게 하는 것은 한 번뿐입니다. 파일마다 20MiB
+상한이 있으며, 그보다 큰 파일(긴 동영상 등)은 경고와 함께 외부 URL을 유지합니다.</p>
+<h2 id="캐시와-오프라인-빌드">캐시와 오프라인 빌드</h2>
+<p>다운로드는 <code>config.toml</code> 옆의 <code>.hwaro/external/</code>에 보관되며, <code>index.json</code>에
+URL마다 파일, 가져온 시각, Content-Type, SHA-256이 기록됩니다. 이 디렉터리는
+빌드 캐시 밖, 그리고 <code>hwaro serve</code>가 감시하는 경로 밖에 있으므로 여기에 쓰는
+일로 다시 빌드가 일어나지 않습니다.</p>
+<ul>
+<li><code>cache_ttl</code>보다 최근에 받은 파일은 요청 없이 사용합니다. 캐시가 채워진
+빌드는 완전히 오프라인으로 동작합니다.</li>
+<li>더 오래된 파일은 다시 받습니다. 실패하면 이전 사본을 쓰고 경고를
+출력합니다.</li>
+<li>사본이 전혀 없으면 <code>on_error</code>를 따릅니다.</li>
+</ul>
+<p><code>hwaro serve</code>도 같은 캐시를 쓰므로 다시 빌드할 때 네트워크에 접근하지
+않습니다. 외부 호스트 상태와 상관없이 빌드하려면 CI에서 <code>.hwaro/external/</code>을
+캐시하거나 커밋하세요. Hwaro는 <code>.hwaro/</code> 안의 모든 것을 무시하는
+<code>.hwaro/.gitignore</code>를 만들므로 <code>git add -f .hwaro/external</code>로 추가해야 합니다.
+이 디렉터리의 오래된 다운로드는 지우지 않으니, 처음부터 다시 받으려면
+디렉터리를 삭제하세요.</p>
+<p>다시 쓰기는 페이지를 쓸 때, <code>--minify</code> 다음에 일어납니다. 따라서 <code>--cache</code>
+빌드가 페이지를 건너뛰어도 이미 바뀐 HTML과 그 페이지가 쓰는 파일은 그대로
+유지됩니다. 다운로드 실패로 외부 URL이 남은 페이지는 캐시하지 않으므로, 다음
+<code>--cache</code> 빌드에서 다시 렌더링하고 다운로드를 재시도합니다.</p>
+<h2 id="다른-기능과의-관계">다른 기능과의 관계</h2>
+<ul>
+<li><strong>하위 리소스 무결성.</strong> 다시 쓴 <code>&lt;link&gt;</code>나 <code>&lt;script&gt;</code>의 <code>integrity</code> 값이
+Hwaro가 제공하는 바이트와 일치하면 그대로 둡니다. 일치하지 않으면
+<code>integrity</code>와 <code>crossorigin</code>을 지우고 URL마다 한 번 경고합니다.
+<a href="/ko/features/asset-pipeline/#sri"><code>[assets] sri = true</code></a>이면 로컬로 옮긴
+스타일시트와 스크립트마다 Hwaro가 직접 <code>integrity</code>를 붙입니다.</li>
+<li><strong>PWA.</strong> <code>[pwa] precache_urls</code>의 외부 URL은 로컬 사본으로 바뀝니다.</li>
+<li><strong>AMP.</strong> AMP 페이지는 다시 쓴 HTML로 만들어집니다. AMP는 폰트 제공자의
+외부 스타일시트만 허용하므로 로컬로 옮긴 폰트 스타일시트는 AMP 페이지에서
+제거되며, AMP 페이지는 여전히 <code>cdn.ampproject.org</code>에서 AMP 런타임을
+불러옵니다.</li>
+</ul>
+<h2 id="제한-사항">제한 사항</h2>
+<ul>
+<li>인라인 <code>style=&quot;…url(…)&quot;</code> 속성, <code>&lt;style&gt;</code> 블록, 인라인 모듈 <code>import</code>, import
+map, 그 밖의 속성(<code>&lt;link rel=&quot;icon&quot;&gt;</code>, <code>&lt;link imagesrcset&gt;</code>, <code>&lt;track src&gt;</code>
+등)은 바꾸지 않으므로 원래 호스트에서 불러옵니다.</li>
+<li>자기 URL 기준으로 다른 파일을 불러오는 스크립트(MathJax, 절대 <code>/npm/...</code>
+import를 쓰는 ESM 번들, pdf.js 워커)는 옮기면 동작하지 않습니다. 해당
+호스트를 <code>exclude</code>에 추가하세요.</li>
+<li>HTML 주석 안의 태그(IE 조건부 주석 포함)와 따옴표로 감싼 속성 값 안에 <code>&gt;</code>가
+있는 태그는 경고 없이 그대로 둡니다.</li>
+<li><code>include</code>와 <code>exclude</code>는 호스트 이름 전체를 비교합니다. 하위 도메인은 따로
+적어야 합니다.</li>
+<li>드물게 스타일시트가 서로를 순환 import하거나 네 단계보다 깊게 이어지면,
+어느 참조가 절대 URL로 남을지는 어느 페이지가 먼저 그 체인에 닿는지에 따라
+달라집니다.</li>
+<li>빌드당 다운로드 전체 크기나 개수에는 제한이 없습니다.</li>
+<li><code>content/</code>에서 복사되는 <code>.html</code> 파일은 그대로 게시됩니다.</li>
+</ul>
+<h2 id="함께-보기">함께 보기</h2>
+<ul>
+<li><a href="/ko/features/remote-data/">원격 데이터 소스</a>는 같은 HTTP 클라이언트와 캐시
+규칙을 씁니다</li>
+<li>하위 리소스 무결성은 <a href="/ko/features/asset-pipeline/">에셋 파이프라인</a>을
+참고하세요</li>
+<li><a href="/ko/start/config/">설정</a></li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/ko/features/deployment/" rel="prev">
+    <span class="pn-label">이전</span>
+    <span class="pn-title">배포 명령</span>
+    <span class="pn-desc">hwaro deploy의 배포 대상 설정</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/ko/features/csp/" rel="next">
+    <span class="pn-label">다음</span>
+    <span class="pn-title">콘텐츠 보안 정책(CSP)</span>
+    <span class="pn-desc">페이지마다 인라인 스크립트와 스타일의 해시로 엄격한 CSP 만들기</span>
+  </a>
+  
+</nav>
+
+    
+<footer class="site-footer">
+  <p class="footer-meta">
+    <a class="footer-sig" href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul, Built with Love">
+      <span class="hahwul-img" aria-hidden="true"></span>
+      <span class="footer-love">Built with Love</span>
+    </a>
+    <span aria-hidden="true">·</span>
+    <span>MIT · © HAHWUL</span>
+  </p>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">목차</div>
+    <ul><li><a href="#빠른-시작">빠른 시작</a></li><li><a href="#설정">설정</a></li><li><a href="#로컬로-옮기는-대상">로컬로 옮기는 대상</a><ul><li><a href="#파일-형식">파일 형식</a></li><li><a href="#hwaro가-출력하는-태그">Hwaro가 출력하는 태그</a></li><li><a href="#user-agent">User-Agent</a></li><li><a href="#네트워크-안전">네트워크 안전</a></li></ul></li><li><a href="#캐시와-오프라인-빌드">캐시와 오프라인 빌드</a></li><li><a href="#다른-기능과의-관계">다른 기능과의 관계</a></li><li><a href="#제한-사항">제한 사항</a></li><li><a href="#함께-보기">함께 보기</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=cbccac98"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=cbccac98"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=cbccac98"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=cbccac98"></script>
+</body>
+</html>

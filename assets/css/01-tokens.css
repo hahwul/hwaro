@@ -1,0 +1,154 @@
+/* =============================================================================
+   Hwaro Docs — Design Tokens ("Hwaro Ember", dark-first)
+   Canonical vocabulary shared with the init scaffolds
+   (src/services/scaffolds/design_tokens.cr). Colors are light-dark() pairs;
+   the docs default to the DARK side (color-scheme: dark) and the theme
+   switcher pins light via [data-theme="light"]. The landing page hardcodes
+   data-theme="dark" and never flips.
+   ============================================================================= */
+
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/GeistVF.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/GeistMonoVF.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Dark by default; [data-theme="light"] re-resolves every pair below. */
+  color-scheme: dark;
+
+  /* Accent — the single ember. */
+  --primary:        light-dark(#b35454, #ec7a66);
+  --primary-strong: light-dark(#8f4040, #f39683);
+  --primary-tint:   color-mix(in srgb, var(--primary) 8%, transparent);
+  --selection:      color-mix(in srgb, var(--primary) 22%, transparent);
+
+  /* Ember rule — the one mark every hwaro surface shares. */
+  --rule-from: light-dark(#c46262, #f39683);
+  --rule-to:   light-dark(#8f4040, #cc5d4b);
+  --spark: linear-gradient(135deg, var(--rule-from), var(--rule-to));
+
+  /* Ink — a three-step ramp. The dark arms run cooler than the scaffold
+     defaults on purpose: the docs' original identity is a warm ember accent
+     over a deep neutral black, not a warm-brown dark. */
+  --heading:        light-dark(#241f1a, #f4f4f6);
+  --text:           light-dark(#2a241f, #dcdce1);
+  --text-secondary: light-dark(#5c5248, #a2a3ac);
+  --text-muted:     light-dark(#6f6358, #7b7c85);
+
+  /* Surfaces & edges (dark arms: cool near-black, see note above). */
+  --bg:            light-dark(#faf7f2, #0a0a0c);
+  --bg-subtle:     light-dark(#f1eae0, #15151a);
+  --bg-code:       light-dark(#f1eae0, #131318);
+  --border:        light-dark(#e4dacd, #26262c);
+  --border-subtle: light-dark(#efe8dd, #1c1c21);
+  --edge:  color-mix(in srgb, var(--text) 8%, transparent);
+  --glass: color-mix(in srgb, var(--bg) 85%, transparent);
+  --scrim: light-dark(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.6));
+
+  /* Support hues (info boxes only — the accent stays singular). */
+  --warn: light-dark(#b07d2e, #d9a45a);
+  --ok:   light-dark(#5e8c61, #8fb491);
+
+  /* Syntax (hljs classes; server-side highlighting). */
+  --code-comment:  light-dark(#a1907c, #8a8073);
+  --code-keyword:  light-dark(#b03a2e, #f0846f);
+  --code-string:   light-dark(#5f7032, #b7c06a);
+  --code-number:   light-dark(#9a6a14, #e8a83f);
+  --code-func:     light-dark(#2f6a5a, #8ec5a3);
+  --code-type:     light-dark(#b0641c, #e6914f);
+  --code-variable: light-dark(#8a4a3a, #e8b0a0);
+  --code-attr:     light-dark(#45617a, #93b5c8);
+  --code-symbol:   light-dark(#8a4368, #d79bb8);
+
+  /* Type scale — minor third (1.2), fluid. */
+  --step--1: clamp(0.83rem, 0.81rem + 0.11vw, 0.89rem);
+  --step-0:  clamp(1rem, 0.96rem + 0.22vw, 1.125rem);
+  --step-1:  clamp(1.2rem, 1.13rem + 0.35vw, 1.4rem);
+  --step-2:  clamp(1.44rem, 1.32rem + 0.61vw, 1.78rem);
+  --step-3:  clamp(1.73rem, 1.53rem + 0.98vw, 2.28rem);
+  --step-4:  clamp(2.07rem, 1.77rem + 1.52vw, 2.92rem);
+
+  /* Space — 8px rhythm. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2.5rem;
+  --space-7: 4rem;
+  --space-8: 6rem;
+
+  /* Shape, depth, motion, measure. */
+  --measure: 68ch;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow-sm: 0 1px 2px light-dark(rgba(42, 36, 31, 0.05), rgba(0, 0, 0, 0.3));
+  --shadow:    0 2px 8px light-dark(rgba(42, 36, 31, 0.08), rgba(0, 0, 0, 0.4));
+  --shadow-lg: 0 16px 70px light-dark(rgba(42, 36, 31, 0.18), rgba(0, 0, 0, 0.5));
+  --transition: 0.15s ease;
+
+  /* Faces — Geist, self-hosted. */
+  --font-sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+
+  /* Layout (docs-specific). */
+  --header-h: 60px;
+  --sidebar-w: 264px;
+  --toc-w: 232px;
+}
+
+/* Pre-light-dark() browsers: pin the static DARK palette (the docs' default
+   scheme) so the site stays fully styled — var() with an invalid value is
+   not a cascade fallback, the page would collapse to UA defaults. */
+@supports not (color: light-dark(#000, #fff)) {
+  :root {
+    --primary: #ec7a66;
+    --primary-strong: #f39683;
+    --primary-tint: rgba(236, 122, 102, 0.08);
+    --selection: rgba(236, 122, 102, 0.22);
+    --rule-from: #f39683;
+    --rule-to: #cc5d4b;
+    --heading: #f4f4f6;
+    --text: #dcdce1;
+    --text-secondary: #a2a3ac;
+    --text-muted: #7b7c85;
+    --bg: #0a0a0c;
+    --bg-subtle: #15151a;
+    --bg-code: #131318;
+    --border: #26262c;
+    --border-subtle: #1c1c21;
+    --edge: rgba(220, 220, 225, 0.08);
+    --glass: rgba(10, 10, 12, 0.85);
+    --scrim: rgba(0, 0, 0, 0.6);
+    --warn: #d9a45a;
+    --ok: #8fb491;
+    --code-comment: #8a8073;
+    --code-keyword: #f0846f;
+    --code-string: #b7c06a;
+    --code-number: #e8a83f;
+    --code-func: #8ec5a3;
+    --code-type: #e6914f;
+    --code-variable: #e8b0a0;
+    --code-attr: #93b5c8;
+    --code-symbol: #d79bb8;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 16px 70px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* Manual scheme override — the theme switcher sets `data-theme` on <html>
+   to pin one side of every light-dark() token above. */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
