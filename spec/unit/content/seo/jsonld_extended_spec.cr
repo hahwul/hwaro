@@ -251,6 +251,32 @@ describe Hwaro::Content::Seo::JsonLd do
       result = Hwaro::Content::Seo::JsonLd.article(page, config)
       result.should contain("jdoe")
     end
+
+    # Regression: the JSON-LD url carried a raw space / non-ASCII path while
+    # canonical and og:url were percent-encoded — an invalid URL.
+    it "percent-encodes page and breadcrumb URLs like the canonical URL" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      section = Hwaro::Models::Section.new("한국/_index.md")
+      section.title = "Korea"
+      section.url = "/한국/"
+      page = Hwaro::Models::Page.new("한국/글 하나.md")
+      page.title = "Post"
+      page.url = "/한국/글 하나/"
+      page.generate_permalink(config.base_url)
+      page.ancestors = [section] of Hwaro::Models::Page
+
+      encoded = "https://example.com/%ED%95%9C%EA%B5%AD/%EA%B8%80%20%ED%95%98%EB%82%98/"
+      Hwaro::Content::Seo::Tags.canonical_url(page, config).should eq(encoded)
+      [
+        Hwaro::Content::Seo::JsonLd.article(page, config),
+        Hwaro::Content::Seo::JsonLd.collection_page(page, config),
+      ].each do |tag|
+        JSON.parse(tag[/\{.*\}/m])["url"].as_s.should eq(encoded)
+      end
+      crumbs = JSON.parse(Hwaro::Content::Seo::JsonLd.breadcrumb(page, config)[/\{.*\}/m])["itemListElement"]
+      crumbs[1]["item"].as_s.should eq("https://example.com/%ED%95%9C%EA%B5%AD/")
+    end
   end
 
   describe ".for_page" do

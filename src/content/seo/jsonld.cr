@@ -14,6 +14,17 @@ module Hwaro
           "#{base}#{Utils::PathUtils.root_relative(path)}"
         end
 
+        # A page's own URL, percent-encoded like its canonical/og:url (a raw
+        # space or non-ASCII slug is not a valid schema.org URL).
+        private def page_url(base : String, page : Models::Page, url_override : String? = nil) : String
+          raw = if u = url_override
+                  abs_path(base, u)
+                else
+                  page.permalink || abs_path(base, page.url)
+                end
+          Utils::TextUtils.encode_url_path(raw)
+        end
+
         # Like abs_path, but leaves a value that already carries its own origin
         # (any `scheme:` URL, or a protocol-relative `//host/…`) untouched.
         private def abs_or_external(base : String, value : String) : String
@@ -23,7 +34,7 @@ module Hwaro
         # Generate Article JSON-LD for a page
         def article(page : Models::Page, config : Models::Config, site : Models::Site? = nil) : String
           base = config.base_url
-          url = page.permalink || abs_path(base, page.url)
+          url = page_url(base, page)
 
           date_published = page.date.try(&.to_s("%Y-%m-%dT%H:%M:%S%:z"))
           updated_str = page.updated.try(&.to_s("%Y-%m-%dT%H:%M:%S%:z"))
@@ -91,11 +102,7 @@ module Hwaro
         # og:type="website" emitted on the same page (gh#522 follow-up).
         def collection_page(page : Models::Page, config : Models::Config, url_override : String? = nil) : String
           base = config.base_url
-          url = if u = url_override
-                  abs_path(base, u)
-                else
-                  page.permalink || abs_path(base, page.url)
-                end
+          url = page_url(base, page, url_override)
 
           json = JSON.build do |j|
             j.object do
@@ -126,12 +133,12 @@ module Hwaro
             "@type"    => "ListItem",
             "position" => 1,
             "name"     => config.title,
-            "item"     => "#{base}#{lang_prefix}/",
+            "item"     => Utils::TextUtils.encode_url_path("#{base}#{lang_prefix}/"),
           }
 
           # Ancestors
           page.ancestors.each_with_index do |ancestor, idx|
-            ancestor_url = abs_path(base, ancestor.url)
+            ancestor_url = Utils::TextUtils.encode_url_path(abs_path(base, ancestor.url))
             items << {
               "@type"    => "ListItem",
               "position" => idx + 2,
@@ -215,7 +222,7 @@ module Hwaro
           return "" if steps.empty?
 
           base = config.base_url
-          url = abs_path(base, page.url)
+          url = page_url(base, page)
 
           json = JSON.build do |j|
             j.object do
