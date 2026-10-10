@@ -340,6 +340,8 @@ base_url이 포함된 URL을 생성합니다.
 
 **반환값:** String(절대 URL)
 
+`page.assets`/`section.assets` 항목(`blog/my-trip/photo.jpg`)을 넘기면 페이지 옆에 게시된 사본의 URL이 됩니다. `slug`, `path`, 언어 접두사로 페이지가 옮겨 가도 마찬가지입니다.
+
 ---
 
 ### get_url()

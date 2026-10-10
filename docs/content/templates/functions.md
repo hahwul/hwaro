@@ -340,6 +340,8 @@ Generate URL with base_url:
 
 **Returns:** String (absolute URL)
 
+A `page.assets`/`section.assets` entry (`blog/my-trip/photo.jpg`) resolves to the copy published next to its page, including when a `slug`, `path` or language prefix moves the page.
+
 ---
 
 ### get_url()

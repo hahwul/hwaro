@@ -150,6 +150,12 @@ module Hwaro
           # url_for() function - generate URL for a path
           @env.functions["url_for"] = Crinja.function({path: ""}) do
             path = arguments["path"].to_s
+            # A `page.assets` entry names the content file; it publishes next
+            # to its page (see Render#bundle_asset_urls).
+            assets = env.resolve("__bundle_asset_urls__").raw
+            if assets.is_a?(Hash) && (published = assets[path]?)
+              path = published.to_s
+            end
             base_url = env.resolve("base_url").to_s
             Crinja::Value.new(Filters::UrlFilters.absolutize(path, base_url))
           end
