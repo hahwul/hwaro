@@ -94,6 +94,33 @@ describe "Series support" do
     p1.series_index.should eq(2)
   end
 
+  # An undated part used to sort as 1970-01-01: ahead of every part dated
+  # later, while list sorting (SortUtils) puts undated pages last.
+  it "puts an undated part after every dated part" do
+    builder = Hwaro::Core::Build::Builder.new
+    config = Hwaro::Models::Config.new
+    site = Hwaro::Models::Site.new(config)
+
+    undated = Hwaro::Models::Page.new("posts/a.md")
+    undated.title = "A"
+    undated.series = "S"
+    old = Hwaro::Models::Page.new("posts/b.md")
+    old.title = "B"
+    old.series = "S"
+    old.date = Time.utc(1969, 7, 20)
+    recent = Hwaro::Models::Page.new("posts/c.md")
+    recent.title = "C"
+    recent.series = "S"
+    recent.date = Time.utc(2025, 1, 1)
+
+    site.pages = [undated, recent, old]
+    builder.test_compute_series(site)
+
+    old.series_index.should eq(1)
+    recent.series_index.should eq(2)
+    undated.series_index.should eq(3)
+  end
+
   it "handles multiple series independently" do
     builder = Hwaro::Core::Build::Builder.new
     config = Hwaro::Models::Config.new

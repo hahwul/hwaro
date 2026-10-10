@@ -816,8 +816,13 @@ module Hwaro::Core::Build::Phases::Transform
   # template's `page.series_pages` guard skips the orphan series-nav box.
   private def assign_series_groups(groups : Hash({String, String, String}, Array(Models::Page)))
     groups.each do |_name, pages|
+      # An undated part sorts after the dated ones (as in SortUtils) rather
+      # than as 1970-01-01, which put it ahead of every part dated after
+      # that. Path last so equal weight/date/title still order the same
+      # way on every build.
       sorted = pages.sort_by do |p|
-        {p.series_weight, p.date || Time::UNIX_EPOCH, p.title}
+        date = p.date
+        {p.series_weight, date ? 0 : 1, date || Time::UNIX_EPOCH, p.title, p.path}
       end
 
       sorted.each_with_index do |page, idx|
