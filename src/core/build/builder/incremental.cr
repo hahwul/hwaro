@@ -214,7 +214,7 @@ module Hwaro
           unless excluded_pages.empty? && relinked_counterparts.empty?
             @output_url_winners = compute_output_url_winners(all_pages)
           end
-          republish_regained_assets(previously_suppressed, output_dir)
+          regained = regained_output_pages(previously_suppressed.reject { |p| excluded_paths.includes?(p.path) }, output_dir)
 
           # Rebuild lookup index (page data may have changed)
           site.build_lookup_index
@@ -272,6 +272,7 @@ module Hwaro
           # unrelated happened to re-render them.
           listing_fanout_pages(site, templates, all_pages, listing_sets)
             .each { |p| pages_to_render << p }
+          regained.each { |p| pages_to_render << p }
 
           render_list = pages_to_render.to_a
 
@@ -951,11 +952,13 @@ module Hwaro
         # unsettled (see `@unsettled_page_outputs`) — less `except`, the
         # paths the caller has just settled itself — and empty the set.
         # Pages that lost an output-path collision before this pass and own
-        # their URL again: Write withheld their bundle files, and the edit
-        # that freed the URL was to the OTHER page, so nothing re-copies them.
-        private def republish_regained_assets(previously_suppressed : Array(Models::Page), output_dir : String) : Nil
+        # their URL again. The edit that freed the URL was to the OTHER page,
+        # so nothing selects them: their HTML and bundle files stayed the old
+        # winner's. Copies the bundle files; the caller re-renders the pages.
+        private def regained_output_pages(previously_suppressed : Array(Models::Page), output_dir : String) : Array(Models::Page)
           regained = previously_suppressed.reject(&.output_suppressed)
           process_assets(regained, output_dir, false) unless regained.empty?
+          regained
         end
 
         private def settle_page_outputs(output_dir : String, except : Array(String) = [] of String) : Nil
@@ -1153,7 +1156,9 @@ module Hwaro
           # may have introduced or resolved a slug/alias collision.
           previously_suppressed = all_pages.select(&.output_suppressed)
           @output_url_winners = compute_output_url_winners(all_pages)
-          republish_regained_assets(previously_suppressed, output_dir)
+          regained_output_pages(previously_suppressed, output_dir).each do |page|
+            pages_to_render << page if page.render && !pages_to_render.includes?(page)
+          end
 
           # User feed templates (rss.xml/atom.xml overrides) are not entry
           # templates for any page, so an edit to one — or to a partial they
