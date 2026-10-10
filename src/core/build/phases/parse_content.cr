@@ -283,6 +283,9 @@ module Hwaro::Core::Build::Phases::ParseContent
       end
     end
     chunk = strip_dangling_footnote_refs(chunk) if footnotes && chunk.includes?("[^")
+    # A marker inside a block shortcode's body: close the block where the
+    # summary ends, as the body would at its own `{% end %}`.
+    chunk += "\n{% end %}" * blocks_open_across(chunk, rest)
     definitions.empty? ? chunk : "#{chunk}\n\n#{definitions.join('\n')}"
   end
 

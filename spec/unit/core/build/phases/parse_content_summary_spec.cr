@@ -45,6 +45,32 @@ describe "marker summary context" do
   end
 end
 
+describe "marker summary inside a block shortcode" do
+  it "closes the block where the summary ends" do
+    summary = ""
+    log = with_captured_log do
+      build_site(
+        BASIC_CONFIG,
+        content_files: {"post.md" => "+++\ntitle = \"P\"\n+++\nIntro.\n\n{% note() %}\nInside.\n\n{% note() %}\nDeep.\n{% end %}\n\n<!-- more -->\n\nStill inside.\n{% end %}\n\nAfter.\n"},
+        template_files: {"page.html" => "SUM=[{{ page.summary }}]END", "section.html" => "{{ content }}",
+                         "shortcodes/note.html" => "<div class=\"note\">{{ body | markdownify }}</div>"},
+      ) do |dir|
+        summary = File.read(File.join(dir, "public", "post", "index.html"))[/SUM=\[(.*?)\]END/m, 1]
+      end
+    end
+    summary.should contain(%(<div class="note"><p>Inside.</p>))
+    summary.should contain(%(<div class="note"><p>Deep.</p>))
+    summary.should_not contain("{%")
+    summary.should_not contain("Still inside")
+    log.should_not contain("never closed")
+  end
+
+  it "leaves an opener the body never closes literal, as the body does" do
+    summary = summary_of("{% note() %}\nInside.\n\n<!-- more -->\n\nRest.\n")
+    summary.should contain("{% note() %}")
+  end
+end
+
 # The summary passes render the page's Markdown before the body render does;
 # each diagnostic used to print once per pass.
 describe "summary pass diagnostics" do

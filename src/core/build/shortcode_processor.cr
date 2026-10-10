@@ -208,39 +208,15 @@ module Hwaro
         private def block_body_lines(content : String) : Array(Bool)
           return [] of Bool unless Utils::ByteScan.includes?(content, "{%")
 
-          tracker = Content::Processors::FenceTracker.new(raw_html_code: false)
           open_lines = [] of Int32
           pairs = [] of Tuple(Int32, Int32)
-          line_count = 0
-
-          content.each_line(chomp: false) do |line|
-            line_no = line_count
-            line_count += 1
-            next if tracker.fence_line?(line)
-
-            # Inline code spans are masked first: a literal `{% alert %}` in
-            # backticks must not count as an opener.
-            scan_line = line.includes?('`') ? mask_inline_code(line)[0] : line
-
-            # Crinja control tags (`{% set %}`, `{% if %}`/`{% endif %}`, …)
-            # are ignored — pairing them would desync the map (an unbalanced
-            # `{% set %}` would swallow a later `{% end %}`). Classification
-            # is EXACT-keyword (control_tag_open? / shortcode_closer?), the
-            # same rules as the block parser below — the prefix regex once
-            # used here treated `-`/`(` as word boundaries, so a shortcode
-            # named `include-code` counted as a control tag and its fenced
-            # body split at the fence line.
-            scan_line.scan(BLOCK_OPEN_RE) do |m|
-              next if control_tag_open?(m) || BLOCK_ANY_CLOSE_RE.matches?(m[0])
+          line_count = each_block_tag(content, Content::Processors::FenceTracker.new(raw_html_code: false)) do |line_no, opener|
+            if opener
               open_lines << line_no
-            end
-            scan_line.scan(BLOCK_ANY_CLOSE_RE) do |m|
-              next unless shortcode_closer?(m[0])
+            elsif opened = open_lines.pop?
               # A closer with nothing open is stray — the block parser emits
               # it as literal text too.
-              if opened = open_lines.pop?
-                pairs << {opened, line_no} if line_no > opened
-              end
+              pairs << {opened, line_no} if line_no > opened
             end
           end
 
@@ -262,6 +238,64 @@ module Hwaro
             body_map[i] = depth > 0
           end
           body_map
+        end
+
+        # The shortcode block tags of `content` outside fenced code, in order:
+        # yields each one's line and whether it opens. Returns the line count.
+        # `tracker` carries fence state, so a text cut in two can be walked
+        # as one.
+        private def each_block_tag(content : String, tracker : Content::Processors::FenceTracker, & : Int32, Bool ->) : Int32
+          line_count = 0
+          content.each_line(chomp: false) do |line|
+            line_no = line_count
+            line_count += 1
+            next if tracker.fence_line?(line)
+
+            # Inline code spans are masked first: a literal `{% alert %}` in
+            # backticks must not count as an opener.
+            scan_line = line.includes?('`') ? mask_inline_code(line)[0] : line
+
+            # Crinja control tags (`{% set %}`, `{% if %}`/`{% endif %}`, …)
+            # are ignored — pairing them would desync the map (an unbalanced
+            # `{% set %}` would swallow a later `{% end %}`). Classification
+            # is EXACT-keyword (control_tag_open? / shortcode_closer?), the
+            # same rules as the block parser below — the prefix regex once
+            # used here treated `-`/`(` as word boundaries, so a shortcode
+            # named `include-code` counted as a control tag and its fenced
+            # body split at the fence line.
+            scan_line.scan(BLOCK_OPEN_RE) do |m|
+              next if control_tag_open?(m) || BLOCK_ANY_CLOSE_RE.matches?(m[0])
+              yield line_no, true
+            end
+            scan_line.scan(BLOCK_ANY_CLOSE_RE) do |m|
+              yield line_no, false if shortcode_closer?(m[0])
+            end
+          end
+          line_count
+        end
+
+        # How many block shortcodes are open where `head` ends and closed in
+        # `tail` — a `<!-- more -->` summary cut inside their bodies needs
+        # that many closers, or the openers ship as literal text.
+        private def blocks_open_across(head : String, tail : String) : Int32
+          return 0 unless Utils::ByteScan.includes?(head, "{%")
+          tracker = Content::Processors::FenceTracker.new(raw_html_code: false)
+          open = 0
+          each_block_tag(head, tracker) { |_, opener| open = opener ? open + 1 : Math.max(open - 1, 0) }
+          inner = 0
+          closed = 0
+          each_block_tag(tail, tracker) do |_, opener|
+            break if open == 0
+            if opener
+              inner += 1
+            elsif inner > 0
+              inner -= 1
+            else
+              open -= 1
+              closed += 1
+            end
+          end
+          closed
         end
 
         # Matched raw blocks must stay in one processing chunk so
