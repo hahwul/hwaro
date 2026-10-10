@@ -25,8 +25,11 @@ module Hwaro::Core::Build::Phases::Write
         ctx.raw_files.reject! { |raw| withheld_content_file?(raw.relative_path, withheld) }
       end
       written_raw = Set(String).new
-      shadowed = content_copy_shadowed_outputs(output_dir)
-      raw_count = process_raw_files(ctx.raw_files, output_dir, minify, verbose, written_raw, shadowed)
+      # O(pages): computed only when there is a content copy to check.
+      if !ctx.raw_files.empty? || ctx.all_pages.any? { |page| !page.assets.empty? }
+        shadowed = content_copy_shadowed_outputs(output_dir)
+      end
+      raw_count = process_raw_files(ctx.raw_files, output_dir, minify, verbose, written_raw, shadowed || Set(String).new)
       ctx.stats.raw_files_processed = raw_count
 
       # Process co-located assets (images, etc. in page bundles). A `.json`/
@@ -177,8 +180,6 @@ module Hwaro::Core::Build::Phases::Write
       Logger.warn "Skipping raw file outside output directory: #{relative_path}"
       return
     end
-    # ponytail: serve's per-file republish recomputes the O(pages) set per
-    # file; pass one in if a mass content edit ever makes that show.
     return if content_copy_shadowed?(source_path, output_path, shadowed || content_copy_shadowed_outputs(output_dir))
 
     # The copy below (and File.read) follows symlinks, so a raw-file symlink
@@ -246,7 +247,6 @@ module Hwaro::Core::Build::Phases::Write
   # Process co-located assets for pages
   private def process_assets(pages : Array(Models::Page), output_dir : String, verbose : Bool, already_written : Set(String) = Set(String).new, shadowed : Set(String)? = nil)
     now = Time.utc.to_unix_ms
-    shadowed ||= content_copy_shadowed_outputs(output_dir)
     pages.each do |page|
       next if page.assets.empty?
       # A collision loser's URL directory belongs to the winner (see
@@ -289,6 +289,7 @@ module Hwaro::Core::Build::Phases::Write
         next if already_written.includes?(File.expand_path(dest_path))
         # A bundle's `index.html` sibling is an asset whose destination IS
         # the page's own output.
+        shadowed ||= content_copy_shadowed_outputs(output_dir)
         next if content_copy_shadowed?(source_path, dest_path, shadowed)
 
         # Claimed even when the copy below is skipped as unchanged: the claim

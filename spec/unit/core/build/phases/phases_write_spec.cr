@@ -623,3 +623,55 @@ describe "Phases::Write content copies vs pages and generated outputs" do
     end
   end
 end
+
+# Counts the O(pages) shadowed-output scans; a subclass so the count stays
+# out of every other spec's builder.
+private class ShadowScanCountingBuilder < Hwaro::Core::Build::Builder
+  getter shadow_scans = 0
+
+  def content_copy_shadowed_outputs(output_dir : String) : Set(String)
+    @shadow_scans += 1
+    super
+  end
+end
+
+describe "Phases::Write shadowed-output scan cost" do
+  # The scan costs O(pages) (owned outputs plus, on --cache, every cached
+  # page's derived paths): 6,300 pages took the Write phase from 0.4ms to
+  # 125ms+ with nothing to copy.
+  it "skips the scan when the build has no content copies" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}")
+        File.write("content/a.md", "+++\ntitle = \"A\"\n+++\n")
+        builder = ShadowScanCountingBuilder.new
+        builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)).should be_true
+        builder.shadow_scans.should eq(0)
+      end
+    end
+  end
+
+  it "scans once for a serve batch of content files" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[content.files]\nallow_extensions = ["txt"]))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}")
+        File.write("content/a.md", "+++\ntitle = \"A\"\n+++\n")
+        files = (1..3).map { |i| "content/f#{i}.txt" }
+        files.each { |path| File.write(path, "x") }
+        builder = ShadowScanCountingBuilder.new
+        builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)).should be_true
+        before = builder.shadow_scans
+
+        builder.copy_changed_content_files(files, "public")
+        (builder.shadow_scans - before).should eq(1)
+        File.read("public/f3.txt").should eq("x")
+      end
+    end
+  end
+end

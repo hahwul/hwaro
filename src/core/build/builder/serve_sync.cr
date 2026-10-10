@@ -179,6 +179,8 @@ module Hwaro
           written = Set(String).new
           withheld = withheld_bundle_dirs
           sources = changed_files.select { |src_path| File.exists?(src_path) && !File.directory?(src_path) }
+          # Once per batch, not per file: the set is O(pages).
+          shadowed : Set(String)? = nil
           sources.each do |src_path|
             relative = path_relative_to(src_path, "content")
 
@@ -187,7 +189,8 @@ module Hwaro
             # draft / future / expired bundle stays unpublished.
             next if withheld_content_file?(relative, withheld)
 
-            next unless dest_path = publish_raw_file(src_path, relative, output_dir, minify)
+            shadowed ||= content_copy_shadowed_outputs(output_dir)
+            next unless dest_path = publish_raw_file(src_path, relative, output_dir, minify, shadowed)
             written << File.expand_path(dest_path)
             Logger.action :copy, dest_path, Logger::Role::Dim if verbose
             copied << src_path
@@ -200,7 +203,7 @@ module Hwaro
             changed = sources.map { |src_path| path_relative_to(src_path, "content") }.to_set
             owners = (site.pages + site.sections).select { |page| !page.output_suppressed && page.assets.any? { |asset| changed.includes?(asset) } }
             unless owners.empty?
-              process_assets(owners, output_dir, verbose, written)
+              process_assets(owners, output_dir, verbose, written, shadowed)
               owners.each { |page| page.assets.each { |asset| copied << File.join("content", asset) if changed.includes?(asset) } }
             end
           end
