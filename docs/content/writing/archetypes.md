@@ -219,8 +219,6 @@ draft = {{ draft }}
 description = "{{ description }}"
 tags = {{ tags }}
 +++
-
-# {{ title }}
 ```
 
 This mirrors the `archetypes/default.md` that `hwaro init` ships. The

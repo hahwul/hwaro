@@ -207,8 +207,6 @@ draft = {{ draft }}
 description = "{{ description }}"
 tags = {{ tags }}
 +++
-
-# {{ title }}
 ```
 
 `hwaro init`이 만들어 주는 `archetypes/default.md`와 같은 내용입니다. `{{ description }}` 플레이스홀더는 플래그 방식에서는 빈 문자열로, 대화형 `hwaro new` 마법사에서는 입력한 값으로 치환됩니다.
