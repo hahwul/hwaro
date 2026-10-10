@@ -254,6 +254,25 @@ describe "CLI Tool Commands" do
       status.success?.should be_false
       error_io.to_s.should contain("unknown command")
     end
+
+    it "classifies an unknown command like `hwaro <command>` does" do
+      error_io = IO::Memory.new
+      status = Process.run(hwaro_binary, ["help", "nosuchcommand"], output: IO::Memory.new, error: error_io)
+      status.exit_code.should eq(2)
+      error_io.to_s.should contain("Error [HWARO_E_USAGE]: unknown command 'nosuchcommand'")
+    end
+
+    it "reaches `tool <sub>`: its help, or a usage error when unknown" do
+      output_io = IO::Memory.new
+      status = Process.run(hwaro_binary, ["help", "tool", "list"], output: output_io, error: IO::Memory.new)
+      status.success?.should be_true
+      output_io.to_s.should contain("Usage: hwaro tool list")
+
+      error_io = IO::Memory.new
+      status = Process.run(hwaro_binary, ["help", "tool", "bogus"], output: IO::Memory.new, error: error_io)
+      status.exit_code.should eq(2)
+      error_io.to_s.should contain("unknown command 'tool bogus'")
+    end
   end
 
   describe "hwaro doctor (top-level)" do

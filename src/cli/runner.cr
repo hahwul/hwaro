@@ -81,21 +81,7 @@ module Hwaro
           if handler = CommandRegistry.get(command)
             handler.call(args)
           else
-            # Classified usage error. The "Did you mean …" suggestion prints
-            # to stderr here (text mode only) so the final error line emitted
-            # by the rescue block below is the `Error [CODE]: …` form.
-            if Runner.json_flag?(args)
-              @@json_mode = true
-            else
-              if suggestion = Utils::CommandSuggester.suggest(command, CommandRegistry.names)
-                STDERR.puts "Did you mean '#{suggestion}'?"
-              end
-            end
-            raise Hwaro::HwaroError.new(
-              code: Hwaro::Errors::HWARO_E_USAGE,
-              message: "unknown command '#{command}'",
-              hint: "Run 'hwaro --help' to see all commands.",
-            )
+            Runner.unknown_command!(command, args)
           end
         end
       rescue ex : Hwaro::HwaroError
@@ -248,27 +234,36 @@ module Hwaro
         # Without this, `help <command>` silently falls back to the generic
         # top-level help, which is confusing for users probing the CLI.
         CommandRegistry.register(CommandInfo.new(name: "help", description: "Show help")) do |args|
-          target = args.find { |a| !a.starts_with?("-") }
+          # `help tool <sub>` reaches the subcommand (`tool <sub> --help`),
+          # so an unknown one fails like `hwaro tool <sub>` instead of
+          # printing the tool overview with exit 0.
+          positional = args.reject(&.starts_with?("-"))
+          target = positional.shift?
           if target && (handler = CommandRegistry.get(target))
-            handler.call(["--help"])
+            handler.call(target == "tool" ? positional.first(1) + ["--help"] : ["--help"])
           elsif target
-            Runner.report_unknown_command(target)
-            exit Hwaro::Errors::EXIT_USAGE
+            Runner.unknown_command!(target, args)
           else
             Runner.print_help
           end
         end
       end
 
-      # Write a concise unknown-command error to stderr with an optional
-      # "Did you mean" suggestion. Intentionally avoids dumping the ASCII
-      # banner or full command list — users can run `hwaro --help` for that.
-      def self.report_unknown_command(command : String, io : IO = STDERR)
-        io.puts "Error: unknown command '#{command}'"
-        if suggestion = Utils::CommandSuggester.suggest(command, CommandRegistry.names)
-          io.puts "Did you mean '#{suggestion}'?"
+      # Classified usage error for an unknown top-level command, shared by
+      # `hwaro <command>` and `hwaro help <command>`. The "Did you mean …"
+      # suggestion prints to stderr (text mode only) so the final error line
+      # emitted by `run`'s rescue is the `Error [CODE]: …` form.
+      def self.unknown_command!(command : String, args : Array(String)) : NoReturn
+        if json_flag?(args)
+          @@json_mode = true
+        elsif suggestion = Utils::CommandSuggester.suggest(command, CommandRegistry.names)
+          STDERR.puts "Did you mean '#{suggestion}'?"
         end
-        io.puts "Run 'hwaro --help' to see all commands."
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_USAGE,
+          message: "unknown command '#{command}'",
+          hint: "Run 'hwaro --help' to see all commands.",
+        )
       end
 
       def self.print_help
