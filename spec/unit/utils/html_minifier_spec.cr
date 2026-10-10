@@ -172,6 +172,13 @@ describe Hwaro::Utils::HtmlMinifier do
           .should eq("<em>a</em> <object data=\"x\"></object>")
       end
 
+      it "treats picture as inline" do
+        # Two images on one line of a paragraph, each wrapped in <picture>
+        # by an image render hook: the space between them is visible.
+        Hwaro::Utils::HtmlMinifier.minify("<p><picture><img src=\"a.png\"></picture>\n<picture><img src=\"b.png\"></picture></p>")
+          .should eq("<p><picture><img src=\"a.png\"></picture> <picture><img src=\"b.png\"></picture></p>")
+      end
+
       it "still strips whitespace between a block neighbour and a video element" do
         html = "<div>\n  <video src=\"v.mp4\"></video>\n</div>"
         result = Hwaro::Utils::HtmlMinifier.minify(html)

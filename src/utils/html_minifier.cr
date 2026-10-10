@@ -50,8 +50,9 @@ module Hwaro
       # between siblings collapses to a single rendered space and must
       # therefore be kept as one literal space. Replaced elements that
       # default to display:inline (iframe, video, audio, canvas, embed,
-      # object) are deliberately NOT listed: whitespace adjacent to them
-      # renders as a visible space and must be preserved.
+      # object — and `picture`, an inline wrapper around its `<img>`) are
+      # deliberately NOT listed: whitespace adjacent to them renders as a
+      # visible space and must be preserved.
       BLOCK_TAGS = Set{
         "address", "article", "aside", "base", "blockquote", "body",
         "caption", "col", "colgroup", "dd", "details", "dialog",
@@ -59,7 +60,7 @@ module Hwaro
         "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6",
         "head", "header", "hgroup", "hr", "html",
         "li", "link", "main", "menu", "meta", "nav", "noscript",
-        "ol", "p", "picture", "pre", "script", "section",
+        "ol", "p", "pre", "script", "section",
         "source", "style", "summary", "table", "tbody", "td",
         "tfoot", "th", "thead", "title", "tr", "track", "ul",
       }
