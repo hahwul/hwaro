@@ -776,7 +776,10 @@ module Hwaro
               # env("VAR") — substitute if set (even empty)
               Crinja::Value.new(env_value)
             else
-              Logger.warn "Environment variable '#{var_name}' is not set (referenced in template)"
+              # Once per name per build, like load_data(): an `env()` in a
+              # base layout warned once for every page on the site.
+              first = @@load_data_mutex.synchronize { @@load_data_warned.add?("env:#{var_name}") }
+              Logger.warn "Environment variable '#{var_name}' is not set (referenced in template)" if first
               Crinja::Value.new("")
             end
           end

@@ -349,6 +349,18 @@ describe Hwaro::Content::Processors::TemplateEngine do
       result.should eq("[]")
     end
 
+    # An env() in a base layout logged the same warning once per page.
+    it "warns about an unset env variable once per build" do
+      ENV.delete("HWARO_TPL_ONCE")
+      Hwaro::Content::Processors::TemplateEngine.clear_load_data_cache
+      log = with_captured_log do
+        3.times { render_crinja(%({{ env("HWARO_TPL_ONCE") }})) }
+      end
+      log.scan("HWARO_TPL_ONCE").size.should eq(1)
+      Hwaro::Content::Processors::TemplateEngine.clear_load_data_cache
+      with_captured_log { render_crinja(%({{ env("HWARO_TPL_ONCE") }})) }.should contain("HWARO_TPL_ONCE")
+    end
+
     it "processes url_for function" do
       vars = {} of String => Crinja::Value
       vars["base_url"] = Crinja::Value.new("https://example.com")
