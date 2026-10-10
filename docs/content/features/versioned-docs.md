@@ -212,7 +212,7 @@ Latest-version pages self-canonicalize as usual. Paginated listings keep self-ca
 |---------|--------|---------|
 | `search.json` | `[versions] search` | latest only |
 | `sitemap.xml` | `[versions] search` (same switch) | latest only |
-| RSS / Atom (main, section, per-language) | `[versions] feeds` | latest only |
+| RSS / Atom (main, section, per-language, taxonomy term) | `[versions] feeds` | latest only |
 | Taxonomy term pages | `[versions] taxonomies` | latest only |
 | `llms.txt` / `llms-full.txt` | — | always latest only |
 

@@ -550,9 +550,12 @@ module Hwaro
         # No caller-side sort/limit: process_feed itself sorts date-desc
         # (SortUtils.compare_by_date) and applies feeds.limit. Dedupe by URL
         # so collision losers (not written as HTML) never appear in the feed,
-        # and keep `redirect_to` stubs out like every other feed does.
+        # and keep `redirect_to` stubs out like every other feed does. Older
+        # versions follow `[versions] feeds`, not `taxonomies`, as in every
+        # other feed.
+        versions = site.config.versions
         Content::Seo::Feeds.process_feed(
-          Content::Seo::Feeds.dedupe_by_output_url(pages.select(&.published_content?)),
+          Content::Seo::Feeds.dedupe_by_output_url(pages.select { |p| p.published_content? && versions.in_feeds?(p) }),
           site.config,
           feed_output_dir,
           "",

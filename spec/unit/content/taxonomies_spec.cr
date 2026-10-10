@@ -1,4 +1,5 @@
 require "../../spec_helper"
+require "../../support/build_helper"
 
 # Reopen Builder so the taxonomy feed-template test can install a loaded
 # template set (feed_template_renderer is nil until templates are loaded).
@@ -474,6 +475,34 @@ describe Hwaro::Content::Taxonomies do
         Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
         site.taxonomies["tags"]["rust"].size.should eq(1)
         File.read(File.join(output_dir, "tags", "rust", "rss.xml")).scan("<item>").size.should eq(1)
+      end
+    end
+
+    it "keeps older versions out of a term feed under [versions] feeds = latest" do
+      config = <<-TOML
+        title = "T"
+        base_url = "https://example.com"
+        [[taxonomies]]
+        name = "tags"
+        feed = true
+        [versions]
+        taxonomies = "all"
+        [[versions.list]]
+        name = "v2"
+        path = "docs/v2"
+        latest = true
+        [[versions.list]]
+        name = "v1"
+        path = "docs/v1"
+        TOML
+      page = "+++\ntitle = \"A\"\ntags = [\"t\"]\n+++\nbody\n"
+      build_site(config, content_files: {"docs/v1/a.md" => page, "docs/v2/a.md" => page}) do |dir|
+        # The term page lists both versions (`taxonomies = "all"`) …
+        File.read(File.join(dir, "public", "tags", "t", "index.html")).should contain("/docs/v1/a/")
+        # … but the feed follows `feeds`, which defaults to "latest".
+        feed = File.read(File.join(dir, "public", "tags", "t", "rss.xml"))
+        feed.should contain("/docs/a/")
+        feed.should_not contain("/docs/v1/a/")
       end
     end
 

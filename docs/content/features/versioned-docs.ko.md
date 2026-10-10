@@ -212,7 +212,7 @@ URL 세그먼트는 디렉터리 이름이 아니라 버전 **name**입니다. `
 |------|--------|--------|
 | `search.json` | `[versions] search` | 최신만 |
 | `sitemap.xml` | `[versions] search` (같은 스위치) | 최신만 |
-| RSS / Atom (메인, 섹션, 언어별) | `[versions] feeds` | 최신만 |
+| RSS / Atom (메인, 섹션, 언어별, 택소노미 용어) | `[versions] feeds` | 최신만 |
 | 택소노미 용어 페이지 | `[versions] taxonomies` | 최신만 |
 | `llms.txt` / `llms-full.txt` | — | 항상 최신만 |
 
