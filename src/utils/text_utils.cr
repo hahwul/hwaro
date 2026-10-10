@@ -816,9 +816,11 @@ module Hwaro
                 pending_space = false
               end
             else
-              # Emit deferred space only if the next char is alphanumeric
-              # (avoids "World !" from "</b>!")
-              if pending_space && char.alphanumeric?
+              # Emit the deferred space unless the next char closes the
+              # sentence or a bracket ("Visible.<!-- -->" stays "Visible."):
+              # an opening quote, bracket or emoji after a block boundary
+              # starts a new word (`<li>a</li><li>"b"</li>` was `a"b"`).
+              if pending_space && !closing_punct?(char)
                 io << ' '
               end
               pending_space = false
@@ -828,6 +830,11 @@ module Hwaro
             reader.next_char
           end
         end.strip
+      end
+
+      # Punctuation that attaches to the word before it.
+      private def closing_punct?(char : Char) : Bool
+        char.in?('.', ',', ';', ':', '!', '?', ')', ']', '}', '、', '。', '）', '，', '！', '？', '：', '；', '」', '』')
       end
 
       # A `<` opens a tag/comment only before a letter, `/`, `!` or `?`;

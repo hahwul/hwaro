@@ -512,6 +512,12 @@ describe Hwaro::Utils::TextUtils do
         Hwaro::Utils::TextUtils.strip_html("<p>a</p><p>b</p><div>c</div>").should eq("a b c")
       end
 
+      it "separates a block boundary from a following quote, bracket or emoji" do
+        Hwaro::Utils::TextUtils.strip_html(%(<ul><li>a</li><li>"b"</li><li>(c)</li><li>✅ d</li></ul>)).should eq(%(a "b" (c) ✅ d))
+        Hwaro::Utils::TextUtils.strip_html(%(Line one<br>"after")).should eq(%(Line one "after"))
+        Hwaro::Utils::TextUtils.strip_html("<p>中文</p>。").should eq("中文。")
+      end
+
       it "matches tag names case-insensitively" do
         Hwaro::Utils::TextUtils.strip_html("a<B>b</B>c").should eq("abc")
         Hwaro::Utils::TextUtils.strip_html("a<P>b</P>c").should eq("a b c")
