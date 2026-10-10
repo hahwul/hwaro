@@ -1,6 +1,7 @@
 require "base64"
 require "digest/sha256"
 require "file_utils"
+require "uri"
 require "json"
 require "../../core/build/parallel"
 require "../../models/config"
@@ -612,7 +613,14 @@ module Hwaro
         MAX_SLUG_BYTES = 240
 
         def self.slug_for(page : Models::Page, seen_slugs : Hash(String, String)) : String
-          url_slug = page.url.gsub("/", "-").strip("-")
+          # The slug becomes a file name AND a URL path segment, so it must not
+          # hold a percent escape: a page URL carries `#`/`?` as `%23`/`%3F`
+          # (Page#url=), and the file literally named `posts-c%23-tips.png`
+          # was requested as the decoded `posts-c#-tips.png` — a 404 og:image.
+          # Decode, then fold the two characters a URL path can't hold raw.
+          url = page.url
+          url = URI.decode(url).scrub.gsub(/[#?]/, "-") if url.includes?('%')
+          url_slug = url.gsub("/", "-").strip("-")
           slug = url_slug.empty? ? Utils::TextUtils.slugify(page.title) : url_slug
           slug = "page" if slug.empty?
           # The slug is the whole URL, so a deep one can exceed NAME_MAX once
