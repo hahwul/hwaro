@@ -881,6 +881,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     # (page.image nil), so this is a no-op there. A front-matter image the
     # edit just added still wins.
     previous_image = page.image
+    previous_url = page.url
 
     page.title = data[:title]
     page.description = data[:description]
@@ -969,6 +970,17 @@ module Hwaro::Core::Build::Phases::ParseContent
 
     # Calculate URL
     calculate_page_url(page)
+
+    # The preserved auto-OG URL above is named after the page URL. A slug or
+    # path edit moved the page, and the image regenerated after this
+    # re-render lives under the new name: re-derive it now, or the page's
+    # og:image kept pointing at the old, deleted file.
+    if (img = page.image) && img == previous_image && page.url != previous_url && (cfg = @config)
+      ai = cfg.og.auto_image
+      if ai.enabled && Content::Seo::OgImage.auto_assigned?(img, ai)
+        page.image = "/#{ai.output_dir}/#{Content::Seo::OgImage.slug_for(page, {} of String => String)}#{File.extname(img)}"
+      end
+    end
   end
 
   # Attach the page's commit metadata (see Builder#@git_info) and fill the
