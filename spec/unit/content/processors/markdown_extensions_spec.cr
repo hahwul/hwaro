@@ -388,6 +388,12 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
   end
 
   describe "math (extended)" do
+    it "keeps multi-line display math inside its blockquote" do
+      html, _ = Hwaro::Processor::Markdown.render("> $$\n> a > b\n> $$\n\n> text $$x\n> y$$ end", markdown_config: make_config(math: true))
+      html.should eq("<blockquote>\n<div class=\"math math-display\">\\[\na &gt; b\n\\]</div>\n</blockquote>\n" \
+                     "<blockquote>\n<p>text <span class=\"math math-display\">\\[x\ny\\]</span> end</p>\n</blockquote>\n")
+    end
+
     it "handles multiline display math" do
       content = "$$\na + b\n= c\n$$"
       result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))

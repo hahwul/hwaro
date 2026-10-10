@@ -253,11 +253,19 @@ module Hwaro
               bare_line = line.strip
               bare_line = bare_line.sub(BLOCKQUOTE_MARKERS_RE, "") if bare_line.starts_with?('>')
               bare_display = bare_line.matches?(BARE_MATH_LINE_RE)
+              # A multi-line span inside a blockquote carries the `>` markers
+              # of its continuation lines: drop them from the formula and put
+              # them back after each newline of the emitted HTML, or the
+              # escaped `&gt;` lines fall out of the quote (and into KaTeX).
+              quote = line[/\A[ \t]*(?:>[ \t]?)+/]?
               io << line.gsub(MATH_PLACEHOLDER_RE) do |match|
                 span = $~[1].to_i?.try { |idx| store[idx]? }
                 next match unless span
 
-                escaped = Utils::TextUtils.escape_xml(span.body)
+                body = span.body
+                body = body.gsub(/\n[ \t]*(?:>[ \t]?)*/, "\n") if quote && body.includes?('\n')
+                escaped = Utils::TextUtils.escape_xml(body)
+                escaped = escaped.gsub("\n", "\n#{quote}") if quote
                 if span.display && (raw_context || bare_display)
                   "<div class=\"math math-display\">\\[#{escaped}\\]</div>"
                 elsif span.display
