@@ -655,6 +655,24 @@ describe "HtmlFilters" do
       end
     end
 
+    # A block body carries nested shortcodes as placeholder comments; safe
+    # mode replaced them with `<!-- raw HTML omitted -->`, so the nested
+    # shortcode's output vanished (the built-in alert markdownifies its body).
+    it "keeps shortcode placeholders under safe mode" do
+      cfg = Hwaro::Models::MarkdownConfig.new
+      cfg.safe = true
+      Hwaro::Processor::Markdown.filter_markdown_config = cfg
+      begin
+        vars = {"md" => Crinja::Value.new("A <!--HWARO-SHORTCODE-PLACEHOLDER-0--> <b>x</b>\n\n<!--HWARO-SHORTCODE-PLACEHOLDER-1-->\n")}
+        result = render_crinja("{{ md | markdownify }}", vars)
+        result.should contain("<!--HWARO-SHORTCODE-PLACEHOLDER-0-->")
+        result.should contain("<!--HWARO-SHORTCODE-PLACEHOLDER-1-->")
+        result.should_not contain("<b>")
+      ensure
+        Hwaro::Processor::Markdown.filter_markdown_config = nil
+      end
+    end
+
     it "honors the site's smart_punctuation setting" do
       cfg = Hwaro::Models::MarkdownConfig.new
       cfg.smart_punctuation = true
