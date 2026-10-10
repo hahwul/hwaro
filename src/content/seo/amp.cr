@@ -357,9 +357,10 @@ module Hwaro
             end
           end
 
-          # Add canonical link to the original page
+          # Add canonical link to the original page — percent-encoded like
+          # the `canonical_tag` the page itself carries.
           base_url = config.base_url.rstrip('/')
-          canonical_url = Utils::TextUtils.escape_xml("#{base_url}#{page.url}")
+          canonical_url = Utils::TextUtils.escape_xml(Utils::TextUtils.encode_url_path("#{base_url}#{page.url}"))
           if !result.includes?("rel=\"canonical\"") && result.matches?(/<\/head>/i)
             result = result.sub(/<\/head>/i, %(<link rel="canonical" href="#{canonical_url}">\n</head>))
           end
@@ -378,7 +379,9 @@ module Hwaro
           return if html.includes?("rel=\"amphtml\"")
 
           base_url = config.base_url.rstrip('/')
-          amp_url = Utils::TextUtils.escape_xml("#{base_url}/#{prefix}#{page.url}")
+          # Percent-encoded like every other page URL hwaro emits: a raw
+          # space or non-ASCII slug is not a valid href.
+          amp_url = Utils::TextUtils.escape_xml(Utils::TextUtils.encode_url_path("#{base_url}/#{prefix}#{page.url}"))
           link_tag = %(<link rel="amphtml" href="#{amp_url}">)
 
           if html.matches?(/<\/head>/i)

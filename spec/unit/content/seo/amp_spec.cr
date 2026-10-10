@@ -590,6 +590,28 @@ describe Hwaro::Content::Seo::Amp do
       end
     end
 
+    it "percent-encodes the amphtml and fallback canonical URLs" do
+      Dir.mktmpdir do |dir|
+        config = make_amp_config(<<-TOML)
+          [amp]
+          enabled = true
+          TOML
+
+        page = Hwaro::Models::Page.new("글 하나.md")
+        page.url = "/글 하나/"
+        canonical_dir = File.join(dir, "글 하나")
+        FileUtils.mkdir_p(canonical_dir)
+        File.write(File.join(canonical_dir, "index.html"), "<html><head></head><body>x</body></html>")
+
+        Hwaro::Content::Seo::Amp.generate([page], config, dir)
+
+        File.read(File.join(canonical_dir, "index.html"))
+          .should contain(%(rel="amphtml" href="https://example.com/amp/%EA%B8%80%20%ED%95%98%EB%82%98/"))
+        File.read(File.join(dir, "amp", "글 하나", "index.html"))
+          .should contain(%(rel="canonical" href="https://example.com/%EA%B8%80%20%ED%95%98%EB%82%98/"))
+      end
+    end
+
     it "skips sections not in configured list" do
       Dir.mktmpdir do |dir|
         config = make_amp_config(<<-TOML)
