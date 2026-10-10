@@ -76,16 +76,6 @@ howto_steps = ["Step Name", "Step Description", "Step 2 Name", "Step 2 Descripti
 
 Auto-included in `{{ jsonld }}` when `schema_type = "HowTo"`. Also available as `{{ jsonld_howto }}`.
 
-### Person
-
-Use in templates for author pages:
-
-```jinja
-{{ jsonld_person }}
-```
-
-Or build manually via the template function (for author-specific pages).
-
 ## Template Variables
 
 | Variable | Scope | Description |

@@ -76,16 +76,6 @@ howto_steps = ["Step Name", "Step Description", "Step 2 Name", "Step 2 Descripti
 
 `schema_type = "HowTo"`이면 `{{ jsonld }}`에 자동 포함됩니다. `{{ jsonld_howto }}`로도 쓸 수 있습니다.
 
-### Person
-
-작성자 페이지 템플릿에서 사용합니다:
-
-```jinja
-{{ jsonld_person }}
-```
-
-또는 템플릿 함수로 직접 구성해도 됩니다 (작성자별 페이지용).
-
 ## 템플릿 변수
 
 | 변수 | 범위 | 설명 |
