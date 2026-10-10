@@ -33,8 +33,15 @@ module Hwaro
     # page was rendered, for the rest of the session. Logging is never the
     # point of the work: the first failed write marks the stream gone and
     # every later one is dropped.
+    #
+    # It is also the one lock on the stream. Render workers run on several
+    # threads and warn concurrently; the terminal IO's buffer is not
+    # thread-safe, so unlocked writes interleaved, duplicated and dropped
+    # warning lines and even emitted NUL bytes. `puts` writes the line and
+    # its newline as one locked write so lines never interleave either.
     class GuardedIO < IO
       @gone = false
+      @mutex = Mutex.new
 
       def initialize(@io : IO)
       end
@@ -44,17 +51,25 @@ module Hwaro
       end
 
       def write(slice : Bytes) : Nil
-        return if @gone
-        @io.write(slice)
-      rescue IO::Error
-        @gone = true
+        @mutex.synchronize do
+          return if @gone
+          @io.write(slice)
+        rescue IO::Error
+          @gone = true
+        end
+      end
+
+      def puts(string : String) : Nil
+        string.ends_with?('\n') ? write(string.to_slice) : write("#{string}\n".to_slice)
       end
 
       def flush : Nil
-        return if @gone
-        @io.flush
-      rescue IO::Error
-        @gone = true
+        @mutex.synchronize do
+          return if @gone
+          @io.flush
+        rescue IO::Error
+          @gone = true
+        end
       end
 
       def tty? : Bool
