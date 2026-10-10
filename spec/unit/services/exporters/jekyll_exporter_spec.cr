@@ -698,3 +698,25 @@ describe "Jekyll export: post addresses" do
     end
   end
 end
+
+# Regression: a post's `slug` renames its URL segment in the build
+# (`/posts/renamed/`), but the export pinned the post to its source path and
+# rewrote `@/` links to it there, so both 404ed in Jekyll.
+describe "Jekyll export: slugged posts" do
+  it "pins the post to its slug URL and links to it there" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(File.join(content_dir, "posts"))
+      File.write(File.join(content_dir, "posts", "a.md"), "+++\ntitle = \"A\"\ndate = 2024-01-15\nslug = \"renamed\"\n+++\na\n")
+      File.write(File.join(content_dir, "posts", "b.md"), "+++\ntitle = \"B\"\ndate = 2024-02-15\n+++\nSee [A](@/posts/a.md#x)\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+      Hwaro::Services::Exporters::JekyllExporter.new.run(options).success.should be_true
+
+      posts = File.join(output_dir, "_posts")
+      File.read(File.join(posts, "2024-01-15-a.md")).should contain(%(permalink: "/posts/renamed/"))
+      File.read(File.join(posts, "2024-02-15-b.md")).should contain("[A](/posts/renamed/#x)")
+    end
+  end
+end

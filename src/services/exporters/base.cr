@@ -14,6 +14,7 @@ require "../../utils/frontmatter_writer"
 require "../../utils/logger"
 require "../../utils/output_guard"
 require "../../utils/path_utils"
+require "../../utils/permalink_resolver"
 require "../../utils/text_utils"
 
 module Hwaro
@@ -164,6 +165,43 @@ module Hwaro
 
         protected def load_draft_paths(content_dir : String) : Nil
           @draft_paths = ContentLister.new(content_dir).draft_paths
+          # Every run starts here; `@/` link targets resolve against it.
+          @content_dir = content_dir
+          @link_target_urls.clear
+        end
+
+        # Content directory of the current run (nil outside a run).
+        @content_dir : String? = nil
+        # Content-relative `@/` target → the URL its front matter moves it to.
+        @link_target_urls = {} of String => String?
+
+        # `/<url>/` for a page whose front matter moves it off its source
+        # path — `path` replaces the whole URL and `slug` the last segment,
+        # as the build resolves them (both targets honour the exported
+        # `slug`/`url`/`permalink`) — or nil when the source path is its URL.
+        protected def front_matter_url(relative : String, fields : Hash(String, YAML::Any)) : String?
+          slug = fields["slug"]?.try(&.as_s?)
+          custom = fields["path"]?.try(&.as_s?)
+          return unless slug || custom
+          url, _ = Utils::PermalinkResolver.resolve_url_lenient(
+            relative, nil, slug: slug, custom_path: custom, language: nil, date: nil, title: "")
+          url
+        end
+
+        # `front_matter_url` of the `@/` link target `relative`, nil when it
+        # is not a readable page of this run's content directory.
+        private def link_target_url(relative : String) : String?
+          dir = @content_dir
+          return unless dir && ContentWalk.markdown?(relative)
+          return if Utils::PathUtils.escapes_parent?(relative)
+          @link_target_urls.put_if_absent(relative) do
+            source = File.join(dir, relative)
+            next unless ContentWalk.readable_file?(source)
+            fields, _ = parse_content(read_content(source))
+            front_matter_url(relative, fields)
+          rescue
+            nil
+          end
         end
 
         # The page's own `draft = true`, or one cascaded from a section.
@@ -606,6 +644,11 @@ module Hwaro
           if idx = target.index(/[#?]/)
             suffix = target[idx..]
             target = target[0...idx]
+          end
+          # A target whose `slug`/`path` moves it is linked where it lives;
+          # the source path is a 404 in the build and in the export alike.
+          if moved = link_target_url(target)
+            return "#{moved}#{suffix}#{title}"
           end
           # A section `_index` and a page-bundle `index` both publish at
           # their directory's URL (`@/posts/my-post/index.md` →

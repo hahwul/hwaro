@@ -548,3 +548,27 @@ describe "Hugo export: cascaded drafts" do
     end
   end
 end
+
+# Regression: `@/` links were rewritten to the target's source path, so a
+# target moved by `slug` or `path` (honoured by the build and by Hugo alike)
+# was linked at an address neither publishes.
+describe "Hugo export: links to moved pages" do
+  it "links to the slug or path URL of the target" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(File.join(content_dir, "posts", "c"))
+      File.write(File.join(content_dir, "posts", "a.md"), "+++\ntitle = \"A\"\nslug = \"renamed\"\n+++\na\n")
+      File.write(File.join(content_dir, "posts", "c", "index.md"), "---\ntitle: C\nslug: cee\n---\nc\n")
+      File.write(File.join(content_dir, "about.md"), "+++\ntitle = \"About\"\npath = \"/company/about\"\n+++\nx\n")
+      File.write(File.join(content_dir, "posts", "b.md"),
+        "+++\ntitle = \"B\"\n+++\n[A](@/posts/a.md) [C](@/posts/c/index.md#top) [About](@/about.md) [B](@/posts/b.md)\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "hugo", content_dir: content_dir, output_dir: output_dir)
+      Hwaro::Services::Exporters::HugoExporter.new.run(options).success.should be_true
+
+      File.read(File.join(output_dir, "content", "posts", "b.md")).should contain(
+        "[A](/posts/renamed/) [C](/posts/cee/#top) [About](/company/about/) [B](/posts/b)")
+    end
+  end
+end

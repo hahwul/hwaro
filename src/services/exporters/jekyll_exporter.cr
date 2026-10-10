@@ -203,7 +203,8 @@ module Hwaro
               # Jekyll's default `/:year/:month/:day/:title.html`, away from the
               # address the build gave it and the one the rewritten `@/` links
               # (and every inbound URL) point at.
-              url = file_path.sub(content_dir, "").lstrip('/').sub(/\.(?:md|markdown)\z/, "").sub(/(\A|\/)_?index\z/, "\\1").strip('/')
+              relative = file_path.sub(content_dir, "").lstrip('/')
+              url = (front_matter_url(relative, fields) || relative.sub(/\.(?:md|markdown)\z/, "").sub(/(\A|\/)_?index\z/, "\\1")).strip('/')
               yaml_lines << "permalink: #{Hwaro::Utils::FrontmatterWriter.yaml_scalar("/#{url}/")}" unless url.empty?
             end
           end
