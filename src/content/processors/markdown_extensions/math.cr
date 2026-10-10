@@ -202,6 +202,21 @@ module Hwaro
           text
         end
 
+        # `$…$` spans of already-rendered inline HTML (footnote bodies, built
+        # after the math pass) wrapped in place, as in a raw HTML block. A
+        # span, not a div, for display math: the body sits inside a `<p>`.
+        private def wrap_rendered_math(html : String) : String
+          return html unless html.includes?('$')
+          store = [] of MathSpan
+          stashed = stash_math_chunk(html, store)
+          return html if store.empty?
+          stashed.gsub(MATH_PLACEHOLDER_RE) do |match|
+            next match unless span = $~[1].to_i?.try { |idx| store[idx]? }
+            body = Utils::TextUtils.escape_xml(HTML.unescape(span.body))
+            span.display ? %(<span class="math math-display">\\[#{body}\\]</span>) : %(<span class="math math-inline">\\(#{body}\\)</span>)
+          end
+        end
+
         # Phase 2: expand stashed math spans into final HTML.
         #
         # Display math emits single-backslash `\[…\]` in a `<div>` when the
@@ -263,6 +278,11 @@ module Hwaro
                 next match unless span
 
                 body = span.body
+                # In a raw HTML block the body is HTML text: a generated
+                # <td>/<dd> was escaped by InlineMarkdown already, and an
+                # author's `&lt;` means `<` there too. Decode once, so the
+                # escape below doesn't hand KaTeX a literal `&lt;`.
+                body = HTML.unescape(body) if raw_context && body.includes?('&')
                 body = body.gsub(/\n[ \t]*(?:>[ \t]?)*/, "\n") if quote && body.includes?('\n')
                 escaped = Utils::TextUtils.escape_xml(body)
                 escaped = escaped.gsub("\n", "\n#{quote}") if quote

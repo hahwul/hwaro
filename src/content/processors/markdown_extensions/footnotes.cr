@@ -161,9 +161,8 @@ module Hwaro
         end
 
         # Post-processing: convert footnote comments to HTML section.
-        # `flags.math` keeps `$…$` spans in footnote bodies untransformed
-        # (math is not rendered in footnotes, but its internals must not be
-        # rewritten by emphasis/strikethrough either); `flags` also threads
+        # `flags.math` renders `$…$` spans in footnote bodies as math, their
+        # internals untouched by emphasis/strikethrough; `flags` also threads
         # the F10 opt-in inline markup (ins/mark/sub/sup).
         def postprocess_footnotes(html : String, *, flags : InlineMarkdown::Flags = InlineMarkdown::Flags.new) : String
           return html unless html.includes?("<!--HWARO-FOOTNOTES-START-->")
@@ -210,6 +209,7 @@ module Hwaro
               paragraphs = fn[:text].split(/\n{2,}/)
               paragraphs.each_with_index do |para, idx|
                 rendered_text = InlineMarkdown.render(para, flags: flags)
+                rendered_text = wrap_rendered_math(rendered_text) if flags.math
                 if idx == paragraphs.size - 1
                   str << "<p>#{rendered_text} #{backrefs}</p>\n"
                 else

@@ -1780,6 +1780,15 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should contain("<td><span class=\"math math-inline\">\\(x+y\\)</span></td>")
     end
 
+    it "escapes math bodies in cells, definitions and footnotes exactly once" do
+      md = "| col |\n|-----|\n| $a<b$ and $c\\&d$ |\n\nT\n: $x<y$\n\nN[^1]\n\n[^1]: fn $f>g$"
+      html, _ = Hwaro::Processor::Markdown.render(md, markdown_config: make_config(math: true, definition_lists: true, footnotes: true))
+      html.should contain(%(<td><span class="math math-inline">\\(a&lt;b\\)</span> and <span class="math math-inline">\\(c\\&amp;d\\)</span></td>))
+      html.should contain(%(<dd><span class="math math-inline">\\(x&lt;y\\)</span></dd>))
+      html.should contain(%(<p>fn <span class="math math-inline">\\(f&gt;g\\)</span> <a href="#fnref-1"))
+      html.should_not contain("&amp;lt;")
+    end
+
     it "renders footnote refs inside a table cell" do
       html, _ = Hwaro::Processor::Markdown.render("| col |\n|-----|\n| see[^1] |\n\n[^1]: note", markdown_config: make_config(footnotes: true))
       html.should contain("<td>see<sup class=\"footnote-ref\">")
@@ -1844,7 +1853,7 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
 
     it "keeps math spans untouched in footnote bodies while striking the rest" do
       html, _ = Hwaro::Processor::Markdown.render("Note[^1].\n\n[^1]: formula $~~x~~$ and ~~real~~", markdown_config: make_config(math: true, footnotes: true))
-      html.should contain("$~~x~~$")
+      html.should contain(%(<span class="math math-inline">\\(~~x~~\\)</span>))
       html.should contain("<del>real</del>")
     end
 
