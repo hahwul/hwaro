@@ -77,7 +77,10 @@ module Hwaro
         # re-matched across the two `**` runs into `<em>* 3 and 4 *</em>`.
         INLINE_ITALIC_ASTERISK_RE   = /(?<!\*)\*(?=[^\s*])(.+?)(?<=[^\s*])\*(?!\*)/
         INLINE_ITALIC_UNDERSCORE_RE = /(?<![a-zA-Z0-9_])_(?=[^\s_])(.+?)(?<=[^\s_])_(?![a-zA-Z0-9_])/
-        INLINE_STRIKETHROUGH_RE     = /~~(?=\S)(.+?)(?<=\S)~~/
+        # A `~~` right after an unescaped backslash is literal (`\~~not\~~`):
+        # rewriting it would leave `\<del>`, which Markd escapes into visible
+        # `&lt;del&gt;` text. `\\~~x~~` (escaped backslash) still strikes.
+        INLINE_STRIKETHROUGH_RE = /(?<!(?<!\\)\\)~~(?=\S)(.+?)(?<=\S)(?<!(?<!\\)\\)~~/
 
         # Opt-in inline markup (F10) — all gated behind their own
         # `[markdown]` flags (see `Flags`), so with every flag off these

@@ -1007,6 +1007,11 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html, _ = Hwaro::Processor::Markdown.render("~~bye~~", markdown_config: cfg)
       html.should contain("<del>bye</del>")
     end
+
+    it "keeps backslash-escaped ~~ literal instead of leaking escaped tags" do
+      html, _ = Hwaro::Processor::Markdown.render("a \\~~not\\~~ b and ~~x\\~~ y~~ and \\\\~~z~~", markdown_config: make_config)
+      html.should eq("<p>a ~~not~~ b and <del>x~~ y</del> and \\<del>z</del></p>\n")
+    end
   end
 
   describe "footnote inline markdown" do
