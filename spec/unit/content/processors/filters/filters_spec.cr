@@ -1232,6 +1232,14 @@ describe "MiscFilters (extended)" do
       result.should eq("3.14")
     end
 
+    # Nested containers printed Crystal internals: `[1, [Crinja::Value<2>]]`.
+    it "inspects nested arrays and mappings" do
+      result = render_crinja(%({{ [1, [2, [3]], {"k": ["v"]}] | inspect }}), {} of String => Crinja::Value)
+      result.should eq("[1, [2, [3]], {k: [v]}]")
+      result = render_crinja(%({{ {"a": [1, 2], "b": {"c": "d"}} | inspect }}), {} of String => Crinja::Value)
+      result.should eq("{a: [1, 2], b: {c: d}}")
+    end
+
     it "inspects an empty array" do
       items = Crinja::Value.new([] of Crinja::Value)
       vars = {"val" => items}
