@@ -124,11 +124,12 @@ module Hwaro::Core::Build::Phases::Render
   INTERNAL_LINK_TARGET_RE = /<@\/([^>\n#?]+)|@\/([^\s()"'#?<>\[\]]+)/
 
   # A content-derived field or `[extra]` read straight off a relation —
-  # `page.higher.summary`, `get_page(path="x").extra.badge` — where the
-  # receiver is an attribute or a call result, so the `<receiver>.<field>`
-  # patterns above (which need a bare word receiver) cannot see it.
-  CHAINED_CONTENT_DERIVED_RE = /(?:\.(?:lower|higher)|\))\s*(?:\.\s*(?:summary(?:_truncated)?|word_count|reading_time)\b|\[\s*["'](?:summary(?:_truncated)?|word_count|reading_time)["'])/
-  CHAINED_EXTRA_RE           = /(?:\.(?:lower|higher)|\))\s*(?:\.\s*extra\b|\[\s*["']extra["'])/
+  # `page.higher.summary`, `get_page(path="x").extra.badge`, `xs[0].summary` —
+  # where the receiver is an attribute, a call result or a subscript, so
+  # the `<receiver>.<field>` patterns above (which need a bare word
+  # receiver) cannot see it.
+  CHAINED_CONTENT_DERIVED_RE = /(?:\.(?:lower|higher)|[)\]])\s*(?:\.\s*(?:summary(?:_truncated)?|word_count|reading_time)\b|\[\s*["'](?:summary(?:_truncated)?|word_count|reading_time)["'])/
+  CHAINED_EXTRA_RE           = /(?:\.(?:lower|higher)|[)\]])\s*(?:\.\s*extra\b|\[\s*["']extra["'])/
 
   # Which relations one page's template closure reads (see the markers above),
   # and which optional page fields it reads off them (`fields`).

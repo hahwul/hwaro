@@ -144,6 +144,18 @@ describe "warm --cache: pages rendering other pages" do
     end
   end
 
+  it "re-renders a page printing a subscripted listing entry's word count" do
+    with_relations_site do
+      File.write("templates/first.html", %(FIRST={{ get_section(path="posts/_index.md").pages[0].word_count }}))
+      File.write("content/first.md", "+++\ntitle = \"First\"\ntemplate = \"first\"\n+++\n")
+      relations_cached_build
+      File.read("public/first/index.html").should contain("FIRST=2")
+      Dir.glob("content/posts/[abc].md").each { |f| File.write(f, File.read(f) + " three four") }
+      relations_cached_build
+      File.read("public/first/index.html").should contain("FIRST=4")
+    end
+  end
+
   it "re-renders a wikilink to a heading whose custom id changed" do
     with_relations_site do
       File.write("config.toml", File.read("config.toml") + "\n[markdown]\nwikilinks = true\n")
