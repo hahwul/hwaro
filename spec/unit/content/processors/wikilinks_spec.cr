@@ -202,6 +202,20 @@ describe Hwaro::Content::Processors::Wikilinks do
       log.should_not contain("Ambiguous")
     end
 
+    it "does not call translations of one page ambiguous from an untranslated language" do
+      en = wl_page("posts/a.md", language: "en")
+      ja = wl_page("posts/a.ja.md", language: "ja")
+      fr_src = wl_page("posts/b.fr.md", language: "fr")
+      index = wl_index([en, ja, fr_src])
+      log = with_captured_log { index.resolve("a", fr_src).should be(en) }
+      log.should_not contain("Ambiguous")
+
+      # Two candidates sharing a language still are.
+      other = wl_page("docs/a.md", language: "en")
+      log = with_captured_log { wl_index([en, ja, other, fr_src]).resolve("a", fr_src).should be(en) }
+      log.should contain("Ambiguous wikilink '[[a]]' in 'posts/b.fr.md'")
+    end
+
     it "breaks ties by same directory, then shortest path, then name, warning once with every candidate" do
       src = wl_page("blog/post.md")
       near = wl_page("blog/setup.md")

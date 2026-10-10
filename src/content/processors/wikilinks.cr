@@ -170,7 +170,12 @@ module Hwaro
             return unless list
             return list.first if list.size == 1
             same = list.select { |c| c.language == source.language }
-            pick(same.empty? ? list : same, source, target) { |c| {c.path, Index.container_dir(c)} }
+            return pick(same, source, target) { |c| {c.path, Index.container_dir(c)} } unless same.empty?
+            # No candidate in the source's language: translations of one page
+            # (`a.md`, `a.ja.md` linked from a French page) are not ambiguous;
+            # only two candidates sharing a language are.
+            langs = list.map(&.language)
+            pick(list, source, target, warn: langs.uniq.size < langs.size) { |c| {c.path, Index.container_dir(c)} }
           end
 
           # The URL of the file an embed names: one of the source page's own
@@ -209,13 +214,13 @@ module Hwaro
 
           # Ambiguity: same directory as the source first, then the shortest
           # path, then lexicographic order; warned once per source and target.
-          # The caller has already narrowed pages to the source's language.
-          private def pick(list : Array(T), source : Models::Page, target : String, & : T -> {String, String}) : T forall T
+          # The caller narrows pages to the source's language when it can.
+          private def pick(list : Array(T), source : Models::Page, target : String, warn : Bool = true, & : T -> {String, String}) : T forall T
             return list.first if list.size == 1
             src_dir = Index.container_dir(source)
             keyed = list.map { |c| path, dir = yield(c); {c, path, dir} }
             chosen = keyed.min_by { |_, path, dir| {dir == src_dir ? 0 : 1, path.size, path} }
-            if @warned.first?(source.path, target)
+            if warn && @warned.first?(source.path, target)
               Logger.warn "Ambiguous wikilink '[[#{target}]]' in '#{source.path}' matches #{keyed.map(&.[1]).sort!.join(", ")}; using '#{chosen[1]}'."
             end
             chosen[0]
