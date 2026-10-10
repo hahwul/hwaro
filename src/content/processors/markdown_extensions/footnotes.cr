@@ -28,6 +28,10 @@ module Hwaro
           HTML.escape(key.gsub(/\s+/, "-"))
         end
 
+        private def footnote_label(key : String) : String
+          key.downcase(Unicode::CaseOptions::Fold).split.join(' ')
+        end
+
         def preprocess_footnotes(content : String) : String
           # Whole-content marker pre-check (memchr-fast): without `[^` there is
           # no footnote definition or reference to process, and without the
@@ -64,6 +68,9 @@ module Hwaro
           # definition. Consumed lines are replaced with bare "\n" so the
           # surrounding CommonMark block structure is unchanged.
           footnotes = {} of String => String
+          # Case-folded label → first definition key: GFM matches footnote
+          # labels like link labels, so `[^Note]` finds `[^note]:`.
+          labels = {} of String => String
           pending_key = nil.as(String?)
           pending_blank = false
           cleaned = String.build do |io|
@@ -100,6 +107,7 @@ module Hwaro
               if m = line.match(FOOTNOTE_DEF_RE)
                 # rstrip: on CRLF content the captured text carries a trailing \r
                 footnotes[m[1]] = m[2].rstrip
+                labels[footnote_label(m[1])] ||= m[1]
                 pending_key = m[1]
                 io << "\n"
               else
@@ -125,7 +133,10 @@ module Hwaro
             transform_outside_code_spans(line) do |stashed|
               stashed.gsub(FOOTNOTE_REF_RE) do |full_match|
                 key = $~[1]
-                next full_match unless footnotes.has_key?(key)
+                unless footnotes.has_key?(key)
+                  next full_match unless label_key = labels[footnote_label(key)]?
+                  key = label_key
+                end
 
                 unless ref_order.has_key?(key)
                   counter += 1

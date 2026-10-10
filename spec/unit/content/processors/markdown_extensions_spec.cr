@@ -318,6 +318,15 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
   end
 
   describe "footnotes (extended)" do
+    it "matches footnote labels case-insensitively, exact keys first" do
+      md = "A[^Note] B[^my  key] C[^x] D[^X]\n\n[^note]: folded\n[^My Key]: spaced\n[^x]: lower\n[^X]: upper"
+      html, _ = Hwaro::Processor::Markdown.render(md, markdown_config: make_config(footnotes: true))
+      html.should contain(%(A<sup class="footnote-ref"><a href="#fn-note" id="fnref-note">[1]</a></sup>))
+      html.should contain(%(B<sup class="footnote-ref"><a href="#fn-My-Key" id="fnref-My-Key">[2]</a></sup>))
+      html.should contain(%(<li id="fn-x">\n<p>lower ))
+      html.should contain(%(<li id="fn-X">\n<p>upper ))
+    end
+
     it "handles footnote keys with special characters (dashes)" do
       content = "Text[^my--note].\n\n[^my--note]: Note with dashes"
       result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_footnotes(content)
