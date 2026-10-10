@@ -1279,6 +1279,13 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should contain("<li>two</li>")
     end
 
+    it "renders the title as inline markdown, escaping raw HTML" do
+      cfg = make_config
+      cfg.containers = true
+      html, _ = Hwaro::Processor::Markdown.render(":::tip *Heads* `up` <b>x</b>\nbody\n:::", markdown_config: cfg)
+      html.should contain(%(<p class="admonition-title"><em>Heads</em> <code>up</code> &lt;b&gt;x&lt;/b&gt;</p>))
+    end
+
     it "is off by default and also renders in safe mode" do
       html, _ = Hwaro::Processor::Markdown.render(":::note\nx\n:::", markdown_config: make_config)
       html.should_not contain("admonition")

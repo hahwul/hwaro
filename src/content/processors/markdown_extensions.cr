@@ -45,7 +45,7 @@ module Hwaro
           # (`trusted`, see `trust`) so the renderer keeps it while still
           # omitting the author's raw HTML.
           trusted = config.safe
-          result = preprocess_containers(result, trusted: trusted) if config.containers
+          result = preprocess_containers(result, flags: inline_flags(config), trusted: trusted) if config.containers
           result = preprocess_definition_lists(result, flags: inline_flags(config), trusted: trusted) if config.definition_lists
           result = preprocess_footnotes(result, trusted: trusted) if config.footnotes
 

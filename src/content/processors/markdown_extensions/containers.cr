@@ -24,11 +24,11 @@ module Hwaro
         # `::::`) with a plain counter. Unclosed containers auto-close at
         # EOF (markdown-it behavior). Fence-aware: ::: lines inside code
         # fences stay verbatim. The type token is class-safe by
-        # construction; the title is HTML-escaped plain text.
+        # construction; the title is inline markdown (escaped).
         CONTAINER_OPEN_RE  = /\A {0,3}:{3,}[ \t]*([A-Za-z][\w-]*)[ \t]*(.*)\z/
         CONTAINER_CLOSE_RE = /\A {0,3}:{3,}\z/
 
-        def preprocess_containers(content : String, *, trusted : Bool = false) : String
+        def preprocess_containers(content : String, *, flags : InlineMarkdown::Flags = InlineMarkdown::Flags.new, trusted : Bool = false) : String
           return content unless content.includes?(":::")
 
           open_count = 0
@@ -43,7 +43,8 @@ module Hwaro
               stripped = line.rstrip
               if m = CONTAINER_OPEN_RE.match(stripped)
                 type = m[1].downcase
-                title = m[2].presence.try { |t| HTML.escape(t) } || m[1].capitalize
+                # Inline-rendered like an admonition's `> [!NOTE] *Title*`.
+                title = m[2].presence.try { |t| render_inline_md(t, flags) } || m[1].capitalize
                 open_count += 1
                 io << trust("<div class=\"admonition admonition-#{type}\">\n", trusted)
                 io << trust("<p class=\"admonition-title\">#{title}</p>\n\n", trusted)

@@ -341,7 +341,7 @@ Any **markdown** body — code fences and task lists included.
 :::
 ```
 
-The title defaults to the capitalized type. Longer runs nest
+The title is rendered as inline markdown (`:::tip *Heads up*`) and defaults to the capitalized type. Longer runs nest
 (`::::outer` … `:::inner` … `:::` … `::::`), a bare `:::` closes the
 innermost open container, and unclosed containers auto-close at the end
 of the page. `:::` lines inside code fences stay literal.
