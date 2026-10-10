@@ -66,7 +66,7 @@ my-site/
 │       └── hello.md
 ├── templates/       # Jinja2 templates
 ├── static/          # Static files (CSS, JS, images)
-├── data/            # Optional: JSON/YAML/TOML/CSV exposed as site.data
+├── data/            # Optional: JSON/YAML/TOML exposed as site.data (CSV via load_data())
 └── public/          # Generated output
 ```
 

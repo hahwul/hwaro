@@ -66,7 +66,7 @@ my-site/
 │       └── hello.md
 ├── templates/       # Jinja2 templates
 ├── static/          # Static files (CSS, JS, images)
-├── data/            # 선택: site.data로 노출되는 JSON/YAML/TOML/CSV
+├── data/            # 선택: site.data로 노출되는 JSON/YAML/TOML (CSV는 load_data()로)
 └── public/          # Generated output
 ```
 
