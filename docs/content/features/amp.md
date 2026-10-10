@@ -27,7 +27,7 @@ sections = ["posts"]
 |-----|------|---------|-------------|
 | enabled | bool | false | Enable AMP page generation |
 | path_prefix | string | "amp" | URL prefix for AMP pages |
-| sections | array | [] | Sections to generate AMP for (empty = all) |
+| sections | array | [] | Sections to generate AMP for (empty = all); a section also covers its subsections (`"posts"` includes `posts/2024`), as in `[feeds]` |
 
 ## What Gets Converted
 
@@ -67,7 +67,7 @@ By default, AMP pages are generated for all sections. Use `sections` to limit:
 ```toml
 [amp]
 enabled = true
-sections = ["posts", "blog"]   # Only these sections get AMP versions
+sections = ["posts", "blog"]   # Only these sections (and their subsections) get AMP versions
 ```
 
 ## Custom Path Prefix

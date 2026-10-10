@@ -183,9 +183,11 @@ module Hwaro
         @sections = [] of String
       end
 
-      # Check if a page section should get an AMP version
+      # Check if a page section should get an AMP version. A listed section
+      # covers its descendants (`"posts"` includes `"posts/2024"`), as
+      # `[feeds]`/`[outputs]` sections do.
       def section_enabled?(section : String) : Bool
-        @sections.empty? || @sections.includes?(section)
+        @sections.empty? || @sections.any? { |s| section == s || section.starts_with?("#{s}/") }
       end
     end
 

@@ -58,6 +58,17 @@ describe Hwaro::Models::AmpConfig do
       config.amp.section_enabled?("posts").should be_true
       config.amp.section_enabled?("pages").should be_false
     end
+
+    it "covers a configured section's descendants, like [feeds] sections" do
+      config = make_amp_config(<<-TOML)
+        [amp]
+        enabled = true
+        sections = ["posts"]
+        TOML
+
+      config.amp.section_enabled?("posts/2024").should be_true
+      config.amp.section_enabled?("postscript").should be_false
+    end
   end
 end
 

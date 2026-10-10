@@ -27,7 +27,7 @@ sections = ["posts"]
 |-----|------|---------|-------------|
 | enabled | bool | false | AMP 페이지 생성 활성화 |
 | path_prefix | string | "amp" | AMP 페이지의 URL 접두사 |
-| sections | array | [] | AMP를 생성할 섹션 (비워 두면 전체) |
+| sections | array | [] | AMP를 생성할 섹션 (비워 두면 전체). `[feeds]`처럼 하위 섹션도 포함 (`"posts"`는 `posts/2024`도 포함) |
 
 ## 변환 내용
 
@@ -67,7 +67,7 @@ public/
 ```toml
 [amp]
 enabled = true
-sections = ["posts", "blog"]   # 이 섹션들만 AMP 버전 생성
+sections = ["posts", "blog"]   # 이 섹션들(과 하위 섹션)만 AMP 버전 생성
 ```
 
 ## 사용자 지정 경로 접두사
