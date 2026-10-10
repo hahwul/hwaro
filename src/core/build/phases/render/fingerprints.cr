@@ -923,7 +923,10 @@ module Hwaro::Core::Build::Phases::Render
   # sorted and unique.
   private def internal_link_targets(page : Models::Page) : Array(String)
     targets = [] of String
-    page_scan_texts(page).each do |text|
+    texts = page_scan_texts(page)
+    # `redirect_to = "@/…"` resolves like a body link (generate_redirect_page).
+    page.redirect_to.try { |r| texts << r }
+    texts.each do |text|
       next unless Utils::ByteScan.includes?(text, "@/")
       text.scan(INTERNAL_LINK_TARGET_RE) { |m| targets << (m[1]? || m[2]) }
     end

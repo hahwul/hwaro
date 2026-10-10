@@ -124,4 +124,32 @@ describe "Render output paths: authored vs generated collisions" do
     log.should contain(%(Skipping alias "/old/a?x=1" on p.md))
     log.should contain(%(Skipping alias "/old/b#frag" on p.md))
   end
+
+  # `redirect_to = "@/…"` was written verbatim as `url=@/blog/b.md`.
+  it "resolves an @/ redirect_to target base_path-aware, and refreshes it on --cache" do
+    rebuild = -> {
+      builder = Hwaro::Core::Build::Builder.new
+      Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+      builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false))
+    }
+    log = with_captured_log do
+      build_site(
+        "title = \"T\"\nbase_url = \"http://localhost/sub\"\n",
+        content_files: {
+          "a.md"       => "+++\ntitle = \"A\"\nredirect_to = \"@/blog/b.md#top\"\n+++\n",
+          "missing.md" => "+++\ntitle = \"M\"\nredirect_to = \"@/nope.md\"\n+++\n",
+          "blog/b.md"  => "+++\ntitle = \"B\"\n+++\nB",
+        },
+        template_files: {"page.html" => "{{ content }}"},
+        cache: true,
+      ) do
+        File.read("public/a/index.html").should contain(%(url=/sub/blog/b/#top"))
+        # The target moves; the redirect page's own source does not change.
+        File.write("content/blog/b.md", "+++\ntitle = \"B\"\nslug = \"moved\"\n+++\nB")
+        rebuild.call
+        File.read("public/a/index.html").should contain(%(url=/sub/blog/moved/#top"))
+      end
+    end
+    log.should contain(%(`redirect_to` "@/nope.md" in 'missing.md' could not be resolved))
+  end
 end

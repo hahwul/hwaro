@@ -237,6 +237,7 @@ module Hwaro::Core::Build::Phases::Render
   )
     redirect_url = page.redirect_to
     return unless redirect_url
+    redirect_url = resolve_redirect_target(page, site, redirect_url)
 
     # Prefix a root-relative target with `base_url`'s path component, exactly
     # as generate_aliases does: without it, `redirect_to = "/about/"` on a
@@ -269,6 +270,26 @@ module Hwaro::Core::Build::Phases::Render
     Hwaro::Utils::FileSafe.atomic_write(output_path, Utils::RedirectHtml.full_redirect(redirect_url))
     note_published_page
     Logger.action :create, output_path if verbose
+  end
+
+  # `redirect_to = "@/blog/post.md"` names a content file the way an `@/`
+  # body link does, and resolves the same way (query/fragment kept); it was
+  # emitted literally as `url=@/blog/post.md`. An unresolved target is kept
+  # as written and reported like an unresolved body link.
+  private def resolve_redirect_target(page : Models::Page, site : Models::Site, target : String) : String
+    return target unless target.starts_with?("@/")
+    rest = target.lchop("@/")
+    split = rest.index(/[?#]/) || rest.size
+    pages_by_path = @pages_by_path || build_pages_by_path(site)
+    if dest = Content::Processors::InternalLinkResolver.page_for(pages_by_path, rest[0, split])
+      url = dest.url.starts_with?('/') ? dest.url : "/#{dest.url}"
+      return "#{url}#{rest[split..]}"
+    end
+    Logger.warn "`redirect_to` #{target.inspect} in '#{page.path}' could not be resolved: page not found."
+    if site.config.links.broken_internal == "error"
+      @broken_links_mutex.synchronize { @broken_internal_links << "#{page.path} → #{target} (page not found)" }
+    end
+    target
   end
 
   private def generate_aliases(page : Models::Page, site : Models::Site, output_dir : String, verbose : Bool)

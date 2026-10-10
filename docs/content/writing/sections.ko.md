@@ -45,7 +45,7 @@ Welcome to my blog.
 | paginate_path | string | "page" | 페이저 URL의 경로 세그먼트(기본값이면 `/blog/page/2/` 형태) |
 | transparent | bool | false | 페이지를 상위 섹션으로 넘김 |
 | generate_feeds | bool | false | RSS 피드 생성 |
-| redirect_to | string | — | 섹션을 렌더링하는 대신 이 URL로 가는 HTML 리다이렉트 페이지 생성 |
+| redirect_to | string | — | 섹션을 렌더링하는 대신 이 URL(또는 `@/blog/post.md` 같은 `@/` 콘텐츠 경로)로 가는 HTML 리다이렉트 페이지 생성 |
 | draft | bool | false | 프로덕션에서 제외 |
 | weight | int | 0 | 섹션 정렬 순서 |
 | cascade | table | — | 하위 항목이 상속하는 기본값 ([캐스케이드](#캐스케이드) 참고) |
