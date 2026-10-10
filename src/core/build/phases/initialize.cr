@@ -70,6 +70,7 @@ module Hwaro::Core::Build::Phases::Initialize
       # hidden static file) is not mistaken for one.
       dev_marker_found = !ctx.options.serve_mode && Utils::DevMarker.present?(output_dir)
       setup_output_dir(output_dir, keep_output)
+      @kept_output_dir = keep_output ? output_dir : nil
       copy_static_files(output_dir, verbose, keep_output)
 
       if ctx.options.serve_mode
@@ -505,7 +506,18 @@ module Hwaro::Core::Build::Phases::Initialize
   # creation stays sequential to avoid the check-then-create race that fires
   # under the multi-threaded runtime.
   private def copy_static_pairs(files_to_copy : Array({String, String, Time}))
-    files_to_copy.each { |_, dest, _| Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest)) }
+    files_to_copy.each do |_, dest, _|
+      mkdir_output(File.dirname(dest))
+      # A kept tree can also hold a DIRECTORY where this file now goes (the
+      # source was `static/x/…` last build, or a page published `/x/`), and
+      # `FileUtils.cp` copies INTO a directory: `public/x/x` instead of
+      # `public/x`. Nothing has been written this build yet, so whatever is
+      # there is the previous build's.
+      if (kept = @kept_output_dir) && File.info?(dest, follow_symlinks: false).try(&.directory?) &&
+         Utils::OutputGuard.safe_to_delete_directory?(dest, kept)
+        FileUtils.rm_rf(dest)
+      end
+    end
 
     # One `getcwd` for the whole copy rather than one per file: the canonical
     # form recorded below is only needed so filter_changed_pages can compare

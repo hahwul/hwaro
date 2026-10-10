@@ -150,7 +150,7 @@ module Hwaro::Core::Build::Phases::Write
 
     ext = File.extname(source_path).downcase
 
-    Hwaro::Utils::FileSafe.mkdir_p(File.dirname(output_path))
+    mkdir_output(File.dirname(output_path))
 
     # JSON and XML are minified; HTML is rewritten unchanged.
     if minify && ext.in?(".json", ".xml", ".html", ".htm")
@@ -265,7 +265,7 @@ module Hwaro::Core::Build::Phases::Write
           end
         end
 
-        Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
+        mkdir_output(File.dirname(dest_path))
         # Atomic copy: bundle assets are re-copied on every serve rebuild while
         # HTTP fibers stream them to the browser, and a truncate-and-stream
         # copy hands out zero-length or partial images that nothing retries.
@@ -356,7 +356,45 @@ module Hwaro::Core::Build::Phases::Write
 
   private def ensure_dir(dir : String)
     return if @created_dirs_mutex.synchronize { @created_dirs.includes?(dir) }
-    Hwaro::Utils::FileSafe.mkdir_p(dir)
+    mkdir_output(dir)
     @created_dirs_mutex.synchronize { @created_dirs << dir }
+  end
+
+  # `mkdir_p` for a directory inside the output tree. A kept tree (`--cache`,
+  # serve) is pruned only in Finalize, so an output that changed kind since
+  # the last build — `static/x` became `static/x/a.css`, the content file
+  # `notes.txt` became the page `notes.txt.md` — still finds the old FILE
+  # where this build needs a directory. mkdir failed on it, and on every
+  # later warm build too, until the output directory was wiped by hand. A
+  # cold build starts empty, so the previous build's leftover is removed; a
+  # file THIS build wrote is a real collision and still fails, as it does
+  # cold.
+  private def mkdir_output(dir : String) : Nil
+    Hwaro::Utils::FileSafe.mkdir_p(dir)
+  rescue ex : File::AlreadyExistsError
+    raise ex unless remove_stale_file_in_the_way(dir)
+    Hwaro::Utils::FileSafe.mkdir_p(dir)
+  end
+
+  # Delete the regular file standing at `dir` or one of its ancestors, when
+  # it is a previous build's output: neither written nor claimed by this
+  # build (an unchanged static copy is skipped, not rewritten, but still
+  # published). True when one was removed.
+  private def remove_stale_file_in_the_way(dir : String) : Bool
+    return false unless kept = @kept_output_dir
+    path = dir
+    while Utils::OutputGuard.within_output_dir?(path, kept)
+      if File.info?(path, follow_symlinks: false).try(&.file?)
+        target = File.expand_path(path)
+        return false if written_this_build?(path) || generated_output_claims.any? { |claim| File.expand_path(claim) == target }
+        return false unless Utils::OutputGuard.safe_to_delete_file?(path, kept)
+        File.delete(path)
+        return true
+      end
+      parent = File.dirname(path)
+      break if parent == path
+      path = parent
+    end
+    false
   end
 end

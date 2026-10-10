@@ -470,6 +470,11 @@ module Hwaro
         # drives the Finalize phase without a build (unit specs) gets exactly
         # the pruning contract it asks for.
         @build_output_epoch : Time? = nil
+        # The output directory when this build kept the previous build's tree
+        # (`--cache`, serve), nil when it started from an empty one. Only a
+        # kept tree can hold a leftover of the other kind where this build
+        # writes (see `mkdir_output`).
+        @kept_output_dir : String? = nil
         # Files a page wrote BESIDES its own output: its `aliases` redirect
         # stubs and, for a section, its `/page/N/` pagination pages. Both are
         # produced by the render pass, so a warm `--cache` build that skips a

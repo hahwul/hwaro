@@ -566,6 +566,74 @@ describe "warm --cache builds" do
     end
   end
 
+  # The prune runs last, so an output that flipped between file and
+  # directory met the previous build's entry still in the way: a FILE where
+  # mkdir needed a directory failed this and every later warm build, and a
+  # DIRECTORY where a file goes swallowed the copy (`public/x/x`).
+  describe "an output that changed between file and directory" do
+    it "publishes a static directory that replaced a static file" do
+      with_cached_site do
+        FileUtils.mkdir_p("static")
+        File.write("static/thing", "file")
+        cached_build
+
+        File.delete("static/thing")
+        FileUtils.mkdir_p("static/thing")
+        File.write("static/thing/a.txt", "inside")
+        cached_build
+
+        File.read("public/thing/a.txt").should eq("inside")
+      end
+    end
+
+    it "publishes a static file that replaced a static directory" do
+      with_cached_site do
+        FileUtils.mkdir_p("static/dir")
+        File.write("static/dir/x.txt", "inside")
+        cached_build
+
+        FileUtils.rm_rf("static/dir")
+        File.write("static/dir", "file")
+        cached_build
+
+        File.file?("public/dir").should be_true
+        File.read("public/dir").should eq("file")
+      end
+    end
+
+    it "renders a page where a deleted static file was published" do
+      with_cached_site do
+        FileUtils.mkdir_p("static")
+        File.write("static/thing", "file")
+        cached_build
+
+        File.delete("static/thing")
+        File.write("content/thing.md", "+++\ntitle = \"Thing\"\n+++\nthing body")
+        cached_build
+
+        File.read("public/thing/index.html").should contain("thing body")
+      end
+    end
+
+    it "still fails when a live static file and a page claim the same path" do
+      with_cached_site do
+        FileUtils.mkdir_p("static")
+        File.write("static/thing", "file")
+        cached_build
+
+        File.write("content/thing.md", "+++\ntitle = \"Thing\"\n+++\nthing body")
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+        expect_raises(Hwaro::HwaroError, /Unable to create directory/) do
+          builder.run(Hwaro::Config::Options::BuildOptions.new(
+            output_dir: "public", parallel: false, cache: true, highlight: false,
+          ))
+        end
+        File.read("public/thing").should eq("file")
+      end
+    end
+  end
+
   # A `[[content.generate]]` page has no source file, so no cache entry named
   # its output: when its record disappeared from the data, the page stayed in
   # `public/` for every later warm build.
