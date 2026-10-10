@@ -2,6 +2,20 @@ require "../../../spec_helper"
 require "../../../../src/services/importers/jekyll_importer"
 
 describe Hwaro::Services::Importers::JekyllImporter do
+  it "maps sitemap: false to in_sitemap = false" do
+    Dir.mktmpdir do |dir|
+      posts_dir = File.join(dir, "_posts")
+      FileUtils.mkdir_p(posts_dir)
+      File.write(File.join(posts_dir, "2024-01-01-hidden.md"), "---\ntitle: Hidden\nsitemap: false\n---\nX\n")
+
+      output_dir = File.join(dir, "output")
+      Hwaro::Services::Importers::JekyllImporter.new.run(
+        Hwaro::Config::Options::ImportOptions.new(source_type: "jekyll", path: dir, output_dir: output_dir))
+
+      File.read(File.join(output_dir, "posts", "hidden.md")).should contain("in_sitemap = false")
+    end
+  end
+
   describe "#run" do
     it "imports a basic Jekyll post with YAML frontmatter" do
       Dir.mktmpdir do |dir|

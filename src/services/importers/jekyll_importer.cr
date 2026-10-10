@@ -183,6 +183,11 @@ module Hwaro
               end
             end
 
+            # jekyll-sitemap's `sitemap: false` is hwaro's `in_sitemap =
+            # false` (the inverse of `tool export jekyll`); left in [extra],
+            # the page was listed in sitemap.xml again.
+            fields["in_sitemap"] = false if yaml["sitemap"]?.try(&.raw) == false
+
             # Description. `first_present`, not `if/elsif` on `[]?`: a
             # present-but-null `excerpt:` would discard the description.
             if desc = first_present(yaml, "excerpt", "description")

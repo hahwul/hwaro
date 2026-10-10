@@ -97,7 +97,7 @@ hwaro tool import hugo path/to/site --verbose
 - Hugo: 미래의 `publishDate`로 예약된 페이지는 그 값을 `date`로 받아 그때까지 게시되지 않습니다(지난 `publishDate`라면 `date`를 유지). 출력이 없는 페이지(`headless = true`, 또는 `build`/`_build`의 `render = "never"`)는 `render = false`가 되고, `sitemap.disable = true`는 `in_sitemap = false`가 됩니다.
 - Hexo: `published: false`인 글은 초안으로 가져옵니다.
 - Hugo: `layout`은 `template`이 됩니다. Hugo에서 의미가 없는 hwaro 키(`toc`, `template`, `page_template`, `image`, `updated` 등)는 그대로 유지하고, 그 밖의 페이지 파라미터(최상위 사용자 키와 `[params]` 테이블)는 `[extra]`로 옮겨 템플릿에서 `page.extra.<key>`로 읽을 수 있습니다. `tool export hugo`가 쓰는 `[extra]` 테이블도 `[extra]`에 합쳐집니다.
-- Jekyll: `last_modified_at`은 `updated`가 되고, `image: {path: …}` 형식은 `image`가 됩니다. 그 밖의 프론트 매터 키(Jekyll 템플릿이 `page.<key>`로 읽는 값)는 모두 `[extra]`로 옮겨집니다.
+- Jekyll: `last_modified_at`은 `updated`가, `sitemap: false`는 `in_sitemap = false`가 되고, `image: {path: …}` 형식은 `image`가 됩니다. 그 밖의 프론트 매터 키(Jekyll 템플릿이 `page.<key>`로 읽는 값)는 모두 `[extra]`로 옮겨집니다.
 - Obsidian: Obsidian이 화면에 표시하지 않는 `%%주석%%`(한 줄 안이든 여러 줄에 걸치든)은 제거됩니다. 코드 안의 `%%`는 그대로 둡니다.
 - 글자나 숫자가 하나도 없는 이름·제목(예: 이모지만 있는 Notion 페이지)은 건너뛰지 않고 원본 텍스트에서 만든 이름으로 저장합니다. 어떤 파일 이름도 만들 수 없는 소스는 그 사실을 알리는 경고와 함께 건너뜁니다.
 - 비어 있는 `title:`은 제목이 없는 것으로 취급합니다. Obsidian은 파일 이름으로, Astro와 Eleventy는 파일 이름에서 만든 제목으로, Notion은 페이지의 첫 제목으로 대체합니다. 따옴표 없는 날짜 제목(`title: 2024-05-01`)은 작성한 그대로 유지됩니다.
