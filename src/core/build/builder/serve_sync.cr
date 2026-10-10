@@ -548,8 +548,16 @@ module Hwaro
           outputs = [] of String
           site = @site
           return outputs unless site
-          (site.pages + site.sections).each { |page| outputs.concat(page_asset_outputs(page, output_dir)) }
+          # A collision loser's files are not published (`process_assets`).
+          (site.pages + site.sections).each { |page| outputs.concat(page_asset_outputs(page, output_dir)) unless page.output_suppressed }
           outputs
+        end
+
+        # The `[content.files]` copies of `page`'s bundle assets. They sit at
+        # their source path, not under the page URL: a slug splits the two.
+        private def page_content_copies(page : Models::Page, output_dir : String) : Array(String)
+          return [] of String unless config = @config
+          page.assets.select { |asset| publishes_content_file?(config, asset) }.map { |asset| File.join(output_dir, asset) }
         end
 
         # One page's share of `bundle_asset_outputs`. Not gated on `render`:

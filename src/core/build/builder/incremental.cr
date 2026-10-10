@@ -214,7 +214,7 @@ module Hwaro
           unless excluded_pages.empty? && relinked_counterparts.empty?
             @output_url_winners = compute_output_url_winners(all_pages)
           end
-          regained = regained_output_pages(previously_suppressed.reject { |p| excluded_paths.includes?(p.path) }, output_dir)
+          regained = regained_output_pages(previously_suppressed.reject { |p| excluded_paths.includes?(p.path) }, all_pages, output_dir)
 
           # Rebuild lookup index (page data may have changed)
           site.build_lookup_index
@@ -943,12 +943,7 @@ module Hwaro
             site.sections.reject! { |p| excluded_paths.includes?(p.path) }
             excluded_pages.each do |p|
               stale = old_output_paths[p.path]? || [get_output_path(p, output_dir)].compact
-              # Its bundle's `[content.files]` copies sit at their source
-              # path, not under the page URL (a slug splits the two).
-              p.assets.each do |asset|
-                stale << File.join(output_dir, asset) if publishes_content_file?(site.config, asset)
-              end
-              prune_unclaimed_outputs(stale, output_dir)
+              prune_unclaimed_outputs(stale + page_content_copies(p, output_dir), output_dir)
             end
           end
 
@@ -964,18 +959,26 @@ module Hwaro
           settle_page_outputs(output_dir, except: old_output_paths.values.flatten)
         end
 
-        # Prune what an earlier pass that raised after its re-parse left
-        # unsettled (see `@unsettled_page_outputs`) — less `except`, the
-        # paths the caller has just settled itself — and empty the set.
         # Pages that lost an output-path collision before this pass and own
         # their URL again. The edit that freed the URL was to the OTHER page,
         # so nothing selects them: their HTML and bundle files stayed the old
         # winner's. Copies the bundle files; the caller re-renders the pages.
-        private def regained_output_pages(previously_suppressed : Array(Models::Page), output_dir : String) : Array(Models::Page)
+        # Pages of `all_pages` that just LOST their URL go the other way: the
+        # full build publishes none of their bundle files, so they are pruned.
+        private def regained_output_pages(previously_suppressed : Array(Models::Page), all_pages : Array(Models::Page), output_dir : String) : Array(Models::Page)
           regained = previously_suppressed.reject(&.output_suppressed)
           process_assets(regained, output_dir, false) unless regained.empty?
+          lost = all_pages.select(&.output_suppressed) - previously_suppressed
+          unless lost.empty?
+            stale = lost.flat_map { |p| page_asset_outputs(p, output_dir) + page_content_copies(p, output_dir) }
+            prune_unclaimed_outputs(stale, output_dir)
+          end
           regained
         end
+
+        # Prune what an earlier pass that raised after its re-parse left
+        # unsettled (see `@unsettled_page_outputs`) — less `except`, the
+        # paths the caller has just settled itself — and empty the set.
 
         private def settle_page_outputs(output_dir : String, except : Array(String) = [] of String) : Nil
           return if @unsettled_page_outputs.empty?
@@ -1173,7 +1176,7 @@ module Hwaro
           # may have introduced or resolved a slug/alias collision.
           previously_suppressed = all_pages.select(&.output_suppressed)
           @output_url_winners = compute_output_url_winners(all_pages)
-          regained_output_pages(previously_suppressed, output_dir).each do |page|
+          regained_output_pages(previously_suppressed, all_pages, output_dir).each do |page|
             pages_to_render << page if page.render && !pages_to_render.includes?(page)
           end
 

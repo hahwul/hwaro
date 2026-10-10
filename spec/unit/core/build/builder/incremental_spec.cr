@@ -214,3 +214,34 @@ describe "Builder#run_incremental drafting a bundle" do
     end
   end
 end
+
+describe "Builder#run_incremental collision loser" do
+  it "unpublishes the bundle files of a page that just lost its URL" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content/posts/a")
+        FileUtils.mkdir_p("content/posts/x")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}")
+        File.write("content/posts/a/index.md", "+++\ntitle = \"A\"\n+++\n")
+        File.write("content/posts/a/cover.png", "A-cover")
+        File.write("content/posts/x/index.md", "+++\ntitle = \"X\"\n+++\n")
+        File.write("content/posts/x/cover.png", "X-cover")
+        File.write("content/posts/x/xonly.png", "X-only")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/posts/a/index.md"], options)
+        File.exists?("public/posts/x/xonly.png").should be_true
+
+        File.write("content/posts/a/index.md", "+++\ntitle = \"A\"\nslug = \"x\"\n+++\n")
+        builder.run_incremental(["content/posts/a/index.md"], options)
+        File.read("public/posts/x/cover.png").should eq("A-cover")
+        File.exists?("public/posts/x/xonly.png").should be_false
+      end
+    end
+  end
+end
