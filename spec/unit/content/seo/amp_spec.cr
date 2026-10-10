@@ -242,6 +242,23 @@ describe Hwaro::Content::Seo::Amp do
       result.should contain("cdn.ampproject.org")
     end
 
+    # Regression: the -ms-animation declaration was missing, and the AMP
+    # validator requires the boilerplate verbatim — every page failed with
+    # "The mandatory text inside tag 'head > style[amp-boilerplate]' is
+    # missing or incorrect".
+    it "injects the AMP boilerplate verbatim" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      result = Hwaro::Content::Seo::Amp.convert_to_amp("<html><head></head><body>x</body></html>", page, Hwaro::Models::Config.new)
+      result.should contain(
+        "<style amp-boilerplate>body{-webkit-animation:-amp-start 8s steps(1,end) 0s 1 normal both;" \
+        "-moz-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-ms-animation:-amp-start 8s steps(1,end) 0s 1 normal both;" \
+        "animation:-amp-start 8s steps(1,end) 0s 1 normal both}@-webkit-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}" \
+        "@-moz-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-ms-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}" \
+        "@-o-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}</style>" \
+        "<noscript><style amp-boilerplate>body{-webkit-animation:none;-moz-animation:none;-ms-animation:none;animation:none}</style></noscript>")
+    end
+
     it "adds canonical link to original page" do
       page = Hwaro::Models::Page.new("test.md")
       page.url = "/posts/hello/"
