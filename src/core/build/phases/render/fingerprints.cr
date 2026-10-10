@@ -386,17 +386,14 @@ module Hwaro::Core::Build::Phases::Render
   end
 
   # Decide which optional page fields the page-set fingerprint must cover for
-  # THIS site (see Builder::ListingPageFields).
+  # THIS site (see Builder::ListingPageFields). Same receiver rules as the
+  # relations hash, chained reads included: a non-literal
+  # `get_page(path=page.extra.ref).summary` puts its template in the listing
+  # union, and only the chained match sees which field it prints.
   private def listing_page_fields(templates : Hash(String, String)) : Builder::ListingPageFields
     blob = listing_source_union(templates)
     return Builder::ListingPageFields.new(false, false) if blob.empty?
-
-    rebound = blob.matches?(REBINDS_SELF_RE)
-    Builder::ListingPageFields.new(
-      extra: reads_other_page_field?(blob, EXTRA_ATTR_RE, EXTRA_INDEX_RE, EXTRA_ARG_RE, rebound),
-      content_derived: reads_other_page_field?(blob, CONTENT_DERIVED_ATTR_RE,
-        CONTENT_DERIVED_INDEX_RE, CONTENT_DERIVED_ARG_RE, rebound),
-    )
+    relation_page_fields(blob)
   end
 
   # True when some listing template reads the field off a page OTHER than the

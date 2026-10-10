@@ -132,6 +132,18 @@ describe "warm --cache: pages rendering other pages" do
     end
   end
 
+  it "re-renders a page printing a computed get_page's word count after a body edit" do
+    with_relations_site do
+      File.write("templates/dyn.html", %(DYN={{ get_page(path=page.extra.ref).word_count }}))
+      File.write("content/dyn.md", "+++\ntitle = \"Dyn\"\ntemplate = \"dyn\"\n[extra]\nref = \"posts/b.md\"\n+++\n")
+      relations_cached_build
+      File.read("public/dyn/index.html").should contain("DYN=2")
+      File.write("content/posts/b.md", File.read("content/posts/b.md") + " three four")
+      relations_cached_build
+      File.read("public/dyn/index.html").should contain("DYN=4")
+    end
+  end
+
   it "re-renders a page whose shortcode lists the page set" do
     with_relations_site do
       File.read("public/sc/index.html").should_not contain("[Post d]")
