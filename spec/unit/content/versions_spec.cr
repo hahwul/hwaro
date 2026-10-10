@@ -72,6 +72,43 @@ describe Hwaro::Content::Versions do
       latest.exists.should be_false
     end
 
+    it "points page.version and the versions list at a written root on a partial translation" do
+      config = load_config(<<-TOML)
+        title = "T"
+        base_url = "https://example.com"
+        default_language = "en"
+        [languages.en]
+        language_name = "English"
+        [languages.ko]
+        language_name = "Korean"
+        [[versions.list]]
+        name = "v2"
+        path = "docs/v2"
+        latest = true
+        [[versions.list]]
+        name = "v1"
+        path = "docs/v1"
+        TOML
+      v2_root = Hwaro::Models::Section.new("docs/v2/_index.md")
+      v2_root.section = "docs/v2"
+      v2_root.url = "/docs/"
+      v2_root.version = config.versions.for_path(v2_root.path)
+      v1_root = Hwaro::Models::Section.new("docs/v1/_index.md")
+      v1_root.section = "docs/v1"
+      v1_root.url = "/docs/v1/"
+      v1_root.version = config.versions.for_path(v1_root.path)
+      # No Korean root for either version: /ko/docs/ and /ko/docs/v1/ are
+      # never written.
+      v1_ko = versioned_page(config, "docs/v1/install.ko.md", "/ko/docs/v1/install/", "ko")
+
+      Hwaro::Content::Versions.link!([v2_root, v1_root, v1_ko] of Hwaro::Models::Page, config)
+
+      Hwaro::Content::Versions.page_version_value(v1_ko, config)["url"].to_s.should eq("/docs/v1/")
+      list = Hwaro::Content::Versions.versions_value(config, "/ko").raw.as(Hwaro::Content::Versions::VersionList)
+      list.items.map(&.["url"].to_s).should eq(["/docs/", "/docs/v1/"])
+      list.latest["url"].to_s.should eq("/docs/")
+    end
+
     it "stubs the parent URL over a headless authored parent index" do
       config = load_config(<<-TOML)
         title = "T"

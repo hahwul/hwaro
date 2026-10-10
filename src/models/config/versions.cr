@@ -70,6 +70,10 @@ module Hwaro
       # "latest" | "all": which versions taxonomy term pages collect from.
       property taxonomies : String
       property list : Array(VersionConfig)
+      # Build-time, not config: the URL of each version root section actually
+      # in the page set, keyed by {version name, lang prefix ("" or "/<code>")}.
+      # Filled by Content::Versions.link! before rendering.
+      getter written_roots = {} of {String, String} => String
 
       SWITCH_VALUES = {"latest", "all"}
 
