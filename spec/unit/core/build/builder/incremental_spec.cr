@@ -363,3 +363,36 @@ describe "Builder#run_incremental collision loser" do
     end
   end
 end
+
+describe "Builder#run_incremental bundle asset URLs" do
+  it "re-renders get_url(path=asset) readers when the bundle page moves" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content/posts/foo")
+        FileUtils.mkdir_p("content/other")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", %({{ get_url(path="posts/foo/photo.jpg") }}))
+        File.write("content/posts/_index.md", "+++\ntitle = \"Posts\"\n+++\n")
+        File.write("content/posts/foo/index.md", "+++\ntitle = \"Foo\"\n+++\n")
+        File.write("content/posts/foo/photo.jpg", "jpg")
+        # `d` sits in another section, past the bundle's reading-order
+        # neighbours: nothing but the call ties it to the bundle.
+        File.write("content/other/c.md", "+++\ntitle = \"C\"\n+++\n")
+        File.write("content/other/d.md", "+++\ntitle = \"D\"\n+++\n")
+        File.write("content/posts/e.md", "+++\ntitle = \"E\"\n+++\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/posts/foo/index.md"], options)
+        File.read("public/other/d/index.html").should eq("http://localhost/posts/foo/photo.jpg")
+
+        File.write("content/posts/foo/index.md", "+++\ntitle = \"Foo\"\nslug = \"moved\"\n+++\n")
+        builder.run_incremental(["content/posts/foo/index.md"], options)
+        File.read("public/other/d/index.html").should eq("http://localhost/posts/moved/photo.jpg")
+      end
+    end
+  end
+end

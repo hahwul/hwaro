@@ -327,4 +327,21 @@ describe "warm --cache builds and template inputs outside the tracked files" do
       end
     end
   end
+
+  # `get_url(path=asset)` of a `page.assets` entry resolves to the copy next
+  # to its page, so a slug edit on the bundle moves what every OTHER page
+  # printing that call renders — and those pages stayed cached.
+  it "re-renders get_url(path=asset) readers when the bundle page moves" do
+    with_render_inputs_site("", %({{ get_url(path="posts/foo/photo.jpg") }})) do
+      FileUtils.mkdir_p("content/posts/foo")
+      File.write("content/posts/foo/index.md", "+++\ntitle = \"Foo\"\n+++\n")
+      File.write("content/posts/foo/photo.jpg", "jpg")
+      render_inputs_build
+      File.read("public/a/index.html").should contain("http://localhost/posts/foo/photo.jpg")
+
+      File.write("content/posts/foo/index.md", "+++\ntitle = \"Foo\"\nslug = \"moved\"\n+++\n")
+      render_inputs_build
+      File.read("public/a/index.html").should contain("http://localhost/posts/moved/photo.jpg")
+    end
+  end
 end

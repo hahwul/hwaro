@@ -27,6 +27,11 @@ module Hwaro::Core::Build::Phases::Render
     # fingerprint of those sets into the rebuild decision.
     @unpublished_pages.set(0)
     @published_pages.set(0)
+    # Claim a deterministic owner for every output URL (slug collisions and
+    # alias collisions) — under parallel render the colliding file's bytes
+    # used to be whichever worker finished last, flapping run-to-run. First:
+    # a loser publishes no bundle files (withheld_bundle_dirs) or asset URLs.
+    @output_url_winners = compute_output_url_winners(all_pages)
     publish_asset_sources(ctx)
 
     # What templates read outside the tracked files (see render_inputs.cr):
@@ -87,10 +92,6 @@ module Hwaro::Core::Build::Phases::Render
 
     error_overlay = ctx.options.error_overlay
 
-    # Claim a deterministic owner for every output URL (slug collisions and
-    # alias collisions) — under parallel render the colliding file's bytes
-    # used to be whichever worker finished last, flapping run-to-run.
-    @output_url_winners = compute_output_url_winners(all_pages)
     # Transform built site.taxonomies before these verdicts; a collision
     # loser is never written and the generator keeps it off its term page
     # (Taxonomies.build_taxonomy_index), so get_taxonomy must not count it.

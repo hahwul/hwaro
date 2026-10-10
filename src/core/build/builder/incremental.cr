@@ -683,7 +683,8 @@ module Hwaro
           taxonomy : String,
           lookup_targets : Array(String) = [] of String,
           lookup_fields : ListingPageFields = ListingPageFields.new(false, false),
-          lookup : String = "" do
+          lookup : String = "",
+          asset_urls : Hash(String, String)? = nil do
           def self.inert : ListingSetSnapshot
             new(false, false, false, false, "", "", "", "")
           end
@@ -712,6 +713,7 @@ module Hwaro
           # when the about page moves and not on every other edit.
           lookup_targets = get_page_targets(blob)
           lookup_fields = relation_page_fields(blob)
+          needs_asset_urls = Phases::Render::ASSET_URL_MARKERS.any? { |marker| blob.includes?(marker) }
 
           ListingSetSnapshot.new(
             needs_page: needs_page,
@@ -727,6 +729,7 @@ module Hwaro
             lookup_targets: lookup_targets,
             lookup_fields: lookup_fields,
             lookup: compute_get_page_lookup_fingerprint(site, lookup_targets, lookup_fields),
+            asset_urls: needs_asset_urls ? bundle_asset_urls(site) : nil,
           )
         end
 
@@ -765,7 +768,11 @@ module Hwaro
           lookup_changed = !before.lookup_targets.empty? &&
                            compute_get_page_lookup_fingerprint(site, before.lookup_targets, before.lookup_fields) != before.lookup
 
-          return [] of Models::Page unless page_changed || section_changed || menu_changed || taxonomy_changed || lookup_changed
+          # ponytail: any moved bundle asset re-renders every get_url reader
+          # (most layouts); per-path targets if bundle slug edits get common.
+          asset_urls_changed = (old_asset_urls = before.asset_urls) && bundle_asset_urls(site) != old_asset_urls
+
+          return [] of Models::Page unless page_changed || section_changed || menu_changed || taxonomy_changed || lookup_changed || asset_urls_changed
 
           all_pages.select do |page|
             next false unless page.render
@@ -782,7 +789,8 @@ module Hwaro
               (deps.section && section_changed) ||
               (deps.menu && menu_changed) ||
               (deps.taxonomy_slug && taxonomy_changed) ||
-              (deps.lookup && lookup_changed)
+              (deps.lookup && lookup_changed) ||
+              (deps.asset_url && asset_urls_changed)
           end
         end
 

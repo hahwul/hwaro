@@ -531,7 +531,10 @@ module Hwaro
 
         # The URL a `page.assets` entry (content path) is published at, next
         # to its page (Render#bundle_asset_urls); nil for anything else.
+        # Recorded as a render read, hit or miss: the answer moves with the
+        # owning page's slug/path and with the bundle's file list.
         def self.published_asset_url(env : Crinja, path : String) : String?
+          record_render_read(BUNDLE_ASSET_READ_PREFIX + path) unless path.empty? || path.starts_with?('/') || path.includes?("://")
           assets = env.resolve("__bundle_asset_urls__").raw
           assets[path]?.try(&.to_s) if assets.is_a?(Hash)
         end
@@ -553,6 +556,9 @@ module Hwaro
         # `asset_integrity(name)`: the value is the integrity of what the name
         # resolves to (see AssetHooks.integrity), wherever the output lives.
         ASSET_READ_PREFIX = "asset:"
+        # `get_url`/`resize_image` of a `page.assets` entry: the value is the
+        # URL it publishes at (Render#bundle_asset_urls), or none.
+        BUNDLE_ASSET_READ_PREFIX = "bundle_asset:"
         # The wall clock, as a `Time#to_s`/date format: `now()` records its
         # format, and the build records the one behind each `current_*`
         # variable a template prints. The value is the clock formatted that

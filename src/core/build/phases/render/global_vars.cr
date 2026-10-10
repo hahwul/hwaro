@@ -27,8 +27,8 @@ module Hwaro::Core::Build::Phases::Render
   # under a `[content.files]` allowlist, and a `slug`/`path`/language prefix
   # moves the page (and its assets) away from it. A translated bundle shares
   # its files; the default-language copy wins.
-  private def bundle_asset_urls(site : Models::Site) : Hash(String, Crinja::Value)
-    urls = {} of String => Crinja::Value
+  private def bundle_asset_urls(site : Models::Site) : Hash(String, String)
+    urls = {} of String => String
     {site.pages, site.sections}.each do |list|
       list.each do |p|
         next if p.assets.empty? || p.output_suppressed
@@ -36,7 +36,7 @@ module Hwaro::Core::Build::Phases::Render
         bundle = "#{File.dirname(p.path)}/"
         p.assets.each do |asset|
           next if p.language && urls.has_key?(asset)
-          urls[asset] = Crinja::Value.new("#{base}#{asset.lchop(bundle)}")
+          urls[asset] = "#{base}#{asset.lchop(bundle)}"
         end
       end
     end
@@ -72,7 +72,7 @@ module Hwaro::Core::Build::Phases::Render
 
     vars["__all_pages__"] = Crinja::Value.new(all_pages_array)
     vars["__pages_by_path__"] = Crinja::Value.new(pages_by_path)
-    vars["__bundle_asset_urls__"] = Crinja::Value.new(bundle_asset_urls(site))
+    vars["__bundle_asset_urls__"] = Crinja::Value.new(bundle_asset_urls(site).transform_values { |url| Crinja::Value.new(url) })
 
     all_sections_array = [] of Crinja::Value
     sections_by_key = {} of String => Crinja::Value

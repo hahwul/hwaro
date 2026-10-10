@@ -33,6 +33,11 @@ module Hwaro::Core::Build::Phases::Render
   TAXONOMY_URL_MARKER = "get_taxonomy_url"
   GET_TAXONOMY_RE     = /get_taxonomy(?!_url)/
 
+  # `get_url`/`resize_image` of a `page.assets` entry resolves through the
+  # bundle asset URL map (Render#bundle_asset_urls), which moves with the
+  # owning page's URL.
+  ASSET_URL_MARKERS = ["get_url", "url_for", "resize_image"]
+
   LISTING_PAGE_MARKERS    = PAGE_SET_MARKERS - MENU_SET_MARKERS
   LISTING_SECTION_MARKERS = SECTION_SET_MARKERS - MENU_SET_MARKERS
 
@@ -51,7 +56,8 @@ module Hwaro::Core::Build::Phases::Render
     section : Bool,
     menu : Bool,
     taxonomy_slug : Bool,
-    lookup : Bool
+    lookup : Bool,
+    asset_url : Bool = false
 
   # Projection scan of one closure source blob for the serve fan-out. Same
   # closure (and same tracking-off fallback) as `listing_template_deps`,
@@ -65,6 +71,7 @@ module Hwaro::Core::Build::Phases::Render
       menu: MENU_SET_MARKERS.any? { |marker| blob.includes?(marker) },
       taxonomy_slug: blob.includes?(TAXONOMY_URL_MARKER),
       lookup: !get_page_targets(blob).empty?,
+      asset_url: ASSET_URL_MARKERS.any? { |marker| blob.includes?(marker) },
     )
   end
 
