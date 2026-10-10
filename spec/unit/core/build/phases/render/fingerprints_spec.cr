@@ -305,6 +305,30 @@ describe "warm --cache: body edits next to relation readers" do
 end
 
 describe "warm --cache: section-set changes" do
+  it "re-renders listings showing a subsection entry's title, [extra] and excerpt" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", "title = \"T\"\nbase_url = \"http://localhost\"\n")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "SIB={% for p in section.pages %}[{{ p.title }}]{% endfor %}")
+        File.write("templates/section.html", "LIST={% for p in section.pages %}[{{ p.title }}|{{ p.extra.badge }}|{{ p.word_count }}]{% endfor %}")
+        FileUtils.mkdir_p("content/blog/sub")
+        File.write("content/blog/_index.md", "+++\ntitle = \"Blog\"\n+++\n")
+        File.write("content/blog/post.md", "+++\ntitle = \"Post\"\n+++\n")
+        File.write("content/blog/sub/_index.md", "+++\ntitle = \"Sub\"\n[extra]\nbadge = \"old\"\n+++\ntwo words\n")
+        relations_cached_build
+        File.read("public/blog/index.html").should contain("[Sub|old|2]")
+        File.read("public/blog/post/index.html").should contain("[Sub]")
+
+        File.write("content/blog/sub/_index.md", "+++\ntitle = \"Sub2\"\n[extra]\nbadge = \"new\"\n+++\nnow four words here\n")
+        relations_cached_build
+
+        File.read("public/blog/index.html").should contain("[Sub2|new|4]")
+        File.read("public/blog/post/index.html").should contain("[Sub2]")
+      end
+    end
+  end
+
   it "drops a subsection made headless from its parent listing and the sitemap" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do

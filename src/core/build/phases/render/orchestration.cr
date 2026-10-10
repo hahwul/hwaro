@@ -45,7 +45,12 @@ module Hwaro::Core::Build::Phases::Render
       build_cache.check_render_inputs(render_inputs_digest(render_globals, build_cache.render_input_keys, render_input_values))
     end
     listing_fields = cache_enabled ? listing_page_fields(templates) : Builder::ListingPageFields.new(false, false)
-    page_set_fp = cache_enabled ? compute_page_set_fingerprint(site.pages, listing_fields) : ""
+    # Sections too: a section's page list carries its child sections as
+    # entries (Site#pages_for_section), so a sibling list or a parent
+    # listing prints a subsection's title, `[extra]` and excerpt — fields
+    # the section-set fingerprint does not carry, and readers of `.pages`
+    # that are not section-set dependent never consult anyway.
+    page_set_fp = cache_enabled ? compute_page_set_fingerprint(site.pages + site.sections, listing_fields) : ""
     section_set_fp = cache_enabled ? compute_section_set_fingerprint(site.sections, !site.config.menus_auto_sections.nil?) : ""
     pages_to_build = if cache_enabled
                        filtered = filter_changed_pages(all_pages, output_dir, build_cache, templates, site, page_set_fp, section_set_fp)
