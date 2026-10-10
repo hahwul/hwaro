@@ -191,6 +191,20 @@ describe Hwaro::Services::Importers::HexoImporter do
       end
     end
 
+    it "keeps a published: false post unpublished" do
+      Dir.mktmpdir do |dir|
+        posts_dir = File.join(dir, "source", "_posts")
+        FileUtils.mkdir_p(posts_dir)
+        File.write(File.join(posts_dir, "hidden.md"), "---\ntitle: Hidden\npublished: false\n---\nSecret.\n")
+
+        output_dir = File.join(dir, "output")
+        Hwaro::Services::Importers::HexoImporter.new.run(
+          Hwaro::Config::Options::ImportOptions.new(source_type: "hexo", path: dir, output_dir: output_dir))
+
+        File.read(File.join(output_dir, "posts", "hidden.md")).should contain("draft = true")
+      end
+    end
+
     it "maps updated field" do
       Dir.mktmpdir do |dir|
         posts_dir = File.join(dir, "source", "_posts")
