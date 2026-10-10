@@ -167,7 +167,7 @@ Tests are not filters, but they are documented on the same page. See [Filters â€
 
 ## Whitespace Control
 
-Trim whitespace with minus signs:
+Trim whitespace with minus signs. A `-` next to a delimiter (`{%-`, `-%}`, `{{-`, `-}}`, `{#-`, `-#}`) removes all whitespace on that side, newlines included, as in Jinja2:
 
 ```jinja
 {%- if condition -%}
