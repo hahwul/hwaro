@@ -168,6 +168,7 @@ module Hwaro
           # Every run starts here; `@/` link targets resolve against it.
           @content_dir = content_dir
           @link_target_urls.clear
+          @site_config = nil
         end
 
         # Content directory of the current run (nil outside a run).
@@ -313,19 +314,49 @@ module Hwaro
         # content directory, else the working directory's (ContentLister's
         # lookup). Defaults (disabled) when there is none or it won't load.
         private def content_files_rules(content_dir : String) : Models::ContentFilesConfig
+          site_config(content_dir).try(&.content_files) || Models::ContentFilesConfig.new
+        end
+
+        # Memo for `site_config`: nil = not loaded yet, false = none.
+        @site_config : (Models::Config | Bool)? = nil
+
+        # The project's `config.toml`: beside the content directory, else
+        # the working directory's (ContentLister's lookup). Nil when there is
+        # none or it won't load. Loaded once per run.
+        private def site_config(content_dir : String) : Models::Config?
+          cached = @site_config
+          return cached.as?(Models::Config) unless cached.nil?
+          @site_config = false
           parent = File.dirname(content_dir.rstrip(File::SEPARATOR))
           path = {File.join(parent, "config.toml"), "config.toml"}.find { |candidate| File.exists?(candidate) }
-          return Models::ContentFilesConfig.new unless path
+          return unless path
           # The build owns config diagnostics; here they would only repeat.
           previous = Logger.level
           Logger.level = Logger::Level::Error
           begin
-            Models::Config.load(path).content_files
+            @site_config = Models::Config.load(path)
           ensure
             Logger.level = previous
           end
         rescue Exception
-          Models::ContentFilesConfig.new
+          nil
+        end
+
+        # Whether the target serves a translation (`about.ko.md`) under its
+        # language prefix (`/ko/about/`), as the build does. Jekyll has no
+        # languages: the exported `about.ko.md` stays at `/about.ko`.
+        protected def language_prefixed_links? : Bool
+          false
+        end
+
+        # The language code of a translated `@/` target (`about.ko.md` ->
+        # "ko") when the project declares that language, else nil.
+        private def link_language(target : String) : String?
+          return unless language_prefixed_links? && (dir = @content_dir) && (config = site_config(dir)) && config.multilingual?
+          stem = target.sub(/\.(?:md|markdown)\z/, "")
+          Utils::PathUtils.language_suffix(File.basename(stem)) do |code|
+            config.languages.has_key?(code) || code == config.default_language
+          end
         end
 
         # Parse frontmatter from content, returns {fields_hash, body}.
@@ -658,16 +689,26 @@ module Hwaro
             suffix = target[idx..]
             target = target[0...idx]
           end
+          # A translation (`about.ko.md`) lives under its language prefix,
+          # `/ko/about/`; the default language's suffix is just dropped.
+          prefix = ""
+          if (lang = link_language(target)) && (dir = @content_dir)
+            prefix = "/#{lang}" unless site_config(dir).try(&.default_language) == lang
+          end
           # A target whose `slug`/`path` moves it is linked where it lives;
           # the source path is a 404 in the build and in the export alike.
           if moved = link_target_url(target)
-            return "#{moved}#{suffix}#{title}"
+            return "#{prefix}#{moved}#{suffix}#{title}"
           end
           # A section `_index` and a page-bundle `index` both publish at
           # their directory's URL (`@/posts/my-post/index.md` →
           # `/posts/my-post/`), as the build resolves them.
-          path = target.sub(/\.(?:md|markdown)$/, "").sub(/(\A|\/)_?index$/, "\\1")
-          "/#{path}#{suffix}#{title}"
+          path = target.sub(/\.(?:md|markdown)$/, "")
+          path = path.rchop(".#{lang}") if lang
+          path = path.sub(/(\A|\/)_?index$/, "\\1")
+          # Jekyll exports a translated `_index.ko.md` as `index.ko.md`.
+          path = path.sub(/(\A|\/)_index(\.[^.\/]+)\z/, "\\1index\\2") unless language_prefixed_links?
+          "#{prefix}/#{path}#{suffix}#{title}"
         end
       end
     end

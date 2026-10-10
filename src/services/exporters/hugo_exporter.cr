@@ -207,6 +207,12 @@ module Hwaro
           :exported
         end
 
+        # Hugo serves `about.ko.md` at `/ko/about/` (its default
+        # `defaultContentLanguageInSubdir = false`), as the build does.
+        protected def language_prefixed_links? : Bool
+          true
+        end
+
         # Where `relative` lands under Hugo's `content/`.
         #
         # Hugo reads `index.md` as a LEAF bundle, and a leaf bundle has no

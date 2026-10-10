@@ -156,6 +156,11 @@ A section `_index.md` and a page-bundle `index.md` both map to their directory
 URL. Links shown inside code blocks or inline code spans are left exactly as
 written, since the build does not resolve them there either.
 
+A link to a translation (`@/about.ko.md`, with `ko` declared under
+`[languages]`) exports to Hugo as `/ko/about`, the URL Hugo and the build both
+serve it at. Jekyll has no languages, so there it points at the exported file
+(`/about.ko`, and `/docs/index.ko` for `@/docs/_index.ko.md`).
+
 ## Example Output
 
 ```

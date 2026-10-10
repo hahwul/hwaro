@@ -655,3 +655,25 @@ describe "Hugo export: in_sitemap" do
     end
   end
 end
+
+describe "Hugo export: links to translations" do
+  it "links a translation at its language-prefixed URL" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(File.join(content_dir, "docs"))
+      File.write(File.join(dir, "config.toml"), %(title = "T"\ndefault_language = "en"\n[languages.en]\nlanguage_name = "English"\n[languages.ko]\nlanguage_name = "Korean"\n))
+      File.write(File.join(content_dir, "_index.md"), "+++\ntitle = \"Home\"\n+++\n[ko](@/about.ko.md) [en](@/about.en.md) [s](@/sl.ko.md#x) [i](@/docs/_index.ko.md)\n")
+      File.write(File.join(content_dir, "about.ko.md"), "+++\ntitle = \"KO\"\n+++\n")
+      File.write(File.join(content_dir, "about.en.md"), "+++\ntitle = \"EN\"\n+++\n")
+      File.write(File.join(content_dir, "sl.ko.md"), "+++\ntitle = \"S\"\nslug = \"moved\"\n+++\n")
+      File.write(File.join(content_dir, "docs", "_index.ko.md"), "+++\ntitle = \"D\"\n+++\n")
+
+      Hwaro::Services::Exporters::HugoExporter.new.run(
+        Hwaro::Config::Options::ExportOptions.new(target_type: "hugo", content_dir: content_dir, output_dir: output_dir))
+
+      # Where the build serves them: /ko/about/, /about/, /ko/moved/, /ko/docs/.
+      File.read(File.join(output_dir, "content", "_index.md")).should contain("[ko](/ko/about) [en](/about) [s](/ko/moved/#x) [i](/ko/docs/)")
+    end
+  end
+end

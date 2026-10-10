@@ -781,3 +781,22 @@ describe "Jekyll export: in_sitemap" do
     end
   end
 end
+
+describe "Jekyll export: links to translated section indexes" do
+  it "links _index.ko.md where it is exported (index.ko.md)" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(File.join(content_dir, "docs"))
+      File.write(File.join(content_dir, "about.md"), "+++\ntitle = \"About\"\n+++\n[i](@/docs/_index.ko.md) [k](@/about.ko.md)\n")
+      File.write(File.join(content_dir, "about.ko.md"), "+++\ntitle = \"KO\"\n+++\n")
+      File.write(File.join(content_dir, "docs", "_index.ko.md"), "+++\ntitle = \"D\"\n+++\n")
+
+      Hwaro::Services::Exporters::JekyllExporter.new.run(
+        Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir))
+
+      File.exists?(File.join(output_dir, "docs", "index.ko.md")).should be_true
+      File.read(File.join(output_dir, "about.md")).should contain("[i](/docs/index.ko) [k](/about.ko)")
+    end
+  end
+end

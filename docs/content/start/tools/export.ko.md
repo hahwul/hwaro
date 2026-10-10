@@ -155,6 +155,11 @@ Hugo는 `index.md`/`_index.md` 옆의 파일을 번들 리소스로 읽습니다
 코드 블록이나 인라인 코드 안의 링크는 빌드에서도 해석하지 않으므로 작성한
 그대로 유지됩니다.
 
+번역본으로의 링크(`@/about.ko.md`, `ko`가 `[languages]`에 선언된 경우)는 Hugo로
+내보낼 때 Hugo와 빌드가 모두 제공하는 URL인 `/ko/about`이 됩니다. Jekyll에는 언어
+개념이 없으므로 내보낸 파일을 가리킵니다(`/about.ko`, `@/docs/_index.ko.md`는
+`/docs/index.ko`).
+
 ## 출력 예시
 
 ```
