@@ -513,6 +513,26 @@ describe "Phases::Write withheld bundle files" do
     end
   end
 
+  it "keeps a collision loser's bundle files out of the winner's directory" do
+    # posts/a (slug = "x") and posts/x both publish /posts/x/; posts/a wins
+    # by path order, so /posts/x/cover.png must be posts/a's file.
+    {WITHHELD_BUNDLE_CONFIG, "title = \"T\"\nbase_url = \"http://localhost\"\n"}.each do |config|
+      build_site(
+        config,
+        content_files: {
+          "posts/a/index.md"  => "+++\ntitle = \"A\"\nslug = \"x\"\n+++\nA\n",
+          "posts/a/cover.png" => "A-cover",
+          "posts/x/index.md"  => "+++\ntitle = \"X\"\n+++\nX\n",
+          "posts/x/cover.png" => "X-cover",
+        },
+        template_files: {"page.html" => "{{ page.title }}"},
+      ) do
+        File.read("public/posts/x/index.html").should eq("A")
+        File.read("public/posts/x/cover.png").should eq("A-cover")
+      end
+    end
+  end
+
   it "publishes a draft bundle's files under --drafts" do
     build_site(
       WITHHELD_BUNDLE_CONFIG,

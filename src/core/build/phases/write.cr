@@ -81,13 +81,15 @@ module Hwaro::Core::Build::Phases::Write
   # lane withholds their files by construction (only surviving pages copy
   # assets); `[content.files]` and raw JSON/XML copies match paths only, so
   # they consult this set. Empty — the common case — when nothing was
-  # filtered out.
+  # filtered out. A page that lost an output-path collision is not
+  # published either: its files went into the WINNER's directory, so two
+  # bundles sharing a URL served the loser's `cover.jpg` on the winner's page.
   def withheld_bundle_dirs : Set(String)
     return Set(String).new if @content_index_dirs.empty?
     live = Set(String).new
     if site = @site
-      site.pages.each { |p| live << File.dirname(p.path) if p.is_index }
-      site.sections.each { |s| live << File.dirname(s.path) if s.is_index }
+      site.pages.each { |p| live << File.dirname(p.path) if p.is_index && !p.output_suppressed }
+      site.sections.each { |s| live << File.dirname(s.path) if s.is_index && !s.output_suppressed }
     end
     @content_index_dirs - live
   end
@@ -206,6 +208,9 @@ module Hwaro::Core::Build::Phases::Write
     now = Time.utc.to_unix_ms
     pages.each do |page|
       next if page.assets.empty?
+      # A collision loser's URL directory belongs to the winner (see
+      # `withheld_bundle_dirs`).
+      next if page.output_suppressed
 
       # Destination directory matches the page's URL structure
       # page.url typically starts with / and ends with /, e.g., /blog/post/
