@@ -72,10 +72,13 @@ module Hwaro
             # object passes through unchanged; any other non-empty target is
             # stringified, as it always was, so string filters chained after
             # it (`| length`, `| replace`) keep working on numbers and bools.
-            env.filters["default"] = Crinja.filter({value: ""}) do
+            # `boolean=true` (Jinja's second argument, which the Crinja
+            # built-in this replaces honored) also replaces any falsy value:
+            # `false`, `0`, an empty list or mapping.
+            env.filters["default"] = Crinja.filter({value: "", boolean: false}) do
               fallback = arguments["value"]
               fallback = Crinja::Value.new("") if fallback.none?
-              if target.raw.nil? || target.undefined?
+              if target.raw.nil? || target.undefined? || (arguments["boolean"].truthy? && !target.truthy?)
                 fallback
               elsif target.indexable? || target.mapping?
                 target

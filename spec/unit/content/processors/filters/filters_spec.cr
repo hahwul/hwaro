@@ -542,6 +542,13 @@ describe "MiscFilters" do
       render_crinja("{{ (missing | default(value=40)) + 2 }}").strip.should eq("42")
     end
 
+    # Jinja's (and the replaced Crinja built-in's) second argument was
+    # silently ignored: `false | default("x", true)` rendered "false".
+    it "replaces falsy values when boolean is true" do
+      render_crinja(%([{{ false | default("x", true) }}|{{ 0 | default(value="x", boolean=true) }}|{{ [] | default("x", true) }}])).should eq("[x|x|x]")
+      render_crinja(%([{{ false | default("x") }}|{{ 0 | default("x") }}|{{ "a" | default("x", true) }}])).should eq("[false|0|a]")
+    end
+
     it "renders a none fallback as an empty string" do
       render_crinja("[{{ missing | default(value=none) }}]").strip.should eq("[]")
       vars = {"text" => Crinja::Value.new("")}
