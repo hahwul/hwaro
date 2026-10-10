@@ -106,6 +106,23 @@ describe Hwaro::Content::Processors::Markdown do
       result[:aliases].should eq(["/legacy/"])
     end
 
+    it "lists a repeated taxonomy term once" do
+      # The term generator de-duplicated, get_taxonomy did not: `["a", "a"]`
+      # counted 2 and listed the page twice under the term.
+      raw = <<-MD
+        +++
+        title = "Post"
+        tags = ["a", "a ", "b"]
+        categories = ["x", "x"]
+        +++
+        Body
+        MD
+
+      result = processor.parse(raw)
+      result[:tags].should eq(["a", "b"])
+      result[:taxonomies]["categories"].should eq(["x"])
+    end
+
     it "parses aliases array" do
       raw = <<-MD
         +++

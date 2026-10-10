@@ -606,7 +606,9 @@ module Hwaro
               Logger.warn "#{file_path}: `#{key}` has a non-string value (#{item.raw.inspect}) — ignored; quote it to keep it as a term."
             end
           end
-          terms.map { |term| Utils::TextUtils.normalize_term(term) }.reject(&.empty?)
+          # `uniq`: `tags = ["a", "a"]` is one term — a repeat must not list
+          # the page twice under it or double its get_taxonomy count.
+          terms.map { |term| Utils::TextUtils.normalize_term(term) }.reject(&.empty?).uniq!
         end
 
         # Build the front matter result NamedTuple from any front matter source.
