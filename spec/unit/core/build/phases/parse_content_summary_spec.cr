@@ -174,3 +174,27 @@ describe "marker summary and image processing" do
     log.scan("could not be resolved").size.should eq(1)
   end
 end
+
+class Hwaro::Core::Build::Builder
+  def test_render_page_summaries(pages : Array(Models::Page), site : Models::Site)
+    render_page_summaries(pages, site, {} of String => String, false)
+  end
+end
+
+describe "marker summary on a page object that had an excerpt" do
+  # serve re-parses a page into the same object: adding `<!-- more -->`
+  # left the old auto excerpt's summary_truncated = true behind.
+  it "clears the automatic excerpt state" do
+    site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+    page = Hwaro::Models::Page.new("posts/p.md")
+    page.url = "/posts/p/"
+    page.raw_content = "Intro.\n\n<!-- more -->\n\nRest."
+    page.summary = "Intro."
+    page.auto_summary = "Intro. Rest…"
+    page.summary_truncated = true
+    Hwaro::Core::Build::Builder.new.test_render_page_summaries([page], site)
+    page.summary_html.to_s.should contain("Intro.")
+    page.auto_summary.should be_nil
+    page.summary_truncated.should be_false
+  end
+end

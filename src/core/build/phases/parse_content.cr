@@ -104,6 +104,10 @@ module Hwaro::Core::Build::Phases::ParseContent
           recomputed_paths << page.path if assign_auto_summary(page, site, templates, global_vars)
           next
         end
+        # The marker wins: drop an excerpt a serve rerender left on this
+        # page object before the marker was added.
+        page.auto_summary = nil
+        page.summary_truncated = false
 
         shortcode_results = {} of String => String
         summary_md = complete_summary_chunk(summary_md, page.raw_content, md_config.footnotes)
