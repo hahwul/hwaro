@@ -181,6 +181,16 @@ module Hwaro
           attrs.gsub(AMP_DISALLOWED_ATTR_RE, "")
         end
 
+        # amp-iframe accepts `allowfullscreen`/`allowtransparency` only as bare
+        # boolean attributes and `frameborder` only as 0/1; the values embed
+        # snippets carry (`allowfullscreen="true"`, `frameborder="no"`) fail
+        # validation.
+        private def self.normalize_iframe_attributes(attrs : String) : String
+          attrs
+            .gsub(/(\s)(allowfullscreen|allowtransparency)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+)/i) { "#{$1}#{$2}" }
+            .gsub(/(\s)frameborder\s*=\s*(["']?)(no|yes)\2(?=[\s>]|\z)/i) { %(#{$1}frameborder="#{$3.downcase == "no" ? 0 : 1}") }
+        end
+
         # Convert standard HTML to AMP-compliant HTML
         def self.convert_to_amp(html : String, page : Models::Page, config : Models::Config) : String
           # The mirror lives one prefix deeper than the page it was rendered
@@ -273,10 +283,14 @@ module Hwaro
             needs_amp_iframe = true
             # Capture both groups before any inner match: `$~` is per-scope,
             # so the src lookup below would otherwise clobber `$2`.
-            attrs = strip_non_amp_attributes($1)
+            attrs = normalize_iframe_attributes(strip_non_amp_attributes($1))
             inner = $2
             unless attrs.includes?("layout=")
-              attrs += %( layout="responsive")
+              # `responsive` needs both dimensions. A height-only embed (the
+              # codepen shortcode, CodePen's own embed snippet) is full-width
+              # by design, which is what `fixed-height` means.
+              height_only = !attrs.matches?(/\swidth\s*=/i) && attrs.matches?(/\sheight\s*=/i)
+              attrs += height_only ? %( layout="fixed-height") : %( layout="responsive")
             end
             # amp-iframe requires a sandbox attribute; add a sane default when
             # the source <iframe> didn't carry one.

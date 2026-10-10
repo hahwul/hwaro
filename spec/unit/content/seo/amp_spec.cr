@@ -316,6 +316,22 @@ describe Hwaro::Content::Seo::Amp do
       result.should contain(amp_ext)
     end
 
+    # Regression: the codepen shortcode / CodePen embed snippet (height only,
+    # allowfullscreen="true", frameborder="no") became an invalid amp-iframe.
+    it "converts a height-only embed iframe into a valid amp-iframe" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      html = %(<html><head></head><body><iframe height="300" scrolling="no" src="https://codepen.io/u/embed/x" ) +
+             %(frameborder="no" allowtransparency="true" allowfullscreen="true"></iframe></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, Hwaro::Models::Config.new)
+      tag = result[/<amp-iframe[^>]*>/]
+      tag.should contain(%(layout="fixed-height"))
+      tag.should contain(%(frameborder="0"))
+      tag.should contain(" allowtransparency ")
+      tag.should contain(" allowfullscreen ")
+      tag.should_not contain(%(="true"))
+    end
+
     it "converts iframe to amp-iframe" do
       page = Hwaro::Models::Page.new("test.md")
       page.url = "/test/"
