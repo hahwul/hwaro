@@ -209,6 +209,11 @@ module Hwaro
       # Runtime / Computed Properties
       property content : String
       property raw_content : String
+      # Stamp of the source file as parse read it: {mtime ms, size, digest}.
+      # The digest is only taken when the mtime was still inside its
+      # timestamp tick (racy-git); see Cache#update. Nil for pages without a
+      # disk file.
+      property source_read : {Int64, Int64, String?}? = nil
       property path : String      # Relative path from content/ (e.g. "projects/a.md")
       property section : String   # Parent directory path (e.g. "blog/news"), not just the first component
       getter url : String         # Calculated relative URL (e.g. "/projects/a/"), written through #url=

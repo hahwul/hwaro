@@ -50,6 +50,23 @@ end
 
 describe Hwaro::Core::Build::Phases::ParseContent do
   describe "#parse_single_page" do
+    # #859: Cache#update records the bytes the render read, through this stamp.
+    it "stamps the source as read, with a digest only while the mtime is racy" do
+      body = "---\ntitle: Hello\n---\nBody"
+      with_content_dir({"post.md" => body, "old.md" => body}) do
+        File.touch("content/old.md", Time.utc - 1.hour)
+        builder = Hwaro::Core::Build::Builder.new
+        builder.test_set_parse_config(Hwaro::Models::Config.new)
+        fresh = Hwaro::Models::Page.new("post.md")
+        settled = Hwaro::Models::Page.new("old.md")
+        builder.test_parse_single_page(fresh)
+        builder.test_parse_single_page(settled)
+
+        fresh.source_read.should eq({File.info("content/post.md").modification_time.to_unix_ms, body.bytesize.to_i64, Digest::MD5.hexdigest(body)})
+        settled.source_read.should eq({File.info("content/old.md").modification_time.to_unix_ms, body.bytesize.to_i64, nil})
+      end
+    end
+
     it "populates frontmatter fields on the page" do
       with_content_dir({
         "post.md" => "---\ntitle: Hello\ndescription: A post\ndraft: false\ntags: [a, b]\n---\nBody content",

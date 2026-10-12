@@ -472,13 +472,16 @@ module Hwaro::Core::Build::Phases::Initialize
       # unpublished until some later edit moved the mtime clear of the
       # window. Compare the bytes in that narrow window instead: coarse
       # destinations still skip the copy, real edits still land.
+      # Racy-git (#857): an exact match proves nothing while the source
+      # mtime is inside its timestamp tick — a same-size rewrite in that
+      # tick keeps it — nor on the next build when the last copy was made
+      # inside it (#859). Such a match falls through to the byte compare.
+      racy = !Cache.stable_mtime?(info.modification_time.to_unix_ms, now)
+      @cache.try(&.record_racy_copy(dest_path)) if racy
       if incremental && (dest_info = File.info?(dest_path)) &&
          info.size == dest_info.size
         delta = (info.modification_time - dest_info.modification_time).abs
-        # Racy-git (#857): an exact match proves nothing while the source
-        # mtime is inside its timestamp tick — a same-size rewrite in that
-        # tick keeps it. Such a match falls through to the byte compare.
-        next if delta.zero? && Cache.stable_mtime?(info.modification_time.to_unix_ms, now)
+        next if delta.zero? && !racy && !@cache.try(&.racy_copy?(dest_path))
         next if delta <= MTIME_SKIP_TOLERANCE && same_contents?(src_path, dest_path)
       end
 

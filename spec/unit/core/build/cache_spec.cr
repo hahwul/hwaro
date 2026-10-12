@@ -266,6 +266,62 @@ describe Hwaro::Core::Build::Cache do
       end
     end
 
+    # #859: a tool that restores mtimes (rsync -t, tar) can bring back the
+    # recorded mtime with different bytes; the size still gives it away.
+    it "re-hashes a file whose size moved under a restored mtime" do
+      Dir.mktmpdir do |dir|
+        test_file = File.join(dir, "test.md")
+        File.write(test_file, "one")
+        old = Time.utc - 1.hour
+        File.touch(test_file, old)
+
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: File.join(dir, ".hwaro_cache.json"))
+        cache.update(test_file)
+
+        File.write(test_file, "three")
+        File.touch(test_file, old)
+        cache.changed?(test_file).should be_true
+      end
+    end
+
+    # #859: a save between the render's read and the entry being recorded
+    # must not be recorded as the bytes that render used.
+    it "does not vouch for a file edited after the render read it" do
+      Dir.mktmpdir do |dir|
+        test_file = File.join(dir, "test.md")
+        File.write(test_file, "one")
+        old = Time.utc - 1.hour
+        File.touch(test_file, old)
+        read = {old.to_unix_ms, 3_i64, nil.as(String?)}
+
+        File.write(test_file, "two")
+        File.touch(test_file, old + 1.second)
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: File.join(dir, ".hwaro_cache.json"))
+        cache.update(test_file, source_read: read)
+        cache.changed?(test_file).should be_true
+      end
+    end
+
+    it "records the bytes of a racy read, not the file's later same-tick rewrite" do
+      Dir.mktmpdir do |dir|
+        test_file = File.join(dir, "test.md")
+        File.write(test_file, "one")
+        written = File.info(test_file).modification_time
+        read = {written.to_unix_ms, 3_i64, Digest::MD5.hexdigest("one").as(String?)}
+
+        File.write(test_file, "two")
+        File.utime(written, written, test_file)
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: File.join(dir, ".hwaro_cache.json"))
+        cache.update(test_file, source_read: read)
+        cache.changed?(test_file).should be_true
+        # The same read recorded against unchanged bytes is up to date.
+        File.write(test_file, "one")
+        File.utime(written, written, test_file)
+        cache.update(test_file, source_read: read)
+        cache.changed?(test_file).should be_false
+      end
+    end
+
     it "trusts the stamp of a file that was safely old when recorded" do
       Dir.mktmpdir do |dir|
         test_file = File.join(dir, "test.md")

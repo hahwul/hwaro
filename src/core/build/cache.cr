@@ -21,6 +21,12 @@ module Hwaro
 
         property path : String
         property mtime : Int64
+        # Source size alongside the mtime: a tool that restores mtimes
+        # (`rsync -t`, tar) can bring back the old mtime with new bytes, and
+        # a size change then still re-hashes the file. -1 (unknown) for
+        # entries written before this field: only their mtime is compared.
+        @[JSON::Field(key: "size", emit_null: false)]
+        property size : Int64
         property hash : String
         property output_path : String
         @[JSON::Field(key: "template_hash", emit_null: false)]
@@ -95,6 +101,7 @@ module Hwaro
           @mtime : Int64,
           @hash : String,
           @output_path : String,
+          @size : Int64 = -1_i64,
           @template_hash : String = "",
           @config_hash : String = "",
           @cascade_hash : String = "",
@@ -110,6 +117,7 @@ module Hwaro
         def self.new(pull : JSON::PullParser)
           path = ""
           mtime = 0_i64
+          size = -1_i64
           hash = ""
           output_path = ""
           template_hash = ""
@@ -125,6 +133,7 @@ module Hwaro
             case key
             when "path"           then path = pull.read_string
             when "mtime"          then mtime = pull.read_int.to_i64
+            when "size"           then size = pull.read_int.to_i64
             when "hash"           then hash = pull.read_string
             when "output_path"    then output_path = pull.read_string
             when "template_hash"  then template_hash = pull.read_string
@@ -143,7 +152,7 @@ module Hwaro
             end
           end
 
-          new(path: path, mtime: mtime, hash: hash, output_path: output_path,
+          new(path: path, mtime: mtime, hash: hash, output_path: output_path, size: size,
             template_hash: template_hash, config_hash: config_hash, cascade_hash: cascade_hash,
             output_paths: output_paths, assets_hash: assets_hash, git_hash: git_hash,
             derived_paths: derived_paths, relations_hash: relations_hash)
@@ -213,6 +222,14 @@ module Hwaro
         property render_inputs_hash : String = ""
         @[JSON::Field(key: "render_input_keys", emit_null: false)]
         property render_input_keys : Array(String) = [] of String
+
+        # Static and bundle copies made while their source mtime was still
+        # inside its timestamp tick (#859). The copy is stamped with the
+        # source mtime, so a same-size rewrite in that tick matches it
+        # exactly; the next build byte-compares these instead of trusting
+        # the match.
+        @[JSON::Field(key: "racy_copies", emit_null: false)]
+        property racy_copies : Array(String) = [] of String
 
         def initialize(@template_hash : String = "", @config_hash : String = "",
                        @page_set_hash : String = "", @section_set_hash : String = "")
@@ -295,6 +312,9 @@ module Hwaro
         # wipes the output directory. Collected under @mutex by #update and
         # drained once by the Finalize phase.
         @orphaned_outputs = [] of String
+
+        # This build's racy copies (see CacheMetadata#racy_copies).
+        @racy_copies = Set(String).new
 
         def initialize(@enabled : Bool = true, @cache_path : String = CACHE_FILE)
           @entries = {} of String => CacheEntry
@@ -530,8 +550,9 @@ module Hwaro
           # Fast path: check modification time first
           begin
             now = Time.utc.to_unix_ms
-            current_mtime = File.info(file_path).modification_time.to_unix_ms
-            if current_mtime != entry.mtime
+            info = File.info(file_path)
+            current_mtime = info.modification_time.to_unix_ms
+            if current_mtime != entry.mtime || (entry.size >= 0 && info.size != entry.size)
               # mtime changed — verify with content hash to catch false positives
               # (e.g. file touched but content identical)
               current_hash = compute_file_hash(file_path)
@@ -545,6 +566,7 @@ module Hwaro
               # field-by-field reconstruction.
               refreshed = entry
               refreshed.mtime = Cache.stable_mtime?(current_mtime, now) ? current_mtime : UNSTABLE_MTIME
+              refreshed.size = info.size.to_i64
               @mutex.synchronize do
                 @entries[file_path] = refreshed
                 @dirty = true
@@ -641,8 +663,13 @@ module Hwaro
         # stores the global templates checksum (non-page entries).
         # `output_paths` are the secondary sibling output files this page
         # emitted (see `[outputs]`); empty when the feature isn't in use.
+        # `source_read` is the page's Page#source_read: the entry then
+        # describes the bytes the render read, not whatever the file holds by
+        # now (#859). A racy read stores its own digest; a file whose stamp
+        # moved since the read stores a hash that never matches, so the next
+        # build re-renders it.
         # Thread-safe: protected by mutex for concurrent parallel builds.
-        def update(file_path : String, output_path : String = "", cascade_hash : String = "", template_hash : String? = nil, output_paths : Array(String) = [] of String, assets_hash : String = "", git_hash : String = "", derived_paths : Array(String) = [] of String, relations_hash : String = "")
+        def update(file_path : String, output_path : String = "", cascade_hash : String = "", template_hash : String? = nil, output_paths : Array(String) = [] of String, assets_hash : String = "", git_hash : String = "", derived_paths : Array(String) = [] of String, relations_hash : String = "", source_read : {Int64, Int64, String?}? = nil)
           return unless @enabled
           return unless File.exists?(file_path)
 
@@ -650,12 +677,16 @@ module Hwaro
 
           begin
             now = Time.utc.to_unix_ms
-            mtime = File.info(file_path).modification_time.to_unix_ms
+            info = File.info(file_path)
+            mtime = info.modification_time.to_unix_ms
+            size = info.size.to_i64
+            read_digest = source_read.try(&.[2])
+            edited_since_read = source_read && read_digest.nil? && {source_read[0], source_read[1]} != {mtime, size}
 
             # Fast path: skip update if entry is unchanged (protected by mutex)
             @mutex.synchronize do
               existing = @entries[file_path]?
-              if existing && existing.mtime == mtime && existing.output_path == output_path &&
+              if existing && !edited_since_read && existing.mtime == mtime && existing.size == size && existing.output_path == output_path &&
                  existing.cascade_hash == cascade_hash && existing.template_hash == effective_template_hash &&
                  existing.output_paths == output_paths && existing.assets_hash == assets_hash &&
                  existing.git_hash == git_hash && existing.derived_paths == derived_paths &&
@@ -665,11 +696,17 @@ module Hwaro
             end
 
             # Compute hash outside the lock to minimize contention
-            content_hash = compute_file_hash(file_path)
+            content_hash = if edited_since_read
+                             ""
+                           else
+                             read_digest || compute_file_hash(file_path)
+                           end
+            stable = Cache.stable_mtime?(mtime, now) && read_digest.nil? && !edited_since_read
 
             entry = CacheEntry.new(
               path: file_path,
-              mtime: Cache.stable_mtime?(mtime, now) ? mtime : UNSTABLE_MTIME,
+              mtime: stable ? mtime : UNSTABLE_MTIME,
+              size: size,
               hash: content_hash,
               output_path: output_path,
               template_hash: effective_template_hash,
@@ -767,6 +804,8 @@ module Hwaro
         # otherwise re-serializes every entry just to write identical bytes.
         def save
           return unless @enabled
+          racy_copies = @mutex.synchronize { @racy_copies.to_a.sort! }
+          @dirty = true if racy_copies != @metadata.racy_copies
           return unless @dirty
           # Per-process temp name: a shared `.tmp` lets two hwaro processes in
           # the same project (the common `hwaro serve` + `hwaro build` pair)
@@ -784,6 +823,7 @@ module Hwaro
               # is a struct, so this leaves @metadata itself untouched.
               stamped = @metadata
               stamped.generator_version = Hwaro::VERSION
+              stamped.racy_copies = racy_copies
               CacheData.new(metadata: stamped, entries: @entries.values)
             end
             # SERVE_CACHE_FILE lives under `.hwaro/`, which may not exist yet.
@@ -797,6 +837,15 @@ module Hwaro
             # Clean up temp file if rename failed
             File.delete(tmp_path) if File.exists?(tmp_path)
           end
+        end
+
+        # Was `dest` copied while its source was racy, on the last build?
+        def racy_copy?(dest : String) : Bool
+          @enabled && @metadata.racy_copies.includes?(dest)
+        end
+
+        def record_racy_copy(dest : String) : Nil
+          @mutex.synchronize { @racy_copies << dest } if @enabled
         end
 
         # Load cache from disk
