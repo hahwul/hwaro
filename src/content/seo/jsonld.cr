@@ -166,7 +166,7 @@ module Hwaro
           items << {
             "@type"    => "ListItem",
             "position" => items.size + 1,
-            "name"     => page.title,
+            "name"     => page.breadcrumb_title,
           }
 
           json = JSON.build do |j|

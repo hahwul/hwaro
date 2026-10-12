@@ -6,8 +6,13 @@ describe Hwaro::Models::Page do
       titled = Hwaro::Models::Section.new("blog/_index.md")
       titled.title = "Blog"
       titled.breadcrumb_title.should eq("Blog")
-      Hwaro::Models::Section.new("blog/2022/_index.md").breadcrumb_title.should eq("2022")
-      Hwaro::Models::Section.new("_index.md").breadcrumb_title.should eq("Untitled")
+      year = Hwaro::Models::Section.new("blog/2022/_index.md")
+      year.is_index = true
+      year.breadcrumb_title.should eq("2022")
+      root = Hwaro::Models::Section.new("_index.md")
+      root.is_index = true
+      root.breadcrumb_title.should eq("Untitled")
+      Hwaro::Models::Page.new("blog/post.md").breadcrumb_title.should eq("Untitled")
     end
   end
 

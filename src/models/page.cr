@@ -354,11 +354,11 @@ module Hwaro
       end
 
       # Name for a breadcrumb crumb (`page.ancestors`, JSON-LD
-      # BreadcrumbList). A title-less section — typically a `transparent`
-      # year folder — falls back to its directory name ("2022") instead of
-      # publishing the placeholder (gh#863).
+      # BreadcrumbList). A title-less section or bundle index — typically a
+      # `transparent` year folder — falls back to its directory name ("2022")
+      # instead of publishing the placeholder (gh#863).
       def breadcrumb_title : String
-        return @title unless untitled?
+        return @title unless untitled? && @is_index
         dir = File.dirname(@path)
         dir == "." ? @title : File.basename(dir)
       end

@@ -583,7 +583,7 @@ module Hwaro
       #
       # Racy-git (#859): that assumption fails while the mtime is still
       # inside its timestamp tick — two same-size saves in one tick share a
-      # stamp. Such a file is hashed on every scan, in every bucket, and once
+      # stamp. Such a file is hashed on every scan, in every watched root, and once
       # more on the first scan after it settles (`@racy_watch_paths`), so the
       # second save shows up as a digest change. Afterwards the digest is
       # carried like any other, so a settled file is never read again.

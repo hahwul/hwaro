@@ -110,13 +110,15 @@ describe "title-less ancestor sections" do
       },
       template_files: {
         "page.html"    => "{% for a in page.ancestors %}[{{ a.title }}]{% endfor %}{{ jsonld_breadcrumb }}",
-        "section.html" => "",
+        "section.html" => "{{ jsonld_breadcrumb }}",
       },
     ) do
       html = File.read("public/blog/2022/post/index.html")
       html.should start_with("[Blog][2022]")
       html.should contain(%("name":"2022"))
       html.should_not contain("Untitled")
+      # The folder's own page ends its breadcrumb with itself.
+      File.read("public/blog/2022/index.html").should contain(%({"@type":"ListItem","position":3,"name":"2022"}))
     end
   end
 end

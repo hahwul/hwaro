@@ -55,3 +55,31 @@ describe "Builder#copy_changed_content_files" do
     log.should_not contain("copied")
   end
 end
+
+# #859: a same-size save in the tick of the last copy keeps the copy's stamp;
+# the serve cache is off, so only the watcher knows the bundle asset changed.
+describe "Builder#copy_changed_content_files and bundle assets" do
+  it "republishes a changed asset whose size and mtime still match the copy" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", "title = \"T\"\nbase_url = \"http://localhost\"\n")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        FileUtils.mkdir_p("content/post")
+        File.write("content/post/index.md", "---\ntitle: Post\n---\nPost")
+        File.write("content/post/data.txt", "VERSION_A")
+        settled = Time.utc - 1.hour
+        File.touch("content/post/data.txt", settled)
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hook| builder.register(hook) }
+        builder.run(Hwaro::Config::Options::BuildOptions.new(highlight: false)).should be_true
+        File.info("public/post/data.txt").modification_time.should eq(settled)
+
+        File.write("content/post/data.txt", "VERSION_B")
+        File.touch("content/post/data.txt", settled)
+        builder.copy_changed_content_files(["content/post/data.txt"], "public", false)
+        File.read("public/post/data.txt").should eq("VERSION_B")
+      end
+    end
+  end
+end

@@ -187,7 +187,7 @@ module Hwaro
 
             | Field | Type | Description |
             |-------|------|-------------|
-            | sort_by | string | Sort by: `date`, `weight`, `title` |
+            | sort_by | string | Sort by: `date`, `published`, `weight`, `title` |
             | paginate | int | Pages per page |
             | transparent | bool | Pass pages to parent section |
             | generate_feeds | bool | Generate RSS feed for this section |
