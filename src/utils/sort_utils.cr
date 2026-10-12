@@ -63,6 +63,17 @@ module Hwaro
         result == 0 ? (a <=> b) : result
       end
 
+      # Taxonomy term order (`terms_sort_by`): by name, or with `by_count` by
+      # the block's page count descending with the name order as tiebreak.
+      def sort_term_names(names : Array(String), by_count : Bool, & : String -> Int32) : Array(String)
+        return names.sort { |a, b| compare_term_names(a, b) } unless by_count
+        counts = names.to_h { |name| {name, yield name} }
+        names.sort do |a, b|
+          result = counts[b] <=> counts[a]
+          result == 0 ? compare_term_names(a, b) : result
+        end
+      end
+
       # Compare two pages by weight value (lower weight first)
       #
       def compare_by_weight(a : Models::Page, b : Models::Page) : Int32

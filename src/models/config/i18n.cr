@@ -12,7 +12,7 @@ module Hwaro
       property feed : Bool
       property sitemap : Bool
       property paginate_by : Int32?
-      # Ordering of pages within a term ("date", "title", "weight") —
+      # Ordering of pages within a term ("date", "published", "title", "weight") —
       # section semantics: date is newest-first, title/weight ascend, and
       # `reverse` flips whichever order `sort_by` produced. Term FEEDS are
       # exempt: RSS consumers assume reverse-chronological, so they stay

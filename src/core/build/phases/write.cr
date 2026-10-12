@@ -306,15 +306,11 @@ module Hwaro::Core::Build::Phases::Write
         # skip forever when an asset is replaced by a same-size file with an
         # older preserved mtime (rsync -a / tar -x restoring a revision).
         src_info = File.info?(source_path)
-        # Racy-git (#857): while the source mtime is inside its timestamp
-        # tick a same-size rewrite keeps it, so compare bytes — and on the
-        # next build too when this copy was made inside it (#859).
-        racy = src_info && !Cache.stable_mtime?(src_info.modification_time.to_unix_ms, now)
-        @cache.try(&.record_racy_copy(dest_path)) if racy
+        # Racy-git: an exact match copy_stamp_trusted? refuses compares bytes.
+        trusted = src_info && copy_stamp_trusted?(dest_path, src_info.modification_time, now)
         if src_info && (dest_info = File.info?(dest_path))
           if src_info.size == dest_info.size && src_info.modification_time == dest_info.modification_time
-            next if (!racy && !@cache.try(&.racy_copy?(dest_path))) ||
-                    same_contents?(source_path, dest_path)
+            next if trusted || same_contents?(source_path, dest_path)
           end
         end
 

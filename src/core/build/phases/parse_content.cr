@@ -855,6 +855,7 @@ module Hwaro::Core::Build::Phases::ParseContent
       info = File.info(source_path)
       raw_content = File.read(source_path)
       mtime_ms = info.modification_time.to_unix_ms
+      # Must equal Cache#compute_file_hash of the same bytes.
       racy_digest = Cache.stable_mtime?(mtime_ms, now_ms) ? nil : Digest::MD5.hexdigest(raw_content)
       page.source_read = {mtime_ms, info.size.to_i64, racy_digest}
     end

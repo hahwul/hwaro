@@ -730,6 +730,27 @@ describe Hwaro::Core::Build::Cache do
   # ===========================================================================
   # invalidate
   # ===========================================================================
+  describe "#copy_stamp_trusted?" do
+    # #859: one Cache serves every rebuild of a serve session, so a racy copy
+    # must stay listed until a settled check takes it off, saved or not.
+    it "distrusts a racy copy until one check against a settled source" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        now = Time.utc.to_unix_ms
+        cache.copy_stamp_trusted?("public/a.css", now, now).should be_false
+        cache.save
+
+        settled = now - 3_600_000
+        reloaded = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        cache.copy_stamp_trusted?("public/a.css", settled, now).should be_false
+        cache.copy_stamp_trusted?("public/a.css", settled, now).should be_true
+        reloaded.copy_stamp_trusted?("public/a.css", settled, now).should be_false
+        reloaded.copy_stamp_trusted?("public/b.css", settled, now).should be_true
+      end
+    end
+  end
+
   describe "#invalidate" do
     it "removes file from cache" do
       Dir.mktmpdir do |dir|

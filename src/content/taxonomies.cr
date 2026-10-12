@@ -213,20 +213,9 @@ module Hwaro
         language : String?,
         default_language : String,
       ) : Array(String)
-        return terms.sort { |a, b| Utils::SortUtils.compare_term_names(a, b) } unless taxonomy.terms_sort_by == "count"
-
-        counts = {} of String => Int32
-        terms.each do |term|
+        Utils::SortUtils.sort_term_names(terms, taxonomy.terms_sort_by == "count") do |term|
           pages = terms_map[term]? || [] of Models::Page
-          counts[term] = if language
-                           pages.count { |p| (p.language || default_language) == language }
-                         else
-                           pages.size
-                         end
-        end
-        terms.sort do |a, b|
-          cmp = counts[b] <=> counts[a]
-          cmp == 0 ? Utils::SortUtils.compare_term_names(a, b) : cmp
+          language ? pages.count { |p| (p.language || default_language) == language } : pages.size
         end
       end
 

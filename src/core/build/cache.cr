@@ -313,7 +313,9 @@ module Hwaro
         # drained once by the Finalize phase.
         @orphaned_outputs = [] of String
 
-        # This build's racy copies (see CacheMetadata#racy_copies).
+        # Racy copies not yet checked against a settled source (see
+        # CacheMetadata#racy_copies): loaded with the cache, kept across serve
+        # rebuilds that reuse it.
         @racy_copies = Set(String).new
 
         def initialize(@enabled : Bool = true, @cache_path : String = CACHE_FILE)
@@ -804,8 +806,13 @@ module Hwaro
         # otherwise re-serializes every entry just to write identical bytes.
         def save
           return unless @enabled
-          racy_copies = @mutex.synchronize { @racy_copies.to_a.sort! }
-          @dirty = true if racy_copies != @metadata.racy_copies
+          @mutex.synchronize do
+            racy_copies = @racy_copies.to_a.sort!
+            if racy_copies != @metadata.racy_copies
+              @metadata.racy_copies = racy_copies
+              @dirty = true
+            end
+          end
           return unless @dirty
           # Per-process temp name: a shared `.tmp` lets two hwaro processes in
           # the same project (the common `hwaro serve` + `hwaro build` pair)
@@ -823,7 +830,6 @@ module Hwaro
               # is a struct, so this leaves @metadata itself untouched.
               stamped = @metadata
               stamped.generator_version = Hwaro::VERSION
-              stamped.racy_copies = racy_copies
               CacheData.new(metadata: stamped, entries: @entries.values)
             end
             # SERVE_CACHE_FILE lives under `.hwaro/`, which may not exist yet.
@@ -839,13 +845,23 @@ module Hwaro
           end
         end
 
-        # Was `dest` copied while its source was racy, on the last build?
-        def racy_copy?(dest : String) : Bool
-          @enabled && @metadata.racy_copies.includes?(dest)
-        end
-
-        def record_racy_copy(dest : String) : Nil
-          @mutex.synchronize { @racy_copies << dest } if @enabled
+        # May a copy whose size and mtime equal its source's skip the byte
+        # compare? Not while the source mtime is racy (#857), nor on the
+        # first check after a copy was made inside that window (#859): the
+        # copy carries the source mtime, so a same-size rewrite in that tick
+        # matches it exactly. That check takes `dest` off the list, since the
+        # caller then compares the bytes or copies again.
+        def copy_stamp_trusted?(dest : String, src_mtime_ms : Int64, now_ms : Int64) : Bool
+          racy = !Cache.stable_mtime?(src_mtime_ms, now_ms)
+          return !racy unless @enabled
+          @mutex.synchronize do
+            if racy
+              @racy_copies << dest
+              false
+            else
+              !@racy_copies.delete(dest)
+            end
+          end
         end
 
         # Load cache from disk
@@ -867,6 +883,7 @@ module Hwaro
             # Try loading new format with metadata
             data = CacheData.from_json(content)
             @metadata = data.metadata
+            @racy_copies = @metadata.racy_copies.to_set
             data.entries.each { |e| @entries[e.path] = e }
             @loaded = true
           rescue JSON::ParseException | JSON::SerializableError
