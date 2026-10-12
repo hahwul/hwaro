@@ -120,6 +120,10 @@ for e in d.get("entries", []):
 d["entries"] = sorted(d.get("entries", []), key=lambda e: e.get("path", ""))
 json.dump(d, open(p, "w"), sort_keys=True, indent=1)
 ' 2>/dev/null || true
+  # Image variant stamps lead with the source mtime and are appended in
+  # resize-completion order; canonicalise them the same way.
+  find "$dir" -path '*/.hwaro/image_variants.log' -type f -print0 2>/dev/null |
+    xargs -0 -r -n 1 perl -i -e 'print sort map { s/","\d+:/","T:/r } <>' 2>/dev/null || true
 }
 
 # Normalise the few things that legitimately differ between two runs of the
