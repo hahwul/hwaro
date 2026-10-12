@@ -202,7 +202,7 @@ module Hwaro
       end
 
       # Order the index page's terms list per the taxonomy's `terms_sort_by`:
-      # "name" (default) is alphabetical ascending; "count" is page count
+      # "name" (default) is alphabetical ascending, ignoring case; "count" is page count
       # descending with a name-ascending tiebreak. Counts use the
       # language-filtered page lists so a per-language index reflects that
       # language's own term sizes.
@@ -213,7 +213,7 @@ module Hwaro
         language : String?,
         default_language : String,
       ) : Array(String)
-        return terms.sort unless taxonomy.terms_sort_by == "count"
+        return terms.sort { |a, b| Utils::SortUtils.compare_term_names(a, b) } unless taxonomy.terms_sort_by == "count"
 
         counts = {} of String => Int32
         terms.each do |term|
@@ -226,7 +226,7 @@ module Hwaro
         end
         terms.sort do |a, b|
           cmp = counts[b] <=> counts[a]
-          cmp == 0 ? (a <=> b) : cmp
+          cmp == 0 ? Utils::SortUtils.compare_term_names(a, b) : cmp
         end
       end
 

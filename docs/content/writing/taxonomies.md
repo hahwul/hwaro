@@ -50,7 +50,7 @@ An invalid `sort_by` value logs a warning and keeps the `"date"` default.
 `terms_sort_by` controls the order of the terms list, on the taxonomy
 index page and in `get_taxonomy().items`:
 
-- `"name"` (default): ascending by term name, compared byte by byte, so `Zebra` sorts before `apple`.
+- `"name"` (default): ascending by term name, ignoring case, so `apple` sorts before `Zebra`.
 - `"count"` — page count descending, name-ascending tiebreak. On a
   multilingual site, each language's index uses that language's own page
   counts.

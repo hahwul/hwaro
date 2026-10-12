@@ -1,6 +1,13 @@
 require "../../spec_helper"
 
 describe Hwaro::Utils::SortUtils do
+  describe ".compare_term_names" do
+    it "ignores case, breaking ties by byte order" do
+      %w(go Zola beta Go acp SRI).sort { |a, b| Hwaro::Utils::SortUtils.compare_term_names(a, b) }
+        .should eq(%w(acp beta Go go SRI Zola))
+    end
+  end
+
   describe ".compare_by_date" do
     it "sorts newer page first (descending)" do
       a = Hwaro::Models::Page.new("a.md")

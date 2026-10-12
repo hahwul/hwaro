@@ -46,6 +46,14 @@ module Hwaro
         result == 0 ? (a.path <=> b.path) : result
       end
 
+      # Compare two taxonomy term names alphabetically, ignoring case
+      # ("acp" < "SRI" < "Zola"); byte order breaks ties so "Go" and "go"
+      # still order deterministically.
+      def compare_term_names(a : String, b : String) : Int32
+        result = a.compare(b, case_insensitive: true)
+        result == 0 ? (a <=> b) : result
+      end
+
       # Compare two pages by weight value (lower weight first)
       #
       def compare_by_weight(a : Models::Page, b : Models::Page) : Int32

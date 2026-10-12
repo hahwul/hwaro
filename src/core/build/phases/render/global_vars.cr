@@ -234,10 +234,10 @@ module Hwaro::Core::Build::Phases::Render
       sorted_term_names = if tax_cfg.try(&.terms_sort_by) == "count"
                             terms.keys.sort! do |a, b|
                               cmp = terms[b].size <=> terms[a].size
-                              cmp == 0 ? (a <=> b) : cmp
+                              cmp == 0 ? Utils::SortUtils.compare_term_names(a, b) : cmp
                             end
                           else
-                            terms.keys.sort!
+                            terms.keys.sort! { |a, b| Utils::SortUtils.compare_term_names(a, b) }
                           end
       terms_array = sorted_term_names.map do |term|
         term_pages = terms[term]
