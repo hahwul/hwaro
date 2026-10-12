@@ -218,20 +218,65 @@ describe "serve data/i18n hook-loop regression (#755)" do
       Dir.cd(dir) do
         write_data_loop_site
         File.write("data/site.json", %({"answer": 42}))
+        settled = Time.utc - 1.hour
+        File.touch("data/site.json", settled)
 
         server = Hwaro::Services::Server.new
         old = server.data_loop_scan
         server.data_loop_scan(old).should eq(old)
 
-        # A same-size edit with the mtime forced back onto the old stamp is
+        # A same-size edit with the mtime forced back onto a SETTLED stamp is
         # invisible: the digest is carried, not recomputed. That is the
         # documented FileStamp tradeoff (bytes can't change without moving
         # mtime or size in any real editor/tool flow), and it is what keeps
-        # steady-state polls read-free for large data files.
-        mtime = File.info("data/site.json").modification_time
+        # steady-state polls read-free for large data files. A stamp still
+        # inside its timestamp tick is re-hashed instead (#859).
         File.write("data/site.json", %({"answer": 24}))
-        File.touch("data/site.json", mtime)
+        File.touch("data/site.json", settled)
         server.data_loop_scan(old)["data/site.json"].should eq(old["data/site.json"])
+      end
+    end
+  end
+
+  # #859: two same-size saves inside one timestamp tick share a stamp. The
+  # mtime is pinned back onto the first save's to model that tick.
+  it "notices a same-size save that keeps a racy stamp, in every bucket" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_data_loop_site
+        File.write("data/site.json", %({"answer": 42}))
+
+        server = Hwaro::Services::Server.new
+        old = server.data_loop_scan
+        {"content/foo.md" => "---\ntitle: Foo\n---\nBodx", "data/site.json" => %({"answer": 24})}.each do |path, body|
+          mtime = File.info(path).modification_time
+          File.write(path, body)
+          File.touch(path, mtime)
+        end
+
+        changes = server.data_loop_detect_changes(old, server.data_loop_scan(old))
+        changes.modified_content.should eq(["content/foo.md"])
+        changes.modified_data.should eq(["data/site.json"])
+      end
+    end
+  end
+
+  it "re-hashes once more on the first scan after a racy stamp settles, then goes quiet" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_data_loop_site
+        tick = Time.utc - 1.8.seconds
+        File.touch("content/foo.md", tick)
+
+        server = Hwaro::Services::Server.new
+        old = server.data_loop_scan
+        sleep 0.4.seconds
+        File.write("content/foo.md", "---\ntitle: Foo\n---\nBodx")
+        File.touch("content/foo.md", tick)
+
+        current = server.data_loop_scan(old)
+        server.data_loop_detect_changes(old, current).modified_content.should eq(["content/foo.md"])
+        server.data_loop_scan(current).should eq(current)
       end
     end
   end
