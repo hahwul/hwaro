@@ -5,6 +5,7 @@
 
 require "../../utils/errors"
 require "../../utils/logger"
+require "../../ext/execution_context_wake"
 
 module Hwaro
   module Core
@@ -16,10 +17,15 @@ module Hwaro
       struct ParallelConfig
         property enabled : Bool
         property max_workers : Int32
+        # Wake idle threads for the workers (see ParallelHelper.wake_workers).
+        # Only for CPU-bound work that prints nothing from its workers: its
+        # warnings and results are handled in item order afterwards.
+        property wake_idle : Bool
 
         def initialize(
           @enabled : Bool = true,
           @max_workers : Int32 = 0, # 0 = auto-detect based on CPU count
+          @wake_idle : Bool = false,
         )
         end
 
@@ -118,6 +124,7 @@ module Hwaro
               end
             end
           end
+          ParallelHelper.wake_workers(worker_count) if @config.wake_idle
 
           # Collect results
           collected = [] of WorkResult(R)
@@ -161,6 +168,26 @@ module Hwaro
             end
           end
           items.size.times { done.receive }
+        end
+
+        @@wake_idle_threads = false
+
+        # `hwaro build` turns this on. `serve` keeps the stock scheduling: a
+        # wake also pulls the thread waiting on the event loop into the
+        # workers, and serve must keep answering HTTP during a rebuild.
+        def wake_idle_threads=(value : Bool) : Nil
+          @@wake_idle_threads = value
+        end
+
+        # Wake idle threads to run fibers this fiber just spawned; see
+        # src/ext/execution_context_wake.cr. Called after spawning the
+        # workers, and only for the `wake_idle` fan-outs (OG images, image
+        # resizing): woken threads make completion order vary on every
+        # build, which the others' first-error pick and warning order
+        # would show.
+        def wake_workers(count : Int32) : Nil
+          return unless @@wake_idle_threads
+          Fiber::ExecutionContext.current?.as?(Fiber::ExecutionContext::Parallel).try(&.wake_idle_schedulers(count))
         end
 
         # Execute multiple independent tasks in parallel.

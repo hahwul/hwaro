@@ -333,3 +333,12 @@ describe "MAX_PARALLEL_WORKERS" do
     Hwaro::Core::Build::MAX_PARALLEL_WORKERS.should eq(64)
   end
 end
+
+# src/ext/execution_context_wake.cr compiles to a no-op when the stdlib method
+# it calls is gone, so a Crystal upgrade would silently lose the OG/image
+# fan-out speed-up; this fails instead.
+describe "Fiber::ExecutionContext::Parallel#wake_idle_schedulers" do
+  it "reaches the stdlib's wake_scheduler" do
+    {{ Fiber::ExecutionContext::Parallel.has_method?(:wake_scheduler) }}.should be_true
+  end
+end
