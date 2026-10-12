@@ -157,7 +157,7 @@ module Hwaro
             items << {
               "@type"    => "ListItem",
               "position" => idx + 2,
-              "name"     => ancestor.title,
+              "name"     => ancestor.breadcrumb_title,
               "item"     => ancestor_url,
             }
           end

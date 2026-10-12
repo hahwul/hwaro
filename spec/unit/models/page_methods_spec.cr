@@ -1,6 +1,16 @@
 require "../../spec_helper"
 
 describe Hwaro::Models::Page do
+  describe "#breadcrumb_title" do
+    it "keeps an authored title and falls back to the directory name otherwise" do
+      titled = Hwaro::Models::Section.new("blog/_index.md")
+      titled.title = "Blog"
+      titled.breadcrumb_title.should eq("Blog")
+      Hwaro::Models::Section.new("blog/2022/_index.md").breadcrumb_title.should eq("2022")
+      Hwaro::Models::Section.new("_index.md").breadcrumb_title.should eq("Untitled")
+    end
+  end
+
   describe "#calculate_word_count" do
     it "counts words in raw content (front matter already stripped)" do
       page = Hwaro::Models::Page.new("test.md")

@@ -429,7 +429,9 @@ Navigation follows the flat reading order across the entire site, similar to mdB
 
 ### page.ancestors
 
-Parent sections for breadcrumbs:
+Parent sections for breadcrumbs. An ancestor section without a `title`
+(such as a `transparent` year folder) uses its directory name (`2022`),
+here and in the JSON-LD `BreadcrumbList`:
 
 ```jinja
 <nav class="breadcrumbs">

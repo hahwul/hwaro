@@ -82,7 +82,7 @@ module Hwaro
           eligible.each do |p|
             next unless p.is_a?(Models::Section)
             next if p.section.empty?
-            headings[p.section] = p.title unless p.title.empty? || p.title == "Untitled"
+            headings[p.section] = p.title unless p.untitled?
           end
 
           # Fold section-level `_index.md` pages (a `Models::Section` with a

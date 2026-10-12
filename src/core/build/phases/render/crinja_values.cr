@@ -115,7 +115,7 @@ module Hwaro::Core::Build::Phases::Render
   private def build_ancestors_crinja(page : Models::Page) : Array(Crinja::Value)
     page.ancestors.map do |ancestor|
       Crinja::Value.new({
-        "title" => Crinja::Value.new(ancestor.title),
+        "title" => Crinja::Value.new(ancestor.breadcrumb_title),
         "url"   => Crinja::Value.new(ancestor.url),
       })
     end

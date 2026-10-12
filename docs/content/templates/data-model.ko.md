@@ -429,7 +429,9 @@ john-doe:
 
 ### page.ancestors
 
-브레드크럼에 쓰는 부모 섹션 목록:
+브레드크럼에 쓰는 부모 섹션 목록. `title`이 없는 상위 섹션(예: `transparent`
+연도 폴더)은 디렉터리 이름(`2022`)을 사용하며, JSON-LD `BreadcrumbList`도
+마찬가지입니다:
 
 ```jinja
 <nav class="breadcrumbs">

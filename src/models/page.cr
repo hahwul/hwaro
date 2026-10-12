@@ -342,6 +342,22 @@ module Hwaro
         @is_index && !@path.includes?('/')
       end
 
+      # No authored title: front matter left it unset (the "Untitled"
+      # placeholder) or blank.
+      def untitled? : Bool
+        @title.empty? || @title == "Untitled"
+      end
+
+      # Name for a breadcrumb crumb (`page.ancestors`, JSON-LD
+      # BreadcrumbList). A title-less section — typically a `transparent`
+      # year folder — falls back to its directory name ("2022") instead of
+      # publishing the placeholder (gh#863).
+      def breadcrumb_title : String
+        return @title unless untitled?
+        dir = File.dirname(@path)
+        dir == "." ? @title : File.basename(dir)
+      end
+
       # Check if page has redirect
       def has_redirect? : Bool
         !@redirect_to.nil? && !@redirect_to.try(&.empty?)
