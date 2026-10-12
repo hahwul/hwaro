@@ -20,8 +20,8 @@ describe Hwaro::Utils::SortUtils do
 
   describe ".compare_term_names" do
     it "ignores case, breaking ties by byte order" do
-      %w(go Zola beta Go acp SRI).sort { |a, b| Hwaro::Utils::SortUtils.compare_term_names(a, b) }
-        .should eq(%w(acp beta Go go SRI Zola))
+      %w[go Zola beta Go acp SRI].sort { |a, b| Hwaro::Utils::SortUtils.compare_term_names(a, b) }
+        .should eq(%w[acp beta Go go SRI Zola])
     end
   end
 
