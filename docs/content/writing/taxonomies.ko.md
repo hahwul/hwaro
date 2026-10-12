@@ -31,7 +31,7 @@ name = "authors"
 | `feed` | bool | false | 항목별 RSS 피드 생성 |
 | `sitemap` | bool | true | 택소노미 페이지를 사이트맵에 포함 |
 | `paginate_by` | int | — | 항목 페이지의 페이지당 항목 수 |
-| `sort_by` | string | "date" | 항목 안 페이지의 정렬 기준: `"date"`, `"title"`, `"weight"` ([정렬](#정렬) 참고) |
+| `sort_by` | string | "date" | 항목 안 페이지의 정렬 기준: `"date"`, `"published"`, `"title"`, `"weight"` ([정렬](#정렬) 참고) |
 | `reverse` | bool | false | `sort_by`가 만든 순서 뒤집기 |
 | `terms_sort_by` | string | "name" | 항목 목록의 정렬 기준: `"name"` 또는 `"count"` ([정렬](#정렬) 참고) |
 
@@ -40,6 +40,7 @@ name = "authors"
 `sort_by`는 각 택소노미 항목에 속한 페이지의 순서를 결정하며, 생성되는 항목 페이지, `get_taxonomy()`의 `term.pages`, 항목별 페이지네이션 모두에 적용됩니다. 의미는 섹션 정렬과 정확히 같습니다:
 
 - `"date"`(기본값): 최신순. `reverse = true`면 오래된 순.
+- `"published"` — `"date"`와 같지만 발행일 `date`만 사용합니다(`updated`는 무시).
 - `"title"` — 제목 오름차순(바이트 단위 비교라 대문자가 소문자보다 앞). `reverse = true`면 내림차순.
 - `"weight"` — 낮은 weight 우선. `reverse = true`면 내림차순.
 
@@ -47,7 +48,7 @@ name = "authors"
 
 `terms_sort_by`는 항목 목록의 순서를 결정하며, 택소노미 인덱스 페이지와 `get_taxonomy().items`에 적용됩니다:
 
-- `"name"`(기본값): 항목 이름 오름차순. 바이트 단위로 비교하므로 `Zebra`가 `apple`보다 앞에 옵니다.
+- `"name"`(기본값): 항목 이름 오름차순. 대소문자를 구분하지 않으므로 `apple`이 `Zebra`보다 앞에 옵니다.
 - `"count"` — 페이지 수 내림차순, 동률이면 이름 오름차순. 다국어 사이트에서는 각 언어의 인덱스가 해당 언어 자체의 페이지 수를 사용합니다.
 
 **항목 피드는 예외입니다.** `feed = true`일 때 각 항목의 RSS 피드는 `sort_by`와 무관하게 항상 역시간순(최신 우선)을 유지합니다. RSS 소비자는 최신 항목이 먼저 온다고 가정하기 때문입니다.

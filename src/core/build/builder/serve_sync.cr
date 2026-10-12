@@ -203,7 +203,7 @@ module Hwaro
             changed = sources.map { |src_path| path_relative_to(src_path, "content") }.to_set
             owners = (site.pages + site.sections).select { |page| !page.output_suppressed && page.assets.any? { |asset| changed.includes?(asset) } }
             unless owners.empty?
-              process_assets(owners, output_dir, verbose, written, shadowed)
+              process_assets(owners, output_dir, verbose, written, shadowed, changed.map { |asset| File.join("content", asset) }.to_set)
               owners.each { |page| page.assets.each { |asset| copied << File.join("content", asset) if changed.includes?(asset) } }
             end
           end

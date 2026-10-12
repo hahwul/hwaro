@@ -209,6 +209,11 @@ module Hwaro
       # Runtime / Computed Properties
       property content : String
       property raw_content : String
+      # Stamp of the source file as parse read it: {mtime ms, size, digest}.
+      # The digest is only taken when the mtime was still inside its
+      # timestamp tick (racy-git); see Cache#update. Nil for pages without a
+      # disk file.
+      property source_read : {Int64, Int64, String?}? = nil
       property path : String      # Relative path from content/ (e.g. "projects/a.md")
       property section : String   # Parent directory path (e.g. "blog/news"), not just the first component
       getter url : String         # Calculated relative URL (e.g. "/projects/a/"), written through #url=
@@ -340,6 +345,22 @@ module Hwaro
       # `content/about/index.md` also has an empty section (gh#601).
       def home? : Bool
         @is_index && !@path.includes?('/')
+      end
+
+      # No authored title: front matter left it unset (the "Untitled"
+      # placeholder) or blank.
+      def untitled? : Bool
+        @title.empty? || @title == "Untitled"
+      end
+
+      # Name for a breadcrumb crumb (`page.ancestors`, JSON-LD
+      # BreadcrumbList). A title-less section or bundle index — typically a
+      # `transparent` year folder — falls back to its directory name ("2022")
+      # instead of publishing the placeholder (gh#863).
+      def breadcrumb_title : String
+        return @title unless untitled? && @is_index
+        dir = File.dirname(@path)
+        dir == "." ? @title : File.basename(dir)
       end
 
       # Check if page has redirect

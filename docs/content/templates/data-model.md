@@ -248,7 +248,7 @@ For the current section URL in `section.html`, use `page.url`.
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| sort_by | String? | "date" | Sort by: date (newest first), weight (lowest first), title (A→Z) |
+| sort_by | String? | "date" | Sort by: date (newest first), published (newest first, ignoring `updated`), weight (lowest first), title (A→Z) |
 | reverse | Bool? | false | Flip the natural sort order — see [Writing › Sections › Sort direction](/writing/sections/#sort-direction) |
 | paginate | Int? | — | Pages per page |
 | transparent | Bool | false | Pass pages to parent |
@@ -429,7 +429,9 @@ Navigation follows the flat reading order across the entire site, similar to mdB
 
 ### page.ancestors
 
-Parent sections for breadcrumbs:
+Parent sections for breadcrumbs. An ancestor section without a `title`
+(such as a `transparent` year folder) uses its directory name (`2022`),
+here and in the JSON-LD `BreadcrumbList`:
 
 ```jinja
 <nav class="breadcrumbs">

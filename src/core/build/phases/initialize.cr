@@ -472,13 +472,13 @@ module Hwaro::Core::Build::Phases::Initialize
       # unpublished until some later edit moved the mtime clear of the
       # window. Compare the bytes in that narrow window instead: coarse
       # destinations still skip the copy, real edits still land.
+      # Racy-git: an exact match that copy_stamp_trusted? refuses falls
+      # through to the byte compare.
+      trusted = copy_stamp_trusted?(dest_path, info.modification_time, now)
       if incremental && (dest_info = File.info?(dest_path)) &&
          info.size == dest_info.size
         delta = (info.modification_time - dest_info.modification_time).abs
-        # Racy-git (#857): an exact match proves nothing while the source
-        # mtime is inside its timestamp tick — a same-size rewrite in that
-        # tick keeps it. Such a match falls through to the byte compare.
-        next if delta.zero? && Cache.stable_mtime?(info.modification_time.to_unix_ms, now)
+        next if delta.zero? && trusted
         next if delta <= MTIME_SKIP_TOLERANCE && same_contents?(src_path, dest_path)
       end
 
@@ -486,6 +486,16 @@ module Hwaro::Core::Build::Phases::Initialize
     end
 
     files_to_copy
+  end
+
+  # Cache#copy_stamp_trusted?, or the bare racy-git rule before a cache exists.
+  private def copy_stamp_trusted?(dest : String, src_mtime : Time, now_ms : Int64) : Bool
+    mtime_ms = src_mtime.to_unix_ms
+    if cache = @cache
+      cache.copy_stamp_trusted?(dest, mtime_ms, now_ms)
+    else
+      Cache.stable_mtime?(mtime_ms, now_ms)
+    end
   end
 
   # Byte-compare two files already known to be the same size.

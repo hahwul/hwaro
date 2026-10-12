@@ -11,6 +11,13 @@ module Hwaro::Core::Build
   end
 end
 
+# get_taxonomy("tags").items names, in order.
+private def tag_item_names(vars : Hash(String, Crinja::Value)) : Array(String)
+  tags = vars["__taxonomies__"].raw.as(Hash(Crinja::Value, Crinja::Value))["tags"]
+  items = tags.raw.as(Hash(Crinja::Value, Crinja::Value))["items"].raw.as(Array(Crinja::Value))
+  items.map { |item| item.raw.as(Hash(Crinja::Value, Crinja::Value))["name"].to_s }
+end
+
 describe Hwaro::Content::Taxonomies do
   describe ".generate" do
     it "does nothing when taxonomies are empty" do
@@ -1086,12 +1093,6 @@ describe Hwaro::Content::Taxonomies do
       p2.tags = ["zeta"]
       site.pages = [p1, p2]
 
-      extract_names = ->(vars : Hash(String, Crinja::Value)) do
-        tags = vars["__taxonomies__"].raw.as(Hash(Crinja::Value, Crinja::Value))["tags"]
-        items = tags.raw.as(Hash(Crinja::Value, Crinja::Value))["items"].raw.as(Array(Crinja::Value))
-        items.map { |item| item.raw.as(Hash(Crinja::Value, Crinja::Value))["name"].to_s }
-      end
-
       Dir.mktmpdir do |output_dir|
         templates = {
           "taxonomy"      => "<html>{{ content }}</html>",
@@ -1101,12 +1102,41 @@ describe Hwaro::Content::Taxonomies do
 
         # Default: alphabetical, regardless of page-scan insertion order.
         vars = Hwaro::Core::Build::Builder.new.global_template_vars(site)
-        extract_names.call(vars).should eq(["alpha", "zeta"])
+        tag_item_names(vars).should eq(["alpha", "zeta"])
 
         # count: zeta (2 pages) first.
         config.taxonomies[0].terms_sort_by = "count"
         vars = Hwaro::Core::Build::Builder.new.global_template_vars(site)
-        extract_names.call(vars).should eq(["zeta", "alpha"])
+        tag_item_names(vars).should eq(["zeta", "alpha"])
+      end
+    end
+
+    it "orders term names alphabetically ignoring case, on the index and in get_taxonomy" do
+      config = Hwaro::Models::Config.new
+      config.taxonomies = [Hwaro::Models::TaxonomyConfig.new("tags")]
+      site = Hwaro::Models::Site.new(config)
+
+      page = Hwaro::Models::Page.new("p.md")
+      page.title = "P"
+      page.url = "/blog/p/"
+      page.tags = ["acp", "SRI", "Zola", "beta"]
+      site.pages = [page]
+
+      Dir.mktmpdir do |output_dir|
+        templates = {
+          "taxonomy"      => "<html>{{ content }}</html>",
+          "taxonomy_term" => "<html>{{ content }}</html>",
+        }
+        Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
+        index = File.read(File.join(output_dir, "tags", "index.html"))
+        positions = ["acp", "beta", "SRI", "Zola"].map { |t| index.index!(">#{t}<") }
+        positions.should eq(positions.sort)
+
+        expected = ["acp", "beta", "SRI", "Zola"]
+        tag_item_names(Hwaro::Core::Build::Builder.new.global_template_vars(site)).should eq(expected)
+        # Equal counts fall back to the same name order.
+        config.taxonomies[0].terms_sort_by = "count"
+        tag_item_names(Hwaro::Core::Build::Builder.new.global_template_vars(site)).should eq(expected)
       end
     end
   end

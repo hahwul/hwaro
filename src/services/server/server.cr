@@ -75,6 +75,11 @@ module Hwaro
       # during that window was absorbed into the baseline and never rebuilt.
       # Consumed once by the watch loop; nil afterwards.
       @watch_baseline : Hash(String, FileStamp)? = nil
+      # Paths whose mtime was still inside its timestamp tick (racy-git) at
+      # the last scan: the next scan re-hashes them once more even when the
+      # stamp has since settled, since a same-size save between the two scans
+      # can keep the stamped mtime (see watch_digest).
+      @racy_watch_paths = Set(String).new
       # Watch roots beyond WATCH_ROOTS, resolved from config at startup: the
       # `[assets] source_dir` when it points outside `static/`. The asset
       # pipeline reads bundle sources from there on every build, but the

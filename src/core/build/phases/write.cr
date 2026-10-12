@@ -245,7 +245,10 @@ module Hwaro::Core::Build::Phases::Write
   end
 
   # Process co-located assets for pages
-  private def process_assets(pages : Array(Models::Page), output_dir : String, verbose : Bool, already_written : Set(String) = Set(String).new, shadowed : Set(String)? = nil)
+  # `changed` are sources (`content/...`) the serve watcher saw change: their
+  # stamp match is never trusted, since a same-size save in the tick of the
+  # last copy keeps it (#859).
+  private def process_assets(pages : Array(Models::Page), output_dir : String, verbose : Bool, already_written : Set(String) = Set(String).new, shadowed : Set(String)? = nil, changed : Set(String)? = nil)
     now = Time.utc.to_unix_ms
     pages.each do |page|
       next if page.assets.empty?
@@ -306,12 +309,12 @@ module Hwaro::Core::Build::Phases::Write
         # skip forever when an asset is replaced by a same-size file with an
         # older preserved mtime (rsync -a / tar -x restoring a revision).
         src_info = File.info?(source_path)
+        # Racy-git: an exact match copy_stamp_trusted? refuses compares bytes.
+        trusted = src_info && copy_stamp_trusted?(dest_path, src_info.modification_time, now) &&
+                  !changed.try(&.includes?(source_path))
         if src_info && (dest_info = File.info?(dest_path))
           if src_info.size == dest_info.size && src_info.modification_time == dest_info.modification_time
-            # Racy-git (#857): while the source mtime is inside its
-            # timestamp tick a same-size rewrite keeps it, so compare bytes.
-            next if Cache.stable_mtime?(src_info.modification_time.to_unix_ms, now) ||
-                    same_contents?(source_path, dest_path)
+            next if trusted || same_contents?(source_path, dest_path)
           end
         end
 

@@ -775,7 +775,7 @@ module Hwaro::Core::Build::Phases::Render
     fmt_paths = format_output_paths(page, output_dir, effective_output_formats(page, site.config))
     relations_hash = @page_template_hash_mutex.synchronize { @filter_relations_hashes.delete(page.path) } ||
                      page_relations_hash(page, templates, site, @pages_by_path || build_pages_by_path(site))
-    cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site), output_paths: fmt_paths, assets_hash: page_assets_hash(page), git_hash: page_git_hash(page), derived_paths: derived, relations_hash: relations_hash)
+    cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site), output_paths: fmt_paths, assets_hash: page_assets_hash(page), git_hash: page_git_hash(page), derived_paths: derived, relations_hash: relations_hash, source_read: page.source_read)
   end
 
   # `page_relations_hash` as of the cache comparison, remembered so the

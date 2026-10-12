@@ -231,14 +231,7 @@ module Hwaro::Core::Build::Phases::Render
       # sorts by its own language-filtered counts and may order differently
       # — get_taxonomy is a site-wide view (documented in functions.md).
       tax_cfg = config.taxonomies.find { |t| t.name == name }
-      sorted_term_names = if tax_cfg.try(&.terms_sort_by) == "count"
-                            terms.keys.sort! do |a, b|
-                              cmp = terms[b].size <=> terms[a].size
-                              cmp == 0 ? (a <=> b) : cmp
-                            end
-                          else
-                            terms.keys.sort!
-                          end
+      sorted_term_names = Utils::SortUtils.sort_term_names(terms.keys, tax_cfg.try(&.terms_sort_by) == "count") { |term| terms[term].size }
       terms_array = sorted_term_names.map do |term|
         term_pages = terms[term]
         term_pages_array = term_pages.map do |tp|

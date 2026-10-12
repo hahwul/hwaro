@@ -765,7 +765,7 @@ module Hwaro
             # You can override per section in `_index.md` with:
             # - paginate = 10
             # - pagination_enabled = true
-            # - sort_by = "date" | "title" | "weight"
+            # - sort_by = "date" | "published" | "title" | "weight"
             # - reverse = false
 
             [pagination]

@@ -1,6 +1,30 @@
 require "../../spec_helper"
 
 describe Hwaro::Utils::SortUtils do
+  describe "sort_pages with \"published\"" do
+    it "orders by publish date and ignores updated" do
+      old = Hwaro::Models::Page.new("old.md")
+      old.date = Time.utc(2014, 8, 9)
+      old.updated = Time.utc(2025, 5, 7)
+      recent = Hwaro::Models::Page.new("recent.md")
+      recent.date = Time.utc(2025, 1, 1)
+      undated = Hwaro::Models::Page.new("undated.md")
+      pages = [undated, old, recent]
+
+      Hwaro::Utils::SortUtils.sort_pages(pages, "published").map(&.path).should eq(["recent.md", "old.md", "undated.md"])
+      Hwaro::Utils::SortUtils.sort_pages(pages, "published", reverse: true).map(&.path).should eq(["undated.md", "old.md", "recent.md"])
+      # "date" still lets the revision move the old post up.
+      Hwaro::Utils::SortUtils.sort_pages(pages, "date").map(&.path).should eq(["old.md", "recent.md", "undated.md"])
+    end
+  end
+
+  describe ".compare_term_names" do
+    it "ignores case, breaking ties by byte order" do
+      %w[go Zola beta Go acp SRI].sort { |a, b| Hwaro::Utils::SortUtils.compare_term_names(a, b) }
+        .should eq(%w[acp beta Go go SRI Zola])
+    end
+  end
+
   describe ".compare_by_date" do
     it "sorts newer page first (descending)" do
       a = Hwaro::Models::Page.new("a.md")

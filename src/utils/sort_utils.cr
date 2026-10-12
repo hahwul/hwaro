@@ -2,6 +2,7 @@
 #
 # Provides reusable sorting utilities for content pages:
 # - compare_by_date: Compare pages by date (newest first)
+# - compare_by_published: Compare pages by publish date only (newest first)
 # - compare_by_title: Compare pages by title alphabetically
 # - compare_by_weight: Compare pages by weight value
 # - sort_pages: Generic page sorting with multiple criteria
@@ -26,8 +27,16 @@ module Hwaro
       # Returns negative if a should come first, positive if b should come first
       #
       def compare_by_date(a : Models::Page, b : Models::Page) : Int32
-        a_date = a.updated || a.date
-        b_date = b.updated || b.date
+        compare_dates(a, a.updated || a.date, b, b.updated || b.date)
+      end
+
+      # Like compare_by_date, but on the publish `date` alone: a revised post
+      # (`updated`) keeps its place in a chronological archive (gh#865).
+      def compare_by_published(a : Models::Page, b : Models::Page) : Int32
+        compare_dates(a, a.date, b, b.date)
+      end
+
+      private def compare_dates(a : Models::Page, a_date : Time?, b : Models::Page, b_date : Time?) : Int32
         # Default: newest first (descending); tiebreak by path for deterministic ordering
         result = if a_date && b_date
                    b_date <=> a_date
@@ -46,6 +55,25 @@ module Hwaro
         result == 0 ? (a.path <=> b.path) : result
       end
 
+      # Compare two taxonomy term names alphabetically, ignoring case
+      # ("acp" < "SRI" < "Zola"); byte order breaks ties so "Go" and "go"
+      # still order deterministically.
+      def compare_term_names(a : String, b : String) : Int32
+        result = a.compare(b, case_insensitive: true)
+        result == 0 ? (a <=> b) : result
+      end
+
+      # Taxonomy term order (`terms_sort_by`): by name, or with `by_count` by
+      # the block's page count descending with the name order as tiebreak.
+      def sort_term_names(names : Array(String), by_count : Bool, & : String -> Int32) : Array(String)
+        return names.sort { |a, b| compare_term_names(a, b) } unless by_count
+        counts = names.to_h { |name| {name, yield name} }
+        names.sort do |a, b|
+          result = counts[b] <=> counts[a]
+          result == 0 ? compare_term_names(a, b) : result
+        end
+      end
+
       # Compare two pages by weight value (lower weight first)
       #
       def compare_by_weight(a : Models::Page, b : Models::Page) : Int32
@@ -57,7 +85,7 @@ module Hwaro
 
       # Generic page sorting with specified criteria
       #
-      # Supported sort_by values: "date", "title", "weight"
+      # Supported sort_by values: "date", "published", "title", "weight"
       #
       def sort_pages(
         pages : Array(Models::Page),
@@ -65,9 +93,10 @@ module Hwaro
         reverse : Bool = false,
       ) : Array(Models::Page)
         comparator = case sort_by.downcase
-                     when "title"  then ->compare_by_title(Models::Page, Models::Page)
-                     when "weight" then ->compare_by_weight(Models::Page, Models::Page)
-                     when "date"   then ->compare_by_date(Models::Page, Models::Page)
+                     when "title"     then ->compare_by_title(Models::Page, Models::Page)
+                     when "weight"    then ->compare_by_weight(Models::Page, Models::Page)
+                     when "date"      then ->compare_by_date(Models::Page, Models::Page)
+                     when "published" then ->compare_by_published(Models::Page, Models::Page)
                      else
                        Logger.warn "Unknown sort_by '#{sort_by}', defaulting to 'date'"
                        ->compare_by_date(Models::Page, Models::Page)

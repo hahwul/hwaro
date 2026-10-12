@@ -232,7 +232,7 @@ feed = true
 | feed | bool | false | Generate RSS feed for each term |
 | sitemap | bool | true | Include taxonomy pages in sitemap |
 | paginate_by | int | — | Items per page on term pages |
-| sort_by | string | "date" | Order of pages within a term: `"date"` (newest first), `"title"`, or `"weight"` |
+| sort_by | string | "date" | Order of pages within a term: `"date"` (newest first), `"published"` (newest first, ignoring `updated`), `"title"`, or `"weight"` |
 | reverse | bool | false | Flip whichever order `sort_by` produced |
 | terms_sort_by | string | "name" | Order of the terms list on the taxonomy index: `"name"` or `"count"` |
 

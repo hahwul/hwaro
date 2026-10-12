@@ -243,6 +243,48 @@ describe "cache: static files whose mtime moves backwards" do
   end
 end
 
+# #859: a copy is stamped with the source mtime, so a same-size rewrite in
+# the tick the copy was made in matches it exactly. Touching both sides to a
+# settled time is that rewrite, seen by a build that runs 2s or more later.
+describe "cache: copies made while their source mtime was racy" do
+  it "byte-compares them once the source settles, then trusts the stamp again" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", CACHE_CONFIG)
+        FileUtils.mkdir_p("content/post")
+        FileUtils.mkdir_p("templates")
+        FileUtils.mkdir_p("static")
+        File.write("content/index.md", "---\ntitle: Home\n---\nHome")
+        File.write("content/post/index.md", "---\ntitle: Post\n---\nPost")
+        File.write("templates/index.html", "{{ content }}")
+        File.write("templates/page.html", "{{ content }}")
+        files = {"static/app.js" => "public/app.js", "content/post/data.txt" => "public/post/data.txt"}
+        files.each_key { |src| File.write(src, "VERSION_A") }
+
+        cached_build
+        settled = Time.utc - 1.hour
+        files.each do |src, dest|
+          File.read(dest).should eq("VERSION_A")
+          File.write(src, "VERSION_B")
+          File.touch(src, settled)
+          File.touch(dest, settled)
+        end
+
+        cached_build
+        files.each_value { |dest| File.read(dest).should eq("VERSION_B") }
+
+        # Settled copies are trusted again: a same-length sentinel survives.
+        files.each_value do |dest|
+          File.write(dest, "SENTINEL!")
+          File.touch(dest, settled)
+        end
+        cached_build
+        files.each_value { |dest| File.read(dest).should eq("SENTINEL!") }
+      end
+    end
+  end
+end
+
 describe "cache: alternating output directories" do
   it "refreshes a stale tree when the output directory switches back" do
     Dir.mktmpdir do |dir|

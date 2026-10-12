@@ -96,3 +96,29 @@ describe "section.subsections" do
     end
   end
 end
+
+describe "title-less ancestor sections" do
+  # gh#863: a `transparent` year folder without a title published the
+  # "Untitled" placeholder as a breadcrumb; it now uses the directory name.
+  it "name the crumb after the directory in page.ancestors and JSON-LD" do
+    build_site(
+      "title = \"T\"\nbase_url = \"http://localhost\"\n",
+      content_files: {
+        "blog/_index.md"      => "+++\ntitle = \"Blog\"\n+++\n",
+        "blog/2022/_index.md" => "+++\ntransparent = true\n+++\n",
+        "blog/2022/post.md"   => "+++\ntitle = \"Post\"\n+++\n",
+      },
+      template_files: {
+        "page.html"    => "{% for a in page.ancestors %}[{{ a.title }}]{% endfor %}{{ jsonld_breadcrumb }}",
+        "section.html" => "{{ jsonld_breadcrumb }}",
+      },
+    ) do
+      html = File.read("public/blog/2022/post/index.html")
+      html.should start_with("[Blog][2022]")
+      html.should contain(%("name":"2022"))
+      html.should_not contain("Untitled")
+      # The folder's own page ends its breadcrumb with itself.
+      File.read("public/blog/2022/index.html").should contain(%({"@type":"ListItem","position":3,"name":"2022"}))
+    end
+  end
+end

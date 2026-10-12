@@ -399,6 +399,9 @@ module Hwaro
 
       private def scan_mtimes(prev : Hash(String, FileStamp)? = nil) : Hash(String, FileStamp)
         mtimes = {} of String => FileStamp
+        # Read before any stat, as Cache.stable_mtime? requires.
+        now_ms = Time.utc.to_unix_ms
+        racy = Set(String).new
         dirs_to_watch = Server::WATCH_ROOTS + @extra_watch_roots
 
         dirs_to_watch.each do |dir|
@@ -434,7 +437,7 @@ module Hwaro
               next if info.nil?
               info = File.info?(file, follow_symlinks: true) if info.symlink?
               next if info.nil? || !info.type.file?
-              mtimes[file] = {info.modification_time, info.size.to_i64, watch_digest(file, info, prev)}
+              mtimes[file] = {info.modification_time, info.size.to_i64, watch_digest(file, info, prev, now_ms, racy)}
             rescue ex
               Logger.debug "Failed to read file info for #{file}: #{ex.message}"
             end
@@ -449,7 +452,7 @@ module Hwaro
           next if watched_root_path?(path) || Server.watcher_ignored?(path)
           begin
             info = File.info?(path)
-            mtimes[path] = info && info.file? ? {info.modification_time, info.size.to_i64, watch_digest(path, info, prev)} : MISSING_STAMP
+            mtimes[path] = info && info.file? ? {info.modification_time, info.size.to_i64, watch_digest(path, info, prev, now_ms, racy)} : MISSING_STAMP
           rescue ex
             Logger.debug "Failed to read file info for #{path}: #{ex.message}"
           end
@@ -468,6 +471,7 @@ module Hwaro
           end
         end
 
+        @racy_watch_paths = racy
         mtimes
       end
 
@@ -576,12 +580,20 @@ module Hwaro
       # but the next byte-identical hook rewrite does need a fresh baseline
       # to compare against, and the read is amortized against the full
       # rebuild the size change is about to trigger anyway).
-      private def watch_digest(file : String, info : File::Info, prev : Hash(String, FileStamp)?) : String?
-        return unless digest_watched?(file)
-
-        if prev && (old = prev[file]?) && old[0] == info.modification_time && old[1] == info.size.to_i64
-          return old[2]
-        end
+      #
+      # Racy-git (#859): that assumption fails while the mtime is still
+      # inside its timestamp tick — two same-size saves in one tick share a
+      # stamp. Such a file is hashed on every scan, in every watched root, and once
+      # more on the first scan after it settles (`@racy_watch_paths`), so the
+      # second save shows up as a digest change. Afterwards the digest is
+      # carried like any other, so a settled file is never read again.
+      private def watch_digest(file : String, info : File::Info, prev : Hash(String, FileStamp)?, now_ms : Int64, racy : Set(String)) : String?
+        mtime_ms = info.modification_time.to_unix_ms
+        racy_now = !Core::Build::Cache.stable_mtime?(mtime_ms, now_ms)
+        racy << file if racy_now
+        same = prev && (old = prev[file]?) && old[0] == info.modification_time && old[1] == info.size.to_i64
+        return old.try(&.[2]) if same && !racy_now && !@racy_watch_paths.includes?(file)
+        return unless racy_now || same || digest_watched?(file)
 
         file_digest(file)
       end
