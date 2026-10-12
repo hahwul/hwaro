@@ -72,7 +72,7 @@ hwaro tool platform vercel --stdout
 
 [build.environment]
   # Add environment variables here
-  # HWARO_VERSION = "0.20.2"
+  # HWARO_VERSION = "0.21.0"
 
 [[redirects]]
   from = "/old-url/"
