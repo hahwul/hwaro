@@ -63,7 +63,7 @@ You can run Hwaro commands directly using the Docker image without installing Cr
 docker run --rm -v $(pwd):/site -w /site ghcr.io/hahwul/hwaro build
 
 # Interactive shell
-docker run --rm -it -v $(pwd):/site -w /site ghcr.io/hahwul/hwaro /bin/sh
+docker run --rm -it -v $(pwd):/site -w /site --entrypoint /bin/sh ghcr.io/hahwul/hwaro
 ```
 
 ## See Also

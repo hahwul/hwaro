@@ -141,7 +141,7 @@ Include partial templates:
 {% include "partials/footer.html" %}
 ```
 
-## Variables
+## Setting Variables
 
 Set variables:
 

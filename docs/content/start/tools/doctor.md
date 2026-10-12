@@ -53,11 +53,14 @@ hwaro doctor --json
 **Config diagnostics:**
 
 - `base_url` is not set, or has a trailing slash
-- `title` is still a placeholder (`Hwaro Site`, `My Hwaro Site`)
+- `title` is not set, or is still a scaffold placeholder (`Hwaro Site`,
+  `My Hwaro Site`, `My Blog`, `My Docs`, …)
 - `sitemap.changefreq` has an invalid value
 - `sitemap.priority` is out of range (0.0 to 1.0), or not a finite number (`inf`, `nan`)
 - Duplicate taxonomy names, or language codes that differ only in case (`en` / `EN`)
-- Invalid `search.format`, `markdown.math_engine` or `pwa.cache_strategy` value
+- Invalid `search.format`, `markdown.math_engine`, `pwa.cache_strategy` or
+  `pwa.display` value
+- `[image_processing]` enabled with an empty `widths` list (a silent no-op)
 - `default_language` with no matching `[languages.<code>]` block
 - `deployment.target` / `[related] taxonomies` referencing something undefined
 - `[[menus.*]]` entries whose `parent` names no identifier in the same menu

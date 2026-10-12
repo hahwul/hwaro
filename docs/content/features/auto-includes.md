@@ -108,6 +108,10 @@ Given the example directory structure above, the template variables produce:
 <script src="/assets/js/02-app.js"></script>
 ```
 
+The example assumes an empty `base_url` and cache busting turned off. In a real build each URL starts with your `base_url` and carries the `?v=<hash>` query from [cache busting](/features/cache-busting/), and `[assets] sri = true` adds an `integrity` attribute (see [Subresource Integrity](/features/asset-pipeline/#subresource-integrity)).
+
+With `[sass]` enabled, each non-partial `.scss` file in the scanned directories is listed as the `.css` file it compiles to.
+
 ## Full Template Example
 
 ```jinja

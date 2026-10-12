@@ -36,6 +36,7 @@ base_url = "https://example.com"
 | title | string | 사이트 제목 |
 | description | string | 사이트 설명 |
 | base_url | string | 프로덕션 URL (끝 슬래시 없음) |
+| default_language | string | 언어 접미사가 없는 콘텐츠 파일의 언어 코드 (기본값 `"en"`). [다국어](/ko/features/multilingual/) 참고 |
 
 ## 환경 변수
 
@@ -86,9 +87,9 @@ hooks.post = ["npm run minify"]
 
 즉 `hwaro build -o dist`는 config의 `output_dir`를 덮어쓰고, `drafts = false`여도 `hwaro build --drafts`를 쓰면 초안이 포함됩니다. 반대 방향은 없습니다. config 값을 다시 끄는 `--no-drafts`나 `--no-cache`는 존재하지 않으므로, 모든 빌드에 항상 적용할 때만 이 키들을 켜세요. `--no-parallel`만 예외로, `parallel = true`를 덮어씁니다.
 
-이 설정들은 `hwaro serve`에도 적용됩니다. serve는 `output_dir`로 빌드하고 그 디렉터리를 서빙합니다. `hwaro deploy`도 이를 따릅니다. `[deployment] source_dir`가 설정되지 않았다면 `public`을 가정하지 않고 `output_dir`를 배포합니다.
+`drafts`, `parallel`, `cache`는 `hwaro serve`에도 적용됩니다. `output_dir`는 예외입니다. serve는 항상 전용 디렉터리 `.hwaro/serve/`에 빌드하고 `output_dir`는 건드리지 않습니다([serve 명령](/ko/start/cli/#serve) 참고). 반면 `hwaro deploy`는 `output_dir`를 따릅니다. `[deployment] source_dir`가 설정되지 않았다면 `public`을 가정하지 않고 `output_dir`를 배포합니다.
 
-`output_dir`에는 프로젝트 상대 경로와 절대 경로를 모두 쓸 수 있습니다. 프로젝트 밖으로 벗어나는 경로(`../out`)는 거부됩니다. 개발 서버가 프로젝트 밖에서는 서빙하지 않기 때문에, 그대로 두면 빌드는 serve가 읽지 않는 곳에 결과를 쓰게 됩니다.
+`output_dir`에는 프로젝트 상대 경로와 절대 경로를 모두 쓸 수 있습니다. 프로젝트 밖으로 벗어나는 상대 경로(`../out`)나 빈 값은 경고와 함께 무시되고 기본값 `public`이 대신 쓰입니다.
 
 오류 처리와 활용 사례는 [빌드 훅](/ko/features/build-hooks/)을 참고합니다.
 
@@ -119,6 +120,13 @@ math_engine = "katex"
 | mermaid | bool | false | ` ```mermaid ` 블록을 `<div class="mermaid">`로 렌더링 |
 | math | bool | false | 수식 문법(`$...$`, `$$...$$`) 사용 |
 | math_engine | string | "katex" | 수식 렌더링 엔진 (`"katex"` 또는 `"mathjax"`) |
+| admonitions | bool | true | GitHub 스타일 `> [!NOTE]` 인용문을 admonition 블록으로 변환 |
+| heading_ids | bool | true | 커스텀 헤딩 ID(`## Heading {#custom-id}`) 사용 |
+| ins | bool | false | 삽입 텍스트(`++text++` → `<ins>text</ins>`) |
+| mark | bool | false | 강조 표시 텍스트(`==text==` → `<mark>text</mark>`) |
+| sub | bool | false | 아래 첨자(`~text~` → `<sub>text</sub>`) |
+| sup | bool | false | 위 첨자(`^text^` → `<sup>text</sup>`) |
+| attributes | bool | false | 헤딩과 인라인 이미지에 붙는 일반화된 `{#id .class key=val}` 블록 |
 | smart_punctuation | bool | false | 타이포그래피용 인용부호/대시/줄임표 (`"x"` → “x”, `--` → –, `...` → …) |
 | containers | bool | false | `:::note Title` … `:::` 커스텀 컨테이너 (admonition 마크업) |
 | wikilinks | bool | false | Obsidian 문법: `[[위키링크]]`, `![[이미지]]` 임베드, `![[노트]]` 트랜스클루전, 접을 수 있는 `> [!type]-` 콜아웃 ([위키링크와 백링크](/ko/writing/obsidian/) 참고) |
@@ -331,9 +339,11 @@ Cache-Control = "no-store"
 | `[image_processing]` | [이미지 처리](/ko/features/image-processing/) | 이미지 리사이즈 & LQIP |
 | `[image_processing.lqip]` | [이미지 처리](/ko/features/image-processing/#lqip-저화질-이미지-플레이스홀더) | Base64 블러업 플레이스홀더 |
 | `[content.files]` | [콘텐츠 파일](/ko/features/content-files/) | 마크다운이 아닌 파일 게시 |
+| `[content.new]` | [아키타입](/ko/writing/archetypes/) | `hwaro new`의 기본 프론트 매터와 번들 방식 |
 | `[[content.generate]]` | [콘텐츠 생성](/ko/features/content-generation/) | `site.data` 레코드를 페이지로 구체화 |
 | `[[content.schema]]` | [프론트 매터 스키마](/ko/writing/schema/) | 섹션별 프론트 매터 타입, 필수 필드, enum, 범위, 기본값 |
 | `[[data.remote]]` | [원격 데이터 소스](/ko/features/remote-data/) | 빌드 시 원격 데이터를 `site.data`로 가져오기 |
+| `[outputs]` | [출력 포맷](/ko/features/output-formats/) | 페이지/섹션별 추가 출력 포맷(JSON, XML, TXT, CSV) |
 | `[privacy]` | [프라이버시 모드](/ko/features/privacy/) | 외부 폰트, 스크립트, 이미지를 빌드 시 직접 호스팅하기 |
 | `[csp]` | [콘텐츠 보안 정책(CSP)](/ko/features/csp/) | 인라인 스크립트/스타일 해시로 Content-Security-Policy 생성(`_headers` 또는 `<meta>`) |
 | `[static]` | [정적 파일](#정적-파일) | `static/` 복사에서 잔여 파일 필터링 / 경로 제외 |

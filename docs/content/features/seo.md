@@ -37,9 +37,13 @@ exclude = ["/private", "/drafts"]
   <url>
     <loc>https://example.com/</loc>
     <lastmod>2024-01-15</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
   </url>
   <url>
     <loc>https://example.com/about/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
   </url>
 </urlset>
 ```
@@ -448,7 +452,7 @@ Or include both OG and Twitter:
 
 ## JSON-LD Structured Data
 
-Hwaro automatically generates Article and BreadcrumbList JSON-LD for every page.
+Hwaro automatically generates page-level JSON-LD for every page: Article for content pages (CollectionPage for listing pages, WebSite on the home page) plus BreadcrumbList.
 
 ```jinja
 <head>
@@ -473,7 +477,7 @@ These variables output ready-to-use HTML tags:
 | og_all_tags | Both OG and Twitter tags |
 | canonical_tag | Canonical link tag |
 | hreflang_tags | Hreflang alternate link tags |
-| jsonld | Article + BreadcrumbList JSON-LD |
+| jsonld | Article (or CollectionPage/WebSite) + BreadcrumbList JSON-LD |
 | jsonld_article | Article JSON-LD only |
 | jsonld_breadcrumb | BreadcrumbList JSON-LD only |
 | page_description | Page description (fallback: site) |

@@ -102,7 +102,7 @@ is never published and keeps loading from its own host.
 
 ### Hwaro's own tags
 
-`[markdown] math = "mathjax"` loads MathJax from `cdn.jsdelivr.net`, and
+`[markdown] math_engine = "mathjax"` loads MathJax from `cdn.jsdelivr.net`, and
 MathJax loads its fonts and extensions relative to its own URL, so it stays
 external. Mermaid (`[markdown] mermaid = true`) is loaded by an inline module
 `import`, which privacy mode does not rewrite. KaTeX and highlight.js are

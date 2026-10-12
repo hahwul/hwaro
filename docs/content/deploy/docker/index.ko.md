@@ -63,7 +63,7 @@ Crystal이나 Hwaro를 로컬에 설치하지 않고도 Docker 이미지로 Hwar
 docker run --rm -v $(pwd):/site -w /site ghcr.io/hahwul/hwaro build
 
 # 대화형 셸
-docker run --rm -it -v $(pwd):/site -w /site ghcr.io/hahwul/hwaro /bin/sh
+docker run --rm -it -v $(pwd):/site -w /site --entrypoint /bin/sh ghcr.io/hahwul/hwaro
 ```
 
 ## 함께 보기

@@ -52,7 +52,7 @@ For JSON, the first balanced `{...}` at the very start of the file is the front 
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| date | string | — | Publication date: `YYYY-MM-DD`, optionally with time (`YYYY-MM-DD HH:MM:SS` or RFC 3339 datetime); unquoted TOML/YAML dates also work. A date without an offset is read in the build machine's local time zone, in TOML, YAML and JSON alike. A written UTC offset (`+09:00`, also `+0900` or after a space: `2024-01-15 10:00:00 +0900`) is kept, so the date prints as written in both TOML and YAML. Since that fix, a TOML offset date also feeds date permalink tokens (`:year`/`:month`/`:day`) and year/month grouping as written, so a URL built from the old UTC day can move (e.g. `/2024/02/29/` → `/2024/03/01/`); add the old URL to `aliases` to keep it working |
+| date | string | — | Publication date: `YYYY-MM-DD`, optionally with time (`YYYY-MM-DD HH:MM:SS` or RFC 3339 datetime); unquoted TOML/YAML dates also work. A date without an offset is read in the build machine's local time zone, in TOML, YAML and JSON alike. A written UTC offset (`+09:00`, also `+0900` or after a space: `2024-01-15 10:00:00 +0900`) is kept, so the date prints as written in both TOML and YAML. A TOML offset date also feeds date permalink tokens (`:year`/`:month`/`:day`) and year/month grouping as written, so a URL built in older versions from the UTC day can move (e.g. `/2024/02/29/` → `/2024/03/01/`); add the old URL to `aliases` to keep it working |
 | description | string | — | SEO description |
 | draft | bool | false | Exclude from production builds |
 | template | string | "page" | Template to use |
@@ -79,6 +79,7 @@ For JSON, the first balanced `{...}` at the very start of the file is the front 
 | expires | date | Auto-exclude after this date |
 | series | string | Series name for grouping |
 | series_weight | int | Sort order within series |
+| menus | string / array / table | Register the page in navigation menus (`menu` is an alias). See [Menus](/features/menus/) |
 | extra | table | Custom metadata |
 
 A field holding the wrong type (`draft = "true"`, `weight = "5"`, `date = 20240315`, `categories = "News"`) is ignored, never coerced, and the build warns with the file and key. In particular `draft = "true"` is not a draft and gets published; write `draft = true`.

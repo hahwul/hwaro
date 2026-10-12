@@ -130,9 +130,9 @@ keep their name.
 | [taxonomies] table | flattened to top-level `tags` / `categories` / … |
 
 Output conventions:
-- Regular posts go to `_posts/` with `YYYY-MM-DD-slug.md` filename
+- Dated pages under a top-level `posts/` or `blog/` section go to `_posts/` with `YYYY-MM-DD-slug.md` filename; every other page (`about.md`, `docs/…`) keeps its directory layout, dated or not
 - A post moved into `_posts/` gets `permalink: /<section>/<name>/` (its hwaro address) unless it already has a `path` or `permalink`, so rewritten `@/` links and inbound URLs keep working instead of moving to Jekyll's `/YYYY/MM/DD/name.html`
-- Draft posts go to `_drafts/` without date prefix
+- Draft posts (under `posts/` or `blog/`, exported with `--drafts`) go to `_drafts/` without date prefix
 - `redirect_from` only redirects when the [jekyll-redirect-from](https://github.com/jekyll/jekyll-redirect-from) plugin is enabled under `plugins:` in the Jekyll `_config.yml` (it is allow-listed, not on by default, on GitHub Pages)
 - Section index files (`_index.md`, and translations such as `_index.ko.md`) become `index.md` (`index.ko.md`) pages
 - Frontmatter is converted from TOML, YAML, or JSON to YAML (`---`)

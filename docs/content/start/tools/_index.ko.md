@@ -14,7 +14,7 @@ Hwaro는 콘텐츠 관리를 돕는 유틸리티 도구와, CLI를 더 편하게
 
 | 하위 명령 | 설명 |
 |------------|-------------|
-| [convert](/ko/start/tools/convert/) | 프론트 매터를 YAML과 TOML 형식 간에 변환 |
+| [convert](/ko/start/tools/convert/) | 프론트 매터를 TOML·YAML·JSON 형식 간에 변환 |
 | [list](/ko/start/tools/list/) | 상태별 콘텐츠 파일 목록 출력 |
 | [check-links](/ko/start/tools/check-links/) | 콘텐츠 파일의 깨진 링크 검사 |
 | [stats](/ko/start/tools/stats/) | 콘텐츠 통계 표시 |
@@ -90,11 +90,11 @@ hwaro completion fish > ~/.config/fish/completions/hwaro.fish
 
 자동 완성 스크립트는 다음을 탭으로 완성합니다.
 
-- **명령**: `hwaro <TAB>` → `init`, `build`, `serve`, `new`, `deploy`, `tool`, `completion`
+- **명령**: `hwaro <TAB>` → `init`, `build`, `serve`, `new`, `deploy`, `tool`, `doctor`, `completion`, `version`, `help`
 - **하위 명령**: `hwaro tool <TAB>` → `convert`, `list`, `stats`, `validate`, `export` 등
 - **플래그**: `hwaro build <TAB>` → `--output`, `--drafts`, `--minify` 등
 - **위치 인자**: `hwaro completion <TAB>` → `bash`, `zsh`, `fish`
-- **위치 인자 선택지**: `hwaro tool convert <TAB>` → `to-yaml`, `to-toml`
+- **위치 인자 선택지**: `hwaro tool convert <TAB>` → `to-yaml`, `to-toml`, `to-json`
 
 ### 자동 갱신
 

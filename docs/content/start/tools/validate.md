@@ -53,12 +53,12 @@ hwaro tool validate --json
 hwaro: validate content
 
 content/blog/draft.md:
-      [warn] Missing description in frontmatter
-      [info] File is marked as draft
+    [warn] Missing description in frontmatter
+    [info] File is marked as draft
 
 content/about.md:
-      [warn] Image missing alt text: ![](photo.jpg)
-      [info] Tag has mixed case: "Crystal" (consider lowercase)
+    [warn] Image missing alt text: ![](photo.jpg)
+    [info] Tag has mixed case: "Crystal" (consider lowercase)
 
 checked: 0 errors, 2 warnings, 2 info
 ```

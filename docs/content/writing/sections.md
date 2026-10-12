@@ -41,7 +41,8 @@ Welcome to my blog.
 | page_template | string | — | Default template for pages |
 | sort_by | string | "date" | Sort by: date, published, weight, title (see [Sort direction](#sort-direction)) |
 | reverse | bool | false | Flip the natural sort order (see [Sort direction](#sort-direction)) |
-| paginate | int | — | Pages per page |
+| paginate | int | — | Items per page (`paginate_by` is accepted as an alias); `0` disables pagination for the section |
+| pagination_enabled | bool | — | Turn pagination on or off for this section, overriding `paginate` and the site-wide `[pagination]` setting |
 | paginate_path | string | "page" | Path segment for pager URLs (default produces `/blog/page/2/`) |
 | transparent | bool | false | Pass pages to parent |
 | generate_feeds | bool | false | Generate RSS feed |
@@ -159,6 +160,7 @@ page_template = "custom-page"
 sort_by = "date"
 reverse = false
 paginate = 10
+pagination_enabled = true
 paginate_path = "page"
 transparent = false
 generate_feeds = true

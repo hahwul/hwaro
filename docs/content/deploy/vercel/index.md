@@ -14,7 +14,7 @@ Deploy your Hwaro site to Vercel with zero-config deployments.
 hwaro tool platform vercel
 ```
 
-This creates a `vercel.json` with build settings, redirects from aliases, and cache headers.
+This creates a `vercel.json` with build settings, redirects from aliases, and (when fingerprinted asset bundles are enabled) cache headers.
 
 ### Deploy via Git
 

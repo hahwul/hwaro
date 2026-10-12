@@ -99,7 +99,7 @@ SVG는 `<img>` 계열 태그에서만 게시하며 경고를 출력합니다. SV
 
 ### Hwaro가 출력하는 태그
 
-`[markdown] math = "mathjax"`는 `cdn.jsdelivr.net`에서 MathJax를 불러오는데,
+`[markdown] math_engine = "mathjax"`는 `cdn.jsdelivr.net`에서 MathJax를 불러오는데,
 MathJax는 폰트와 확장을 자기 URL 기준으로 불러오므로 외부에 그대로 둡니다.
 Mermaid(`[markdown] mermaid = true`)는 인라인 모듈 `import`로 불러오며, 프라이버시
 모드는 이를 다시 쓰지 않습니다. KaTeX와 highlight.js는 그대로 로컬로 옮깁니다.

@@ -19,7 +19,7 @@ templates/
 ├── taxonomy_term.html  # Taxonomy term page
 ├── 404.html            # Error page
 ├── shortcodes/         # Shortcode templates
-└── hooks/              # Markdown render-element overrides (link/image/heading/codeblock)
+└── hooks/              # Markdown render-element overrides (link/image/heading/codeblock/blockquote/table)
 ```
 
 The `shortcodes/` directory contains reusable components you can embed in Markdown. See [Writing: Shortcodes](/writing/shortcodes/) for usage and how to create custom shortcodes.

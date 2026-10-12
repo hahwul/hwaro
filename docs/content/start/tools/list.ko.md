@@ -17,7 +17,7 @@ hwaro tool list drafts
 hwaro tool list published
 
 # 특정 디렉터리의 파일 나열
-hwaro tool list all -c posts
+hwaro tool list all -c content/posts
 
 # 가장 최근 발행 파일 5개
 hwaro tool list published --limit 5

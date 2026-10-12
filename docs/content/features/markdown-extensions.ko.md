@@ -159,6 +159,8 @@ $$
 
 ### 클라이언트 사이드 설정
 
+`bare`를 제외한 내장 스캐폴드의 헤더에는 `{{ math_tags }}`가 들어 있습니다. 이 변수는 설정한 `math_engine`에 맞는 KaTeX 또는 MathJax 태그를 출력하며, `math = false`이면 아무것도 출력하지 않습니다. 직접 만든 `<head>`에 넣거나, 라이브러리를 직접 불러옵니다.
+
 #### KaTeX
 
 ```html
@@ -201,15 +203,16 @@ graph TD
 ### 출력
 
 ```html
-<div class="mermaid">
-graph TD
-    A[Start] --> B{Decision}
-    B -->|Yes| C[OK]
-    B -->|No| D[Cancel]
+<div class="mermaid">graph TD
+    A[Start] --&gt; B{Decision}
+    B --&gt;|Yes| C[OK]
+    B --&gt;|No| D[Cancel]
 </div>
 ```
 
 ### 클라이언트 사이드 설정
+
+`{{ mermaid_tags }}`는 Mermaid에 대해 같은 역할을 합니다(`mermaid = false`이면 빈 값). 직접 불러오려면 다음과 같이 합니다.
 
 ```html
 <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>

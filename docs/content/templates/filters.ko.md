@@ -93,7 +93,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 | 필터 | 설명 | 예시 |
 |--------|-------------|---------|
 | absolute_url | base를 포함한 전체 URL | {{ "/about/" \| absolute_url }} |
-| relative_url | base_url 접두사 추가 | {{ "/img.png" \| relative_url }} |
+| relative_url | base_url의 경로 부분(스킴과 호스트 제외)을 접두사로 추가 | {{ "/img.png" \| relative_url }} |
 | active_path | 이 URL이 현재 페이지(또는 그 상위)인지 | {{ item.url \| active_path }} |
 
 `active_path`는 URL(보통 [메뉴](/ko/features/menus/) 엔트리의 `item.url`)을 현재 페이지와 비교합니다. 기본은 정확히 일치할 때만 참이고, `ancestor=true`를 넘기면 하위 페이지도 매칭합니다.
@@ -109,9 +109,10 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 
 | 필터 | 설명 | 예시 |
 |--------|-------------|---------|
-| default | 정의되지 않았거나 none이거나 빈 값일 때의 폴백 값(아래 "기본값" 참고) | {{ value \| default(value="N/A") }} |
+| default | 정의되지 않았거나 none이거나 빈 값일 때의 폴백 값([기본값](#기본값) 참고) | {{ value \| default(value="N/A") }} |
 | jsonify | JSON 인코딩 | {{ data \| jsonify }} |
-| date | 날짜 포맷 | {{ page.date \| date("%Y-%m-%d") }} |
+| tojson | JSON 인코딩. `indent`를 주면 그만큼의 공백(0–16)으로 들여쓰기 | {{ data \| tojson(indent=2) }} |
+| date | 날짜 포맷(기본 포맷 `%Y-%m-%d`) | {{ page.date \| date("%Y-%m-%d") }} |
 
 ## 예시
 

@@ -68,7 +68,7 @@ the build. No JavaScript ships to the browser, and code is colored even
 with JavaScript disabled.
 
 The build-time highlighter emits Highlight.js-compatible CSS classes, so
-every theme above keeps working unchanged: `{{ highlight_css }}` still
+every theme below keeps working unchanged: `{{ highlight_css }}` still
 injects the theme stylesheet, while `{{ highlight_js }}` becomes empty.
 
 Over 250 languages are supported (via [Tartrazine](https://github.com/ralsina/tartrazine)

@@ -25,7 +25,7 @@ A value placed inside a double-quoted string is inserted as exactly the characte
 
 ```toml
 # Dynamic base URL for CI/CD
-base_url = "${SITE_URL:-https://localhost:1313}"
+base_url = "${SITE_URL:-http://localhost:3000}"
 
 # Bare form
 title = "$SITE_TITLE"
@@ -40,7 +40,7 @@ fb_app_id = "${FB_APP_ID:-}"
 Missing variables without a default value are left unchanged and produce a build-time warning:
 
 ```
-WARN: Environment variable 'SITE_URL' is not set (referenced in config.toml)
+[WARN] Environment variable 'SITE_URL' is not set (referenced in config.toml)
 ```
 
 ## Template Function
@@ -55,9 +55,9 @@ Use the `env()` function to read environment variables inside templates.
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | name | String | Variable name |
-| default | String? | Fallback if unset (optional) |
+| default | String? | Fallback if unset or empty, matching `${VAR:-default}` (optional) |
 
-If the variable is not set and no default is provided, an empty string is returned and a warning is logged.
+If the variable is not set and no default is provided, an empty string is returned and a warning is logged (once per variable per build).
 
 ### Examples
 
@@ -114,7 +114,7 @@ hwaro build
 Each developer can override values locally via their shell environment without modifying `config.toml`:
 
 ```bash
-export SITE_URL="http://localhost:1313"
+export SITE_URL="http://localhost:3000"
 hwaro serve
 ```
 

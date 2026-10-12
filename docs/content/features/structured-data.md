@@ -9,20 +9,26 @@ Hwaro automatically generates JSON-LD structured data for rich search results. B
 
 ## Auto-Generated (Always)
 
-These are generated for every page:
+Every page gets page-level JSON-LD that matches its kind:
 
-- **Article** — headline, dates, description, author, image
-- **BreadcrumbList** — auto-generated from page hierarchy/ancestors
+- **Article** — content pages: headline, dates, description, author, image
+- **CollectionPage** — listing pages (section indexes, taxonomy and term pages, or a page with `[extra] og_type = "website"`): name, URL, description, consistent with the `og:type="website"` on the same page
+- **WebSite** — the home page, in place of an Article (see below)
+- **BreadcrumbList** — auto-generated from page hierarchy/ancestors (not on the home page)
+
+The 404 page gets no page-level JSON-LD, and a page without a title gets no Article.
 
 Available as template variables: `{{ jsonld }}`, `{{ jsonld_article }}`, `{{ jsonld_breadcrumb }}`
 
 ## Site-Wide Schemas
 
-Generated once and available on all pages:
+Generated once and available on all pages. Both need `base_url` and render as an empty string without it.
 
 ### WebSite + SearchAction
 
-Enables the sitelinks search box in Google. Automatically includes `SearchAction` when `[search]` is enabled.
+Enables the sitelinks search box in Google. Automatically includes `SearchAction` when `[search]` is enabled. Its target is `<base_url>/?q={search_term_string}`, so your site needs a page that reads the `q` query parameter (the built-in search UI does not).
+
+The home page's `{{ jsonld }}` already includes this schema, so output `{{ jsonld_website }}` yourself only where you don't use `{{ jsonld }}`.
 
 ```jinja
 {{ jsonld_website }}
@@ -56,6 +62,13 @@ Or use paired array format:
 faq = ["Question 1", "Answer 1", "Question 2", "Answer 2"]
 ```
 
+Or an array of tables:
+```toml
+[[extra.faq]]
+question = "What is Hwaro?"
+answer = "A fast static site generator."
+```
+
 The FAQ schema is auto-included in `{{ jsonld }}` when `schema_type = "FAQ"`. You can also use `{{ jsonld_faq }}` directly.
 
 ### HowTo
@@ -74,14 +87,21 @@ Or use paired array format:
 howto_steps = ["Step Name", "Step Description", "Step 2 Name", "Step 2 Description"]
 ```
 
+Or an array of tables:
+```toml
+[[extra.howto_steps]]
+name = "Install"
+text = "Run the install command."
+```
+
 Auto-included in `{{ jsonld }}` when `schema_type = "HowTo"`. Also available as `{{ jsonld_howto }}`.
 
 ## Template Variables
 
 | Variable | Scope | Description |
 |----------|-------|-------------|
-| `jsonld` | per-page | All applicable JSON-LD combined (Article + Breadcrumb + extended type) |
-| `jsonld_article` | per-page | Article schema only |
+| `jsonld` | per-page | All applicable JSON-LD combined (Article or CollectionPage + Breadcrumb + extended type; WebSite on the home page) |
+| `jsonld_article` | per-page | Article schema only (CollectionPage on listing pages; empty on the home page) |
 | `jsonld_breadcrumb` | per-page | BreadcrumbList schema only |
 | `jsonld_faq` | per-page | FAQPage schema (empty if not FAQ) |
 | `jsonld_howto` | per-page | HowTo schema (empty if not HowTo) |
@@ -95,9 +115,10 @@ Typical placement in your base template `<head>`:
 ```jinja
 <head>
   {{ jsonld }}
-  {{ jsonld_website }}
 </head>
 ```
+
+`{{ jsonld }}` already carries the WebSite schema on the home page; adding `{{ jsonld_website }}` next to it would emit it twice there.
 
 ## See Also
 

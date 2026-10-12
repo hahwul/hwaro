@@ -38,7 +38,7 @@ series_weight = 1
 
 시리즈 안의 글은 `series_weight`, 날짜(오래된 글부터, 날짜 없는 글은 마지막), 제목 순으로 정렬됩니다.
 
-시리즈는 언어별로(그리고 [버전 문서](/features/versioned-docs/) 사이트에서는 버전별로) 나뉩니다. [다국어](/features/multilingual/) 사이트에서 같은 `series` 이름을 쓰는 `hello.md`와 번역본 `hello.ko.md`는 서로 다른 두 시리즈에 속하며, 각 언어 안에서 따로 번호가 매겨지고 연결됩니다.
+시리즈는 언어별로(그리고 [버전 문서](/ko/features/versioned-docs/) 사이트에서는 버전별로) 나뉩니다. [다국어](/ko/features/multilingual/) 사이트에서 같은 `series` 이름을 쓰는 `hello.md`와 번역본 `hello.ko.md`는 서로 다른 두 시리즈에 속하며, 각 언어 안에서 따로 번호가 매겨지고 연결됩니다.
 
 ## 템플릿 변수
 
@@ -48,7 +48,7 @@ series_weight = 1
 |----------|------|-------------|
 | page.series | string | 시리즈 이름 |
 | page.series_index | int | 시리즈 내 위치(1부터 시작) |
-| page.series_pages | array | 같은 시리즈의 모든 페이지(정렬됨) |
+| page.series_pages | array | 같은 시리즈의 모든 페이지(정렬됨, 시리즈에 페이지가 하나뿐이면 비어 있음) |
 
 ## 템플릿에서 사용
 

@@ -28,7 +28,7 @@ hwaro tool agents-md --write --force
 | Mode | Description |
 |------|-------------|
 | `--local` (default) | Full embedded reference (~260 lines). Includes content format, template variables, configuration reference, and AI agent notes. Best for offline or local LLM environments. |
-| `--remote` | Lightweight version (~50 lines). Includes project structure, essential commands, and AI agent notes with links to [online documentation](https://hwaro.hahwul.com) and [LLM reference](https://hwaro.hahwul.com/llms-full.txt). |
+| `--remote` | Lightweight version (~70 lines). Includes project structure, essential commands, and AI agent notes with links to [online documentation](https://hwaro.hahwul.com) and [LLM reference](https://hwaro.hahwul.com/llms-full.txt). |
 
 Both modes include a **Site-Specific Instructions** section where you can add your own project rules and conventions. Regenerating with `--write` preserves that section from the existing file. The generated parts are refreshed (or switched between modes) while whatever you wrote under `## Site-Specific Instructions` is carried over unchanged. Preservation keys on that exact heading: an existing file without a `## Site-Specific Instructions` heading is replaced entirely (the prompt, or a warning under `--force`, says so before it happens).
 

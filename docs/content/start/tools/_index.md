@@ -14,7 +14,7 @@ The `hwaro tool` command provides utility subcommands for working with content f
 
 | Subcommand | Description |
 |------------|-------------|
-| [convert](/start/tools/convert/) | Convert frontmatter between YAML and TOML formats |
+| [convert](/start/tools/convert/) | Convert frontmatter between TOML, YAML, and JSON formats |
 | [list](/start/tools/list/) | List content files by status |
 | [check-links](/start/tools/check-links/) | Check for dead links in content files |
 | [stats](/start/tools/stats/) | Show content statistics |
@@ -90,11 +90,11 @@ hwaro completion fish > ~/.config/fish/completions/hwaro.fish
 
 The completion scripts provide tab completion for:
 
-- **Commands**: `hwaro <TAB>` → `init`, `build`, `serve`, `new`, `deploy`, `tool`, `completion`
+- **Commands**: `hwaro <TAB>` → `init`, `build`, `serve`, `new`, `deploy`, `tool`, `doctor`, `completion`, `version`, `help`
 - **Subcommands**: `hwaro tool <TAB>` → `convert`, `list`, `stats`, `validate`, `export`, etc.
 - **Flags**: `hwaro build <TAB>` → `--output`, `--drafts`, `--minify`, etc.
 - **Positional arguments**: `hwaro completion <TAB>` → `bash`, `zsh`, `fish`
-- **Positional choices**: `hwaro tool convert <TAB>` → `to-yaml`, `to-toml`
+- **Positional choices**: `hwaro tool convert <TAB>` → `to-yaml`, `to-toml`, `to-json`
 
 ### Automatic Updates
 

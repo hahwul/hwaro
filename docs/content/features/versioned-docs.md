@@ -189,9 +189,8 @@ Every version is its own tree; nothing leaks across the boundary:
 | `get_section()`, `section.pages`, `section.subsections` | A version root is not a subsection or page of its unversioned parent; listings inside a version only see that version. |
 | Menus (`get_menu`) | Config `[[menus.*]]` entries appear everywhere. Front-matter `menus = […]` registrations from a versioned page appear only in that version's menus; unversioned pages additionally see the **latest** version's registrations. |
 | Related posts | Never cross a version boundary. |
+| Series | Grouped per `{language, version}`: a `series` shared by a v1 and a v2 page forms two separate series, each numbered within its own version. |
 | Taxonomies | Term pages collect from unversioned content plus the latest version (`taxonomies = "latest"`, the default). Set `taxonomies = "all"` to list every version. |
-
-Series are not version-aware: a `series` shared by a v1 and a v2 page groups them together.
 
 ## SEO & Discovery
 
@@ -232,7 +231,6 @@ const hits = results.filter((r) => !r.version || r.version === current);
 ## Not Included
 
 - Redirect rules for URLs that exist only in the latest version (an old-version 404 is a plain 404).
-- Version-aware series.
 - The `docs` scaffold is unchanged; add `[versions]` to a generated site by hand using the snippet above.
 
 ## See Also

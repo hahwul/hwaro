@@ -19,7 +19,7 @@ This generates static files in `public/`. You can optionally minify output:
 hwaro build --minify
 ```
 
-This performs conservative optimization: HTML comments and trailing whitespace are removed, and JSON/XML whitespace is compacted. All code blocks and content structure are preserved.
+This performs conservative optimization: HTML comments are removed, whitespace inside and between tags is collapsed, and JSON/XML whitespace is compacted. Whitespace-sensitive elements (`<pre>`, `<code>`, `<script>`, `<style>`, …) and content structure are preserved. See the [CLI Reference](/start/cli/#build) for details.
 
 Everything in `static/` is copied into `public/` and deployed, including hidden dot-paths such as `.well-known/security.txt` and `.domains`, identically for cold and `--cache`/incremental builds. Common OS/editor/VCS cruft (`.DS_Store`, `.git/`, …) is filtered out automatically; see [Static Files](/start/config/#static-files) to tune it.
 

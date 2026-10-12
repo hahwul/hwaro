@@ -189,7 +189,7 @@ stay predictable. Pass a `<path>` (and any flags) to skip the prompts entirely.
 | --bundle | Create a leaf-bundle directory (`foo/index.md`) instead of a single file |
 | --no-bundle | Force a single file (`foo.md`); overrides `[content.new].bundle = true` |
 | --list-archetypes | List archetypes in the current project and exit |
-| --json | Emit machine-readable JSON output (archetypes listing and classified errors) |
+| -j, --json | Emit machine-readable JSON output (archetypes listing and classified errors) |
 
 `hwaro new` rejects destinations that cannot be resolved within `content/`, including paths through symlinks outside it.
 
@@ -480,7 +480,7 @@ hwaro deploy --dry-run
 | --force | Force upload/copy (ignore file comparisons), and allow clearing a destination from an empty source |
 | --max-deletes N | Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables) |
 | --list-targets | List configured deployment targets and exit |
-| --json | Emit machine-readable JSON output (plan with `--dry-run`, per-target summary otherwise, target list with `--list-targets`) |
+| -j, --json | Emit machine-readable JSON output (plan with `--dry-run`, per-target summary otherwise, target list with `--list-targets`) |
 | -e, --env NAME | Config environment to load (also `HWARO_ENV`) |
 | -q, --quiet | Suppress human log output |
 
@@ -607,7 +607,7 @@ paths and options.
 | Content | [unused-assets](/start/tools/unused-assets/) | Find unreferenced static files |
 | Site | [platform](/start/tools/platform/) | Generate platform config and CI/CD workflow files |
 | Site | [doctor](/start/tools/doctor/) | Diagnose config, template, and structure issues |
-| Site | import | Import content from WordPress, Jekyll, Hugo, Notion, Obsidian, Hexo, Astro, or Eleventy |
+| Site | [import](/start/tools/import/) | Import content from WordPress, Jekyll, Hugo, Notion, Obsidian, Hexo, Astro, or Eleventy |
 | Site | [export](/start/tools/export/) | Export content to Hugo or Jekyll |
 | Site | [agents-md](/start/tools/agents-md/) | Generate or update AGENTS.md file |
 
@@ -701,8 +701,8 @@ hwaro serve -i ~/projects/my-blog --open
 
 | Flag | Description |
 |------|-------------|
-| -h, --help | Show help |
-| -v, --verbose | Verbose output |
+| -h, --help | Show help (`hwaro <command> --help` for one command) |
+| -v, -V, --version | Print the version and exit (same as `hwaro version`) |
 
 ## See Also
 
