@@ -113,5 +113,25 @@ describe Hwaro::Utils::ByteScan do
         scan.byte_index(haystack, needle).should eq(haystack.index(needle))
       end
     end
+
+    # The memchr anchors on the needle's first byte that is not a letter,
+    # digit or space; longer, mostly-alphanumeric needles and start offsets
+    # exercise that anchor against the stdlib's byte search.
+    it "agrees with String#byte_index for anchored needles and start offsets" do
+      rng = Random.new(20261012)
+      alphabet = ['a', 'b', '1', ' ', '-', '_', '<']
+
+      5_000.times do
+        haystack = String.build do |io|
+          rng.rand(0..30).times { io << alphabet.sample(rng) }
+        end
+        needle = String.build do |io|
+          rng.rand(1..6).times { io << alphabet.sample(rng) }
+        end
+        start = rng.rand(0..haystack.bytesize)
+
+        scan.byte_index(haystack, needle, start).should eq(haystack.byte_index(needle, start))
+      end
+    end
   end
 end

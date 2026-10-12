@@ -2,6 +2,7 @@ require "html"
 require "crinja"
 require "../utils/text_utils"
 require "../utils/path_utils"
+require "../utils/byte_scan"
 require "../content/processors/fence_tracker"
 require "./git_info"
 require "./config"
@@ -532,7 +533,7 @@ module Hwaro
       MORE_MARKER_REGEX = /<!--\s*more\s*-->/i
 
       def extract_summary : String?
-        return @summary unless @raw_content.includes?("<!--")
+        return @summary unless Utils::ByteScan.includes?(@raw_content, "<!--")
 
         offset = 0
         tracker = Content::Processors::FenceTracker.new

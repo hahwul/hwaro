@@ -40,7 +40,7 @@ module Hwaro
           result = html.gsub(TASK_LIST_ITEM_RE) do
             %(<li class="task-list-item">#{$1}<input type="checkbox"#{$2?} disabled class="task-list-item-checkbox">)
           end
-          return result unless result.includes?("task-list-item")
+          return result unless Utils::ByteScan.includes?(result, "task-list-item")
 
           mark_containing_lists(result)
         end

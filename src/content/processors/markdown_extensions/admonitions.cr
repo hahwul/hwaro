@@ -56,7 +56,7 @@ module Hwaro
         # inside the admonition will close the match early. Acceptable for v1 —
         # GitHub admonitions don't support nested blockquotes either.
         def postprocess_admonitions(html : String, foldable : Bool = false) : String
-          return html unless html.includes?("[!")
+          return html unless Utils::ByteScan.includes?(html, "[!")
 
           html.gsub(ADMONITION_BLOCKQUOTE_RE) do |_|
             type = $1

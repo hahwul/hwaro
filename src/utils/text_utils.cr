@@ -7,6 +7,7 @@
 require "digest/sha1"
 require "html"
 require "uri"
+require "./byte_scan"
 
 module Hwaro
   module Utils
@@ -825,7 +826,7 @@ module Hwaro
         text = text.gsub(RAW_TEXT_ELEMENT, " ")
         # Then the decorative ones. Guarded by a substring probe so a page
         # with no aria-hidden markup never pays for the scan.
-        text = text.gsub(ARIA_HIDDEN_ELEMENT, " ") if text.includes?("aria-hidden")
+        text = text.gsub(ARIA_HIDDEN_ELEMENT, " ") if ByteScan.includes?(text, "aria-hidden")
         size = text.bytesize
         String.build(size) do |io|
           last_was_space = true # suppress leading space
@@ -857,8 +858,21 @@ module Hwaro
                 io << ' '
               end
               pending_space = false
-              io << char
               last_was_space = false
+              if char.ascii?
+                # The ASCII bytes up to the next `<`, `>`, whitespace or
+                # non-ASCII byte all land here with nothing pending: copy
+                # the run in one write.
+                run_end = reader.pos + 1
+                while run_end < size && (byte = text.to_unsafe[run_end]) < 0x80 &&
+                      byte != '<'.ord && byte != '>'.ord && !byte.unsafe_chr.ascii_whitespace?
+                  run_end += 1
+                end
+                io.write(text.to_slice[reader.pos, run_end - reader.pos])
+                reader.pos = run_end
+                next
+              end
+              io << char
             end
             reader.next_char
           end
@@ -888,7 +902,7 @@ module Hwaro
         size = text.bytesize
         i = start + 1
         if text.byte_at?(i) == '!'.ord && text.byte_at?(i + 1) == '-'.ord && text.byte_at?(i + 2) == '-'.ord
-          close = text.byte_index("-->", i + 1)
+          close = ByteScan.byte_index(text, "-->", i + 1)
           return {close ? close + 3 : size, false}
         end
 
@@ -1019,10 +1033,16 @@ module Hwaro
         total > 0 && cjk * 2 > total
       end
 
+      # The text before the max_words-th space — what
+      # `text.split(' ')[0, max_words].join(' ')` builds — without splitting
+      # the whole body into words to keep the first few.
       private def truncate_excerpt_words(text : String, max_words : Int32) : String?
-        words = text.split(' ')
-        return if words.size <= max_words
-        words[0, max_words].join(' ')
+        bytes = text.to_slice
+        cut = -1
+        max_words.times do
+          cut = bytes.index(' '.ord.to_u8, cut + 1) || return
+        end
+        text.byte_slice(0, cut)
       end
 
       private def truncate_excerpt_chars(text : String, max_chars : Int32) : String?
@@ -1046,6 +1066,7 @@ module Hwaro
       end
 
       private def collapse_whitespace(text : String) : String
+        return text if collapsed_whitespace?(text)
         String.build(text.bytesize) do |io|
           pending = false
           started = false
@@ -1060,6 +1081,25 @@ module Hwaro
             end
           end
         end
+      end
+
+      # Already collapse_whitespace's output: no edge whitespace and every
+      # whitespace run a single ASCII space. Text excerpt_text produced
+      # always is, so truncate_excerpt's second pass allocates nothing. An
+      # invalid byte (read as U+FFFD, which the rebuild writes out) or a
+      # literal U+FFFD takes the rebuild.
+      private def collapsed_whitespace?(text : String) : Bool
+        prev_space = true
+        text.each_char do |c|
+          return false if c == Char::REPLACEMENT
+          if c.whitespace?
+            return false if prev_space || c != ' '
+            prev_space = true
+          else
+            prev_space = false
+          end
+        end
+        !prev_space || text.empty?
       end
 
       # A combining mark that is part of a word (vowel signs, virama, tone and

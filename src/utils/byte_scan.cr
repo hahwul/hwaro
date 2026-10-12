@@ -48,23 +48,38 @@ module Hwaro
         return if nsize > hsize - start
 
         hay = haystack.to_slice
-        first = needle.to_unsafe.value
-        return hay.index(first, start) if nsize == 1
+        return hay.index(needle.to_unsafe.value, start) if nsize == 1
+
+        # memchr for the needle's least common-looking byte — markup or an
+        # uppercase letter, else common punctuation, else the first byte
+        # (`"aria-hidden"` scans for `-`, not for every `a` in the prose) —
+        # confirming each candidate with memcmp.
+        bytes = needle.to_slice
+        anchor = bytes.index { |byte| anchor_rank(byte) == 2 } || bytes.index { |byte| anchor_rank(byte) == 1 } || 0
+        anchor_byte = needle.to_unsafe[anchor]
 
         limit = hsize - nsize
-        rest = (nsize - 1).to_u64
-        needle_rest = needle.to_unsafe + 1
         offset = start
         while offset <= limit
-          found = hay.index(first, offset)
+          found = hay.index(anchor_byte, offset + anchor)
           return unless found
-          return if found > limit
-          if LibC.memcmp((haystack.to_unsafe + found + 1).as(Void*), needle_rest.as(Void*), rest) == 0
-            return found
+          candidate = found - anchor
+          return if candidate > limit
+          if LibC.memcmp((haystack.to_unsafe + candidate).as(Void*), needle.to_unsafe.as(Void*), nsize.to_u64) == 0
+            return candidate
           end
-          offset = found + 1
+          offset = candidate + 1
         end
         nil
+      end
+
+      # 0: lowercase letter or space (prose), 1: digit or punctuation common
+      # in markup text, 2: anything else (`<`, `[`, `{`, `@`, uppercase, …).
+      private def anchor_rank(byte : UInt8) : Int32
+        char = byte.unsafe_chr
+        return 0 if char.ascii_lowercase? || char == ' '
+        return 1 if char.ascii_number? || "-=\"/.:;,'_".includes?(char)
+        2
       end
     end
   end

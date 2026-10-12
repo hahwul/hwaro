@@ -53,8 +53,8 @@ module Hwaro
         private def html_comment_spans(html : String) : Array(Range(Int32, Int32))
           spans = [] of Range(Int32, Int32)
           pos = 0
-          while open = html.byte_index("<!--", pos)
-            close = html.byte_index("-->", open + 4)
+          while open = Utils::ByteScan.byte_index(html, "<!--", pos)
+            close = Utils::ByteScan.byte_index(html, "-->", open + 4)
             # An UNTERMINATED `<!--` is deliberately NOT treated as a comment
             # running to end of input. In practice a lone `<!--` this deep in
             # rendered HTML is far more likely to be a stray sequence inside a
