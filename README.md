@@ -4,7 +4,7 @@
 </div>
 
 <p align="center">
-<a href="https://github.com/hahwul/hwaro/blob/main/CONTRIBUTING.md">
+<a href="https://github.com/hahwul/hwaro/blob/main/.github/CONTRIBUTING.md">
 <img src="https://img.shields.io/badge/CONTRIBUTIONS-WELCOME-000000?style=for-the-badge&labelColor=black"></a>
 <a href="https://github.com/hahwul/hwaro/releases">
 <img src="https://img.shields.io/github/v/release/hahwul/hwaro?style=for-the-badge&color=black&labelColor=black&logo=web"></a>
@@ -119,7 +119,7 @@ shards build --release --no-debug --production
 
 ## Contributing
 
-Hwaro is an open-source project made with ❤️. If you would like to contribute, please check [CONTRIBUTING.md](CONTRIBUTING.md) and submit a Pull Request.
+Hwaro is an open-source project made with ❤️. If you would like to contribute, please check [CONTRIBUTING.md](.github/CONTRIBUTING.md) and submit a Pull Request.
 
 ![](docs/static/CONTRIBUTORS.svg)
 
