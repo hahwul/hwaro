@@ -20,7 +20,7 @@ module Hwaro
           # must lstrip-start with ": " (see the loop conditions below), so a
           # content without ": " anywhere cannot contain a definition list and
           # the walk is the identity transform — skip it.
-          return content unless content.includes?(": ")
+          return content unless Utils::ByteScan.includes?(content, ": ")
 
           lines = content.split("\n")
 

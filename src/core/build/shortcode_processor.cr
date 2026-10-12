@@ -1193,7 +1193,7 @@ module Hwaro
             # Substring probe before the regex pass: the typical page pays
             # one confirming scan per nesting level otherwise, over the
             # whole rendered HTML.
-            return result unless result.includes?("HWARO-SHORTCODE-PLACEHOLDER-")
+            return result unless Utils::ByteScan.includes?(result, "HWARO-SHORTCODE-PLACEHOLDER-")
             code_depth = 0
             replaced = result.gsub(SHORTCODE_PLACEHOLDER_RESTORE_RE) do |match, m|
               if m[1]?

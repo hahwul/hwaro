@@ -478,10 +478,15 @@ module Hwaro
           # touched by exactly one worker. The font context, cached
           # logo/bg, and base layer are read-only after build.
           unless pending.empty?
-            config_struct = Hwaro::Core::Build::ParallelConfig.new(enabled: parallel)
-            processor = Hwaro::Core::Build::Parallel(Tuple(Models::Page, String), Bool).new(config_struct)
+            # Workers print nothing: each returns its PNG-fallback warning,
+            # if any, and the results come back in page order, so the
+            # warnings and debug lines print in the same order on every
+            # build however the workers interleave.
+            config_struct = Hwaro::Core::Build::ParallelConfig.new(enabled: parallel, wake_idle: true)
+            processor = Hwaro::Core::Build::Parallel(Tuple(Models::Page, String), String?).new(config_struct)
             results = processor.process(pending) do |item, _idx|
               page, slug = item
+              fallback_warning = nil
               if format == "png" && png_available
                 png_filename = "#{slug}.png"
                 png_path = File.join(img_dir, png_filename)
@@ -493,7 +498,7 @@ module Hwaro
                   svg = render_svg(page, config, logo_data_uri, bg_data_uri)
                   Hwaro::Utils::FileSafe.atomic_write(File.join(img_dir, svg_filename), svg)
                   page.image = "/#{ai.output_dir}/#{svg_filename}"
-                  Logger.warn "  PNG render failed for #{slug}, falling back to SVG"
+                  fallback_warning = "  PNG render failed for #{slug}, falling back to SVG"
                 end
               else
                 svg_filename = "#{slug}.svg"
@@ -501,7 +506,6 @@ module Hwaro
                 Hwaro::Utils::FileSafe.atomic_write(File.join(img_dir, svg_filename), svg)
                 page.image = "/#{ai.output_dir}/#{svg_filename}"
               end
-              Logger.debug "  OG image: #{page.image}" if verbose
 
               # Cooperative yielding for responsiveness during heavy OG
               # generation (especially PNG) when running in a background
@@ -519,7 +523,14 @@ module Hwaro
               if (_idx + 1) % PNG_YIELD_INTERVAL == 0
                 Fiber.yield
               end
-              true
+              fallback_warning
+            end
+            results.each do |result|
+              next unless result.success
+              if warning = result.value
+                Logger.warn warning
+              end
+              Logger.debug "  OG image: #{pending[result.index][0].image}" if verbose
             end
             # Surface render/I-O failures (e.g. File.write raising on disk full /
             # permission). Without this, an exception is swallowed by the worker

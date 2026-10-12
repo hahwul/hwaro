@@ -158,7 +158,7 @@ module Hwaro::Core::Build::Phases::Render
       # documentation pages full of example syntax no longer pay the cost of
       # build_template_variables + full shortcode processing.
       has_shortcodes = content_may_contain_shortcodes?(raw)
-      warn_hugo_shortcode_syntax(raw, page.path) if raw.includes?("{{<")
+      warn_hugo_shortcode_syntax(raw, page.path) if Utils::ByteScan.includes?(raw, "{{<")
       shortcode_context : Hash(String, Crinja::Value)? = nil
 
       processed_content = if has_shortcodes

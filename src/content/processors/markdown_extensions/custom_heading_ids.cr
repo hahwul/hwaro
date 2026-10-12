@@ -81,7 +81,7 @@ module Hwaro
         ANY_ID_ATTR_PRESENT_RE = /(?<![\w-])id\s*=/i
 
         def postprocess_heading_ids(html : String) : String
-          return html unless html.includes?("<!--HID:")
+          return html unless Utils::ByteScan.includes?(html, "<!--HID:")
 
           html.gsub(HEADING_TAG_FOR_HID_RE) do |match|
             tag = $1

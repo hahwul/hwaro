@@ -45,7 +45,7 @@ src/
     sass/                 scanner → parser → AST → evaluator (+ functions, color, extend, importer)
   utils/                  Logger, PathUtils, TextUtils, FileSafe, FrontmatterScanner/Writer,
                           OutputGuard, DevMarker, Profiler, minifiers, …
-  ext/                    vendored patches for markd/crinja/toml/tartrazine + stb_image bindings
+  ext/                    vendored patches for markd/crinja/toml/tartrazine, stdlib patches, stb_image bindings
 spec/
   spec_helper.cr          requires src/hwaro, support/config_helper and support/sass_helper
   support/                shared helpers: config_helper, sass_helper, build_helper (build_site;
@@ -185,6 +185,11 @@ Also, every PR: bilingual docs (`.md` + `.ko.md`) when user-facing.
   inside inline JSON; safe casts (`as_s?`, `as_bool?`, …) on `TOML::Any`,
   `YAML::Any`, `JSON::Any`; `PathUtils.sanitize_path` on content-derived paths.
 - Vendored shard fixes live in `src/ext/` (markd, crinja, toml, tartrazine).
+- Crystal 1.21's parallel execution context wakes no idle thread when a fiber
+  is spawned from inside it; `src/ext/execution_context_wake.cr` exposes the
+  wake. Only `hwaro build`'s `wake_idle` fan-outs (OG images, image resizing)
+  use it, and they print nothing from their workers: woken threads make
+  completion order vary, which a first-error pick or a worker warning shows.
 
 ## Known debts (deliberately not fixed in the structure refactor)
 

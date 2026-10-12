@@ -40,7 +40,7 @@ module Hwaro
         IMG_HATTR_RE = /(<img\b(?:[^>"']|"[^"]*"|'[^']*')*?)(\s*\/?>)((?:(?!<img\b|<!--HATTR:|<\/(?:p|li|t[dh]|d[dt]|h[1-6])\b).)*?)<!--HATTR:([0-9a-f]+)-->/m
 
         def postprocess_attributes(html : String) : String
-          return html unless html.includes?("<!--HATTR:")
+          return html unless Utils::ByteScan.includes?(html, "<!--HATTR:")
 
           result = html.gsub(HEADING_TAG_FOR_HID_RE) do |match|
             tag = $1

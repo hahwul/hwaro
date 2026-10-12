@@ -425,43 +425,26 @@ module Hwaro
             return
           end
 
-          # Phase 3: Process the work set in parallel with bounded concurrency
-          map_mutex = Mutex.new
-          work_channel = Channel(ImageJob?).new(CONCURRENCY)
-          done_channel = Channel(Nil).new
-
-          # Spawn worker fibers
-          CONCURRENCY.times do
-            spawn do
-              while job = work_channel.receive?
-                begin
-                  width_map, lqip_data = resize_one(job, widths, quality, lqip_width, lqip_quality, authored_for.call(job))
-                  map_mutex.synchronize do
-                    new_map[job.original_url] = width_map unless width_map.empty?
-                    new_lqip_map[job.original_url] = lqip_data if lqip_data
-                  end
-                rescue ex
-                  # resize_one does file I/O (cp, mkdir_p, image writes) that
-                  # can raise on permissions/disk-full/vanished files. A dead
-                  # worker would stall the bounded work_channel feeder below
-                  # and hang the build, so log and move to the next job.
-                  Logger.warn "  Image resize failed for #{job.source_path}: #{ex.message}"
-                end
-              end
-            ensure
-              # Guarantee the done signal even if the loop dies some other
-              # way; the `CONCURRENCY.times { done_channel.receive }` wait
-              # below hangs otherwise.
-              done_channel.send(nil)
+          # Phase 3: Process the work set in parallel with bounded concurrency.
+          # Results (and failures) come back in job order, so the maps and
+          # the warnings are the same on every build. resize_one does file
+          # I/O (cp, mkdir_p, image writes) that can raise on
+          # permissions/disk-full/vanished files: that job is reported and
+          # the rest carry on.
+          config = Core::Build::ParallelConfig.new(max_workers: CONCURRENCY, wake_idle: ctx.options.parallel)
+          results = Core::Build::Parallel(ImageJob, {Hash(Int32, String), Hash(String, String)?}).new(config).process(jobs_to_process) do |job, _idx|
+            resize_one(job, widths, quality, lqip_width, lqip_quality, authored_for.call(job))
+          end
+          results.each do |result|
+            job = jobs_to_process[result.index]
+            if (value = result.value) && result.success
+              width_map, lqip_data = value
+              new_map[job.original_url] = width_map unless width_map.empty?
+              new_lqip_map[job.original_url] = lqip_data if lqip_data
+            else
+              Logger.warn "  Image resize failed for #{job.source_path}: #{result.error}"
             end
           end
-
-          # Feed jobs
-          jobs_to_process.each { |job| work_channel.send(job) }
-          CONCURRENCY.times { work_channel.send(nil) } # sentinel to stop workers
-
-          # Wait for all workers
-          CONCURRENCY.times { done_channel.receive }
 
           @@resize_map_mutex.synchronize do
             @@resize_map = new_map

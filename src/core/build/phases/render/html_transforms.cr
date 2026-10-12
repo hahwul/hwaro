@@ -27,7 +27,7 @@ module Hwaro::Core::Build::Phases::Render
   private def apply_responsive_images(html : String, page : Models::Page, config : Models::Config) : String
     dimensions = config.image_processing.dimensions
     return html unless config.image_processing.enabled || dimensions
-    return html unless html.includes?("<img")
+    return html unless Utils::ByteScan.includes?(html, "<img")
 
     # Read-only view: apply_responsive_images only looks up keys, never
     # mutates. Using the live map avoids a per-page full-map copy plus a

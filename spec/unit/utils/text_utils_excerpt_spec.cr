@@ -133,6 +133,20 @@ describe Hwaro::Utils::TextUtils do
       amp.should eq("fish & chips…")
     end
 
+    it "cuts at the length-th word, and not when the text has exactly that many" do
+      Hwaro::Utils::TextUtils.truncate_excerpt("one two three", 3, ELLIPSIS).should eq({"one two three", false})
+      Hwaro::Utils::TextUtils.truncate_excerpt("one two three four", 3, ELLIPSIS).should eq({"one two three…", true})
+      Hwaro::Utils::TextUtils.truncate_excerpt(" one\ttwo\u00A0 three four ", 2, ELLIPSIS).should eq({"one two…", true})
+    end
+
+    # Already-collapsed text is returned as is; an invalid byte must still be
+    # rebuilt into U+FFFD like any other text.
+    it "writes an invalid byte as U+FFFD even when the whitespace is already collapsed" do
+      text, cut = Hwaro::Utils::TextUtils.truncate_excerpt("ab\xFFcd ef", 5, ELLIPSIS)
+      text.should eq("ab\uFFFDcd ef")
+      cut.should be_false
+    end
+
     it "treats a non-positive length as no limit" do
       text, cut = Hwaro::Utils::TextUtils.truncate_excerpt("a b c", 0, ELLIPSIS)
       text.should eq("a b c")

@@ -38,9 +38,9 @@ module Hwaro
           # HWARO comment markers the neutralization gsubs below are identity —
           # skipping keeps both the output AND the in-band-injection defense
           # exactly as before. Any page passing this check transforms as today.
-          unless content.includes?("[^") ||
-                 content.includes?("<!--HWARO-FN") ||
-                 content.includes?("<!--HWARO-FOOTNOTES-")
+          unless Utils::ByteScan.includes?(content, "[^") ||
+                 Utils::ByteScan.includes?(content, "<!--HWARO-FN") ||
+                 Utils::ByteScan.includes?(content, "<!--HWARO-FOOTNOTES-")
             return content
           end
 
@@ -181,7 +181,7 @@ module Hwaro
         # internals untouched by emphasis/strikethrough; `flags` also threads
         # the F10 opt-in inline markup (ins/mark/sub/sup).
         def postprocess_footnotes(html : String, *, flags : InlineMarkdown::Flags = InlineMarkdown::Flags.new) : String
-          return html unless html.includes?("<!--HWARO-FOOTNOTES-START-->")
+          return html unless Utils::ByteScan.includes?(html, "<!--HWARO-FOOTNOTES-START-->")
 
           # Extract footnote data from comments
           footnotes = [] of {key: String, num: Int32, occ: Int32, text: String}

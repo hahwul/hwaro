@@ -92,6 +92,7 @@ module Hwaro
           end
 
           builder = Core::Build::Builder.new
+          Core::Build::ParallelHelper.wake_idle_threads = true
 
           # Set logger level based on verbose option
           if options.verbose

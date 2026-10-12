@@ -29,7 +29,7 @@ module Hwaro
         CONTAINER_CLOSE_RE = /\A {0,3}:{3,}\z/
 
         def preprocess_containers(content : String, *, flags : InlineMarkdown::Flags = InlineMarkdown::Flags.new, trusted : Bool = false) : String
-          return content unless content.includes?(":::")
+          return content unless Utils::ByteScan.includes?(content, ":::")
 
           open_count = 0
           String.build do |io|

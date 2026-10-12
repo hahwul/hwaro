@@ -569,6 +569,12 @@ describe Hwaro::Utils::TextUtils do
     it "leaks the body of an unterminated <style> at EOF (documented fall-through)" do
       Hwaro::Utils::TextUtils.strip_html("<style>.x{color:red}").should eq(".x{color:red}")
     end
+
+    # Plain ASCII runs are copied in one write; these pin the run's edges.
+    it "ends a copied run at a non-tag `<`, a bare `>`, whitespace and non-ASCII" do
+      Hwaro::Utils::TextUtils.strip_html("a<3 b>c\td한e").should eq("a<3 bc d한e")
+      Hwaro::Utils::TextUtils.strip_html("<p>x</p>.y").should eq("x.y")
+    end
   end
 
   describe ".cjk_char?" do
