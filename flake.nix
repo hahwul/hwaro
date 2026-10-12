@@ -181,7 +181,7 @@
           format = "crystal";
 
           # Regenerate with `just nix-update` whenever shard.lock changes.
-          shardsFile = ./shards.nix;
+          shardsFile = ./packaging/nix/shards.nix;
 
           # Kept in sync with `targets.hwaro.main` in shard.yml by hand -- Nix
           # has no YAML parser at eval time. A stale path fails the build loudly
@@ -255,7 +255,7 @@
               echo "hwaro dev shell — $(crystal --version | head -n1)"
               echo "  just build       # shards install && shards build"
               echo "  just test        # crystal spec"
-              echo "  just nix-update  # regenerate shards.nix after shard.lock changes"
+              echo "  just nix-update  # regenerate packaging/nix/shards.nix after shard.lock changes"
             } >&2
           '';
         };

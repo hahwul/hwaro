@@ -37,9 +37,9 @@ end
 # flake.nix is intentionally absent: it derives both the package version and
 # the minimum Crystal from shard.yml at eval time, so there is nothing to drift.
 
-# Extract pkgver from aur/PKGBUILD
+# Extract pkgver from packaging/aur/PKGBUILD
 def get_pkgbuild_version : String?
-  content = File.read("aur/PKGBUILD")
+  content = File.read("packaging/aur/PKGBUILD")
   match = content.match(/^pkgver=([\d.]+)/m)
   match ? match[1] : nil
 rescue

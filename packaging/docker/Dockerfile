@@ -43,6 +43,6 @@ RUN apt-get update && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /hwaro/bin/hwaro /usr/local/bin/hwaro
-COPY --chmod=755 docker/entrypoint.sh /entrypoint.sh
+COPY --chmod=755 packaging/docker/entrypoint.sh /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
