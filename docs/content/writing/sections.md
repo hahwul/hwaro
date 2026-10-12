@@ -39,7 +39,7 @@ Welcome to my blog.
 | description | string | — | Section description |
 | template | string | "section" | Template to use |
 | page_template | string | — | Default template for pages |
-| sort_by | string | "date" | Sort by: date, weight, title (see [Sort direction](#sort-direction)) |
+| sort_by | string | "date" | Sort by: date, published, weight, title (see [Sort direction](#sort-direction)) |
 | reverse | bool | false | Flip the natural sort order (see [Sort direction](#sort-direction)) |
 | paginate | int | — | Pages per page |
 | paginate_path | string | "page" | Path segment for pager URLs (default produces `/blog/page/2/`) |
@@ -89,10 +89,11 @@ Each `sort_by` value has a different natural direction, chosen to match what aut
 | `sort_by` | Default order | With `reverse = true` |
 |-----------|---------------|------------------------|
 | `date`    | Newest first (descending) | Oldest first |
+| `published` | Newest first (descending) | Oldest first |
 | `weight`  | Lowest weight first (ascending) | Highest weight first |
 | `title`   | A → Z (ascending) | Z → A |
 
-A page's `date` order uses its `updated` date when it has one, so a revised post moves up the list; pages without any date sort last (first with `reverse = true`, which flips the whole list), after pages dated before 1970 too. `title` compares titles byte by byte, so uppercase letters sort before lowercase ones and accented letters come after `z`.
+A page's `date` order uses its `updated` date when it has one, so a revised post moves up the list; `published` orders by `date` alone and ignores `updated`, which keeps a chronological archive stable when an old post is revised; pages without any date sort last (first with `reverse = true`, which flips the whole list), after pages dated before 1970 too. `title` compares titles byte by byte, so uppercase letters sort before lowercase ones and accented letters come after `z`.
 
 `reverse` flips whichever direction is natural for the chosen `sort_by`. For example, a blog index sorted by `date` is newest-first by default; setting `reverse = true` switches it to oldest-first.
 

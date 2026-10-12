@@ -162,10 +162,10 @@ module Hwaro
           taxonomy.sitemap = bool_value(taxonomy_hash["sitemap"]?, taxonomy.sitemap)
           taxonomy.paginate_by = taxonomy_hash["paginate_by"]?.try { |v| int_or_nil(v) }
           if sort_by = taxonomy_hash["sort_by"]?.try(&.as_s?)
-            if {"date", "title", "weight"}.includes?(sort_by)
+            if {"date", "published", "title", "weight"}.includes?(sort_by)
               taxonomy.sort_by = sort_by
             else
-              Logger.warn "Unknown taxonomy sort_by '#{sort_by}' for '#{name}' — expected \"date\", \"title\" or \"weight\". Using \"date\"."
+              Logger.warn "Unknown taxonomy sort_by '#{sort_by}' for '#{name}' — expected \"date\", \"published\", \"title\" or \"weight\". Using \"date\"."
             end
           end
           taxonomy.reverse = bool_value(taxonomy_hash["reverse"]?, taxonomy.reverse)

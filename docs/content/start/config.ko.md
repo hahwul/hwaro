@@ -230,7 +230,7 @@ feed = true
 | feed | bool | false | 택소노미 항목마다 RSS 피드 생성 |
 | sitemap | bool | true | 택소노미 페이지를 사이트맵에 포함 |
 | paginate_by | int | — | 택소노미 항목 페이지의 페이지당 글 수 |
-| sort_by | string | "date" | 항목 안 페이지 정렬 기준: `"date"`(최신순), `"title"`, `"weight"` |
+| sort_by | string | "date" | 항목 안 페이지 정렬 기준: `"date"`(최신순), `"published"`(최신순, `updated` 무시), `"title"`, `"weight"` |
 | reverse | bool | false | `sort_by`가 만든 순서를 뒤집음 |
 | terms_sort_by | string | "name" | 택소노미 인덱스의 항목 목록 정렬: `"name"` 또는 `"count"` |
 

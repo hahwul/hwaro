@@ -248,7 +248,7 @@ For the current section URL in `section.html`, use `page.url`.
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| sort_by | String? | "date" | Sort by: date (newest first), weight (lowest first), title (A→Z) |
+| sort_by | String? | "date" | Sort by: date (newest first), published (newest first, ignoring `updated`), weight (lowest first), title (A→Z) |
 | reverse | Bool? | false | Flip the natural sort order — see [Writing › Sections › Sort direction](/writing/sections/#sort-direction) |
 | paginate | Int? | — | Pages per page |
 | transparent | Bool | false | Pass pages to parent |

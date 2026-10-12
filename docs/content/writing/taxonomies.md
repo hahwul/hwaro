@@ -31,7 +31,7 @@ name = "authors"
 | `feed` | bool | false | Generate RSS feed for each term |
 | `sitemap` | bool | true | Include taxonomy pages in sitemap |
 | `paginate_by` | int | — | Items per page on term pages |
-| `sort_by` | string | "date" | Order of pages within a term: `"date"`, `"title"`, or `"weight"` (see [Sorting](#sorting)) |
+| `sort_by` | string | "date" | Order of pages within a term: `"date"`, `"published"`, `"title"`, or `"weight"` (see [Sorting](#sorting)) |
 | `reverse` | bool | false | Flip whichever order `sort_by` produced |
 | `terms_sort_by` | string | "name" | Order of the terms list: `"name"` or `"count"` (see [Sorting](#sorting)) |
 
@@ -42,6 +42,7 @@ term pages, in `term.pages` from `get_taxonomy()`, and in per-term
 pagination. The semantics match section sorting exactly:
 
 - `"date"` (default): newest first; `reverse = true` gives oldest first.
+- `"published"` — like `"date"`, but on the publish `date` alone (`updated` is ignored).
 - `"title"` — ascending by title, compared byte by byte (uppercase before lowercase); `reverse = true` descends.
 - `"weight"` — lowest weight first; `reverse = true` descends.
 

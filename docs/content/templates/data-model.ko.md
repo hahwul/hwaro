@@ -248,7 +248,7 @@ john-doe:
 
 | 속성 | 타입 | 기본값 | 설명 |
 |----------|------|---------|-------------|
-| sort_by | String? | "date" | 정렬 기준: date(최신순), weight(낮은 값 우선), title(A→Z) |
+| sort_by | String? | "date" | 정렬 기준: date(최신순), published(최신순, `updated` 무시), weight(낮은 값 우선), title(A→Z) |
 | reverse | Bool? | false | 기본 정렬 순서 뒤집기 — [콘텐츠 작성 › 섹션 › 정렬 방향](/ko/writing/sections/#정렬-방향) 참고 |
 | paginate | Int? | — | 한 페이지에 표시할 페이지 수 |
 | transparent | Bool | false | 페이지를 부모 섹션으로 전달 |

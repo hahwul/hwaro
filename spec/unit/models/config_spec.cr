@@ -1375,6 +1375,18 @@ describe Hwaro::Models::Config do
       config.taxonomies[0].terms_sort_by.should eq("count")
     end
 
+    it "accepts taxonomy sort_by = \"published\"" do
+      config = load_config(<<-TOML)
+        title = "Test"
+
+        [[taxonomies]]
+        name = "tags"
+        sort_by = "published"
+        TOML
+
+      config.taxonomies[0].sort_by.should eq("published")
+    end
+
     it "warns and keeps the defaults on invalid sort_by / terms_sort_by values" do
       config = load_config(<<-TOML)
         title = "Test"
