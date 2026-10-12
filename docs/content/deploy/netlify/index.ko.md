@@ -14,7 +14,7 @@ Netlify에 Hwaro 사이트를 배포하면 자동 빌드와 글로벌 CDN을 이
 hwaro tool platform netlify
 ```
 
-빌드 설정, 별칭(alias) 기반 리다이렉트, 캐시 헤더가 담긴 `netlify.toml`이 생성됩니다.
+빌드 설정, 별칭(alias) 기반 리다이렉트, 캐시 헤더(핑거프린트된 에셋 번들을 켠 경우)가 담긴 `netlify.toml`이 생성됩니다.
 
 ### Git으로 배포
 
@@ -57,11 +57,13 @@ aliases:
   from = "/old-url/"
   to = "/posts/new-post/"
   status = 301
+  force = true
 
 [[redirects]]
   from = "/legacy/post/"
   to = "/posts/new-post/"
   status = 301
+  force = true
 ```
 
 ## 커스텀 도메인

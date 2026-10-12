@@ -19,7 +19,7 @@ templates/
 ├── taxonomy_term.html  # Taxonomy term page
 ├── 404.html            # Error page
 ├── shortcodes/         # Shortcode templates
-└── hooks/              # Markdown render-element overrides (link/image/heading/codeblock)
+└── hooks/              # Markdown render-element overrides (link/image/heading/codeblock/blockquote/table)
 ```
 
 `shortcodes/` 디렉터리에는 마크다운에 삽입할 수 있는 재사용 컴포넌트를 둡니다. 사용법과 커스텀 숏코드 만드는 방법은 [콘텐츠 작성: 숏코드](/ko/writing/shortcodes/)를 참고합니다.

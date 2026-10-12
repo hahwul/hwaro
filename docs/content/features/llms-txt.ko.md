@@ -54,7 +54,7 @@ This is my site. Content is provided under the MIT license.
 
 ### llms-full.txt
 
-전체 버전에는 사이트의 렌더링된 콘텐츠가 모두 들어가므로 LLM이 사이트 전체를 파일 하나로 수집하기 쉽습니다. 각 페이지는 `---` 구분자로 나뉩니다.
+전체 버전에는 대상이 되는 모든 페이지의 원본 Markdown 소스가 들어가므로 LLM이 사이트 전체를 파일 하나로 수집하기 쉽습니다. 각 페이지는 `---` 구분자로 나뉩니다.
 
 **출력 예시 (`llms-full.txt`):**
 
@@ -102,11 +102,11 @@ Getting started guide content...
 
 다음 조건을 만족하는 페이지만 `llms-full.txt`에 포함됩니다:
 
-- `render = true`인 페이지 (기본값)
+- `llms.txt`, 검색 인덱스와 같은 페이지별 조건을 통과한 페이지. 초안, `render = false` 페이지, `in_search_index = false` 페이지, `redirect_to` 스텁은 빠집니다. 섹션 `_index.md` 페이지는 `llms.txt`에서는 제목으로만 쓰이지만 여기에는 포함됩니다
 - 원본 콘텐츠가 비어 있지 않은 페이지
 - 일관된 출력을 위해 URL 순으로 정렬
 
-초안 페이지는 프로덕션 빌드에서 제외됩니다 (`--drafts`를 쓰지 않는 한).
+초안은 `--drafts`로 빌드해도 두 파일 모두에서 빠집니다. [버전별 문서](/ko/features/versioned-docs/)를 쓰면 두 파일 모두 최신 버전만 다룹니다.
 
 ## 다국어 지원
 

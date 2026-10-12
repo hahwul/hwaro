@@ -61,11 +61,13 @@ my-site/
 ├── config.toml      # Site configuration
 ├── content/         # Markdown content
 │   ├── index.md     # Homepage
-│   └── blog/        # Blog section
+│   ├── about.md
+│   └── posts/       # Blog section
 │       ├── _index.md
-│       └── hello.md
+│       └── hello-world.md
 ├── templates/       # Jinja2 templates
 ├── static/          # Static files (CSS, JS, images)
+├── archetypes/      # Front matter templates for hwaro new
 ├── data/            # Optional: JSON/YAML/TOML exposed as site.data (CSV via load_data())
 └── public/          # Generated output
 ```
@@ -112,23 +114,23 @@ base_url = "https://example.com"
 ## 5. Create a Page
 
 ```bash
-hwaro new content/about.md
+hwaro new content/contact.md
 ```
 
 > **Tip:** run `hwaro new` with no arguments to open an interactive wizard that
 > suggests a path and collects the title, description, tags, and more for you.
 
-Edit `content/about.md`:
+Edit `content/contact.md`:
 
 ```markdown
 +++
-title = "About"
+title = "Contact"
 +++
 
-Welcome to my site!
+Reach me at hello@example.com.
 ```
 
-Visit `http://localhost:3000/about/`.
+Visit `http://localhost:3000/contact/`.
 
 ## 6. Create a Section
 

@@ -54,7 +54,7 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -71,7 +71,12 @@ jobs:
 |-------|-------------|---------|
 | `build_dir` | Hwaro 사이트가 있는 디렉터리 | `.` (저장소 루트) |
 | `build_only` | 배포 없이 빌드만 수행 | `false` |
-| `token` | 배포에 사용할 GitHub 토큰 | — |
+| `pages_branch` | 빌드된 사이트를 푸시할 브랜치 | `gh-pages` |
+| `output_dir` | 액션이 빌드하고 배포할 출력 디렉터리 | `public` |
+| `build_flags` | `hwaro build`에 추가로 넘길 플래그 | — |
+| `repository` | 배포할 저장소 | 현재 저장소 |
+| `github_hostname` | GitHub 호스트 이름 (GitHub Enterprise용) | `github.com` |
+| `token` | 배포에 사용할 GitHub 토큰 | 배포 시 워크플로 토큰, `build_only` 실행에서는 없음 |
 
 Hwaro 사이트가 하위 디렉터리(예: `docs/`)에 있다면 `build_dir`를 지정합니다:
 

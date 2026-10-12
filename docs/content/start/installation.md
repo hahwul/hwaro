@@ -146,7 +146,7 @@ so the dylibs are still found. Homebrew installs the tarball the same way.
 > codesign --force --sign - lib/*.dylib hwaro
 > ```
 >
-> A patch release will carry the fix, after which no manual step is needed.
+> v0.20.1 and later ship correctly signed tarballs, so no manual step is needed.
 
 ### Windows
 
@@ -204,7 +204,7 @@ The binary is created at `./bin/hwaro` (`bin\hwaro.exe` on Windows).
 > allocation-heavy sites, at the cost of a higher peak memory floor during
 > the build. Exporting either variable overrides the built-in default, and
 > the heap presize is skipped when `--memory-limit` is used. See the
-> [global flags table](@/start/cli.md) for details.
+> [global flags table](@/start/cli.md#global-flags) for details.
 
 ### Add to PATH (Optional)
 

@@ -143,12 +143,12 @@ URL은 빌드와 같은 방식으로 원본에서 계산하므로 첫 빌드 전
 hwaro: check-links content
 scan: 30 external, 20 internal
 
-    [err] content/blog/post.md
-      -> https://old-site.com/page  404
-    [err] content/blog/post.md
-      -> ../missing-page  Internal link target not found
-    [err] content/about.md
-      -> /images/photo.png  Image not found
+  [err] content/blog/post.md
+    -> https://old-site.com/page  404
+  [err] content/blog/post.md
+    -> ../missing-page  Internal link target not found
+  [err] content/about.md
+    -> /images/photo.png  Image not found
 checked: 50 links, 3 dead
 ```
 

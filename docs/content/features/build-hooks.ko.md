@@ -77,12 +77,14 @@ hooks.pre = ["echo Step 1", "echo Step 2", "echo Step 3"]
 출력:
 
 ```
-Running pre-build hook: echo Step 1
-Step 1
-Running pre-build hook: echo Step 2
-Step 2
-Running pre-build hook: echo Step 3
-Step 3
+Running pre-build hooks...
+     Running  pre-build [1/3]: echo Step 1
+  Step 1
+     Running  pre-build [2/3]: echo Step 2
+  Step 2
+     Running  pre-build [3/3]: echo Step 3
+  Step 3
+Pre-build hooks completed successfully.
 ```
 
 ## serve 모드
@@ -98,7 +100,7 @@ Step 3
 
 ### 재빌드 루프
 
-감시 대상 디렉터리(`content/`, `templates/`, `static/`, `data/`, `i18n/`)나 `config.toml` 자체에 쓰는 훅은 자기 결과물을 다시 감시자에게 흘려보냅니다. 무해한 경우는 하와로가 알아서 처리합니다. 빌드가 이미 읽은 것과 **같은 바이트**를 다시 쓰는 실행(변하지 않은 응답을 받아오는 `curl -o data/team.json`, 동일한 결과물을 다시 내보내는 번들러, `config.toml`의 시각만 건드리는 훅)은 무한 재빌드로 이어지지 않고 잦아듭니다. 파일 위치에 따라 그 변경은 아예 무시되거나, 훅을 다시 실행하지 않는 부분 재빌드로 흡수됩니다.
+감시 대상 디렉터리(`content/`, `templates/`, `static/`, `data/`, `i18n/`)나 `config.toml` 자체에 쓰는 훅은 자기 결과물을 다시 감시자에게 흘려보냅니다. 무해한 경우는 Hwaro가 알아서 처리합니다. 빌드가 이미 읽은 것과 **같은 바이트**를 다시 쓰는 실행(변하지 않은 응답을 받아오는 `curl -o data/team.json`, 동일한 결과물을 다시 내보내는 번들러, `config.toml`의 시각만 건드리는 훅)은 무한 재빌드로 이어지지 않고 잦아듭니다. 파일 위치에 따라 그 변경은 아예 무시되거나, 훅을 다시 실행하지 않는 부분 재빌드로 흡수됩니다.
 
 반면 다음 두 가지는 감시자 입장에서 실제 변경이므로 매번 재빌드를 유발합니다.
 

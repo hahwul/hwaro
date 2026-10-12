@@ -159,6 +159,11 @@ $$
 
 ### Client-Side Setup
 
+The built-in scaffolds' headers (all but `bare`) include `{{ math_tags }}`, which emits the
+KaTeX or MathJax tags for the configured `math_engine` (and renders
+nothing when `math = false`). Put it in your own `<head>`, or load the
+library yourself:
+
 #### KaTeX
 
 ```html
@@ -201,15 +206,17 @@ graph TD
 ### Output
 
 ```html
-<div class="mermaid">
-graph TD
-    A[Start] --> B{Decision}
-    B -->|Yes| C[OK]
-    B -->|No| D[Cancel]
+<div class="mermaid">graph TD
+    A[Start] --&gt; B{Decision}
+    B --&gt;|Yes| C[OK]
+    B --&gt;|No| D[Cancel]
 </div>
 ```
 
 ### Client-Side Setup
+
+`{{ mermaid_tags }}` does the same for Mermaid (empty when `mermaid = false`).
+The manual equivalent:
 
 ```html
 <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>

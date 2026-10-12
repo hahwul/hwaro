@@ -19,19 +19,22 @@ hwaro tool platform gitlab-ci
 Or add `.gitlab-ci.yml` to your repository manually:
 
 ```yaml
-image: ghcr.io/hahwul/hwaro:latest
+image:
+  name: ghcr.io/hahwul/hwaro:latest
+  entrypoint: [""]
 
 pages:
+  stage: deploy
   script:
     - hwaro build
   artifacts:
     paths:
       - public
-  only:
-    - main
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 ```
 
-This configuration uses the official Hwaro Docker image to build your site and deploys the `public` directory to GitLab Pages.
+This configuration uses the official Hwaro Docker image to build your site and deploys the `public` directory to GitLab Pages on pushes to the default branch. `entrypoint: [""]` is required: the image's entrypoint passes its arguments to `hwaro`, so without the override GitLab cannot run the job's shell script.
 
 ## See Also
 

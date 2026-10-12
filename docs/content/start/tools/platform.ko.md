@@ -72,11 +72,13 @@ hwaro tool platform vercel --stdout
 
 [build.environment]
   # Add environment variables here
+  # HWARO_VERSION = "0.20.2"
 
 [[redirects]]
   from = "/old-url/"
   to = "/posts/new-post/"
   status = 301
+  force = true
 
 [[headers]]
   for = "/assets/*"

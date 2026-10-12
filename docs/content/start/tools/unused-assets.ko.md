@@ -76,11 +76,11 @@ total: 24
 referenced: 20
 unused: 4
 unused files:
-    - static/old-logo.png
-    - static/unused-banner.jpg
-    - content/blog/my-post/draft-image.png
-    - static/deprecated.css
-    [info] dynamic references (e.g. template variables) may cause false positives
+  - static/old-logo.png
+  - static/unused-banner.jpg
+  - content/blog/my-post/draft-image.png
+  - static/deprecated.css
+  [info] dynamic references (e.g. template variables) may cause false positives
 found: 4 unused assets
 ```
 

@@ -61,11 +61,13 @@ my-site/
 ├── config.toml      # Site configuration
 ├── content/         # Markdown content
 │   ├── index.md     # Homepage
-│   └── blog/        # Blog section
+│   ├── about.md
+│   └── posts/       # Blog section
 │       ├── _index.md
-│       └── hello.md
+│       └── hello-world.md
 ├── templates/       # Jinja2 templates
 ├── static/          # Static files (CSS, JS, images)
+├── archetypes/      # Front matter templates for hwaro new
 ├── data/            # 선택: site.data로 노출되는 JSON/YAML/TOML (CSV는 load_data()로)
 └── public/          # Generated output
 ```
@@ -112,23 +114,23 @@ base_url = "https://example.com"
 ## 5. 페이지 만들기
 
 ```bash
-hwaro new content/about.md
+hwaro new content/contact.md
 ```
 
 > **팁:** 인자 없이 `hwaro new`를 실행하면 대화형 위저드가 열립니다.
 > 경로를 추천해 주고 제목, 설명, 태그 등을 대신 받아 줍니다.
 
-`content/about.md`를 수정합니다:
+`content/contact.md`를 수정합니다:
 
 ```markdown
 +++
-title = "About"
+title = "Contact"
 +++
 
-Welcome to my site!
+Reach me at hello@example.com.
 ```
 
-`http://localhost:3000/about/`에서 확인합니다.
+`http://localhost:3000/contact/`에서 확인합니다.
 
 ## 6. 섹션 만들기
 
@@ -192,7 +194,7 @@ npx skills add hahwul/hwaro
 다크 팔레트로 리테마해 줘"* 처럼 요청하면 에이전트가 알아서 맞는 스킬을
 불러옵니다. 수동 설치 경로와 에이전트별 디렉터리는
 [에이전트 스킬](/ko/integrations/skills/)을, 에이전트가 먼저 따라야 할
-프로젝트별 규칙을 기록해 두려면 [agents-md](/ko/start/tools/agents-md/)를
+프로젝트별 규칙을 기록해 두려면 [AGENTS.md](/ko/start/tools/agents-md/)를
 참고합니다.
 
 ## 다음 단계

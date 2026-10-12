@@ -67,9 +67,9 @@ hwaro build --stream --memory-limit 512M
 |---|---|---|---|
 | - | - | - | Normal build |
 | yes | - | - | Streaming, batch=500 |
-| - | 2G | - | Streaming, batch≈20000 |
-| - | - | 1G | Streaming, batch≈10000 |
-| yes | 512M | - | Streaming, batch≈5000 |
+| - | 2G | - | Streaming, batch≈41900 |
+| - | - | 1G | Streaming, batch≈21000 |
+| yes | 512M | - | Streaming, batch≈10500 |
 | - | 2G | 1G | CLI wins (2G) |
 
 ## How It Works

@@ -21,7 +21,7 @@ max_deletes = 256
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | target | string | — | Default target name to deploy to |
-| source_dir | string | "public" | Directory containing the built site |
+| source_dir | string | "public" | Directory containing the built site (follows `[build] output_dir` when only that is set) |
 | confirm | bool | false | Prompt for confirmation before deploying |
 | dry_run | bool | false | Show what would be deployed without making changes |
 | force | bool | false | Force deployment even if no changes detected |

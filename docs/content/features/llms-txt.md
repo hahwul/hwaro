@@ -54,7 +54,7 @@ This is my site. Content is provided under the MIT license.
 
 ### llms-full.txt
 
-The full version includes all rendered content from your site, making it easy for LLMs to ingest your entire site in a single file. Each page is separated by `---` delimiters.
+The full version includes the raw Markdown source of every eligible page, making it easy for LLMs to ingest your entire site in a single file. Each page is separated by `---` delimiters.
 
 **Example output (`llms-full.txt`):**
 
@@ -102,11 +102,11 @@ The `llms-full.txt` file is structured as follows:
 
 Only pages that meet these criteria are included in `llms-full.txt`:
 
-- The page has `render = true` (default)
+- The page passes the same per-page check as `llms.txt` and the search index: no drafts, `render = false` pages, `in_search_index = false` pages or `redirect_to` stubs. Section `_index.md` pages are included, although `llms.txt` only uses them as headings
 - The page has non-empty raw content
 - Pages are sorted by URL for consistent output
 
-Draft pages are excluded from production builds (unless `--drafts` is used).
+Drafts stay out of both files even when you build with `--drafts`. With [versioned docs](/features/versioned-docs/), both files describe only the latest version.
 
 ## Multilingual Support
 

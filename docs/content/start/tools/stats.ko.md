@@ -41,7 +41,7 @@ hwaro tool stats --json
 
 ```
 hwaro: stats content
-total: 42 files, 4 drafts · 1 future
+total: 42 files, 4 drafts, 1 future
 words: 28,500 total, 678 avg
 range: 120 min, 3,200 max
 
@@ -55,7 +55,7 @@ monthly:
       2024-02      5  ####################
       2024-03      2  ########
 
-counted: 42 files, 37 published, 4 drafts · 1 future
+counted: 42 files, 37 published, 4 drafts, 1 future
 ```
 
 색상 터미널에서는 같은 보고서가 `hwaro stats` 헤딩, 정렬된 영수증 형식 행,

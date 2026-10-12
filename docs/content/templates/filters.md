@@ -93,7 +93,7 @@ The `t` filter looks up translation keys from TOML files in the `i18n/` director
 | Filter | Description | Example |
 |--------|-------------|---------|
 | absolute_url | Full URL with base | {{ "/about/" \| absolute_url }} |
-| relative_url | Prefix base_url | {{ "/img.png" \| relative_url }} |
+| relative_url | Prefix the path part of base_url (no scheme or host) | {{ "/img.png" \| relative_url }} |
 | active_path | Is this URL the current page (or an ancestor of it)? | {{ item.url \| active_path }} |
 
 `active_path` compares a URL (typically a [menu](/features/menus/) entry's `item.url`) against the current page. It's an exact match by default; pass `ancestor=true` to also match descendant pages:
@@ -111,7 +111,8 @@ Both sides are normalized to one trailing slash before comparing, so `/posts` an
 |--------|-------------|---------|
 | default | Fallback for an undefined, none, or empty value (see [Default Values](#default-values)) | {{ value \| default(value="N/A") }} |
 | jsonify | JSON encode | {{ data \| jsonify }} |
-| date | Format date | {{ page.date \| date("%Y-%m-%d") }} |
+| tojson | JSON encode; `indent` pretty-prints with that many spaces (0–16) | {{ data \| tojson(indent=2) }} |
+| date | Format date (default format `%Y-%m-%d`) | {{ page.date \| date("%Y-%m-%d") }} |
 
 ## Examples
 

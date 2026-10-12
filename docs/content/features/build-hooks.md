@@ -77,12 +77,14 @@ hooks.pre = ["echo Step 1", "echo Step 2", "echo Step 3"]
 Output:
 
 ```
-Running pre-build hook: echo Step 1
-Step 1
-Running pre-build hook: echo Step 2
-Step 2
-Running pre-build hook: echo Step 3
-Step 3
+Running pre-build hooks...
+     Running  pre-build [1/3]: echo Step 1
+  Step 1
+     Running  pre-build [2/3]: echo Step 2
+  Step 2
+     Running  pre-build [3/3]: echo Step 3
+  Step 3
+Pre-build hooks completed successfully.
 ```
 
 ## Serve Mode

@@ -17,7 +17,7 @@ hwaro tool convert to-toml
 hwaro tool convert to-json
 
 # 특정 디렉터리만 변환
-hwaro tool convert to-yaml -c posts
+hwaro tool convert to-yaml -c content/posts
 
 # 아무것도 바꾸지 않고 어떤 파일이 변환될지 미리보기
 hwaro tool convert to-yaml --dry-run
@@ -39,7 +39,7 @@ hwaro tool convert to-yaml --json
 | -j, --json | 결과를 JSON으로 출력 |
 | -h, --help | 도움말 표시 |
 
-변환은 파일을 제자리에서 다시 쓰며 프런트매터 주석을 보존할 수 없으므로,
+변환은 파일을 제자리에서 다시 쓰며 프론트 매터 주석을 보존할 수 없으므로,
 중요한 트리에는 `--dry-run`을 먼저 실행하세요. 파일을 쓰지 않을 뿐 파일별
 "dropping N comment line(s)" 경고를 포함한 전체 파이프라인이 동일하게
 동작합니다.
@@ -67,8 +67,8 @@ TOML에는 null이 없으므로 `to-toml`은 YAML/JSON의 null 값을 빌드가 
 
 ## 건너뛴 파일
 
-사람이 읽는 요약에는 건너뛴 이유가 함께 표시됩니다. `already TOML`,
-`without front matter`, `not front matter`:
+사람이 읽는 요약에는 건너뛴 개수가 이유별(`already TOML`,
+`without front matter`, `not front matter`)로 나뉘어 표시됩니다.
 
 ```
 converted: 5 files · 2 skipped (1 already TOML, 1 not front matter)
@@ -96,11 +96,11 @@ Content here.
 
 ```markdown
 ---
-title: "My Post"
+title: My Post
 date: "2024-01-15"
 tags:
-  - crystal
-  - tutorial
+- crystal
+- tutorial
 ---
 
 Content here.

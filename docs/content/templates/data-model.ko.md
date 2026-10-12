@@ -113,8 +113,6 @@ data/
 
 디렉터리는 얼마든지 중첩됩니다: `data/users/admins/root.yml` → `site.data.users.admins.root`.
 
-**타임아웃.** 소스마다 연결 10초, 읽기 1회당 30초, 그리고 전체 120초가 주어집니다. 마지막 제한은 모든 리디렉션 구간과 본문 전체를 아우르므로, 읽기 타임아웃을 아슬아슬하게 피하며 바이트를 흘려보내는 소스가 빌드를 붙잡아 둘 수 없습니다. 어느 하나라도 초과하면 다른 실패와 마찬가지로 `on_error`가 처리합니다.
-
 **충돌.** 디렉터리와 파일이 같은 이름을 공유하면(예: `data/users.yml`과 `data/users/`가 나란히 있는 경우) **디렉터리가 우선**하고 파일은 무시됩니다. 가려진 파일이 조용히 사라지지 않도록 Hwaro는 빌드 중에 경고를 출력합니다.
 
 ### 원격 데이터 소스
@@ -130,7 +128,7 @@ key = "team"                # site.data.team으로 노출
 url = "https://api.example.com/team"
 format = "json"             # json | toml | yaml | csv (생략 가능, 아래 추론 참고)
 headers = { Authorization = "Bearer ${API_TOKEN}" }
-cache = "1h"                # 캐시된 사본이 이 시간보다 젊으면 요청을 건너뜀
+cache = "1h"                # 캐시된 사본이 이 시간보다 오래되지 않았으면 요청을 건너뜀
 on_error = "fail"           # fail | warn-and-use-cache | warn-and-skip
 ```
 
@@ -150,6 +148,8 @@ CSV 페이로드는 행의 배열로 파싱되며 각 행은 공백을 제거한
 **환경 변수.** `url`과 `headers` 값의 `${VAR}`는 환경 변수로 치환됩니다. 참조한 변수가 설정되어 있지 않으면 변수 이름을 명시한 오류와 함께 빌드가 실패합니다(`config.toml`의 다른 곳에서는 경고에 그칩니다). 기본값이 필요하면 `${VAR:-default}`를 쓰세요. 이 오류는 소스를 실제로 가져오는 시점에 발생하므로, 네트워크를 쓰지 않는 `hwaro deploy`, `hwaro new`, `hwaro tool ...`은 변수를 내보내지 않아도 그대로 동작합니다.
 
 **캐싱.** 페이로드는 `.hwaro/remote_data/` 아래에 캐시됩니다. `data/`를 비롯해 `hwaro serve`가 감시하는 어떤 디렉터리에도 속하지 않으므로, TTL 안의 serve 재빌드는 API를 다시 호출하는 대신 캐시를 재사용하고, 캐시 기록이 재빌드를 유발하지도 않습니다. 이 캐시는 `hwaro build --full`에도 지워지지 않으며(페이지 캐시만 초기화됩니다), `on_error = "warn-and-use-cache"`와 함께 오프라인 빌드를 가능하게 하는 것도 이 캐시입니다. `.hwaro/`는 생성 시 자기 자신을 무시하는 `.hwaro/.gitignore`가 함께 쓰이므로 캐시가 `git status`에 나타나지 않습니다. 긴 `hwaro serve` 세션에서는 각 소스를 한 번 가져와 메모리에서 재사용합니다. `cache` TTL이 있는 항목은 TTL이 만료된 뒤 첫 전체 재빌드에서 다시 가져오고, TTL이 없는 항목은 저장할 때마다가 아니라 세션당 한 번만 가져옵니다. 세션이 이미 페이로드를 갖고 있는 상태에서 재요청이 실패하면 `on_error` 설정과 무관하게 경고를 남기고 기존 페이로드를 계속 사용하므로, 오프라인에서도 편집을 이어갈 수 있습니다. `hwaro build`는 빌드마다 별도 프로세스이므로 영향이 없으며 `cache`/`on_error`를 그대로 따릅니다. 페이로드가 바뀌면 `data/` 파일을 편집했을 때와 같은 방식으로 캐시된 페이지가 무효화됩니다.
+
+**타임아웃.** 소스마다 연결 10초, 읽기 1회당 30초, 그리고 전체 120초가 주어집니다. 마지막 제한은 모든 리디렉션 구간과 본문 전체를 아우르므로, 읽기 타임아웃을 아슬아슬하게 피하며 바이트를 흘려보내는 소스가 빌드를 붙잡아 둘 수 없습니다. 어느 하나라도 초과하면 다른 실패와 마찬가지로 `on_error`가 처리합니다.
 
 **충돌.** 원격 `key`가 디스크에도 존재하면(예: `key = "team"` 옆에 `data/team.json`) 두 소스를 모두 명시한 설정 오류가 발생합니다. 하나의 키는 정확히 하나의 소스만 가져야 하므로, `site.data.team`이 어느 쪽이 이기는지에 따라 조용히 달라지는 일은 없습니다.
 
@@ -332,6 +332,7 @@ john-doe:
 | page.weight | Int | 정렬 가중치 |
 | page.image | String? | 대표 이미지 경로 |
 | page.authors | Array<String> | 작성자 이름 |
+| page.tags | Array<String> | 프론트 매터의 태그 |
 | page.taxonomies | Object | 이 페이지의 택소노미 항목(`page.taxonomies.tags`, `page.taxonomies.<name>`) |
 | page.extra | Object | 커스텀 프론트 매터 필드 |
 
@@ -360,6 +361,7 @@ john-doe:
 | page.is_index | Bool | — | 인덱스 파일 여부: 섹션의 `_index.md`, 홈 페이지, 페이지 번들의 `index.md` |
 | page.is_section | Bool | — | 섹션의 `_index.md` 여부. `section.pages`에서 페이지 번들은 남기고 하위 섹션 항목만 빼려면 `rejectattr("is_section")`을 사용하세요 |
 | page.generated | Bool | false | 자동 생성된 페이지 여부 |
+| page.synthesized | Bool | false | [`[[content.generate]]`](/ko/features/content-generation/)로 만들어진 페이지 여부 |
 | page.in_sitemap | Bool | true | 사이트맵 포함 여부 |
 | page.in_search_index | Bool | true | 검색 인덱스 포함 여부 |
 
@@ -369,7 +371,7 @@ john-doe:
 |----------|------|-------------|
 | page.lower | Page? | 읽기 순서상 이전 페이지 |
 | page.higher | Page? | 읽기 순서상 다음 페이지 |
-| page.ancestors | Array<Page> | 부모 섹션 체인 |
+| page.ancestors | Array<Object> | 부모 섹션 체인(각 항목은 `title`과 `url`을 가짐) |
 | page.translations | Array<TranslationLink> | 언어별 번역본 |
 
 ### 커스텀 메타데이터
@@ -393,9 +395,11 @@ john-doe:
 | page_reading_time | page.reading_time |
 | page_permalink | page.permalink |
 | page_authors | page.authors |
+| page_tags | page.tags |
 | page_weight | page.weight |
 | page_language | page.language |
 | page_translations | page.translations |
+| lang_prefix | 기본 언어면 `""`, 다른 언어면 `"/<code>"`(예: `{{ base_url }}{{ lang_prefix }}/posts/`) |
 | taxonomy_name | 현재 택소노미 이름(택소노미 페이지) |
 | taxonomy_term | 현재 택소노미 항목(택소노미 항목 페이지) |
 | content | 렌더링된 HTML 콘텐츠 |
@@ -560,6 +564,8 @@ pros = ["Fast", "Reliable"]
 | canonical_tag | 캐노니컬 링크 태그 |
 | hreflang_tags | Hreflang 대체 링크 태그(다국어) |
 | pagination_seo_links | `<link rel="prev/next">` 태그 |
+| alternate_output_tags | 페이지에 활성화된 [출력 포맷](/ko/features/output-formats/)의 `<link rel="alternate">` 태그 |
+| jsonld | JSON-LD 구조화 데이터(`jsonld_article`, `jsonld_breadcrumb`, `jsonld_website` 등도 제공, [구조화 데이터](/ko/features/structured-data/) 참고) |
 
 ```jinja
 <head>
@@ -618,6 +624,8 @@ pros = ["Fast", "Reliable"]
 | auto_includes_css | 자동 인클루드된 CSS `<link>` 태그 |
 | auto_includes_js | 자동 인클루드된 JS `<script>` 태그 |
 | auto_includes | 모든 자동 인클루드 태그 |
+| math_tags | `[markdown] math`용 KaTeX/MathJax 태그(math가 꺼져 있으면 빈 문자열) |
+| mermaid_tags | Mermaid 스크립트 태그(`[markdown] mermaid`가 꺼져 있으면 빈 문자열) |
 | pwa_tags | PWA manifest 링크, theme-color 메타, 서비스 워커 등록 태그(`[pwa]` 비활성 시 빈 문자열) |
 | search_tags | [내장 검색 UI](/ko/features/search/#내장-ui)의 스타일시트와 스크립트 태그(`[search] ui = true`가 아니면 빈 문자열) |
 

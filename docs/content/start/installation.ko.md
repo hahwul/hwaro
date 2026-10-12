@@ -144,7 +144,7 @@ sudo ln -sf /usr/local/libexec/hwaro/hwaro /usr/local/bin/hwaro
 > codesign --force --sign - lib/*.dylib hwaro
 > ```
 >
-> 패치 릴리스가 나가면 이 과정은 필요 없습니다.
+> v0.20.1부터는 올바르게 서명된 tarball이 배포되므로 이 과정이 필요 없습니다.
 
 ### Windows
 
@@ -200,7 +200,7 @@ shards build --release --no-debug
 > 빌드 중 피크 메모리 사용량이 늘어납니다. 두 환경 변수를 직접
 > export하면 내장 기본값보다 우선하고, `--memory-limit` 사용 시 힙
 > 프리사이즈는 자동으로 비활성화됩니다. 자세한 내용은
-> [전역 플래그 표](@/start/cli.md)를 참고하세요.
+> [전역 플래그 표](/ko/start/cli/#전역-플래그)를 참고하세요.
 
 ### PATH 등록 (선택)
 

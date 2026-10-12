@@ -37,7 +37,8 @@ paginate_path = "page"
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| paginate | int | — | Items per page; `0` (or less) turns pagination off for the section |
+| paginate | int | — | Items per page (`paginate_by` is accepted as an alias); `0` (or less) turns pagination off for the section |
+| pagination_enabled | bool | — | Turn pagination on or off for this section, overriding `paginate` and the site-wide `[pagination]` setting |
 | paginate_path | string | "page" | URL pattern for pages |
 
 A section that names its own `template` paginates too once it sets `paginate` (or `pagination_enabled = true`); its template then receives `section_list`, `pagination` and `paginator`. Without that, a custom template keeps listing every page even when `[pagination]` is enabled site-wide.
@@ -169,12 +170,12 @@ Build your own pagination UI with the `paginator` object:
 
 ## Ellipsis for Large Page Counts
 
-When there are more than 7 pages, the built-in pagination navigation automatically inserts ellipsis (`...`) to keep the UI compact. A sliding window of 5 page numbers around the current page is shown, with the first and last pages always visible.
+When there are more than 7 pages, the built-in pagination navigation automatically inserts an ellipsis (`…`) to keep the UI compact. A sliding window of 5 page numbers around the current page is shown, with the first and last pages always visible.
 
 For example, on page 5 of 20:
 
 ```
-« Prev  1 ... 3  4  [5]  6  7 ... 20  Next »
+Prev  1 … 3  4  [5]  6  7 … 20  Next
 ```
 
 ## SEO Links

@@ -41,7 +41,8 @@ Welcome to my blog.
 | page_template | string | — | 하위 페이지의 기본 템플릿 |
 | sort_by | string | "date" | 정렬 기준: date, published, weight, title ([정렬 방향](#정렬-방향) 참고) |
 | reverse | bool | false | 기본 정렬 방향 뒤집기 ([정렬 방향](#정렬-방향) 참고) |
-| paginate | int | — | 한 페이지에 표시할 항목 수 |
+| paginate | int | — | 한 페이지에 표시할 항목 수(`paginate_by`도 별칭으로 인식). `0`이면 이 섹션의 페이지네이션을 끔 |
+| pagination_enabled | bool | — | 이 섹션의 페이지네이션을 켜거나 끔. `paginate`와 사이트 전체 `[pagination]` 설정보다 우선 |
 | paginate_path | string | "page" | 페이저 URL의 경로 세그먼트(기본값이면 `/blog/page/2/` 형태) |
 | transparent | bool | false | 페이지를 상위 섹션으로 넘김 |
 | generate_feeds | bool | false | RSS 피드 생성 |
@@ -150,6 +151,7 @@ page_template = "custom-page"
 sort_by = "date"
 reverse = false
 paginate = 10
+pagination_enabled = true
 paginate_path = "page"
 transparent = false
 generate_feeds = true

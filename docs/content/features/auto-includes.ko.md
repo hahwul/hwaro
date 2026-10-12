@@ -108,6 +108,10 @@ CSS와 JS를 한꺼번에 포함합니다.
 <script src="/assets/js/02-app.js"></script>
 ```
 
+이 예시는 `base_url`이 비어 있고 캐시 버스팅이 꺼져 있다고 가정합니다. 실제 빌드에서는 각 URL이 `base_url`로 시작하고 [캐시 버스팅](/ko/features/cache-busting/)의 `?v=<hash>` 쿼리가 붙으며, `[assets] sri = true`이면 `integrity` 속성도 추가됩니다([하위 리소스 무결성](/ko/features/asset-pipeline/#sri) 참고).
+
+`[sass]`가 활성화되어 있으면 스캔하는 디렉터리의 파셜이 아닌 `.scss` 파일은 컴파일 결과인 `.css` 파일로 포함됩니다.
+
 ## 전체 템플릿 예시
 
 ```jinja

@@ -196,7 +196,7 @@ hwaro new my-post.md --section blog --draft --tags "go,web" --date 2026-03-22
 | --bundle | 단일 파일 대신 리프 번들 디렉터리(`foo/index.md`) 생성 |
 | --no-bundle | 단일 파일(`foo.md`) 강제; `[content.new].bundle = true`보다 우선 |
 | --list-archetypes | 현재 프로젝트의 아키타입 목록 출력 후 종료 |
-| --json | 기계가 읽을 수 있는 JSON 출력 (아키타입 목록과 분류된 오류) |
+| -j, --json | 기계가 읽을 수 있는 JSON 출력 (아키타입 목록과 분류된 오류) |
 
 `hwaro new`는 `content/` 안에서 확인할 수 없는 경로(디렉터리 밖으로 이어지는 심볼릭 링크 포함)를 거부합니다.
 
@@ -270,14 +270,14 @@ hwaro build -i /path/to/my-site -o ./dist
 | --debug | 빌드 후 디버그 정보 출력 |
 | -j, --json | 로그 대신 JSON 요약 하나(`{"status","pages_generated","duration_ms","cache_hits","raw_files_processed","pages_not_published"}`)를 stdout에 출력. `--quiet` 포함 |
 
-**출력 디렉토리에 대해:** 전체 빌드는 빈 출력 디렉토리에서 시작하지만, hwaro는
-자신이 책임질 수 있는 디렉토리만 비웁니다. 프로젝트 옆의 관례적인 `public/`,
+**출력 디렉터리에 대해:** 전체 빌드는 빈 출력 디렉터리에서 시작하지만, hwaro는
+자신이 책임질 수 있는 디렉터리만 비웁니다. 프로젝트 옆의 관례적인 `public/`,
 `hwaro serve`가 쓰는 `.hwaro/serve`, 그리고 이전 빌드에서 hwaro가 직접 만들었거나
-비어 있는 상태로 발견한 디렉토리입니다. 다른 파일이 이미 들어 있는 디렉토리를
+비어 있는 상태로 발견한 디렉터리입니다. 다른 파일이 이미 들어 있는 디렉터리를
 `-o`로 지정하면(`-o ~/Documents/site`, 번들러와 공유하는 `dist/` 등) 그 파일들은
 그대로 두고 사이트를 그 안에 씁니다. 이때 이전 빌드의 파일이 남아 있을 수 있다는
-경고가 출력됩니다. 한 번 디렉토리를 비워 주면 이후부터는 hwaro가 관리합니다.
-파일시스템 루트, 홈 디렉토리, 프로젝트 자체와 입력 디렉토리(`content/`,
+경고가 출력됩니다. 한 번 디렉터리를 비워 주면 이후부터는 hwaro가 관리합니다.
+파일시스템 루트, 홈 디렉터리, 프로젝트 자체와 입력 디렉터리(`content/`,
 `templates/`, `static/` 등)는 아예 거부됩니다.
 
 **`--stream` / `--memory-limit` (스트리밍 빌드):**
@@ -486,7 +486,7 @@ hwaro deploy --dry-run
 | --force | 강제 업로드/복사 (파일 비교 무시). 빈 소스로 대상을 비우는 것도 허용 |
 | --max-deletes N | 최대 삭제 수 (기본값: deployment.maxDeletes 또는 256, -1이면 제한 없음) |
 | --list-targets | 설정된 배포 대상 목록 출력 후 종료 |
-| --json | 기계가 읽을 수 있는 JSON 출력 (`--dry-run`이면 계획, 아니면 대상별 요약, `--list-targets`면 대상 목록) |
+| -j, --json | 기계가 읽을 수 있는 JSON 출력 (`--dry-run`이면 계획, 아니면 대상별 요약, `--list-targets`면 대상 목록) |
 | -e, --env NAME | 불러올 설정 환경 (`HWARO_ENV`로도 지정) |
 | -q, --quiet | 사람이 읽는 로그 출력 억제 |
 
@@ -504,7 +504,7 @@ hwaro deploy --dry-run
   건드리지 않은 채 링크만 제거합니다.
 - 소스 심볼릭 링크는 대상이 프로젝트 디렉터리 안 또는 확인된 소스 디렉터리
   안에 있으면 따라갑니다. 두 경계 모두 벗어난 링크는 건너뜁니다. 따라서
-  `public/`이 외부 배포 디렉터리를 가리키는 경우에도 그 안의 링크를 사용할 수 있습니다.
+  `public/` 자체가 외부 배포 디렉터리를 가리키는 심볼릭 링크여도 동작합니다.
 - `--json`은 비대화형입니다. `--confirm`과 함께 쓰면 JSON 문서에 프롬프트를
   섞어 넣는 대신 오류로 실패합니다.
 - 템플릿에 셸 메타문자(`|`, `;`, `&`, `` ` ``, `$`, `sudo`, `rm -rf`)가 있는
@@ -609,7 +609,7 @@ hwaro tool export hugo --dry-run
 | 콘텐츠 | [unused-assets](/ko/start/tools/unused-assets/) | 참조되지 않는 정적 파일 찾기 |
 | 사이트 | [platform](/ko/start/tools/platform/) | 플랫폼 설정과 CI/CD 워크플로 파일 생성 |
 | 사이트 | [doctor](/ko/start/tools/doctor/) | 설정, 템플릿, 구조 문제 진단 |
-| 사이트 | import | WordPress, Jekyll, Hugo, Notion, Obsidian, Hexo, Astro, Eleventy에서 콘텐츠 가져오기 |
+| 사이트 | [import](/ko/start/tools/import/) | WordPress, Jekyll, Hugo, Notion, Obsidian, Hexo, Astro, Eleventy에서 콘텐츠 가져오기 |
 | 사이트 | [export](/ko/start/tools/export/) | 콘텐츠를 Hugo 또는 Jekyll로 내보내기 |
 | 사이트 | [agents-md](/ko/start/tools/agents-md/) | AGENTS.md 파일 생성 또는 갱신 |
 
@@ -703,8 +703,8 @@ hwaro serve -i ~/projects/my-blog --open
 
 | 플래그 | 설명 |
 |------|-------------|
-| -h, --help | 도움말 표시 |
-| -v, --verbose | 상세 출력 |
+| -h, --help | 도움말 표시 (명령별 도움말은 `hwaro <command> --help`) |
+| -v, -V, --version | 버전을 출력하고 종료 (`hwaro version`과 동일) |
 
 ## 함께 보기
 

@@ -14,7 +14,7 @@ Deploy your Hwaro site to Netlify with automatic builds and global CDN.
 hwaro tool platform netlify
 ```
 
-This creates a `netlify.toml` with build settings, redirects from aliases, and cache headers.
+This creates a `netlify.toml` with build settings, redirects from aliases, and (when fingerprinted asset bundles are enabled) cache headers.
 
 ### Deploy via Git
 
@@ -57,11 +57,13 @@ Generates:
   from = "/old-url/"
   to = "/posts/new-post/"
   status = 301
+  force = true
 
 [[redirects]]
   from = "/legacy/post/"
   to = "/posts/new-post/"
   status = 301
+  force = true
 ```
 
 ## Custom Domain

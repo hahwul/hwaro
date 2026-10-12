@@ -85,7 +85,7 @@ Sub-tables are merged recursively, not replaced entirely. This means you only ne
 |------|----------|--------|
 | `[sitemap] enabled = true, changefreq = "weekly"` | `[sitemap] changefreq = "daily"` | `[sitemap] enabled = true, changefreq = "daily"` |
 
-Top-level scalars and arrays are replaced, not merged:
+Scalars and arrays are replaced, not merged, at any depth. That includes arrays of tables such as `[[deployment.targets]]`: an override that declares any targets replaces the whole list.
 
 | Base | Override | Result |
 |------|----------|--------|

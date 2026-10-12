@@ -26,7 +26,7 @@ Retrieve any page by path or URL:
 |------|------|-------------|
 | path | String | Relative source path (e.g. `about.md`) or URL path (e.g. `/about/`) |
 
-**Returns:** Page? (nil if not found). Exposes the standard [Page properties](/templates/data-model/#page), minus per-render computed fields (`permalink`, `lower`/`higher`, `ancestors`, `series_index`, `series_pages`, `related_posts`).
+**Returns:** Page? (nil if not found). Exposes the standard [Page properties](/templates/data-model/#page), minus per-render computed fields (`permalink`, `lower`/`higher`, `ancestors`, `series_index`, `series_pages`, `related_posts`, `backlinks`).
 
 **Examples:**
 
@@ -83,6 +83,7 @@ a specific language variant.
 | pages | Array<Page> |
 | pages_count | Int |
 | assets | Array<String> |
+| subsections | Array<Section> |
 
 **Examples:**
 
@@ -299,7 +300,7 @@ Read environment variables in templates:
 | Name | Type | Description |
 |------|------|-------------|
 | name | String | Environment variable name |
-| default | String? | Fallback value if variable is unset (optional) |
+| default | String? | Fallback value if the variable is unset or empty (optional) |
 
 **Returns:** String (env var value, default, or empty string)
 
@@ -416,7 +417,7 @@ Get current datetime:
 
 | Name | Type | Description |
 |------|------|-------------|
-| format | String? | Date format string (optional) |
+| format | String? | Date format string (optional; default `%Y-%m-%d %H:%M:%S`) |
 
 **Returns:** String
 

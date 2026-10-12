@@ -37,9 +37,13 @@ exclude = ["/private", "/drafts"]
   <url>
     <loc>https://example.com/</loc>
     <lastmod>2024-01-15</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
   </url>
   <url>
     <loc>https://example.com/about/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
   </url>
 </urlset>
 ```
@@ -448,7 +452,7 @@ twitter_creator = "@authorusername"
 
 ## JSON-LD 구조화된 데이터
 
-Hwaro는 모든 페이지에 Article과 BreadcrumbList JSON-LD를 자동 생성합니다.
+Hwaro는 모든 페이지에 페이지 단위 JSON-LD를 자동 생성합니다. 콘텐츠 페이지에는 Article(목록 페이지는 CollectionPage, 홈 페이지는 WebSite)과 BreadcrumbList가 생성됩니다.
 
 ```jinja
 <head>
@@ -473,7 +477,7 @@ FAQ, HowTo, WebSite, Organization 같은 추가 스키마 타입도 사용할 �
 | og_all_tags | OG와 Twitter 태그 전체 |
 | canonical_tag | canonical 링크 태그 |
 | hreflang_tags | hreflang 대체 링크 태그 |
-| jsonld | Article + BreadcrumbList JSON-LD |
+| jsonld | Article(또는 CollectionPage/WebSite) + BreadcrumbList JSON-LD |
 | jsonld_article | Article JSON-LD만 |
 | jsonld_breadcrumb | BreadcrumbList JSON-LD만 |
 | page_description | 페이지 설명 (없으면 사이트 설명) |

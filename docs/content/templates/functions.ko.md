@@ -26,7 +26,7 @@ toc = true
 |------|------|-------------|
 | path | String | 소스 상대 경로(예: `about.md`) 또는 URL 경로(예: `/about/`) |
 
-**반환값:** Page? (못 찾으면 nil). 표준 [Page 속성](/ko/templates/data-model/#page)을 노출하되, 렌더링 시점에 계산되는 필드(`permalink`, `lower`/`higher`, `ancestors`, `series_index`, `series_pages`, `related_posts`)는 제외됩니다.
+**반환값:** Page? (못 찾으면 nil). 표준 [Page 속성](/ko/templates/data-model/#page)을 노출하되, 렌더링 시점에 계산되는 필드(`permalink`, `lower`/`higher`, `ancestors`, `series_index`, `series_pages`, `related_posts`, `backlinks`)는 제외됩니다.
 
 **예시:**
 
@@ -83,6 +83,7 @@ toc = true
 | pages | Array<Page> |
 | pages_count | Int |
 | assets | Array<String> |
+| subsections | Array<Section> |
 
 **예시:**
 
@@ -237,7 +238,7 @@ toc = true
 
 **반환값:** 파싱된 데이터 또는 nil
 
-`load_data()`는 로컬 파일 시스템만 읽으며, 경로는 프로젝트 디렉터리 안에서 해석됩니다. 프로젝트 밖의 파일도, URL도 읽을 수 없습니다. HTTP(S) GET 요청 하나의 페이로드라면 [`[[data.remote]]`](/ko/features/remote-data/)로 `site.data`에 노출하세요. 여러 요청이나 변형이 필요하면 [빌드 훅](/ko/features/build-hooks/)으로 `data/`에 내려받습니다. `data/` 아래 파일은 `load_data()` 호출 없이도 `site.data`로 노출됩니다.
+`load_data()`는 로컬 파일 시스템만 읽으며, 경로는 프로젝트 디렉터리 안에서 해석됩니다. 프로젝트 밖의 파일도, URL도 읽을 수 없습니다. HTTP(S) GET 요청 하나의 페이로드라면 [`[[data.remote]]`](/ko/features/remote-data/)로 `site.data`에 노출하세요. 여러 요청이나 변형이 필요하면 [사전 빌드 훅](/ko/features/build-hooks/)으로 `data/`에 내려받습니다. `data/` 아래 파일은 `load_data()` 호출 없이도 `site.data`로 노출됩니다.
 
 **지원 포맷:**
 
@@ -299,7 +300,7 @@ url = "https://twitter.com/example"
 | 이름 | 타입 | 설명 |
 |------|------|-------------|
 | name | String | 환경 변수 이름 |
-| default | String? | 변수가 없을 때의 폴백 값(선택) |
+| default | String? | 변수가 없거나 비어 있을 때의 폴백 값(선택) |
 
 **반환값:** String(환경 변수 값, 기본값, 또는 빈 문자열)
 
@@ -416,7 +417,7 @@ base_url이 포함된 URL을 생성합니다.
 
 | 이름 | 타입 | 설명 |
 |------|------|-------------|
-| format | String? | 날짜 포맷 문자열(선택) |
+| format | String? | 날짜 포맷 문자열(선택, 기본값 `%Y-%m-%d %H:%M:%S`) |
 
 **반환값:** String
 

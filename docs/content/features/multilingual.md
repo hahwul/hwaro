@@ -33,8 +33,8 @@ weight = 3
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | default_language | string | "en" | Default language code |
-| language_name | string | — | Human-readable language name |
-| weight | int | 0 | Sort order (lower = first) |
+| language_name | string | the language code | Human-readable language name |
+| weight | int | 1 | Sort order (lower = first) |
 | generate_feed | bool | true | Generate the RSS/Atom/JSON feed for this language |
 | build_search_index | bool | true | Include in search index |
 | taxonomies | array | every `[[taxonomies]]` name | Taxonomies for this language; omit to inherit the global set, `[]` for none |
@@ -385,7 +385,8 @@ default_language_only = true
 - Feed title includes the language name: `"My Site (한국어)"`
 - Self-referencing links point to the correct language path (e.g., `https://example.com/ko/rss.xml`)
 - Draft pages and section index pages are excluded
-- Language feeds are generated independently of the main feed's `enabled` setting
+- Language feeds require `[feeds] enabled = true`; `generate_feed = false` only opts a language out
+- A language with no published pages gets no feed
 
 ### Template Links
 

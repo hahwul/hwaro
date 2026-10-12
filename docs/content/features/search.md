@@ -22,8 +22,8 @@ exclude = ["/private", "/drafts"]
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | enabled | bool | false | Generate search index |
-| format | string | "fuse_json" | Search index format |
-| fields | array | ["title", "content"] | Fields to include in index — by default only `title` and `content` (`url` is always added) |
+| format | string | "fuse_json" | Search index format: `fuse_json`, `fuse_javascript`, `elasticlunr_json`, or `elasticlunr_javascript` (the `*_javascript` forms wrap the array in a `var searchData = ...` script) |
+| fields | array | ["title", "content"] | Fields to include in index — by default only `title` and `content` (`url` and `lang` are always added) |
 | filename | string | "search.json" | Output filename |
 | exclude | array | [] | Paths (prefixes) to exclude from search index |
 | tokenize_cjk | bool | false | Enable CJK bigram tokenization |
@@ -46,14 +46,15 @@ When enabled, Hwaro generates `/search.json` (configurable via `filename`):
     "content": "Page content...",
     "description": "Post description",
     "section": "blog",
-    "tags": ["tutorial"]
+    "tags": ["tutorial"],
+    "lang": "en"
   }
 ]
 ```
 
 ## Fields Indexed
 
-Only fields listed in `fields` are emitted (`url` is always included):
+Only fields listed in `fields` are emitted (`url` and `lang` are always included, and pages of a [versioned](/features/versioned-docs/) site also carry `version`):
 
 | Field | Description |
 |-------|-------------|
@@ -63,6 +64,7 @@ Only fields listed in `fields` are emitted (`url` is always included):
 | description | Page description |
 | section | Section name |
 | tags | Page tags |
+| lang | Page language (always included) |
 
 ## Built-in UI
 
@@ -101,7 +103,7 @@ With `ui = true`, the build writes `assets/hwaro-search/search.js` and `assets/h
 
 - **Opening:** press `/` or `Cmd/Ctrl+K`, or click any element with `data-hwaro-search`. The search opens in a modal dialog. If the page has an element with `data-hwaro-search-input`, the UI mounts inside that element instead (inline search box), and the shortcuts focus it.
 - **Loading:** the index is fetched on first open, never on page load. With `shards`, the UI reads `search/index.json` and loads only the current language's shards.
-- **Matching:** case-insensitive prefix and substring matching on every word of the query, all words required. Title matches rank above heading matches, and heading matches above content matches. With `tokenize_cjk = true`, the query is split into the same CJK bigrams as the index. At most 20 results are shown.
+- **Matching:** case-insensitive prefix and substring matching on every word of the query, all words required. Page-title matches rank above heading matches, and heading matches above content matches. With `tokenize_cjk = true`, the query is split into the same CJK bigrams as the index. At most 20 results are shown.
 - **Results:** each result shows the title (› heading), plus an excerpt with the matched words highlighted, and links to the page or to `#heading`.
 - **Facets:** with `facets` set, chips for the values found in the results filter the list.
 - **Language:** on a multilingual site, results are limited to the page's language.

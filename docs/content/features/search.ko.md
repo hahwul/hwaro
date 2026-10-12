@@ -22,8 +22,8 @@ exclude = ["/private", "/drafts"]
 | 키 | 타입 | 기본값 | 설명 |
 |-----|------|---------|-------------|
 | enabled | bool | false | 검색 인덱스 생성 여부 |
-| format | string | "fuse_json" | 검색 인덱스 포맷 |
-| fields | array | ["title", "content"] | 인덱스에 포함할 필드 — 기본값은 `title`과 `content`뿐 (`url`은 항상 추가) |
+| format | string | "fuse_json" | 검색 인덱스 포맷: `fuse_json`, `fuse_javascript`, `elasticlunr_json`, `elasticlunr_javascript` (`*_javascript` 형식은 배열을 `var searchData = ...` 스크립트로 감쌈) |
+| fields | array | ["title", "content"] | 인덱스에 포함할 필드 — 기본값은 `title`과 `content`뿐 (`url`과 `lang`은 항상 추가) |
 | filename | string | "search.json" | 출력 파일 이름 |
 | exclude | array | [] | 검색 인덱스에서 제외할 경로(접두사) |
 | tokenize_cjk | bool | false | CJK 바이그램 토큰화 활성화 |
@@ -46,14 +46,15 @@ exclude = ["/private", "/drafts"]
     "content": "Page content...",
     "description": "Post description",
     "section": "blog",
-    "tags": ["tutorial"]
+    "tags": ["tutorial"],
+    "lang": "en"
   }
 ]
 ```
 
 ## 인덱싱되는 필드
 
-`fields`에 나열한 필드만 출력됩니다(`url`은 항상 포함).
+`fields`에 나열한 필드만 출력됩니다(`url`과 `lang`은 항상 포함되며, [버전별 문서](/ko/features/versioned-docs/) 사이트의 페이지에는 `version`도 붙습니다).
 
 | 필드 | 설명 |
 |-------|-------------|
@@ -63,6 +64,7 @@ exclude = ["/private", "/drafts"]
 | description | 페이지 설명 |
 | section | 섹션 이름 |
 | tags | 페이지 태그 |
+| lang | 페이지 언어(항상 포함) |
 
 ## 내장 UI
 
@@ -101,7 +103,7 @@ facets = ["section", "tags"] # 선택: 필터 칩
 
 - **열기:** `/` 또는 `Cmd/Ctrl+K`를 누르거나 `data-hwaro-search` 속성이 있는 요소를 클릭하면 모달 대화상자로 열립니다. 페이지에 `data-hwaro-search-input` 속성을 가진 요소가 있으면 대신 그 요소 안에 인라인 검색창으로 붙고, 단축키는 그 입력창으로 포커스를 옮깁니다.
 - **로딩:** 인덱스는 페이지 로드 때가 아니라 처음 열 때 가져옵니다. `shards`를 쓰면 `search/index.json`을 읽고 현재 언어의 샤드만 불러옵니다.
-- **매칭:** 질의의 모든 단어에 대해 대소문자를 구분하지 않는 접두사·부분 문자열 매칭을 하며, 모든 단어가 일치해야 합니다. 제목 일치가 제목(heading) 일치보다, 제목(heading) 일치가 본문 일치보다 앞에 옵니다. `tokenize_cjk = true`이면 질의도 인덱스와 같은 CJK 바이그램으로 나눕니다. 결과는 최대 20개입니다.
+- **매칭:** 질의의 모든 단어에 대해 대소문자를 구분하지 않는 접두사·부분 문자열 매칭을 하며, 모든 단어가 일치해야 합니다. 페이지 제목 일치가 소제목 일치보다, 소제목 일치가 본문 일치보다 앞에 옵니다. `tokenize_cjk = true`이면 질의도 인덱스와 같은 CJK 바이그램으로 나눕니다. 결과는 최대 20개입니다.
 - **결과:** 각 결과는 제목(› 소제목)과 일치한 단어가 강조된 발췌문을 보여 주고, 페이지나 `#heading`으로 연결됩니다.
 - **패싯:** `facets`를 설정하면 결과에 나온 값으로 만든 칩으로 목록을 거를 수 있습니다.
 - **언어:** 다국어 사이트에서는 현재 페이지 언어의 결과만 보여 줍니다.

@@ -85,7 +85,7 @@ enabled = true                        # 기본 설정에서(변경 없음)
 |------|----------|--------|
 | `[sitemap] enabled = true, changefreq = "weekly"` | `[sitemap] changefreq = "daily"` | `[sitemap] enabled = true, changefreq = "daily"` |
 
-최상위 스칼라와 배열은 병합되지 않고 교체됩니다.
+스칼라와 배열은 깊이와 관계없이 병합되지 않고 교체됩니다. `[[deployment.targets]]` 같은 테이블 배열도 마찬가지여서, 재정의 파일에 대상을 하나라도 선언하면 목록 전체가 바뀝니다.
 
 | 기본 | 재정의 | 결과 |
 |------|----------|--------|

@@ -332,6 +332,7 @@ Rendered HTML content is available as the top-level `content` variable.
 | page.weight | Int | Sort weight |
 | page.image | String? | Featured image path |
 | page.authors | Array<String> | Author names |
+| page.tags | Array<String> | Tags from front matter |
 | page.taxonomies | Object | This page's taxonomy terms (`page.taxonomies.tags`, `page.taxonomies.<name>`) |
 | page.extra | Object | Custom front matter fields |
 
@@ -360,6 +361,7 @@ Rendered HTML content is available as the top-level `content` variable.
 | page.is_index | Bool | — | Is an index file: a section's `_index.md`, the home page, or a page bundle's `index.md` |
 | page.is_section | Bool | — | Is a section's `_index.md`. Use `rejectattr("is_section")` to drop subsection entries from `section.pages` while keeping page bundles |
 | page.generated | Bool | false | Auto-generated page |
+| page.synthesized | Bool | false | Page created by [`[[content.generate]]`](/features/content-generation/) |
 | page.in_sitemap | Bool | true | Include in sitemap |
 | page.in_search_index | Bool | true | Include in search |
 
@@ -369,7 +371,7 @@ Rendered HTML content is available as the top-level `content` variable.
 |----------|------|-------------|
 | page.lower | Page? | Previous page in reading order |
 | page.higher | Page? | Next page in reading order |
-| page.ancestors | Array<Page> | Parent section chain |
+| page.ancestors | Array<Object> | Parent section chain (each entry has `title` and `url`) |
 | page.translations | Array<TranslationLink> | Language variants |
 
 ### Custom Metadata
@@ -393,9 +395,11 @@ Rendered HTML content is available as the top-level `content` variable.
 | page_reading_time | page.reading_time |
 | page_permalink | page.permalink |
 | page_authors | page.authors |
+| page_tags | page.tags |
 | page_weight | page.weight |
 | page_language | page.language |
 | page_translations | page.translations |
+| lang_prefix | `""` for the default language, `"/<code>"` for other languages (e.g. `{{ base_url }}{{ lang_prefix }}/posts/`) |
 | taxonomy_name | Current taxonomy name (taxonomy pages) |
 | taxonomy_term | Current taxonomy term (taxonomy term pages) |
 | content | Rendered HTML content |
@@ -563,6 +567,8 @@ unknown key that lands in `page.extra.outputs`, and it overrides the
 | canonical_tag | Canonical link tag |
 | hreflang_tags | Hreflang alternate link tags (multilingual) |
 | pagination_seo_links | `<link rel="prev/next">` tags |
+| alternate_output_tags | `<link rel="alternate">` tags for the page's enabled [output formats](/features/output-formats/) |
+| jsonld | JSON-LD structured data (`jsonld_article`, `jsonld_breadcrumb`, `jsonld_website`, … also available; see [Structured Data](/features/structured-data/)) |
 
 ```jinja
 <head>
@@ -621,6 +627,8 @@ Pre-rendered `<link>` and `<script>` tags for convenience. These are generated f
 | auto_includes_css | Auto-included CSS `<link>` tags |
 | auto_includes_js | Auto-included JS `<script>` tags |
 | auto_includes | All auto-include tags |
+| math_tags | KaTeX/MathJax tags for `[markdown] math` (empty when math is off) |
+| mermaid_tags | Mermaid script tags (empty when `[markdown] mermaid` is off) |
 | pwa_tags | PWA manifest link, theme-color meta, and service-worker registration (empty unless `[pwa]` is enabled) |
 | search_tags | Stylesheet and script tags of the [built-in search UI](/features/search/#built-in-ui) (empty unless `[search] ui = true`) |
 

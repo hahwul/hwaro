@@ -17,7 +17,7 @@ hwaro tool list drafts
 hwaro tool list published
 
 # List files in a specific directory
-hwaro tool list all -c posts
+hwaro tool list all -c content/posts
 
 # The 5 newest published files
 hwaro tool list published --limit 5

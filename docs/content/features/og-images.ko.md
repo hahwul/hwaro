@@ -5,7 +5,7 @@ weight = 3
 toc = true
 +++
 
-Hwaro는 프론트 매터에 커스텀 `image`가 없는 모든 페이지에 1200x630 Open Graph 미리보기 이미지를 자동 생성합니다. 생성된 경로가 `page.image`로 설정되므로 `og:image` 메타 태그가 자동으로 이를 사용하므로 템플릿을 고칠 필요가 없습니다.
+Hwaro는 프론트 매터에 커스텀 `image`가 없는 모든 페이지에 1200x630 Open Graph 미리보기 이미지를 자동 생성합니다. 생성된 경로가 `page.image`로 설정되어 `og:image` 메타 태그가 자동으로 이를 사용하므로, 템플릿을 고칠 필요가 없습니다.
 
 ![자동 OG 이미지 페이지의 자동 생성 OG 이미지](/og-images/features-og-images.png)
 *이 페이지의 자동 생성 OG 이미지 (`style = "terminal"`).*

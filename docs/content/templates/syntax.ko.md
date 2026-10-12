@@ -141,7 +141,7 @@ elif와 함께:
 {% include "partials/footer.html" %}
 ```
 
-## 변수
+## 변수 설정
 
 변수를 설정합니다.
 

@@ -38,6 +38,7 @@ base_url = "https://example.com"
 | title | string | Site title |
 | description | string | Site description |
 | base_url | string | Production URL (no trailing slash) |
+| default_language | string | Language code of unsuffixed content files (default `"en"`). See [Multilingual](/features/multilingual/) |
 
 ## Environment Variables
 
@@ -88,9 +89,9 @@ command-line flag  >  config.toml  >  built-in default
 
 So `hwaro build -o dist` overrides `output_dir` in config, and `hwaro build --drafts` still includes drafts when `drafts = false`. The reverse does not exist: there is no `--no-drafts` or `--no-cache` to turn a config value back off, so set those keys only when you want them on for every build. `--no-parallel` is the one exception, and it overrides `parallel = true`.
 
-These apply to `hwaro serve` as well, which builds into (and serves from) `output_dir`. `hwaro deploy` follows it too: when `[deployment] source_dir` is not set, it deploys `output_dir` rather than assuming `public`.
+`drafts`, `parallel` and `cache` apply to `hwaro serve` as well. `output_dir` does not: serve always builds into its own `.hwaro/serve/` and leaves `output_dir` untouched (see the [serve command](/start/cli/#serve)). `hwaro deploy` does follow `output_dir`: when `[deployment] source_dir` is not set, it deploys `output_dir` rather than assuming `public`.
 
-`output_dir` may be relative to the project or absolute. A path that escapes the project (`../out`) is refused, because the dev server will not serve from outside the project and the build would otherwise write somewhere serve never reads.
+`output_dir` may be relative to the project or absolute. A relative path that escapes the project (`../out`) or an empty value is ignored with a warning, and the default `public` is used instead.
 
 See [Build Hooks](/features/build-hooks/) for error handling and use cases.
 
@@ -121,6 +122,13 @@ math_engine = "katex"
 | mermaid | bool | false | Render ` ```mermaid ` blocks as `<div class="mermaid">` |
 | math | bool | false | Enable math syntax (`$...$` and `$$...$$`) |
 | math_engine | string | "katex" | Math rendering engine (`"katex"` or `"mathjax"`) |
+| admonitions | bool | true | GitHub-style `> [!NOTE]` blockquotes become admonition blocks |
+| heading_ids | bool | true | Custom heading IDs (`## Heading {#custom-id}`) |
+| ins | bool | false | Inserted text (`++text++` → `<ins>text</ins>`) |
+| mark | bool | false | Highlighted text (`==text==` → `<mark>text</mark>`) |
+| sub | bool | false | Subscript (`~text~` → `<sub>text</sub>`) |
+| sup | bool | false | Superscript (`^text^` → `<sup>text</sup>`) |
+| attributes | bool | false | Generalized `{#id .class key=val}` blocks on headings and inline images |
 | smart_punctuation | bool | false | Typographic quotes/dashes/ellipses (`"x"` → “x”, `--` → –, `...` → …) |
 | containers | bool | false | `:::note Title` … `:::` custom containers (admonition markup) |
 | wikilinks | bool | false | Obsidian syntax: `[[wikilinks]]`, `![[image]]` embeds, `![[note]]` transclusion and foldable `> [!type]-` callouts (see [Wikilinks & Backlinks](/writing/obsidian/)) |
@@ -333,9 +341,11 @@ Each feature has its own documentation with full configuration details. Below is
 | `[image_processing]` | [Image Processing](/features/image-processing/) | Image resizing & LQIP |
 | `[image_processing.lqip]` | [Image Processing](/features/image-processing/#lqip-low-quality-image-placeholders) | Base64 blur-up placeholders |
 | `[content.files]` | [Content Files](/features/content-files/) | Publish non-Markdown files |
+| `[content.new]` | [Archetypes](/writing/archetypes/) | Default front matter and bundle style for `hwaro new` |
 | `[[content.generate]]` | [Content Generation](/features/content-generation/) | Materialize `site.data` records into pages |
 | `[[content.schema]]` | [Front Matter Schema](/writing/schema/) | Per-section front-matter types, required fields, enums, bounds and defaults |
 | `[[data.remote]]` | [Remote Data Sources](/features/remote-data/) | Fetch remote data into `site.data` at build time |
+| `[outputs]` | [Output Formats](/features/output-formats/) | Extra per-page/per-section output formats (JSON, XML, TXT, CSV) |
 | `[privacy]` | [Privacy Mode](/features/privacy/) | Self-host third-party fonts, scripts and images at build time |
 | `[csp]` | [Content Security Policy](/features/csp/) | Content-Security-Policy from inline script/style hashes (`_headers` or `<meta>`) |
 | `[static]` | [Static Files](#static-files) | Filter cruft / exclude paths from the `static/` copy |

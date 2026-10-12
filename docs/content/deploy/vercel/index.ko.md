@@ -14,7 +14,7 @@ Vercel에 Hwaro 사이트를 배포합니다. 별도 설정 없이도 바로 배
 hwaro tool platform vercel
 ```
 
-빌드 설정, 별칭(alias) 기반 리다이렉트, 캐시 헤더가 담긴 `vercel.json`이 생성됩니다.
+빌드 설정, 별칭(alias) 기반 리다이렉트, 캐시 헤더(핑거프린트된 에셋 번들을 켠 경우)가 담긴 `vercel.json`이 생성됩니다.
 
 ### Git으로 배포
 

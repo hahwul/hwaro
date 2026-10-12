@@ -28,10 +28,10 @@ taxonomies = ["tags"]
 1. Hwaro builds an inverted index of taxonomy terms to pages
 2. For each page, it counts how many taxonomy terms are shared with other pages
 3. Pages with more shared terms rank higher
-4. Results are filtered by language (multilingual sites only show same-language posts)
+4. Results are filtered by language (multilingual sites only show same-language posts) and by version ([versioned docs](/features/versioned-docs/) never cross a version boundary)
 5. The top N results (up to `limit`) are assigned as related posts
 
-Draft pages, index pages, and generated pages are excluded from related post computation.
+Draft pages, the home page, section index pages (`_index.md`), headless pages (`render = false`), and generated pages are excluded from related post computation. Page bundles (`post/index.md`) are ordinary posts and take part.
 
 ## Template Variable
 

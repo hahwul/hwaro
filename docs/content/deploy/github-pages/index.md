@@ -54,7 +54,7 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -71,7 +71,12 @@ jobs:
 |-------|-------------|---------|
 | `build_dir` | Directory containing the Hwaro site | `.` (repository root) |
 | `build_only` | Only build without deploying | `false` |
-| `token` | GitHub token for deployment | — |
+| `pages_branch` | Branch to push the built site to | `gh-pages` |
+| `output_dir` | Output directory the action builds into and deploys | `public` |
+| `build_flags` | Extra flags passed to `hwaro build` | — |
+| `repository` | Repository to deploy to | current repository |
+| `github_hostname` | GitHub hostname (for GitHub Enterprise) | `github.com` |
+| `token` | GitHub token for deployment | workflow token when deploying; none for `build_only` runs |
 
 If your Hwaro site is in a subdirectory (e.g., `docs/`), set `build_dir`:
 

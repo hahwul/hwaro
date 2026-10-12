@@ -17,7 +17,7 @@ hwaro tool convert to-toml
 hwaro tool convert to-json
 
 # Convert only in a specific directory
-hwaro tool convert to-yaml -c posts
+hwaro tool convert to-yaml -c content/posts
 
 # Preview which files would change without touching anything
 hwaro tool convert to-yaml --dry-run
@@ -98,11 +98,11 @@ After `hwaro tool convert to-yaml`:
 
 ```markdown
 ---
-title: "My Post"
+title: My Post
 date: "2024-01-15"
 tags:
-  - crystal
-  - tutorial
+- crystal
+- tutorial
 ---
 
 Content here.
