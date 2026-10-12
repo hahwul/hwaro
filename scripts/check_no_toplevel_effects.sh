@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Guard for the file-split convention (ARCHITECTURE.md, "The file-split
+# Guard for the file-split convention (.github/ARCHITECTURE.md, "The file-split
 # convention"): a part file only REOPENS a type and fills it with
 # definitions. Everything that runs at load time — `Registry.register(...)`,
 # a class-variable initialiser, a bare method call — and every `require`

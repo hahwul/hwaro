@@ -3,7 +3,7 @@
 # This is the main entry point for the Hwaro library; src/main.cr wraps it in
 # the process entry. The require list below is ORDERED and explicit; part
 # files of a split owner (e.g. core/build/phases/render/*.cr) are required
-# from their owner, never from here. ARCHITECTURE.md is the map:
+# from their owner, never from here. .github/ARCHITECTURE.md is the map:
 #
 # - cli/       : Runner + CommandRegistry, commands/, commands/tool/
 # - config/    : options/ — typed option structs (BuildOptions, ServeOptions, ...)

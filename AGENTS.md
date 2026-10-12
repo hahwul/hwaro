@@ -2,7 +2,7 @@
 
 Hwaro is a fast, lifecycle-driven static site generator written in Crystal
 (>= 1.21): a hook-based build pipeline, pluggable content processors,
-multi-layer caching and fiber-parallel rendering. **`ARCHITECTURE.md` is the
+multi-layer caching and fiber-parallel rendering. **`.github/ARCHITECTURE.md` is the
 map** — directory layout, the build pipeline, every registry, and a
 "where does X go" table. This file is the rules.
 
@@ -79,7 +79,7 @@ and **only reopen the same type**; the owner keeps its path, its ivars, its
 load-time statements (`Registry.register`, …) and an explicit, ordered
 `require "./render/x"` list. No globs, no new mixin modules, no ivar
 declarations in parts. Full rules and the current list of split owners are
-in `ARCHITECTURE.md`.
+in `.github/ARCHITECTURE.md`.
 
 ## Coding patterns
 

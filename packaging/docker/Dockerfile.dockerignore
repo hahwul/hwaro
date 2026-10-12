@@ -22,7 +22,6 @@ lib/
 .ameba.yml
 .editorconfig
 AGENTS.md
-CONTRIBUTING.md
 CHANGELOG.md
 justfile
 
