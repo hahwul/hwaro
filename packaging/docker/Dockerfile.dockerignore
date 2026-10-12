@@ -1,0 +1,43 @@
+# Ignore list for packaging/docker/Dockerfile. BuildKit reads
+# `<dockerfile>.dockerignore` ahead of `<context>/.dockerignore`, so this applies
+# to every BuildKit build (`docker build` on Docker >= 23, docker/build-push-action).
+# A build forced onto the classic builder (DOCKER_BUILDKIT=0) finds no ignore
+# list and ships the whole tree as context.
+#
+# Patterns are relative to the build CONTEXT (the repo root), not to this file.
+
+# Build artifacts
+bin/
+lib/
+**/*.o
+**/*.dwarf
+
+# Git & VCS
+.git/
+.gitignore
+
+# Dev tooling
+.github/
+.claude/
+.ameba.yml
+.editorconfig
+AGENTS.md
+CONTRIBUTING.md
+CHANGELOG.md
+justfile
+
+# Nix
+flake.nix
+flake.lock
+result
+
+# Packaging (keep entrypoint.sh — it's COPY'd into the runner stage)
+packaging/*
+!packaging/docker/
+packaging/docker/*
+!packaging/docker/entrypoint.sh
+snap/
+
+# Tests & docs
+spec/
+docs/

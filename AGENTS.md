@@ -38,11 +38,15 @@ just dev                # serve the docs site (bin/hwaro serve -i docs)
 - `bin/ameba` is built by `just ameba` (ameba 1.7 ships no executable).
 - Anything that changes `shard.lock` must be followed by `just nix-update`.
   `flake.nix` reads the version and minimum Crystal from `shard.yml`.
+- Distribution recipes live under `packaging/` (`aur/`, `chocolatey/`,
+  `docker/`, `nix/shards.nix`). Three stay at the root because their tool only
+  looks there: `flake.nix` + `flake.lock`, `snap/snapcraft.yaml`, and
+  `action.yml` (a GitHub Action is resolved from the repo root).
 - CI (`.github/workflows/ci.yml`) sizes its two expensive matrices in the
   `plan` job. An ordinary source PR builds one nix system and one Docker arch;
   every push to main builds both matrices in full, and so does a PR touching
-  the inputs a matrix exists to protect — `flake.*`/`shards.nix` for nix,
-  `docker/`/`action.yml` for the image, `shard.lock`/`shard.yml`/the workflow
+  the inputs a matrix exists to protect — `flake.*`/`packaging/nix/shards.nix`
+  for nix, `packaging/docker/`/`action.yml` for the image, `shard.lock`/`shard.yml`/the workflow
   for both. Widen those file lists rather than the matrices when a new input
   can break packaging. `tests` and `package-macos` restore
   `~/.cache/crystal`; only pushes to main write it back.

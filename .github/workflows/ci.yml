@@ -7,12 +7,13 @@ on:
       - .github/workflows/ci.yml
       - shard.yml
       - shard.lock
-      - docker/Dockerfile
+      - packaging/docker/Dockerfile
+      - packaging/docker/Dockerfile.dockerignore
       # The image smoke test in build-docker exercises these two, so a PR that
       # touches only them still has to run it — otherwise the job that exists
       # to catch entrypoint/action regressions is skipped on exactly the PRs
       # that can introduce one, and the failure lands on main instead.
-      - docker/entrypoint.sh
+      - packaging/docker/entrypoint.sh
       - action.yml
       - "**/*.cr"
       # The Nix packaging silently rotted for several releases because nothing
@@ -20,7 +21,7 @@ on:
       # change too.
       - flake.nix
       - flake.lock
-      - shards.nix
+      - packaging/nix/shards.nix
       # package-macos.sh only ever ran during a release before, so a break in
       # it was discovered by users rather than by CI. These are the two files
       # that decide what the macOS tarball contains -- the script itself and
@@ -89,8 +90,8 @@ jobs:
             # any of them gets its full matrix back. A `gh` failure widens both:
             # losing coverage must never be the quiet outcome of an API hiccup.
             if files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename'); then
-              grep -qE '^(flake\.nix|flake\.lock|shards\.nix|shard\.lock|shard\.yml|\.github/workflows/ci\.yml)$' <<<"$files" && nix="$nix_all"
-              grep -qE '^(docker/Dockerfile|docker/entrypoint\.sh|action\.yml|shard\.lock|shard\.yml|\.github/workflows/ci\.yml)$' <<<"$files" && docker="$docker_all"
+              grep -qE '^(flake\.nix|flake\.lock|packaging/nix/shards\.nix|shard\.lock|shard\.yml|\.github/workflows/ci\.yml)$' <<<"$files" && nix="$nix_all"
+              grep -qE '^(packaging/docker/[^/]+|action\.yml|shard\.lock|shard\.yml|\.github/workflows/ci\.yml)$' <<<"$files" && docker="$docker_all"
             else
               echo "::warning::could not list the PR's files; building the full matrices"
               nix="$nix_all"
@@ -121,7 +122,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: docker/Dockerfile
+          file: packaging/docker/Dockerfile
           push: false
           # A fixed local tag (rather than the metadata tags) so the smoke test
           # below has a deterministic name to run. `load: true` puts the image
@@ -274,11 +275,12 @@ jobs:
       # explicitly. `nix develop -c` runs the crystal2nix pinned by flake.lock,
       # the same one `just nix-update` uses, so this gate cannot fail on a
       # crystal2nix version the author never ran.
-      - name: shards.nix matches shard.lock
+      - name: packaging/nix/shards.nix matches shard.lock
         if: matrix.system == 'x86_64-linux'
         run: |
           nix develop --command crystal2nix
-          git diff --exit-code -- shards.nix
+          mv shards.nix packaging/nix/shards.nix
+          git diff --exit-code -- packaging/nix/shards.nix
   package-macos:
     # scripts/package-macos.sh rewrites dylib load paths with install_name_tool,
     # which invalidates the code signature of every Mach-O it touches. The

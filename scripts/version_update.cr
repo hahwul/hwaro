@@ -5,7 +5,7 @@ SHARD_FILE     = "shard.yml"
 HWARO_FILE     = "src/hwaro.cr"
 SNAPCRAFT_FILE = "snap/snapcraft.yaml"
 SPEC_FILE      = "spec/hwaro_spec.cr"
-PKGBUILD_FILE  = "aur/PKGBUILD"
+PKGBUILD_FILE  = "packaging/aur/PKGBUILD"
 
 # Extract version from shard.yml
 def get_shard_version : String?
@@ -44,7 +44,7 @@ end
 # flake.nix is intentionally absent: it derives both the package version and
 # the minimum Crystal from shard.yml at eval time, so there is nothing to bump.
 
-# Extract pkgver from aur/PKGBUILD
+# Extract pkgver from packaging/aur/PKGBUILD
 def get_pkgbuild_version : String?
   content = File.read(PKGBUILD_FILE)
   match = content.match(/^pkgver=([\d.]+)/m)
@@ -97,7 +97,7 @@ rescue ex
   false
 end
 
-# Update aur/PKGBUILD pkgver (and reset pkgrel to 1)
+# Update packaging/aur/PKGBUILD pkgver (and reset pkgrel to 1)
 def update_pkgbuild_version(new_version : String) : Bool
   content = File.read(PKGBUILD_FILE)
   updated = content.gsub(/^pkgver=[\d.]+/m, "pkgver=#{new_version}")
