@@ -164,10 +164,10 @@ verify *ARGS:
 version-check:
     crystal run scripts/version_check.cr
 
-# Update version across all files.
+# Update version across all files (`just vu 1.2.3`, or prompt without one).
 [group('development')]
-version-update:
-    crystal run scripts/version_update.cr
+version-update *VERSION:
+    crystal run scripts/version_update.cr -- {{ VERSION }}
 
 # Test known external hwaro-powered sites ("friends") to prevent regressions.
 # This ensures that changes to hwaro don't accidentally break real user sites.
