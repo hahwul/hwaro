@@ -126,8 +126,9 @@ end
           ensure
             socket.close
           end
-          status.should contain("404")
-          status.should_not contain("500")
+          # Crystal >= 1.22 refuses a non-ASCII request target itself with a 400
+          # before any handler runs; either way it must not be a 500.
+          status.should match(/ (400|404) /)
         end
       end
     end
@@ -146,7 +147,11 @@ end
     it "serves unicode routes percent-encoded and raw" do
       with_dev_server(base_path: mount || "") do |port, _|
         dev_client(port, &.get(at.call("/%ED%95%9C%EA%B8%80/"))).body.should contain("HANGUL")
-        dev_client(port, &.get(at.call("/한글/"))).body.should contain("HANGUL")
+        # Crystal >= 1.22 rejects a raw non-ASCII request target on both the
+        # client and the server side; browsers always send it percent-encoded.
+        {% if compare_versions(Crystal::VERSION, "1.22.0") < 0 %}
+          dev_client(port, &.get(at.call("/한글/"))).body.should contain("HANGUL")
+        {% end %}
       end
     end
 
