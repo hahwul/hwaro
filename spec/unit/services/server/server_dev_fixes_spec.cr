@@ -109,7 +109,7 @@ private def build_context(method : String, path : String, headers = HTTP::Header
   request = begin
     HTTP::Request.new(method, path, headers)
   rescue ArgumentError
-    HTTP::Request.new(method, "/", headers).tap { |r| r.path = path }
+    HTTP::Request.new(method, "/", headers).tap(&.path=(path))
   end
   io = IO::Memory.new
   response = HTTP::Server::Response.new(io)
