@@ -147,7 +147,7 @@ describe Hwaro::Core::Build::Phases::Initialize do
           FileUtils.mkdir_p("public")
           begin
             # Root reads it anyway; nothing to assert there.
-            next if File.readable?("static/locked.css")
+            next if File::Info.readable?("static/locked.css")
             expect_raises(File::Error, /locked\.css/) do
               Hwaro::Core::Build::Builder.new.test_copy_static_files("public")
             end

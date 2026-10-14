@@ -107,7 +107,7 @@ module Hwaro
         # The request line carries what a browser or curl would send: bytes
         # outside printable ASCII (raw UTF-8, spaces) are percent-encoded,
         # existing `%XX` escapes and reserved characters stay as they are.
-        private def request_target(uri : URI) : String
+        def request_target(uri : URI) : String
           target = uri.request_target
           return target unless target.to_slice.any? { |b| b <= 0x20 || b >= 0x7f }
           String.build(target.bytesize + 8) do |io|

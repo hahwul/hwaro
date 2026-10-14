@@ -104,7 +104,13 @@ private def content_changeset : Hwaro::Services::ChangeSet
 end
 
 private def build_context(method : String, path : String, headers = HTTP::Headers.new)
-  request = HTTP::Request.new(method, path, headers)
+  # Crystal >= 1.22 refuses a non-ASCII/control resource in `Request.new`; set
+  # such a path afterwards so handlers still see the raw value under test.
+  request = begin
+    HTTP::Request.new(method, path, headers)
+  rescue ArgumentError
+    HTTP::Request.new(method, "/", headers).tap(&.path=(path))
+  end
   io = IO::Memory.new
   response = HTTP::Server::Response.new(io)
   {HTTP::Server::Context.new(request, response), response, io}

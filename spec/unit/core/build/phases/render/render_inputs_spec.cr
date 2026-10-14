@@ -149,7 +149,7 @@ describe "warm --cache builds and template inputs outside the tracked files" do
       posix_only!("chmod can't make a file unreadable on Windows")
       File.chmod("static/img.png", 0o000)
       begin
-        pending!("a 0o000 file is still readable (root)") if File.readable?("static/img.png")
+        pending!("a 0o000 file is still readable (root)") if File::Info.readable?("static/img.png")
         render_inputs_build
       ensure
         File.chmod("static/img.png", 0o644)

@@ -123,9 +123,9 @@ module Hwaro
                 begin
                   headers = HTTP::Headers{"User-Agent" => "hwaro-link-checker/1.0"}
                   response = if method == "HEAD"
-                               client.head(request_uri.request_target, headers: headers)
+                               client.head(Core::Build::RemoteFetch.request_target(request_uri), headers: headers)
                              else
-                               client.get(request_uri.request_target, headers: headers)
+                               client.get(Core::Build::RemoteFetch.request_target(request_uri), headers: headers)
                              end
 
                   status_code = response.status_code

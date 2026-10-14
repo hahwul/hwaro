@@ -24,7 +24,7 @@ jobs:
           - os: windows-latest
             platform: windows
             # The compiler windows.yml tests the --static build with.
-            crystal: 1.21.0
+            crystal: 1.22.0
     runs-on: ${{ matrix.os }}
     # publish-homebrew and the deb/rpm/apk releases run only when this whole
     # workflow succeeds; a Windows build failure must not hold the macOS/Linux
@@ -67,7 +67,7 @@ jobs:
           # Parallelism comes from Crystal's execution contexts, sized in
           # src/main.cr — the old `-Dpreview_mt` flag is deprecated and its
           # legacy MT scheduler can spin forever at process exit.
-          docker run --rm -v $(pwd):/hwaro -w /hwaro --entrypoint="" crystallang/crystal:1.21.0-alpine sh -c "
+          docker run --rm -v $(pwd):/hwaro -w /hwaro --entrypoint="" crystallang/crystal:1.22.0-alpine sh -c "
             apk add --no-cache yaml-dev zlib-dev zlib-static git curl &&
             shards install --release --no-debug --production &&
             mkdir -p build &&
