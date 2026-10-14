@@ -334,7 +334,7 @@ describe Hwaro::Core::Build::Cache do
         posix_only!("chmod can't make a file unreadable on Windows")
         File.chmod(test_file, 0o000)
         begin
-          pending!("a 0o000 file is still readable (root)") if File.readable?(test_file)
+          pending!("a 0o000 file is still readable (root)") if File::Info.readable?(test_file)
           cache.changed?(test_file).should be_false
         ensure
           File.chmod(test_file, 0o644)
