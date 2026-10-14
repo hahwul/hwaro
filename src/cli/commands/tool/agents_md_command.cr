@@ -99,6 +99,13 @@ module Hwaro
                   hint: "Point the AGENTS.md symlink at a file inside the project, or remove it.",
                 )
               end
+              if Dir.exists?(filename)
+                raise Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_IO,
+                  message: "AGENTS.md is a directory; refusing to write over it.",
+                  hint: "Rename or remove the AGENTS.md directory, then re-run 'hwaro tool agents-md --write'.",
+                )
+              end
               existed = File.exists?(filename)
               existing = existed ? File.read(filename) : nil
               # Marker detection and the merge are regex-based and raise on

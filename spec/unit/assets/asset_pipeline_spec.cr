@@ -1157,6 +1157,24 @@ describe Hwaro::Assets::Pipeline do
       end
     end
 
+    # PCRE2 validates the whole subject on every match: one Latin-1 byte
+    # anywhere in a bundled stylesheet raised ArgumentError and failed the build.
+    it "rebases url()s in a stylesheet that is not valid UTF-8" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("static/css/img")
+          File.write("static/css/img/x.png", "png")
+          File.write("static/css/a.css", ".a{background:url(img/x.png)}\n/* \xA9 1999 */\n")
+
+          config = make_config
+          config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "main.css", files: ["css/a.css"])
+          Hwaro::Assets::Pipeline.new(config).process("public")
+
+          File.read("public/assets/main.css").should contain("url(../css/img/x.png)")
+        end
+      end
+    end
+
     it "does not rewrite url( text inside a CSS string or comment" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

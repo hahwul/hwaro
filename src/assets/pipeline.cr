@@ -180,6 +180,9 @@ module Hwaro
       private def rebase_css_urls(css : String, file : String, bundle_dir : String) : String
         source_dir = File.dirname(file)
         return css if source_dir == bundle_dir
+        # PCRE2 validates the whole subject on every match, so one legacy
+        # (Latin-1) byte anywhere in the file failed the build.
+        css = css.scrub unless css.valid_encoding?
         bytes = css.to_slice
         n = bytes.size
         String.build(css.bytesize) do |io|

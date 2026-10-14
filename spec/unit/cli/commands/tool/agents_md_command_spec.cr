@@ -140,6 +140,22 @@ describe Hwaro::CLI::Commands::Tool::AgentsMdCommand do
       end
     end
 
+    # File.exists? is true for a directory, so File.read raised EISDIR as an
+    # unclassified `Error: read (AGENTS.md): Is a directory`.
+    it "refuses with a classified HWARO_E_IO error when AGENTS.md is a directory" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          Dir.mkdir("AGENTS.md")
+
+          err = expect_raises(Hwaro::HwaroError) do
+            with_captured_log { Hwaro::CLI::Commands::Tool::AgentsMdCommand.new.run(["--write", "--force"]) }
+          end
+          err.code.should eq(Hwaro::Errors::HWARO_E_IO)
+          Dir.exists?("AGENTS.md").should be_true
+        end
+      end
+    end
+
     it "overwrites an existing AGENTS.md when --force is given" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

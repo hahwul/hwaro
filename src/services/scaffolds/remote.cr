@@ -417,7 +417,7 @@ module Hwaro
             end
           end
 
-          data = JSON.parse(response.body)
+          data = github_json(response, "repo info for #{owner}/#{repo}")
           data["default_branch"]?.try(&.as_s?) || raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_NETWORK,
             message: "GitHub repo info for #{owner}/#{repo} is missing 'default_branch'",
@@ -438,7 +438,7 @@ module Hwaro
             )
           end
 
-          data = JSON.parse(response.body)
+          data = github_json(response, "tree for #{owner}/#{repo}@#{branch}")
           # GitHub sets `truncated` when the recursive tree exceeds its size
           # limit and returns a PARTIAL listing — warn so silently-dropped
           # scaffold files don't read as a clean checkout.
@@ -480,6 +480,20 @@ module Hwaro
 
         private def encode_path(path : String) : String
           path.split('/').join('/') { |segment| URI.encode_path_segment(segment) }
+        end
+
+        # A 200 body that is not a JSON object (a proxy's HTML page, a
+        # truncated body) is a network failure, not an internal error.
+        private def github_json(response : HTTP::Client::Response, what : String) : Hash(String, JSON::Any)
+          data = begin
+            JSON.parse(response.body).as_h?
+          rescue JSON::ParseException
+          end
+          data || raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_NETWORK,
+            message: "GitHub returned an unreadable #{what} (not a JSON object)",
+            hint: "Check for a proxy rewriting HTTPS responses and try again.",
+          )
         end
 
         private def github_api_get(path : String) : HTTP::Client::Response

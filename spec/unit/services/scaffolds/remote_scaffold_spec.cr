@@ -268,15 +268,21 @@ describe Hwaro::Services::Scaffolds::Remote do
       err.message.not_nil!.should contain("missing 'default_branch'")
     end
 
-    # A non-JSON 200 body crashes in JSON.parse BEFORE the `|| raise`, so it
-    # surfaces as a bare JSON::ParseException (not a classified HwaroError).
-    # This pins the current unguarded behavior.
-    it "raises JSON::ParseException on a non-JSON 200 body (unguarded)" do
-      TestRemoteHelper.stub_response(200, "<html>not json</html>")
-      helper = TestRemoteHelper.new
+    # A 200 body that is not a JSON object (a proxy's HTML page, or JSON of
+    # another shape, where `#[]?` raises) used to escape as an unclassified
+    # JSON::ParseException / Exception.
+    ["<html>not json</html>", %(["default_branch"])].each do |body|
+      it "raises HwaroError(HWARO_E_NETWORK) on a 200 body that is not a JSON object: #{body}" do
+        TestRemoteHelper.stub_response(200, body)
+        helper = TestRemoteHelper.new
 
-      expect_raises(JSON::ParseException) do
-        helper.do_fetch_default_branch("some-owner", "some-repo")
+        err = expect_raises(Hwaro::HwaroError) do
+          helper.do_fetch_default_branch("some-owner", "some-repo")
+        end
+
+        err.code.should eq(Hwaro::Errors::HWARO_E_NETWORK)
+        err.exit_code.should eq(7)
+        err.message.not_nil!.should contain("some-owner/some-repo")
       end
     end
   end
