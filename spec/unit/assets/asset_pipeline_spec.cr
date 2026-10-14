@@ -1157,6 +1157,33 @@ describe Hwaro::Assets::Pipeline do
       end
     end
 
+    # PCRE2 validates the whole subject on every match: one Latin-1 byte
+    # anywhere in a bundled file raised ArgumentError (url() rebasing, either
+    # minifier) and failed the build.
+    it "bundles files that are not valid UTF-8, rebased or minified" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("static/css/img")
+          FileUtils.mkdir_p("static/assets")
+          File.write("static/css/img/x.png", "png")
+          File.write("static/css/a.css", ".a{background:url(img/x.png)}\n/* \xA9 1999 */\n")
+          File.write("static/assets/b.css", ".caf\xE9 { color : red }\n")
+          File.write("static/assets/c.js", "// \xA9 1999\nvar a = 1;\n")
+
+          config = make_config(minify: true)
+          config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "main.css", files: ["css/a.css", "assets/b.css"])
+          config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "app.js", files: ["assets/c.js"])
+          log = with_captured_log { Hwaro::Assets::Pipeline.new(config).process("public") }
+
+          css = File.read("public/assets/main.css")
+          css.should contain("url(../css/img/x.png)")
+          css.should contain(".caf\uFFFD{color:red}")
+          File.read("public/assets/app.js").should contain("var a")
+          log.should contain("'assets/b.css' is not valid UTF-8")
+        end
+      end
+    end
+
     it "does not rewrite url( text inside a CSS string or comment" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
