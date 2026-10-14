@@ -96,6 +96,13 @@ module Hwaro
             # leave the bundle starting with a stray separator.
             io << separator if wrote_any
             content = Utils::TextUtils.strip_bom(File.read(source))
+            # Sass, url() rebasing and both minifiers are regex-based, and
+            # PCRE2 rejects the whole subject over one legacy (Latin-1) byte,
+            # failing the build.
+            unless content.valid_encoding?
+              Logger.warn "Asset pipeline: '#{file}' is not valid UTF-8; invalid bytes were replaced with U+FFFD. Re-save it as UTF-8."
+              content = content.scrub
+            end
             # `.scss` bundle entries compile before concatenation when the
             # built-in Sass feature is on; verbatim otherwise.
             if @sass_enabled && file.ends_with?(".scss")
@@ -180,9 +187,6 @@ module Hwaro
       private def rebase_css_urls(css : String, file : String, bundle_dir : String) : String
         source_dir = File.dirname(file)
         return css if source_dir == bundle_dir
-        # PCRE2 validates the whole subject on every match, so one legacy
-        # (Latin-1) byte anywhere in the file failed the build.
-        css = css.scrub unless css.valid_encoding?
         bytes = css.to_slice
         n = bytes.size
         String.build(css.bytesize) do |io|

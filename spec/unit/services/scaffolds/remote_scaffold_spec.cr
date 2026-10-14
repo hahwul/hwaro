@@ -206,6 +206,10 @@ class TestRemoteHelper < Hwaro::Services::Scaffolds::Remote
     fetch_default_branch(owner, repo)
   end
 
+  def do_fetch_tree(owner : String, repo : String, branch : String) : Array(JSON::Any)?
+    fetch_tree(owner, repo, branch)
+  end
+
   # Override the private HTTP hop so the classifier path can be exercised
   # deterministically.
   private def github_api_get(path : String) : HTTP::Client::Response
@@ -284,6 +288,18 @@ describe Hwaro::Services::Scaffolds::Remote do
         err.exit_code.should eq(7)
         err.message.not_nil!.should contain("some-owner/some-repo")
       end
+    end
+
+    it "raises HwaroError(HWARO_E_NETWORK) when the tree response is not a JSON object" do
+      TestRemoteHelper.stub_response(200, "<html>not json</html>")
+      helper = TestRemoteHelper.new
+
+      err = expect_raises(Hwaro::HwaroError) do
+        helper.do_fetch_tree("some-owner", "some-repo", "main")
+      end
+
+      err.code.should eq(Hwaro::Errors::HWARO_E_NETWORK)
+      err.message.not_nil!.should contain("some-owner/some-repo@main")
     end
   end
 end
@@ -370,6 +386,7 @@ end
 class FetchStubRemote < Hwaro::Services::Scaffolds::Remote
   @@failing = Set(String).new
   @@calls = [] of String
+  class_property stray_entries = [] of JSON::Any
 
   def self.failing=(paths : Set(String))
     @@failing = paths
@@ -397,7 +414,8 @@ class FetchStubRemote < Hwaro::Services::Scaffolds::Remote
     @@calls << "tree:#{branch}"
     return if missing_ok && branch != "feature/x"
     paths = ["config.toml", "templates/page.html", "data/menu.yml", "docs/config.toml"]
-    JSON.parse(paths.map { |p| {path: p, type: "blob"} }.to_json).as_a
+    entries = JSON.parse(paths.map { |p| {path: p, type: "blob"} }.to_json).as_a
+    entries + @@stray_entries
   end
 
   private def fetch_file(owner : String, repo : String, branch : String, path : String) : String
@@ -417,6 +435,16 @@ describe "Remote scaffold fetching" do
     (err.message || "").should contain("templates/page.html")
   ensure
     FetchStubRemote.failing = Set(String).new
+  end
+
+  # `entry["path"]?` raises on a JSON::Any that is not an object.
+  it "skips tree entries that are not JSON objects" do
+    FetchStubRemote.stray_entries = [JSON::Any.new(1_i64), JSON::Any.new("x")]
+    remote : FetchStubRemote? = nil
+    with_captured_log { remote = FetchStubRemote.new("github:o/r") }
+    remote.not_nil!.config_content.should eq("body of config.toml")
+  ensure
+    FetchStubRemote.stray_entries = [] of JSON::Any
   end
 
   it "carries data/ over as a root-relative extra file" do

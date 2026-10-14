@@ -99,15 +99,16 @@ module Hwaro
                   hint: "Point the AGENTS.md symlink at a file inside the project, or remove it.",
                 )
               end
-              if Dir.exists?(filename)
+              existed = File.exists?(filename)
+              # A directory raised EISDIR unclassified; a FIFO blocked the read.
+              if existed && !File.file?(filename)
                 raise Hwaro::HwaroError.new(
                   code: Hwaro::Errors::HWARO_E_IO,
-                  message: "AGENTS.md is a directory; refusing to write over it.",
-                  hint: "Rename or remove the AGENTS.md directory, then re-run 'hwaro tool agents-md --write'.",
+                  message: "AGENTS.md exists but is not a regular file; refusing to write over it.",
+                  hint: "Rename or remove it, then re-run 'hwaro tool agents-md --write'.",
                 )
               end
-              existed = File.exists?(filename)
-              existing = existed ? File.read(filename) : nil
+              existing = existed ? io_classified(filename) { File.read(filename) } : nil
               # Marker detection and the merge are regex-based and raise on
               # invalid UTF-8; refuse (nothing written, nothing lost) instead
               # of crashing with an unclassified error.
@@ -161,7 +162,7 @@ module Hwaro
                 content = merged
               end
 
-              File.write(filename, content)
+              io_classified(filename) { File.write(filename, content) }
               mode_name = remote ? "remote" : "local"
               outcome_verb = existed ? "updated" : "created"
               summary = "AGENTS.md · #{mode_name} mode"
@@ -170,6 +171,18 @@ module Hwaro
             else
               puts content
             end
+          end
+
+          # Permission and read-only filesystem errors, classified instead of
+          # escaping as an unhandled exception.
+          private def io_classified(filename : String, &)
+            yield
+          rescue ex : File::Error | IO::Error
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_IO,
+              message: "Could not access #{filename}: #{ex.message}",
+              hint: "Check the file's permissions.",
+            )
           end
 
           # The generated document ends with a "Site-Specific Instructions"

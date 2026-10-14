@@ -228,6 +228,7 @@ module Hwaro
           targets = [] of {category: Symbol, key: String, full_path: String, display: String}
 
           tree.each do |entry|
+            next unless entry = entry.as_h?
             full_path = entry["path"]?.try(&.as_s?)
             next unless full_path
             next unless entry["type"]?.try(&.as_s?) == "blob"

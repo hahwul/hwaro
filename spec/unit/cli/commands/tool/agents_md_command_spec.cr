@@ -156,6 +156,22 @@ describe Hwaro::CLI::Commands::Tool::AgentsMdCommand do
       end
     end
 
+    it "refuses with a classified HWARO_E_IO error when AGENTS.md is unreadable" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("AGENTS.md", "# mine\n")
+          File.chmod("AGENTS.md", 0o000)
+
+          err = expect_raises(Hwaro::HwaroError) do
+            with_captured_log { Hwaro::CLI::Commands::Tool::AgentsMdCommand.new.run(["--write", "--force"]) }
+          end
+          err.code.should eq(Hwaro::Errors::HWARO_E_IO)
+        ensure
+          File.chmod("AGENTS.md", 0o644)
+        end
+      end
+    end
+
     it "overwrites an existing AGENTS.md when --force is given" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
