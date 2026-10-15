@@ -1355,6 +1355,24 @@ describe Hwaro::Content::Seo::OgImage do
       end
     end
 
+    it "treats a manifest that is valid JSON but not an object as empty" do
+      Dir.mktmpdir do |dir|
+        ["[]", "null", "123", "\"x\""].each do |body|
+          path = File.join(dir, "manifest.json")
+          File.write(path, body)
+          config_hash, entries = Hwaro::Content::Seo::OgImage.load_manifest(path)
+          config_hash.should eq("")
+          entries.should be_empty
+        end
+      end
+    end
+
+    it "returns nil for an unreadable logo instead of raising" do
+      Dir.mktmpdir do |dir|
+        Hwaro::Content::Seo::OgImage.file_to_data_uri(dir).should be_nil # a directory: IO::Error
+      end
+    end
+
     it "returns empty manifest for missing file" do
       config_hash, entries = Hwaro::Content::Seo::OgImage.load_manifest("/nonexistent/path.json")
       config_hash.should eq("")

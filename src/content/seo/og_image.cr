@@ -1397,12 +1397,15 @@ module Hwaro
         end
 
         # Convert a file to a data URI with base64 encoding
-        def self.file_to_data_uri(file_path : String) : String
+        def self.file_to_data_uri(file_path : String) : String?
           ext = File.extname(file_path).downcase
           mime = MIME_TYPES[ext]? || "application/octet-stream"
           data = File.open(file_path, "rb", &.getb_to_end)
           encoded = Base64.strict_encode(data)
           "data:#{mime};base64,#{encoded}"
+        rescue ex : IO::Error
+          Logger.warn "OG image asset unreadable (#{file_path}): #{ex.message}"
+          nil
         end
 
         # Compute logo (x, y) for a given position string.
@@ -1632,7 +1635,8 @@ module Hwaro
         # Load the OG manifest file. Returns {config_hash, entries}.
         def self.load_manifest(manifest_path : String) : Tuple(String, Hash(String, String))
           return {"", {} of String => String} unless File.exists?(manifest_path)
-          data = JSON.parse(File.read(manifest_path))
+          # Valid JSON that is not an object (`[]`, `null`) makes `Any#[]?` raise.
+          return {"", {} of String => String} unless data = JSON.parse(File.read(manifest_path)).as_h?
           config_hash = data["config_hash"]?.try(&.as_s?) || ""
           entries = {} of String => String
           if e = data["entries"]?.try(&.as_h?)

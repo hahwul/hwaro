@@ -1157,6 +1157,21 @@ describe Hwaro::Assets::Pipeline do
       end
     end
 
+    it "leaves a url() containing an encoded NUL as written" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("static/css")
+          File.write("static/css/a.css", ".a{background:url(img/a%00.png)}")
+
+          config = make_config
+          config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "main.css", files: ["css/a.css"])
+          Hwaro::Assets::Pipeline.new(config).process("public")
+
+          File.read("public/assets/main.css").should contain("url(img/a%00.png)")
+        end
+      end
+    end
+
     # PCRE2 validates the whole subject on every match: one Latin-1 byte
     # anywhere in a bundled file raised ArgumentError (url() rebasing, either
     # minifier) and failed the build.
