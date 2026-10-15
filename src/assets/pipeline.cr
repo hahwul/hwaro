@@ -228,7 +228,9 @@ module Hwaro
         return whole if path_part.matches?(/%2[EeFf]/)
         target = Path.posix(source_dir, path_part).normalize
         return whole if Utils::PathUtils.escapes_parent?(target.to_s)
-        return whole unless File.file?(File.join(@config.source_dir, URI.decode(target.to_s)))
+        decoded = URI.decode(target.to_s)
+        return whole if decoded.includes?('\0') # File.file? raises on NUL
+        return whole unless File.file?(File.join(@config.source_dir, decoded))
         rebased = target.relative_to(Path.posix(bundle_dir)).to_s
         "url(#{quote}#{rebased}#{suffix}#{quote})"
       end
