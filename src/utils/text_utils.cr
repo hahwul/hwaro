@@ -795,7 +795,7 @@ module Hwaro
       # relying on a dotall flag; `\1` ties the close tag to the open tag.
       # A self-closing or unterminated tag won't match and is left to the
       # tag stripper below.
-      RAW_TEXT_ELEMENT = /<(script|style)(?:\s#{HTML_TAG_ATTRS})?>[\s\S]*?<\/\1\s*>/i
+      RAW_TEXT_ELEMENT = /<(script|style)(?:\s#{HTML_TAG_ATTRS})?>/i
 
       # Elements the author marked `aria-hidden="true"` are decoration, not
       # text: a screen reader skips them and so must every plain-text
@@ -807,7 +807,36 @@ module Hwaro
       # RAW_TEXT_ELEMENT: an unterminated or same-tag-nested element just
       # falls through to the tag stripper, which is harmless here because the
       # result is text either way.
-      ARIA_HIDDEN_ELEMENT = /<([a-zA-Z][a-zA-Z0-9]*)\s[^>]*aria-hidden=["']true["'][^>]*>[\s\S]*?<\/\1\s*>/
+      ARIA_HIDDEN_ELEMENT = /<([a-zA-Z][a-zA-Z0-9]*)\s[^>]*aria-hidden=["']true["'][^>]*>/
+
+      # Replace each `opener` match (capture 1 = tag name) and everything up to
+      # the first matching `</tag>` with a space; an opener with no closer is
+      # left to the tag stripper. A lazy `[\s\S]*?</\1>` regex rescans to the
+      # end for every unclosed opener (quadratic on `<script>` x 20k), so the
+      # closer is searched here and a tag with no closer left is not retried.
+      private def drop_elements(text : String, opener : Regex, ignore_case : Bool) : String
+        return text unless opener.matches?(text)
+        closers = {} of String => Regex
+        dead = Set(String).new
+        pos = 0
+        copied = 0
+        String.build do |io|
+          while m = opener.match_at_byte_index(text, pos)
+            start = m.byte_begin
+            tag = ignore_case ? m[1].downcase : m[1]
+            closer = closers[tag] ||= Regex.new("</#{Regex.escape(m[1])}\\s*>", ignore_case ? Regex::Options::IGNORE_CASE : Regex::Options::None)
+            if !dead.includes?(tag) && (c = closer.match_at_byte_index(text, m.byte_end))
+              io.write(text.to_slice[copied, start - copied])
+              io << ' '
+              copied = pos = c.byte_end
+            else
+              dead << tag
+              pos = start + 1
+            end
+          end
+          io.write(text.to_slice[copied, text.bytesize - copied])
+        end
+      end
 
       # Rendered HTML as plain text: tags stripped, entities decoded, edges
       # trimmed. The one spelling for excerpts and feed descriptions.
@@ -823,10 +852,10 @@ module Hwaro
       def strip_html(text : String) : String
         # Remove raw-text element bodies (<style>/<script>) before stripping
         # tags so their CSS/JS contents don't leak through as "text".
-        text = text.gsub(RAW_TEXT_ELEMENT, " ")
+        text = drop_elements(text, RAW_TEXT_ELEMENT, true)
         # Then the decorative ones. Guarded by a substring probe so a page
         # with no aria-hidden markup never pays for the scan.
-        text = text.gsub(ARIA_HIDDEN_ELEMENT, " ") if ByteScan.includes?(text, "aria-hidden")
+        text = drop_elements(text, ARIA_HIDDEN_ELEMENT, false) if ByteScan.includes?(text, "aria-hidden")
         size = text.bytesize
         String.build(size) do |io|
           last_was_space = true # suppress leading space
@@ -961,14 +990,14 @@ module Hwaro
       # `[\s\S]*?` so multi-line blocks are removed whole; the `<code>`
       # inside `<pre>` is consumed by the outer match. Unterminated tags
       # fall through to the generic tag stripper.
-      EXCERPT_SKIP_ELEMENT = /<(pre|script|style|figure|h[1-6])(?:\s#{HTML_TAG_ATTRS})?>[\s\S]*?<\/\1\s*>/i
+      EXCERPT_SKIP_ELEMENT = /<(pre|script|style|figure|h[1-6])(?:\s#{HTML_TAG_ATTRS})?>/i
       EXCERPT_SKIP_VOID    = /<img(?:\s#{HTML_TAG_ATTRS})?\/?>/i
       # Markup the Markdown extensions emit whose text is not prose either:
       # display math (TeX source until KaTeX/MathJax runs in the browser),
       # footnote reference markers (`[1]`) and the trailing footnotes
       # section. Inline math (`math-inline`) is part of the sentence and
       # keeps its `\(x\)` source.
-      EXCERPT_SKIP_CLASSED = /<(span|div|sup|section)\s+class="(?:math(?! math-inline)|footnote-ref|footnotes)[^"]*"[^>]*>[\s\S]*?<\/\1\s*>/i
+      EXCERPT_SKIP_CLASSED = /<(span|div|sup|section)\s+class="(?:math(?! math-inline)|footnote-ref|footnotes)[^"]*"[^>]*>/i
 
       # Plain prose of a rendered HTML body, for the automatic summary:
       # code-block/figure/heading/display-math/footnote blocks dropped, tags stripped,
@@ -977,7 +1006,7 @@ module Hwaro
       # whitespace collapsed to single spaces. The result is TEXT — a
       # consumer that embeds it in HTML must escape it again.
       def excerpt_text(html : String) : String
-        cleaned = html.gsub(EXCERPT_SKIP_ELEMENT, " ").gsub(EXCERPT_SKIP_CLASSED, " ").gsub(EXCERPT_SKIP_VOID, " ")
+        cleaned = drop_elements(drop_elements(html, EXCERPT_SKIP_ELEMENT, true), EXCERPT_SKIP_CLASSED, true).gsub(EXCERPT_SKIP_VOID, " ")
         text = HTML.unescape(strip_html(cleaned))
         collapse_whitespace(text)
       end
