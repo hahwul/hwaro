@@ -372,6 +372,14 @@ describe Hwaro::Utils::TextUtils do
   end
 
   describe ".strip_html" do
+    it "stays linear on many unclosed raw-text and aria-hidden openers" do
+      t = Time.instant
+      Hwaro::Utils::TextUtils.strip_html("<script>" * 20_000 + "x").should eq("x")
+      Hwaro::Utils::TextUtils.strip_html(%(<b aria-hidden="true">) * 20_000 + "x").should eq("x")
+      Hwaro::Utils::TextUtils.excerpt_text("<pre>" * 20_000 + "x").should eq("x")
+      (Time.instant - t).should be < 10.seconds # quadratic took 16s+; slack for a loaded suite
+    end
+
     it "strips simple tags" do
       Hwaro::Utils::TextUtils.strip_html("<p>Hello</p>").should eq("Hello")
     end
