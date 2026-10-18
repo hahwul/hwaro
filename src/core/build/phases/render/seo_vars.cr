@@ -12,7 +12,11 @@ module Hwaro::Core::Build::Phases::Render
     page_url_override : String?,
     og_type_override : String?,
   )
-    is_homepage = page.home?
+    # The homepage, or a page published AT the home URL from elsewhere: a
+    # top-level `[[versions.list]]` root (`content/v2/_index.md` → `/`) is
+    # the site's home page but not `home?` (its source sits in a folder).
+    lang = page.language
+    is_homepage = page.home? || page.url == "/" || (!lang.nil? && page.url == "/#{lang}/")
     jsonld_article = if is_homepage || page.title.empty? || page.path == "404.html"
                        # The synthesized 404 page is neither an Article nor a
                        # collection — emit no page-level JSON-LD for it.
@@ -27,8 +31,11 @@ module Hwaro::Core::Build::Phases::Render
                      end
     # The synthesized 404 page carries no page-level structured data (matching
     # the Article/CollectionPage suppression above) — skip its breadcrumb too.
-    needs_breadcrumb = page.path != "404.html" && (!page.ancestors.empty? || !page.is_index)
-    jsonld_breadcrumb = needs_breadcrumb ? Content::Seo::JsonLd.breadcrumb(page, config) : ""
+    # Only the homepage itself has no trail. Keying off `is_index` also
+    # dropped it from every top-level section and page bundle
+    # (`about/index.md` lost the crumbs `about.md` gets).
+    needs_breadcrumb = page.path != "404.html" && !is_homepage
+    jsonld_breadcrumb = needs_breadcrumb ? Content::Seo::JsonLd.breadcrumb(page, config, site) : ""
 
     # Extended schema types (FAQ, HowTo) auto-detected from extra.schema_type
     jsonld_extra = Content::Seo::JsonLd.for_page(page, config)

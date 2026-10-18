@@ -544,6 +544,11 @@ module Hwaro::Core::Build::Phases::Render
     if version = p.version
       fp_value(digest, "v:#{version.name}")
     end
+    # A transparent subsection lists its pages in the parent's
+    # `section.pages` instead of itself, so flipping it changes what every
+    # page of the parent section lists. Folded only when set, so sites
+    # without transparent sections keep their digest.
+    fp_value(digest, "transparent") if p.is_a?(Models::Section) && p.transparent
     fp_value(digest, extra_fp(p.extra)) if fields.extra
     if fields.content_derived
       fp_value(digest, p.summary || "")
@@ -860,18 +865,26 @@ module Hwaro::Core::Build::Phases::Render
     if rel.ancestors
       fp_value(digest, "c#{page.ancestors.size}")
       # `page.ancestors` and the JSON-LD breadcrumb expose nothing but each
-      # ancestor's title and URL (build_ancestors_crinja).
+      # ancestor's title and URL (build_ancestors_crinja) — and whether it
+      # renders, which decides if the breadcrumb lists it.
       page.ancestors.each do |a|
         fp_value(digest, a.path)
         fp_value(digest, a.url)
         fp_value(digest, a.title)
+        fp_value(digest, a.render ? "1" : "0")
+      end
+      # The breadcrumb's Home crumb is the page language's homepage only
+      # while one exists.
+      if (lang = page.language) && lang != site.config.default_language && site.config.multilingual?
+        fp_value(digest, site.home_language?(lang) ? "h1" : "h0")
       end
     end
     unless rel.get_page_targets.empty?
       fp_value(digest, "g#{rel.get_page_targets.size}")
+      index = pass_get_page_index(site, link_targets)
       rel.get_page_targets.each do |target|
         fp_value(digest, target)
-        fp_relation(digest, resolve_get_page_target(target, site), rel.fields)
+        fp_relation(digest, resolve_get_page_target(target, index), rel.fields)
       end
     end
     unless links.empty?
@@ -898,9 +911,10 @@ module Hwaro::Core::Build::Phases::Render
   private def compute_get_page_lookup_fingerprint(site : Models::Site, targets : Array(String), fields : Builder::ListingPageFields) : String
     return "" if targets.empty?
     digest = Digest::MD5.new
+    index = build_get_page_index(site)
     targets.each do |target|
       fp_value(digest, target)
-      fp_relation(digest, resolve_get_page_target(target, site), fields)
+      fp_relation(digest, resolve_get_page_target(target, index), fields)
     end
     digest.final.hexstring
   end
@@ -917,13 +931,48 @@ module Hwaro::Core::Build::Phases::Render
 
   # The page `get_page(path: target)` returns — same lookup order as the
   # template function (content path, URL, URL without its trailing slash,
-  # then `/<path minus .md>/`), over `site.pages` only.
-  private def resolve_get_page_target(target : String, site : Models::Site) : Models::Page?
-    site.pages.find { |p| p.path == target || p.url == target || (p.url.size > 1 && p.url.ends_with?('/') && p.url.rstrip('/') == target) } ||
-      begin
-        alt = "/#{target.chomp(".markdown").chomp(".md")}/"
-        site.pages.find { |p| p.path == alt || p.url == alt }
+  # then `/<path minus .md>/`), over `site.pages` only. A non-ASCII target
+  # is NFC-folded and each key falls back to the folded keys before the next
+  # key is tried: the template function's one map holds both (exact entries
+  # win, Render#add_nfc_keys). `index` is build_get_page_index's: a
+  # `site.pages.find` per page per target made a `--cache` build quadratic
+  # in the page count. The `/…/` fallback can't hit a slash-stripped key, so
+  # one index serves both lookups.
+  private def resolve_get_page_target(target : String, index : GetPageIndex) : Models::Page?
+    exact, folded_keys = index
+    key = target.ascii_only? ? target : target.unicode_normalize(:nfc)
+    alt = "/#{key.chomp(".markdown").chomp(".md")}/"
+    exact[key]? || folded_keys[key]? || exact[alt]? || folded_keys[alt]?
+  end
+
+  # Each key → the first page (in `site.pages` order) whose content path,
+  # URL, or URL without its trailing slash it is; the second hash holds the
+  # NFC-folded spelling of every non-ASCII key (an ASCII key folds to itself).
+  alias GetPageIndex = {Hash(String, Models::Page), Hash(String, Models::Page)}
+
+  private def build_get_page_index(site : Models::Site) : GetPageIndex
+    exact = {} of String => Models::Page
+    folded = {} of String => Models::Page
+    site.pages.each do |p|
+      keys = {p.path, p.url, (p.url.size > 1 && p.url.ends_with?('/')) ? p.url.rstrip('/') : nil}
+      keys.each do |key|
+        next unless key
+        exact[key] ||= p
+        folded[key.unicode_normalize(:nfc)] ||= p unless key.ascii_only?
       end
+    end
+    {exact, folded}
+  end
+
+  # build_get_page_index, once per render pass (see @get_page_index).
+  private def pass_get_page_index(site : Models::Site, link_targets : Hash(String, Models::Page)) : GetPageIndex
+    @page_template_hash_mutex.synchronize do
+      memo = @get_page_index
+      return memo[1] if memo && memo[0].same?(link_targets)
+      index = build_get_page_index(site)
+      @get_page_index = {link_targets, index}
+      index
+    end
   end
 
   # The `@/` link targets in a page's content (included text counted),

@@ -124,6 +124,17 @@ facets = ["section", "tags"] # 선택: 필터 칩
 
 그 밖의 속성은 `--hwaro-search-bg`, `-fg`, `-muted`, `-border`, `-active`, `-mark`, `-backdrop`입니다.
 
+덮어쓴 값은 라이트·다크 모드 모두에 적용됩니다. `-bg`나 `-fg` 같은 색을 바꿀 때는 다크 모드 값도 함께 지정하세요. 그렇지 않으면 밝은 배경에 밝은 글자가 놓일 수 있습니다.
+
+```css
+@media (prefers-color-scheme: dark) {
+  .hwaro-search-overlay, .hwaro-search-inline {
+    --hwaro-search-bg: #1c1917;
+    --hwaro-search-fg: #f5f5f4;
+  }
+}
+```
+
 빌드는 항상 자체 `assets/hwaro-search/` 파일을 씁니다. `static/` 아래 같은 경로에 파일이 있으면 덮어쓰고 경고를 남깁니다.
 
 ### 번역

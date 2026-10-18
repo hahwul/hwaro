@@ -382,6 +382,7 @@ default_language_only = true
 - **RSS feeds** include a `<language>` tag (e.g., `<language>ko</language>`)
 - **Atom feeds** include an `xml:lang` attribute (e.g., `<feed xmlns="..." xml:lang="ko">`)
 - **JSON feeds** include a top-level `"language"` field (e.g., `"language": "ko"`)
+- Section feeds (`/ko/blog/rss.xml`) and taxonomy term feeds (`/ko/tags/crystal/rss.xml`) of a non-default language declare it the same way; default-language feeds declare none
 - Feed title includes the language name: `"My Site (한국어)"`
 - Self-referencing links point to the correct language path (e.g., `https://example.com/ko/rss.xml`)
 - Draft pages and section index pages are excluded

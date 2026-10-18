@@ -101,6 +101,11 @@ module Hwaro
       property content_schema : Array(ContentSchemaConfig)
       property permalinks : Hash(String, String)
       property raw : Hash(String, TOML::Any)
+      # The variable a `base_url = "${SITE_URL}"` still names because it is
+      # unset. base_url stays empty and the build refuses to run without a
+      # `--base-url` (see `require_resolved_base_url!`); serve, which always
+      # supplies its own, and the commands that only read config keep working.
+      property unresolved_base_url_var : String? = nil
       @base_path : String? = nil
       @multilingual : Bool? = nil
 
@@ -282,6 +287,29 @@ module Hwaro
         end
       end
 
+      # A build needs a real base_url: refuse one still naming an unset
+      # variable unless the command line supplies its own (`--base-url`, or
+      # the localhost URL serve always passes).
+      def require_resolved_base_url!(override : String?) : Nil
+        return unless name = @unresolved_base_url_var
+        return if override.try(&.strip.presence)
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_CONFIG,
+          message: "Environment variable '#{name}' is not set (referenced in base_url).",
+          hint: "Export #{name}, give it a default such as ${#{name}:-https://example.com}, or pass --base-url.",
+        )
+      end
+
+      # The first placeholder in `value` naming an unset variable, or nil.
+      # Substitution already ran, so any placeholder left is an unset one.
+      private def self.unresolved_env_var(value : String) : String?
+        value.scan(Utils::EnvSubstitutor::PATTERN) do |m|
+          name = m[1]? || m[3]?
+          return name if name && ENV[name]?.nil?
+        end
+        nil
+      end
+
       # True when built-in Sass compilation is on and `relative_path` is an
       # SCSS source — such files compile to `.css` instead of publishing
       # verbatim through the static copy. The extension must be lowercase
@@ -352,18 +380,32 @@ module Hwaro
         # `title` does instead of being dropped in silence.
         if config.raw.has_key?("base_url")
           raw_base_url = string_or_default(config.raw, "base_url", config.base_url)
-          begin
-            validate_base_url!(raw_base_url)
-          rescue ex : ArgumentError
-            raise Hwaro::HwaroError.new(
-              code: Hwaro::Errors::HWARO_E_CONFIG,
-              message: ex.message || "Invalid base_url in #{config_path}",
-              hint: "Set base_url to an absolute URL such as \"https://example.com\" or \"http://localhost:3000\".",
-            )
+          # An unset `${SITE_URL}` is left in the text (and already warned
+          # about). Rejecting it here as an invalid URL also broke
+          # `hwaro serve` and `build --base-url`, which replace it anyway.
+          if name = unresolved_env_var(raw_base_url)
+            config.unresolved_base_url_var = name
+          else
+            begin
+              validate_base_url!(raw_base_url)
+            rescue ex : ArgumentError
+              raise Hwaro::HwaroError.new(
+                code: Hwaro::Errors::HWARO_E_CONFIG,
+                message: ex.message || "Invalid base_url in #{config_path}",
+                hint: "Set base_url to an absolute URL such as \"https://example.com\" or \"http://localhost:3000\".",
+              )
+            end
+            config.base_url = raw_base_url
           end
-          config.base_url = raw_base_url
         end
-        config.default_language = string_or_default(config.raw, "default_language", config.default_language)
+        # A blank code (`default_language = ""`, an unset `${LANG:-}`) is no
+        # language: it rendered `<html lang="">` on every page in silence.
+        default_language = string_or_default(config.raw, "default_language", config.default_language)
+        if default_language.blank?
+          Logger.warn "Ignoring empty default_language in #{config_path}; using #{config.default_language.inspect}"
+        else
+          config.default_language = default_language
+        end
 
         SECTION_LOADERS.each(&.load.call(config))
 

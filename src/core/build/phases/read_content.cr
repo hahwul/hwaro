@@ -62,6 +62,12 @@ module Hwaro::Core::Build::Phases::ReadContent
         # so this stat cannot hit the ELOOP the lstat above avoids.
         target = File.info?(file_path, follow_symlinks: true)
         next if target.nil?
+        # The glob does not descend into a linked directory, so a symlinked
+        # section would vanish from the site without a word.
+        if target.directory?
+          Logger.warn "Skipping content directory symlink (directory symlinks are not followed): #{file_path}"
+          next
+        end
       else
         target = lstat
       end
@@ -69,9 +75,8 @@ module Hwaro::Core::Build::Phases::ReadContent
       # Only regular files are readable content. A FIFO or socket dropped into
       # content/ would otherwise reach the parse phase's `File.read`, and
       # `open(2)` on a writer-less FIFO blocks forever — a build that hangs
-      # with no output and no error. Directories were dropped above; a symlink
-      # to an in-project directory lands here (the glob does not descend into
-      # it either) and is skipped by the same test.
+      # with no output and no error. Directories, linked ones included, were
+      # dropped above.
       next unless target.file?
 
       relative_path = Path[file_path].relative_to("content").to_s

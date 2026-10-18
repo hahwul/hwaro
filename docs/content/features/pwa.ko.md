@@ -84,7 +84,7 @@ cache_strategy = "cache-first"
 ```html
 <head>
   <link rel="manifest" href="{{ base_url }}/manifest.json">
-  <meta name="theme-color" content="{{ config.pwa.theme_color }}">
+  <meta name="theme-color" content="#1a1a2e"> <!-- [pwa] theme_color 값 -->
 </head>
 <body>
   ...

@@ -109,6 +109,13 @@ module Hwaro
 
           @consulted = true
           mtime = info.modification_time
+          # Bundle asset and static copies keep their SOURCE's mtime (the
+          # skip-unchanged check relies on it), so a copy's own mtime says
+          # when the source was saved, not when the build wrote it. Every
+          # write lands by atomic rename, which bumps the parent directory.
+          if info.file? && (parent = File.info?(File.dirname(File.join(@base, relative))))
+            mtime = parent.modification_time if parent.modification_time > mtime
+          end
           oldest = @oldest_accepted
           @oldest_accepted = mtime if oldest.nil? || mtime < oldest
           true

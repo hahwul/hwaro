@@ -300,6 +300,17 @@ describe "check-links section feed routes" do
     end
   end
 
+  it "resolves the PWA manifest and service worker only when [pwa] is on" do
+    Dir.mktmpdir do |dir|
+      config = Hwaro::Models::Config.new
+      cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      links = [feed_link(dir, "/manifest.json"), feed_link(dir, "/sw.js")]
+      cmd.resolve_with_routes_for_test(links, dir, cmd.routes_for_test(config)).size.should eq(2)
+      config.pwa.enabled = true
+      cmd.resolve_with_routes_for_test(links, dir, cmd.routes_for_test(config)).should be_empty
+    end
+  end
+
   it "still rejects a section feed for a section that did not opt in" do
     Dir.mktmpdir do |dir|
       FileUtils.mkdir_p(File.join(dir, "posts"))

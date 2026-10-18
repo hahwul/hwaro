@@ -55,6 +55,11 @@ describe Hwaro::Utils::TextUtils do
       Hwaro::Utils::TextUtils.excerpt_text(html).should eq("Euler wrote (e^{ipi}) first.")
     end
 
+    it "drops mermaid diagram source like a code block" do
+      html = %(<p>Intro.</p>\n<div class="mermaid">graph TD\nA--&gt;B\n</div>\n<p>Outro.</p>)
+      Hwaro::Utils::TextUtils.excerpt_text(html).should eq("Intro. Outro.")
+    end
+
     it "never reads a decoded entity as markup" do
       # `&lt;script&gt;` is literal text in the rendered HTML; decoding
       # happens after stripping so it survives as characters.

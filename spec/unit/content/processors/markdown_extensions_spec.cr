@@ -270,10 +270,10 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
 
   describe "definition lists (extended)" do
     it "escapes HTML in terms" do
-      content = "<script>alert(1)</script>\n: Safe definition"
+      content = "<img src=x onerror=alert(1)>\n: Safe definition"
       result = Hwaro::Content::Processors::MarkdownExtensions.preprocess_definition_lists(content)
-      result.should contain("&lt;script&gt;")
-      result.should_not contain("<script>alert")
+      result.should contain("&lt;img")
+      result.should_not contain("<img src=x")
     end
 
     it "escapes HTML in definitions" do

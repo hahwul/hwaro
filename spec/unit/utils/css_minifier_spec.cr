@@ -404,6 +404,11 @@ describe Hwaro::Utils::CssMinifier do
       result.should contain("--spacing:16px")
     end
 
+    it "keeps a space in an empty custom property value" do
+      css = "*, ::before { --tw-pan-x: ; --tw-pan-y:  ;\n  --tw-ring-inset: }"
+      Hwaro::Utils::CssMinifier.minify(css).should eq("*,::before{--tw-pan-x: ;--tw-pan-y: ;--tw-ring-inset: }")
+    end
+
     it "preserves var() function calls" do
       css = "body { color: var(--main-color); }"
       result = Hwaro::Utils::CssMinifier.minify(css)

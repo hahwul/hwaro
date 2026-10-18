@@ -70,6 +70,7 @@ module Hwaro::Core::Build::Phases::Render
       end
     end
 
+    add_nfc_keys(pages_by_path)
     vars["__all_pages__"] = Crinja::Value.new(all_pages_array)
     vars["__pages_by_path__"] = Crinja::Value.new(pages_by_path)
     vars["__bundle_asset_urls__"] = Crinja::Value.new(bundle_asset_urls(site).transform_values { |url| Crinja::Value.new(url) })
@@ -156,9 +157,11 @@ module Hwaro::Core::Build::Phases::Render
     end
 
     vars["__all_sections__"] = Crinja::Value.new(all_sections_array)
+    add_nfc_keys(sections_by_key)
     vars["__sections_by_key__"] = Crinja::Value.new(sections_by_key)
     sections_by_language = {} of String => Crinja::Value
     sections_by_key_by_lang.each do |language, sections|
+      add_nfc_keys(sections)
       sections_by_language[language] = Crinja::Value.new(sections)
     end
     vars["__sections_by_key_by_lang__"] = Crinja::Value.new(sections_by_language)
@@ -418,6 +421,17 @@ module Hwaro::Core::Build::Phases::Render
     vars["_i18n_default_language"] = Crinja::Value.new(config.default_language)
 
     vars
+  end
+
+  # `get_page`/`get_section` look a non-ASCII path up NFC-folded, as `@/`
+  # links resolve (InternalLinkResolver.page_for): macOS and zip hand out
+  # decomposed (NFD) file names while templates are typed precomposed, so
+  # `get_page(path="posts/café.md")` missed a decomposed `café.md`. Index the
+  # folded spelling of every key too; an exact key keeps its entry.
+  private def add_nfc_keys(map : Hash(String, Crinja::Value)) : Nil
+    map.to_a.each do |key, value|
+      map[key.unicode_normalize(:nfc)] ||= value unless key.ascii_only?
+    end
   end
 
   # Converts a resolved menu `Entry` (see `Content::Menus`) to the Crinja

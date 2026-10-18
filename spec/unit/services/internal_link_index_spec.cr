@@ -32,6 +32,18 @@ describe Hwaro::Services::InternalLinkIndex do
       end
     end
 
+    # The build retries a miss NFC-folded (InternalLinkResolver.page_for), so
+    # a precomposed link reaches a decomposed (macOS/zip) file name.
+    it "folds Unicode normalization like the build's page_for" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "café.md".unicode_normalize(:nfd)), "+++\ntitle = \"C\"\n+++\n")
+        index = Hwaro::Services::InternalLinkIndex.new(dir + "/")
+        index.unresolved_reason("café.md".unicode_normalize(:nfc)).should be_nil
+        index.unresolved_reason("caf%C3%A9.md").should be_nil
+        index.unresolved_reason("cafe.md").should eq("not found")
+      end
+    end
+
     it "resolves published pages and sections by their exact content path" do
       Dir.mktmpdir do |dir|
         FileUtils.mkdir_p(File.join(dir, "posts", "bundle"))
@@ -47,6 +59,25 @@ describe Hwaro::Services::InternalLinkIndex do
         index.unresolved_reason("posts/a.md").should eq("not found")
         index.unresolved_reason("posts/bundle/").should eq("not found")
         index.unresolved_reason("").should eq("empty link")
+      end
+    end
+
+    # The build's add_default_language_aliases: `@/blog/bun/index.md` reaches
+    # `blog/bun/index.ko.md` on a `ko`-default site.
+    it "resolves the bare path of a file spelling the default language out" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "config.toml"), "default_language = \"ko\"\n[languages.ko]\n[languages.en]\n")
+        content = File.join(dir, "content")
+        FileUtils.mkdir_p(File.join(content, "bun"))
+        File.write(File.join(content, "bun", "index.ko.md"), "+++\ntitle = \"B\"\n+++\n")
+        File.write(File.join(content, "about.ko.md"), "+++\ntitle = \"A\"\ndraft = true\n+++\n")
+        File.write(File.join(content, "about.md"), "+++\ntitle = \"A\"\n+++\n")
+        File.write(File.join(content, "x.en.md"), "+++\ntitle = \"X\"\n+++\n")
+
+        index = Hwaro::Services::InternalLinkIndex.new(content)
+        index.unresolved_reason("bun/index.md").should be_nil
+        index.unresolved_reason("about.md").should be_nil
+        index.unresolved_reason("x.md").should eq("not found")
       end
     end
 

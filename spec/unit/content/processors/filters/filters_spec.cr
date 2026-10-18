@@ -1472,6 +1472,11 @@ describe "MenuFilters" do
       render_crinja("{{ '/' | active_path(ancestor=true) }}", vars).should eq("true")
     end
 
+    it "never matches an empty url, even on the homepage" do
+      vars = {"page_url" => Crinja::Value.new("/")}
+      render_crinja("{{ '' | active_path }}", vars).should eq("false")
+    end
+
     it "never matches an external http(s) entry" do
       vars = {"page_url" => Crinja::Value.new("/posts/")}
       render_crinja("{{ 'https://example.com' | active_path }}", vars).should eq("false")

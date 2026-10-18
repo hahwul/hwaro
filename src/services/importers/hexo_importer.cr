@@ -156,6 +156,10 @@ module Hwaro
                   normalized = ps.strip("/").sub(/\.\w+$/, "")
                   parts = normalized.split("/")
                   slug = Utils::TextUtils.slugify(parts.last) unless parts.empty?
+                  # The permalink is the post's published address; the slug
+                  # alone moved `hello/world/` to /posts/world/, breaking
+                  # every inbound link. Kept as `path`, as Jekyll's is.
+                  apply_source_url(fields, ps, file_info[:path])
                 end
               end
             end

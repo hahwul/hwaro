@@ -629,7 +629,7 @@ module Hwaro::Core::Build::Phases::Transform
     all_pages = site.pages.select { |p| related_candidate?(p) }
 
     # Build inverted index first (needed for both candidate discovery and scoring)
-    inverted, page_lookup = build_related_index(all_pages, taxonomy_names)
+    inverted, index_of = build_related_index(all_pages, taxonomy_names)
 
     # Collect paths of pages that need related_posts recomputed:
     # 1. Changed pages themselves
@@ -637,6 +637,13 @@ module Hwaro::Core::Build::Phases::Transform
     # 3. Pages sharing any taxonomy term with changed pages (may become newly related)
     changed_paths = changed_pages.map(&.path).to_set
     pages_to_update = Set(String).new(changed_paths)
+
+    # A changed page that just left the candidate set (an --include-future
+    # preview, render = false) is skipped by the loop below; drop the list it
+    # carried over, as a cold build never gives it one.
+    changed_pages.each do |page|
+      page.related_posts = [] of Models::Page unless index_of.has_key?(page.path)
+    end
 
     # A page turned draft/future/expired is removed from site.pages, so it is
     # neither a changed page nor in the inverted index — but pages that listed it
@@ -658,42 +665,18 @@ module Hwaro::Core::Build::Phases::Transform
         next unless inv_tax
         values.each do |term|
           if candidates = inv_tax[term]?
-            candidates.each { |path| pages_to_update << path }
+            candidates.each { |j| pages_to_update << all_pages[j].path }
           end
         end
       end
     end
 
     # Recompute only for affected pages
+    scores = Array(Int32).new(all_pages.size, 0)
+    touched = [] of Int32
     pages_to_update.each do |page_path|
-      page = page_lookup[page_path]?
-      next unless page
-
-      scores = Hash(String, Int32).new(0)
-      taxonomy_names.each do |tax_name|
-        values = page.taxonomy_values(tax_name).uniq
-        inv_tax = inverted[tax_name]?
-        next unless inv_tax
-        values.each do |term|
-          if candidates = inv_tax[term]?
-            candidates.each do |other_path|
-              next if other_path == page.path
-              scores[other_path] += 1
-            end
-          end
-        end
-      end
-
-      if scores.empty?
-        page.related_posts = [] of Models::Page
-        next
-      end
-
-      page.related_posts = scores.to_a
-        .select { |path, _| (other = page_lookup[path]?) && other.language == page.language && other.version.same?(page.version) }
-        .sort_by! { |_, s| -s }
-        .first(limit)
-        .map { |path, _| page_lookup[path] }
+      next unless i = index_of[page_path]?
+      all_pages[i].related_posts = top_related_posts(i, all_pages, inverted, taxonomy_names, limit, scores, touched)
     end
 
     pages_to_update
@@ -709,12 +692,13 @@ module Hwaro::Core::Build::Phases::Transform
       pages: Array(Models::Page),
       extra: Hash(String, Crinja::Value))
 
-    # 1. Collect authors from all pages. Skip drafts/generated to match the
-    # /authors/ taxonomy generator (build_taxonomy_index skips both); otherwise
-    # under `--drafts` site.authors would list draft posts the generated author
-    # page omits — two views of the same author disagreeing.
+    # 1. Collect authors from all pages. Skip what the /authors/ taxonomy
+    # generator skips (build_taxonomy_index): otherwise under `--drafts`
+    # site.authors would list draft posts the generated author page omits,
+    # and a headless (`render = false`) page — never written — showed up as
+    # a dead link in `author.pages`.
     site.pages.each do |page|
-      next if page.draft || page.unpublished || page.generated
+      next if page.excluded_from_listings?
       page.authors.each do |author_id|
         # Normalize ID: lower case, stripped
         id = author_id.strip.downcase
@@ -743,9 +727,20 @@ module Hwaro::Core::Build::Phases::Transform
       # an author as a template variable, implied a template was involved, and
       # never mentioned the data file. Enrichment is optional metadata, so a
       # wrong shape degrades to a warning naming the file instead.
-      if authors_data.raw.is_a?(Hash)
+      if (data_hash = authors_data.raw).is_a?(Hash)
+        # Author ids are normalized (stripped, downcased) above, so the data
+        # keys are too: `authors = ["JohnDoe"]` with a `JohnDoe:` entry — the
+        # id exactly as written — never matched the lookup of "johndoe" and
+        # the author silently lost its name and fields. An exact lowercase key
+        # wins over a differently cased one.
+        by_id = {} of String => Crinja::Value
+        data_hash.each do |key, value|
+          raw_key = key.to_s
+          id = raw_key.strip.downcase
+          by_id[id] = value if raw_key == id || !by_id.has_key?(id)
+        end
         temp_authors.each_key do |id|
-          author_info = authors_data[id]
+          author_info = by_id[id]? || next
           next if author_info.raw.nil?
 
           # Normalize Crinja hash entries to {String, Crinja::Value} pairs
@@ -865,28 +860,83 @@ module Hwaro::Core::Build::Phases::Transform
     !(page.is_index && File.basename(page.path).starts_with?("_index"))
   end
 
-  # Build the taxonomy inverted index ({tax_name => {term => [page_path]}}) and a
-  # path->page lookup for the given candidate pages. Shared by the full and
-  # incremental related-posts computations.
-  private def build_related_index(pages : Array(Models::Page), taxonomy_names : Array(String)) : {Hash(String, Hash(String, Array(String))), Hash(String, Models::Page)}
-    inverted = {} of String => Hash(String, Array(String))
-    page_lookup = {} of String => Models::Page
+  # Build the taxonomy inverted index ({tax_name => {term => [page index]}})
+  # and a path->index lookup for the given candidate pages. Shared by the
+  # full and incremental related-posts computations.
+  private def build_related_index(pages : Array(Models::Page), taxonomy_names : Array(String)) : {Hash(String, Hash(String, Array(Int32))), Hash(String, Int32)}
+    inverted = {} of String => Hash(String, Array(Int32))
+    index_of = {} of String => Int32
 
-    pages.each do |page|
-      page_lookup[page.path] = page
+    pages.each_with_index do |page, i|
+      index_of[page.path] = i
       taxonomy_names.each do |tax_name|
         # uniq: a term repeated in front matter is still one shared term,
         # as on the taxonomy pages; counting it twice inflated scores.
         values = page.taxonomy_values(tax_name).uniq
         values.each do |term|
-          inv_tax = inverted[tax_name]? || (inverted[tax_name] = {} of String => Array(String))
-          arr = inv_tax[term]? || (inv_tax[term] = [] of String)
-          arr << page.path
+          inv_tax = inverted[tax_name]? || (inverted[tax_name] = {} of String => Array(Int32))
+          arr = inv_tax[term]? || (inv_tax[term] = [] of Int32)
+          arr << i
         end
       end
     end
 
-    {inverted, page_lookup}
+    {inverted, index_of}
+  end
+
+  # The `limit` pages most related to `pages[i]`: those sharing a taxonomy
+  # term with it in its own language and version, by shared-term count, ties
+  # in first-seen order (pages/taxonomy iteration order). `scores` (one zero
+  # per page) and `touched` are scratch buffers reused across calls and left
+  # zeroed/empty. A term nearly every page carries (`tags = ["blog"]`) makes
+  # this walk O(pages²) site-wide, so the pair loop stays on array slots: a
+  # string-keyed hash insert per pair took ~8s at 4,000 posts.
+  private def top_related_posts(
+    i : Int32,
+    pages : Array(Models::Page),
+    inverted : Hash(String, Hash(String, Array(Int32))),
+    taxonomy_names : Array(String),
+    limit : Int32,
+    scores : Array(Int32),
+    touched : Array(Int32),
+  ) : Array(Models::Page)
+    return [] of Models::Page if limit <= 0
+    page = pages[i]
+    page_lang = page.language
+    taxonomy_names.each do |tax_name|
+      next unless inv_tax = inverted[tax_name]?
+      page.taxonomy_values(tax_name).uniq.each do |term|
+        next unless candidates = inv_tax[term]?
+        candidates.each do |j|
+          next if j == i
+          other = pages[j]
+          next unless other.language == page_lang
+          # Related posts never cross a version boundary either — a v2
+          # page recommending its own v1 twin is noise, not a relation.
+          next unless other.version.same?(page.version)
+          touched << j if scores[j] == 0
+          scores[j] += 1
+        end
+      end
+    end
+
+    # Bounded top-k selection — a stable descending sort's first `limit`,
+    # in O(n*k). Every touched slot is reset on the way through.
+    top = [] of {Int32, Int32}
+    touched.each do |j|
+      score = scores[j]
+      scores[j] = 0
+      next if top.size == limit && score <= top[-1][1]
+      idx = 0
+      while idx < top.size && score <= top[idx][1]
+        idx += 1
+      end
+      next if idx >= limit
+      top.insert(idx, {j, score})
+      top.pop if top.size > limit
+    end
+    touched.clear
+    top.map { |j, _| pages[j] }
   end
 
   # Compute related posts for each page based on shared taxonomy terms.
@@ -898,57 +948,13 @@ module Hwaro::Core::Build::Phases::Transform
     return if limit <= 0
     pages = site.pages.select { |p| related_candidate?(p) }
 
-    # Build inverted index: {taxonomy_name => {term => Array(page_path)}}
-    # This avoids the O(N²) pairwise comparison
-    inverted, page_lookup = build_related_index(pages, taxonomy_names)
+    inverted, _ = build_related_index(pages, taxonomy_names)
+    scores = Array(Int32).new(pages.size, 0)
+    touched = [] of Int32
 
-    pages.each do |page|
-      # Count co-occurrences via inverted index: O(terms * avg_pages_per_term).
-      # Filter by language during accumulation — cross-language candidates are
-      # discarded from the final output anyway, so skipping them here produces
-      # identical results while reducing work for multilingual sites.
-      scores = Hash(String, Int32).new(0)
-      page_lang = page.language
-      taxonomy_names.each do |tax_name|
-        values = page.taxonomy_values(tax_name).uniq
-        inv_tax = inverted[tax_name]?
-        next unless inv_tax
-        values.each do |term|
-          if candidates = inv_tax[term]?
-            candidates.each do |other_path|
-              next if other_path == page.path
-              # page_lookup[other_path] is guaranteed present: the inverted
-              # index is populated from the same `pages` iteration above.
-              other = page_lookup[other_path]
-              next unless other.language == page_lang
-              # Related posts never cross a version boundary either — a v2
-              # page recommending its own v1 twin is noise, not a relation.
-              next unless other.version.same?(page.version)
-              scores[other_path] += 1
-            end
-          end
-        end
-      end
-
-      next if scores.empty?
-
-      # Bounded top-k selection — equivalent to `.sort_by { -s }.first(limit)`
-      # but O(n*k) instead of O(n log n) with fewer allocations. Ties break by
-      # scores-hash insertion order (which mirrors pages/taxonomy iteration),
-      # matching a stable descending sort. Optimal when limit is small
-      # (default 5); parity with sort near limit ≈ log₂(n).
-      top = [] of {String, Int32}
-      scores.each do |path, score|
-        idx = 0
-        while idx < top.size && score <= top[idx][1]
-          idx += 1
-        end
-        next if idx >= limit
-        top.insert(idx, {path, score})
-        top.pop if top.size > limit
-      end
-
-      page.related_posts = top.map { |path, _| page_lookup[path] }
+    pages.each_with_index do |page, i|
+      related = top_related_posts(i, pages, inverted, taxonomy_names, limit, scores, touched)
+      page.related_posts = related unless related.empty?
     end
   end
 

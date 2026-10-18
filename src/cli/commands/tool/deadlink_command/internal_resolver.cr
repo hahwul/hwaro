@@ -74,7 +74,7 @@ module Hwaro
                        resolves?(resolved_url, link, content_dir, base_dir, project_root, taxonomy_names, oracle, routes) ||
                        generated_routes.matches?(resolved_url) ||
                        feed_route?(resolved_url, generated_routes, content_dir, base_dir, language_codes) ||
-                       paginated_route?(resolved_url, link, content_dir, base_dir, taxonomy_names) ||
+                       paginated_route?(resolved_url, link, taxonomy_names, routes) ||
                        published_route?(resolved_url, routes)
 
               # Only when the literal path fails do we read the URL as a
@@ -210,6 +210,7 @@ module Hwaro
             add_route.call(config.robots.filename) if config.robots.enabled
             add_route.call(config.llms.filename) if config.llms.enabled
             add_route.call(config.llms.full_filename) if config.llms.enabled && config.llms.full_enabled
+            Content::Seo::Pwa.published_outputs(config, "/").each { |path| add_route.call(path) }
             add_route.call(config.search.filename) if config.search.enabled && (!config.search.sharded? || config.search.single_file)
             # Sharded index: the manifest is a fixed well-known route; the
             # per-shard files are only discoverable through it.
@@ -330,7 +331,7 @@ module Hwaro
           # tail resolves to a section that actually paginates. The `/page/`
           # segment is trusted only for a real section, so an ordinary dead
           # `/foo/page/2/` still reports.
-          private def paginated_route?(url : String, link : Link, content_dir : String, base_dir : String, taxonomy_names : Array(String)) : Bool
+          private def paginated_route?(url : String, link : Link, taxonomy_names : Array(String), routes : Services::PageRouteIndex) : Bool
             return false if link.kind == :image
             match = url.match(/\A(.*)\/([^\/]+)\/(\d+)\/?\z/)
             return false unless match
@@ -341,10 +342,11 @@ module Hwaro
             # Taxonomy term listings paginate too (`/tags/crystal/page/2/`).
             return true if segment == "page" && taxonomy_url?(prefix, taxonomy_names)
 
-            index_path = section_index_path(prefix, content_dir, base_dir)
-            return false unless index_path
-            paginate_path, per_page = section_pagination(index_path)
-            return false unless per_page
+            # The section the build publishes at `prefix` — slugged, remapped,
+            # versioned or translated (`/ko/blog/p/2/`) — and whether it
+            # paginates there, the way the build decides it (`paginate`,
+            # `pagination_enabled`, the site-wide `[pagination]`).
+            paginate_path, per_page, dir = routes.pager_for(prefix) || return false
             return false unless segment == paginate_path
 
             number = match[3].to_i?
@@ -355,7 +357,7 @@ module Hwaro
             # section. The count is a deliberate OVER-estimate (every
             # descendant, drafts included), so the bound can never report a
             # link the build does publish.
-            descendants = section_page_count(File.dirname(index_path))
+            descendants = section_page_count(dir)
             return true if descendants == 0
             number <= (descendants + per_page - 1) // per_page
           end
@@ -388,44 +390,6 @@ module Hwaro
               return candidate if File.exists?(candidate)
             end
             nil
-          end
-
-          # `{paginate_path, per_page}` for a section `_index` file. `per_page`
-          # is nil unless the section declares a positive `paginate_by`, which
-          # is what makes it produce `/page/N/` routes at all.
-          private def section_pagination(index_path : String) : {String, Int32?}
-            content = Utils::TextUtils.strip_bom(File.read(index_path))
-            return {"page", nil} unless fm = Utils::FrontmatterScanner.detect(content)
-            dialect, source = fm
-
-            case dialect
-            when :toml
-              data = TOML.parse(source)
-              per_page = data["paginate_by"]?.try(&.raw).as?(Int64)
-              path = data["paginate_path"]?.try(&.as_s?) || "page"
-              return {path, positive_page_size(per_page)}
-            when :yaml
-              if h = YAML.parse(source).as_h?
-                per_page = h[YAML::Any.new("paginate_by")]?.try(&.as_i64?)
-                path = h[YAML::Any.new("paginate_path")]?.try(&.as_s?) || "page"
-                return {path, positive_page_size(per_page)}
-              end
-            when :json
-              if h = JSON.parse(source).as_h?
-                per_page = h["paginate_by"]?.try(&.as_i64?)
-                path = h["paginate_path"]?.try(&.as_s?) || "page"
-                return {path, positive_page_size(per_page)}
-              end
-            end
-
-            {"page", nil}
-          rescue
-            {"page", nil}
-          end
-
-          private def positive_page_size(value : Int64?) : Int32?
-            return unless value && value > 0
-            value.clamp(1_i64, Int32::MAX.to_i64).to_i32
           end
 
           # Taxonomy listing and term pages (`/tags/`, `/categories/foo/`) are

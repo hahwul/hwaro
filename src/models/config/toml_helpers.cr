@@ -185,9 +185,15 @@ module Hwaro
 
       # Safe boolean loader: returns the parsed Bool if present, otherwise the default.
       # This avoids the `||` pitfall where `false || default` silently ignores `false`.
+      # A present-but-non-boolean value (`safe = "true"`, `enabled = 1`) warns
+      # like int_value does: quoting a bool is an easy TOML slip, and dropping
+      # it in silence left `[markdown] safe` or `[csp] enabled` off unnoticed.
       private def self.bool_value(raw : TOML::Any?, default : Bool) : Bool
-        val = raw.try(&.as_bool?)
-        val.nil? ? default : val
+        return default unless raw
+        val = raw.as_bool?
+        return val unless val.nil?
+        Logger.warn "Ignoring non-boolean config value #{raw.raw.inspect}; using default #{default}"
+        default
       end
 
       # Safe integer loader: handles both integer and float TOML values.
@@ -235,12 +241,19 @@ module Hwaro
         val
       end
 
-      # Non-raising Int32 extraction from a single TOML value (nil if absent or
+      # Non-raising Int32 extraction from a single present TOML value (nil if
       # non-numeric). Clamps to Int32 range like int_value so an oversized value
       # never raises OverflowError out of as_i?/to_i at the inline call sites.
+      # A non-numeric value warns like int_value: a quoted
+      # `[deployment] max_deletes = "10"` used to leave the 256-file default
+      # in force without a word.
       private def self.int_or_nil(raw : TOML::Any) : Int32?
         val = raw.as_i64? || raw.as_f?.try { |f| f.finite? ? f.clamp(Int32::MIN.to_f64, Int32::MAX.to_f64).to_i64 : nil }
-        val.try(&.clamp(Int32::MIN.to_i64, Int32::MAX.to_i64).to_i32)
+        unless val
+          Logger.warn "Ignoring non-numeric config value #{raw.raw.inspect}"
+          return
+        end
+        val.clamp(Int32::MIN.to_i64, Int32::MAX.to_i64).to_i32
       end
 
       # Reads a string-list option. An array keeps its string entries as
@@ -263,6 +276,20 @@ module Hwaro
           return string.blank? ? nil : [string]
         end
         Logger.warn "Ignoring #{key} = #{raw.raw.inspect}: expected a string or an array of strings. Keeping the default."
+        nil
+      end
+
+      # An array-of-tables option (`[[robots.rules]]`, `[[menus.main]]`, …),
+      # or nil when absent. Any other shape — usually a single `[robots.rules]`
+      # table, the one-bracket slip — is ignored with a warning: it used to
+      # vanish in silence, so a robots rule meant to block crawlers published
+      # `Allow: /` and a menu rendered empty.
+      private def self.table_array?(raw : TOML::Any?, key : String) : Array(TOML::Any)?
+        return unless raw
+        if array = raw.as_a?
+          return array
+        end
+        Logger.warn "Ignoring #{key}: it must be an array of tables — write each entry as [[#{key}]]."
         nil
       end
 

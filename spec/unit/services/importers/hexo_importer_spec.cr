@@ -3,6 +3,20 @@ require "../../../../src/services/importers/hexo_importer"
 
 describe Hwaro::Services::Importers::HexoImporter do
   describe "#run" do
+    it "keeps a post's permalink as its path" do
+      Dir.mktmpdir do |dir|
+        posts_dir = File.join(dir, "source", "_posts")
+        FileUtils.mkdir_p(posts_dir)
+        File.write(File.join(posts_dir, "p.md"), "---\ntitle: P\npermalink: hello/world/\n---\nbody\n")
+
+        output_dir = File.join(dir, "output")
+        Hwaro::Services::Importers::HexoImporter.new.run(Hwaro::Config::Options::ImportOptions.new(
+          source_type: "hexo", path: dir, output_dir: output_dir))
+
+        File.read(File.join(output_dir, "posts", "world.md")).should contain(%(path = "hello/world"))
+      end
+    end
+
     it "imports a basic Hexo post" do
       Dir.mktmpdir do |dir|
         posts_dir = File.join(dir, "source", "_posts")

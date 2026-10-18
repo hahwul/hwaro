@@ -329,9 +329,19 @@ module Hwaro
 
           private def ident_start?(c : Char) : Bool
             return true if c.ascii_letter? || c == '_' || c.ord > 0x7F
+            return escape_at?(0) if c == '\\'
             return false unless c == '-'
             n = peek(1)
-            !n.nil? && (n.ascii_letter? || n == '_' || n == '-' || n.ord > 0x7F)
+            !n.nil? && (n.ascii_letter? || n == '_' || n == '-' || n.ord > 0x7F || (n == '\\' && escape_at?(1)))
+          end
+
+          # True when the backslash at `offset` starts a CSS escape (`\30`,
+          # `\f101`, `\:`), which belongs to an identifier: Font Awesome's
+          # `$fa-var-0: \30;` icon map. A backslash before a newline or the
+          # end of the text is not one.
+          private def escape_at?(offset : Int32) : Bool
+            n = peek(offset + 1)
+            !n.nil? && n != '\n' && n != '\r' && n != '\f'
           end
 
           private def lex_number : Nil
@@ -431,9 +441,9 @@ module Hwaro
 
           private def lex_ident : Nil
             start = @char_i
-            advance
-            while Scanner.ident_char?(peek)
+            while (c = peek) && (Scanner.ident_char?(c) || (c == '\\' && escape_at?(0)))
               advance
+              advance if c == '\\' # the escaped character
             end
             name = text[start...@char_i]
 
@@ -469,7 +479,11 @@ module Hwaro
 
           private def raw_span_fn?(name : String) : Bool
             down = name.downcase
-            RAW_SPAN_FNS.includes?(down) || down.ends_with?("calc")
+            # `calc` and its vendor spellings (`-webkit-calc`), as dart-sass
+            # strips the prefix. Not any name ending in "calc": Foundation's
+            # own `rem-calc()` / `unitless-calc()` are Sass functions, and a
+            # verbatim span shipped `rem-calc(0, $base: 16px)` as text.
+            RAW_SPAN_FNS.includes?(down) || down == "calc" || down.matches?(/\A-[a-z0-9]+-calc\z/)
           end
 
           # Balanced-paren verbatim span starting at `start` (cursor on
@@ -948,7 +962,8 @@ module Hwaro
             case tok.kind
             when TokKind::Number
               @pos += 1
-              Lit.new(Number.new(tok.num_value, tok.num_unit, tok.text))
+              lexeme = Number.precise_spelling?(tok.text) ? nil : tok.text
+              Lit.new(Number.new(tok.num_value, tok.num_unit, lexeme))
             when TokKind::Str
               @pos += 1
               parts = tok.str_parts || fail
@@ -1462,16 +1477,127 @@ module Hwaro
         def self.coerce(text : String) : Value
           stripped = text.strip
           return Raw.new(text) if stripped.empty?
+          return coerce_unparsed(stripped) if unparseable?(stripped)
           template = Ast::TextTemplate.new([stripped.as(Ast::Piece)], 1, 1)
           node = parse(template)
-          return Raw.new(stripped) unless node
+          unless node
+            remember_unparseable(stripped)
+            return coerce_unparsed(stripped)
+          end
           # coercing: true — slash text arriving through storage is always
           # a CONSTRUCTED list (a literal lazy pair would have divided at
           # its force_div declaration), so it must not re-acquire lazy
           # division here. dart-sass errors on math over such a list.
           Evaluator.new(CoerceHost.new, coercing: true).eval(node)
         rescue SoftEvalError
-          Raw.new(text.strip)
+          remember_unparseable(text.strip)
+          coerce_unparsed(text.strip)
+        end
+
+        # Storage text that failed to parse or evaluate. Coercion runs
+        # against a context-free CoerceHost, so failure depends on the text
+        # alone; remembering it spares a raised SoftEvalError per member
+        # each time a stored list is read back — an append(..., comma) loop
+        # over unparseable strings re-coerces every member per iteration.
+        UNPARSEABLE       = Set(String).new
+        UNPARSEABLE_LOCK  = Mutex.new
+        UNPARSEABLE_LIMIT = 50_000
+
+        private def self.unparseable?(text : String) : Bool
+          UNPARSEABLE_LOCK.synchronize { UNPARSEABLE.includes?(text) }
+        end
+
+        private def self.remember_unparseable(text : String) : Nil
+          # List members are what repeat; a whole long list is read back
+          # once per change and would only pin memory in a long serve.
+          return if text.bytesize > 1024
+          UNPARSEABLE_LOCK.synchronize do
+            UNPARSEABLE.clear if UNPARSEABLE.size >= UNPARSEABLE_LIMIT
+            UNPARSEABLE << text
+          end
+        end
+
+        # Storage text the expression grammar can't read — typically
+        # unquoted strings holding selector syntax (`[type='text']`, `.a`)
+        # — still keeps the comma-list structure storage spelled out:
+        # `(x,)` is a one-element list and `, ` separates members. As one
+        # Raw, Foundation's `text-inputs()` (a selector list built with
+        # `append(..., comma)`) emitted `([type='text'],), [type='password']`,
+        # an invalid selector. A comma without the space is part of a
+        # string (`data:image/svg+xml,<svg …>`), never a list separator.
+        private def self.coerce_unparsed(text : String) : Value
+          if text.starts_with?('(') && text.ends_with?(",)") && closing_paren(text) == text.bytesize - 1
+            return ListV.new([coerce(text.byte_slice(1, text.bytesize - 3)).as(Value)], ListV::Sep::Comma)
+          end
+          parts = split_storage_commas(text)
+          return Raw.new(text) unless parts && parts.size >= 2 && parts.none?(&.empty?)
+          ListV.new(parts.map { |part| coerce(part).as(Value) }, ListV::Sep::Comma)
+        end
+
+        # Byte index of the paren closing the one that opens `text`,
+        # skipping quoted strings; nil when unbalanced. Scans bytes: every
+        # delimiter is ASCII, and `String#[](i)` is O(i) on non-ASCII text,
+        # which made long stored lists of such strings cubic.
+        private def self.closing_paren(text : String) : Int32?
+          bytes = text.to_slice
+          depth = 0
+          quote : UInt8? = nil
+          i = 0
+          while i < bytes.size
+            c = bytes[i]
+            if quote
+              i += 1 if c == '\\'.ord
+              quote = nil if c == quote
+            elsif c == '"'.ord || c == '\''.ord
+              quote = c
+            elsif c == '('.ord
+              depth += 1
+            elsif c == ')'.ord
+              depth -= 1
+              return i if depth == 0
+            end
+            i += 1
+          end
+          nil
+        end
+
+        # `text` split on the `, ` storage separators outside quotes and
+        # brackets; nil when the text cannot be a stored list — a top-level
+        # comma without the space, or unbalanced quotes/brackets (a
+        # `str-slice` cut through some string). Scans bytes like
+        # closing_paren.
+        private def self.split_storage_commas(text : String) : Array(String)?
+          bytes = text.to_slice
+          parts = [] of String
+          depth = 0
+          quote : UInt8? = nil
+          start = 0
+          i = 0
+          while i < bytes.size
+            c = bytes[i]
+            if quote
+              if c == '\\'.ord
+                i += 1
+              elsif c == quote
+                quote = nil
+              end
+            elsif c == '"'.ord || c == '\''.ord
+              quote = c
+            elsif c == '('.ord || c == '['.ord
+              depth += 1
+            elsif c == ')'.ord || c == ']'.ord
+              return if depth == 0
+              depth -= 1
+            elsif c == ','.ord && depth == 0
+              return unless bytes[i + 1]? == ' '.ord
+              parts << text.byte_slice(start, i - start).strip
+              start = i + 1
+            end
+            i += 1
+          end
+          return if quote || depth != 0
+          parts << text.byte_slice(start, bytes.size - start).strip
+          parts
         end
 
         # :nodoc:

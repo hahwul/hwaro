@@ -57,7 +57,10 @@ module Hwaro
         # inspect the RAW config value for the trailing-slash advisory — the
         # build is already correct, but `--fix` still tidies the file.
         raw_base_url = config.raw["base_url"]?.try(&.as_s?)
-        if config.base_url.empty?
+        if name = config.unresolved_base_url_var
+          issues << Issue.new(id: "base-url-missing", level: :warning, category: "config", file: @config_path,
+            message: "base_url names the unset environment variable '#{name}'; hwaro build refuses to run without it or --base-url")
+        elsif config.base_url.empty?
           issues << Issue.new(id: "base-url-missing", level: :warning, category: "config", file: @config_path, message: "base_url is not set")
         elsif raw_base_url && raw_base_url.ends_with?("/")
           issues << Issue.new(id: "base-url-trailing-slash", level: :warning, category: "config", file: @config_path,
@@ -80,10 +83,12 @@ module Hwaro
       end
 
       private def check_sitemap_changefreq(issues : Array(Issue), config : Models::Config) : Nil
-        # sitemap changefreq validity
-        unless VALID_CHANGEFREQS.includes?(config.sitemap.changefreq)
+        # sitemap changefreq validity. Read the RAW value: `Config.load`
+        # falls an unknown value back to the default, like math_engine.
+        changefreq = config.raw["sitemap"]?.try(&.as_h?).try(&.["changefreq"]?).try(&.as_s?) || config.sitemap.changefreq
+        unless VALID_CHANGEFREQS.includes?(changefreq)
           issues << Issue.new(id: "sitemap-changefreq-invalid", level: :warning, category: "config", file: @config_path,
-            message: "sitemap.changefreq \"#{config.sitemap.changefreq}\" is not valid (expected: #{VALID_CHANGEFREQS.join(", ")})")
+            message: "sitemap.changefreq \"#{changefreq}\" is not valid (expected: #{VALID_CHANGEFREQS.join(", ")})")
         end
       end
 

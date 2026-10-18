@@ -114,11 +114,35 @@ describe Hwaro::Services::Importers::HtmlToMarkdown do
       result.should contain("2. Second")
     end
 
+    it "keeps an ordered list's start number" do
+      html = %(<ol start="3"><li>Third</li><li>Fourth</li></ol>)
+      Hwaro::Services::Importers::HtmlToMarkdown.convert(html).should eq("3. Third\n4. Fourth")
+    end
+
+    it "escapes prose that Markdown would read as markup" do
+      convert = ->(html : String) { Hwaro::Services::Importers::HtmlToMarkdown.convert(html) }
+      convert.call("<p>2*3*4 and _x_ and snake_case and `tick` and C:\\</p>")
+        .should eq("2\\*3\\*4 and \\_x\\_ and snake_case and \\`tick\\` and C:\\\\")
+      convert.call("<p>- dash</p><p>2024. year</p><p># hash</p><p>&gt; gt</p>")
+        .should eq("\\- dash\n\n2024\\. year\n\n\\# hash\n\n\\> gt")
+      # Generated markup and code are left alone.
+      convert.call("<p><em>a*b</em> <code>x*y_</code></p><pre>p*q</pre>")
+        .should eq("*a\\*b* `x*y_`\n\n```\np*q\n```")
+    end
+
     it "converts code blocks" do
       html = "<pre><code>puts 1</code></pre>"
       result = Hwaro::Services::Importers::HtmlToMarkdown.convert(html)
       result.should contain("```")
       result.should contain("puts 1")
+    end
+
+    it "keeps a code block's language class as the fence info string" do
+      convert = ->(html : String) { Hwaro::Services::Importers::HtmlToMarkdown.convert(html) }
+      convert.call(%(<pre><code class="language-ruby">puts 1</code></pre>)).should eq("```ruby\nputs 1\n```")
+      convert.call(%(<pre class="wp-block-code lang-js"><code>x()</code></pre>)).should eq("```js\nx()\n```")
+      convert.call(%(<pre class="language-c++">int x;</pre>)).should eq("```c++\nint x;\n```")
+      convert.call(%(<pre class="wp-block-code"><code>plain</code></pre>)).should eq("```\nplain\n```")
     end
 
     it "converts inline code" do

@@ -167,6 +167,9 @@ module Hwaro
           #        {{ about.title }}
           @env.functions["get_page"] = Crinja.function({path: ""}) do
             path_arg = arguments["path"].to_s
+            # The lookup maps also hold every key NFC-folded (see
+            # Render#add_nfc_keys).
+            path_arg = path_arg.unicode_normalize(:nfc) unless path_arg.ascii_only?
 
             # Optimised O(1) lookup
             pages_map = env.resolve("__pages_by_path__")
@@ -211,6 +214,7 @@ module Hwaro
           #        {% for page in blog.pages %}
           @env.functions["get_section"] = Crinja.function({path: ""}) do
             path_arg = arguments["path"].to_s
+            path_arg = path_arg.unicode_normalize(:nfc) unless path_arg.ascii_only?
             # "blog", "/blog", "blog/" and "/blog/" all name the same section.
             url_key = "/#{path_arg.strip('/')}/"
 
@@ -658,9 +662,13 @@ module Hwaro
                 nil
               end
 
-              if resolved &&
-                 Hwaro::Utils::PathUtils.within?(resolved, project_root) &&
-                 (info = File.info?(resolved)) && info.file?
+              is_file = resolved &&
+                        Hwaro::Utils::PathUtils.within?(resolved, project_root) &&
+                        (info = File.info?(resolved)) && info.file?
+              format = data_format(path)
+              if is_file && format.nil?
+                warn_load_data_once(path, "has an unsupported file type (supported: .json, .toml, .yaml, .yml, .csv)")
+              elsif resolved && format && is_file && info
                 # to_unix_ms (Int64) like the build cache — to_unix_ns is Int128
                 mtime = info.modification_time.to_unix_ms
 
@@ -671,7 +679,7 @@ module Hwaro
                   cached = @@load_data_cache[resolved]?
                   if cached && cached[0] == mtime
                     cached[1]
-                  elsif parsed = parse_data_content(path, Utils::TextUtils.strip_bom(File.read(resolved)))
+                  elsif parsed = Utils::CrinjaUtils.parse_data_string(Utils::TextUtils.strip_bom(File.read(resolved)), format)
                     @@load_data_cache[resolved] = {mtime, parsed}
                     parsed
                   else
@@ -705,30 +713,23 @@ module Hwaro
           Logger.warn "load_data(#{path.inspect}) #{reason}; the template receives none." if first
         end
 
-        # Parse a data file's content by the extension carried on `path` (the
-        # template-facing argument). Returns nil for unsupported types.
-        #
-        # The extension→format mapping stays a suffix match rather than
-        # `File.extname` (which reads a bare ".json" as a dotfile, not an
-        # extension), and the content is handed over WITHOUT a BOM strip —
-        # both are long-standing `load_data()` behavior. Only the
-        # format→Crinja parsing itself is shared with `data/` files and
-        # `[[data.remote]]`.
-        private def parse_data_content(path : String, content : String) : Crinja::Value?
-          format = if path.ends_with?(".json")
-                     "json"
-                   elsif path.ends_with?(".toml")
-                     "toml"
-                   elsif path.ends_with?(".yaml") || path.ends_with?(".yml")
-                     "yaml"
-                   elsif path.ends_with?(".csv")
-                     "csv"
-                   end
-          unless format
-            Logger.debug "load_data('#{path}'): unsupported file type '#{File.extname(path)}' (supported: .json, .toml, .yaml, .yml, .csv)"
-            return
+        # The parse format for a `load_data()` path (the template-facing
+        # argument), or nil for an unsupported type. A suffix match rather
+        # than `File.extname` (which reads a bare ".json" as a dotfile), and
+        # case-insensitive like the `data/` loader: `data/Team.JSON` is
+        # `site.data.Team` there, and `load_data` of the same file used to
+        # return none without a word.
+        private def data_format(path : String) : String?
+          lower = path.downcase
+          if lower.ends_with?(".json")
+            "json"
+          elsif lower.ends_with?(".toml")
+            "toml"
+          elsif lower.ends_with?(".yaml") || lower.ends_with?(".yml")
+            "yaml"
+          elsif lower.ends_with?(".csv")
+            "csv"
           end
-          Utils::CrinjaUtils.parse_data_string(content, format)
         end
 
         private def register_asset_functions

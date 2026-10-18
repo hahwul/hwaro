@@ -33,7 +33,12 @@ module Hwaro
         # board renders this check as skipped (`CheckSpec#blocked_by`).
         return unless config
 
-        walk_section_dirs(@content_dir, issues, index_names(config))
+        # A `[[versions.list]]` parent (`docs/` over `docs/v1`, `docs/v2`) is
+        # not a section missing its index: with `latest_at_root` an authored
+        # `docs/_index.md` collides with the latest version's root, and
+        # without it the build writes a redirect stub there.
+        version_parents = config.versions.list.map(&.parent_dir).reject(&.empty?).to_set
+        walk_section_dirs(@content_dir, issues, index_names(config), version_parents)
       end
 
       # The base names that count as an index page for this site: always
@@ -59,7 +64,7 @@ module Hwaro
         names
       end
 
-      private def walk_section_dirs(root : String, issues : Array(Issue), index_names : Set(String))
+      private def walk_section_dirs(root : String, issues : Array(Issue), index_names : Set(String), version_parents : Set(String))
         Dir.each_child(root) do |entry|
           next if entry.starts_with?(".") || entry.starts_with?("_")
           child = File.join(root, entry)
@@ -86,13 +91,13 @@ module Hwaro
           # markdown content beneath it (suggesting it intends to be a section).
           has_nested_content = dir_has_markdown_in_subdirs?(child, index_names)
 
-          if !has_index && has_nested_content
-            relative = child.lchop(@content_dir).lchop(File::SEPARATOR)
+          relative = child.lchop(@content_dir).lchop(File::SEPARATOR)
+          if !has_index && has_nested_content && !version_parents.includes?(relative.gsub(File::SEPARATOR, '/'))
             issues << Issue.new(id: "structure-missing-index", level: :info, category: "structure", file: child,
               message: "Section directory missing _index.md: #{relative}/")
           end
 
-          walk_section_dirs(child, issues, index_names)
+          walk_section_dirs(child, issues, index_names, version_parents)
         end
       rescue ex : File::Error
         # Belt and braces: an unreadable (or concurrently removed) directory
@@ -300,15 +305,21 @@ module Hwaro
         default = config.default_language
         others = Content::Multilingual.ordered_language_codes(config) - [default]
         menus = MenuScope.new(config)
-        entries = ContentLister.new(@content_dir).list_all.select(&.published?).sort_by!(&.path).map do |info|
-          relative = Path[info.path].relative_to(@content_dir).to_s
+        # `[[content.generate]]` pages pair with authored translations in the
+        # build (`products/blue.ko.md` ↔ generated `products/blue.md`), so they
+        # count as originals; they have no file to report as untranslated.
+        generated = {} of String => String
+        entries = ContentLister.new(@content_dir, GeneratedContent.infos(@content_dir)).list_all.select(&.published?).sort_by!(&.path).map do |info|
+          relative = info.generated_from ? info.path : Path[info.path].relative_to(@content_dir).to_s
+          file = info.generated_from ? File.join(@content_dir, info.path) : info.path
+          info.generated_source.try { |source| generated[file] = source }
           # `_index` files are sections: their own `[cascade]` skips them.
           page = File.basename(relative).starts_with?("_index.") ? Models::Section.new(relative) : Models::Page.new(relative)
-          language = menus.filename_language(info.path)
+          language = menus.filename_language(file)
           page.language = language == default ? nil : language
-          {page, info.path}
+          {page, file}
         end
-        apply_render_state(entries)
+        apply_render_state(entries, generated)
         Content::Multilingual.link_translations!(entries.map(&.[0]), config)
 
         # Grouped per language, in configured order.
@@ -320,6 +331,7 @@ module Hwaro
             code = Content::Multilingual.language_code(page, config)
             codes = page.translations.empty? ? [code] : page.translations.map(&.code)
             if code == default && !codes.includes?(other)
+              next if generated.has_key?(file)
               issues << Issue.new(id: "translation-missing", level: :info, category: "i18n", file: file,
                 message: "No '#{other}' translation", language: other)
             elsif code == other && !codes.includes?(default)
@@ -333,13 +345,13 @@ module Hwaro
       # Fill in what `link_translations!` reads besides the path: `render`
       # (front matter, or a section `[cascade]`, as the build resolves it) and
       # `redirect_to`. Without them every page looks renderable and linkable.
-      private def apply_render_state(entries : Array({Models::Page, String})) : Nil
+      private def apply_render_state(entries : Array({Models::Page, String}), sources : Hash(String, String)) : Nil
         previous = Logger.level
         Logger.level = Logger::Level::Error # the build reports front-matter warnings
         begin
           parsed = entries.compact_map do |page, file|
             data = begin
-              Processor::Markdown.parse(File.read(file), file)
+              Processor::Markdown.parse(sources[file]? || File.read(file), file)
             rescue Hwaro::HwaroError | File::Error
               next # doctor's parse check and the build report it
             end

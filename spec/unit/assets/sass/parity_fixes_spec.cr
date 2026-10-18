@@ -392,6 +392,11 @@ describe "Sass dart parity fixes" do
       css.should_not contain("inf")
     end
 
+    it "formats mid-size integers and halves without rounding noise" do
+      value_of("3333333333 * 10 + 3").should eq("33333333333")
+      value_of("33333333333 + 0.5").should eq("33333333333.5")
+    end
+
     it "emits null !important without a double space" do
       compile_source(".a { y: null !important; }").should contain("y: !important;")
     end

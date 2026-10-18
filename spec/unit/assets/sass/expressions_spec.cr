@@ -273,4 +273,40 @@ describe "Sass namespaced-reference failures" do
     end
     warnings.should_not contain("not valid CSS")
   end
+
+  it "reads a CSS-escaped identifier as a map value (Font Awesome icon map)" do
+    css = compile(<<-'SCSS')
+      $v0: \30;
+      $icons: ("0": $v0, "a": \f63f);
+      @each $name, $icon in $icons { .fa-#{$name} { content: "#{$icon}"; } }
+      .x { n: length($icons); v: map-get($icons, "a"); }
+      SCSS
+    css.should contain(%(.fa-0 {\n  content: "\\30";))
+    css.should contain(%(.fa-a {\n  content: "\\f63f";))
+    css.should contain("n: 2;")
+    css.should contain("v: \\f63f;")
+  end
+
+  it "keeps full precision in variables between evaluations" do
+    css = compile(<<-'SCSS')
+      @function tiny() { $x: 1; @for $i from 1 through 12 { $x: $x * 0.1; } @return $x * 1000000000000; }
+      $t: 0.1 + 0.2;
+      .a { w: tiny() * 1px; v: $t; t: $t == 0.3; m: $t * 10; i: "#{$t}"; }
+      SCSS
+    css.should contain("w: 1px;")
+    css.should contain("v: 0.3;")
+    css.should contain("t: true;")
+    css.should contain("m: 3;")
+    css.should contain(%(i: "0.3";))
+  end
+
+  it "evaluates a user function whose name ends in calc" do
+    css = compile(<<-SCSS)
+      @function rem-calc($v) { @return $v * 2; }
+      .a { w: rem-calc(2px); x: -webkit-calc(1px + 2px); y: calc(100% - 2px); }
+      SCSS
+    css.should contain("w: 4px;")
+    css.should contain("x: -webkit-calc(1px + 2px);")
+    css.should contain("y: calc(100% - 2px);")
+  end
 end

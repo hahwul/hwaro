@@ -455,6 +455,11 @@ templates/shortcodes/
     └── github.html
 ```
 
+Call a shortcode in a subdirectory with the explicit form, naming its path
+under `templates/shortcodes/`: `{{ shortcode("code/tabs", lang="crystal") }}`.
+The short form only accepts a plain name, so `{{ code/tabs() }}` stays literal
+text.
+
 ## See Also
 
 - [Template Syntax](/templates/syntax/) — Jinja2 reference for custom shortcodes

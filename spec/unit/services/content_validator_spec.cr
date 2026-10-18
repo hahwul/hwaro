@@ -76,6 +76,30 @@ describe Hwaro::Services::ContentValidator do
       end
     end
 
+    it "detects a blank title" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "blank.md"), "+++\ntitle = \"  \"\ndescription = \"d\"\n+++\nx\n")
+
+        issues = Hwaro::Services::ContentValidator.new(content_dir).run
+        issues.any? { |i| i.id == "content-title-missing" && i.message == "Title is empty" }.should be_true
+      end
+    end
+
+    it "accepts a blank title on the homepage, as the blog scaffold ships it" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(File.join(content_dir, "posts"))
+        File.write(File.join(content_dir, "index.md"), "+++\ntitle = \"\"\ndescription = \"d\"\n+++\nx\n")
+        File.write(File.join(content_dir, "index.ko.md"), "+++\ntitle = \"\"\ndescription = \"d\"\n+++\nx\n")
+        File.write(File.join(content_dir, "posts", "index.md"), "+++\ntitle = \"\"\ndescription = \"d\"\n+++\nx\n")
+
+        issues = Hwaro::Services::ContentValidator.new(content_dir).run.select { |i| i.id == "content-title-missing" }
+        issues.map { |i| File.basename(File.dirname(i.file.to_s)) }.should eq(["posts"])
+      end
+    end
+
     it "detects missing description" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")

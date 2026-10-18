@@ -86,7 +86,7 @@ module Hwaro
         h.each do |menu_name, menu_value|
           # Reserved for `[menus] auto_sections`, never a menu name.
           next if menu_name == AUTO_SECTIONS_KEY
-          entries = menu_value.as_a?
+          entries = table_array?(menu_value, "menus.#{menu_name}")
           next unless entries
 
           result[menu_name] = entries.compact_map do |entry_any|

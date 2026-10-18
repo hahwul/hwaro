@@ -41,9 +41,12 @@ module Hwaro
         end
 
         # Like abs_path, but leaves a value that already carries its own origin
-        # (any `scheme:` URL, or a protocol-relative `//host/…`) untouched.
+        # (any `scheme:` URL, or a protocol-relative `//host/…`) untouched. A
+        # site path is percent-encoded like og:image (the Organization logo is
+        # the same `og.default_image`): `my logo.png` is not a valid URL raw.
         private def abs_or_external(base : String, value : String) : String
-          Processors::InternalLinkResolver.has_own_origin?(value) ? value : abs_path(base, value)
+          return value if Processors::InternalLinkResolver.has_own_origin?(value)
+          abs_path(base, Utils::TextUtils.encode_url_path_keep_query(value))
         end
 
         # Generate Article JSON-LD for a page
@@ -135,7 +138,7 @@ module Hwaro
         end
 
         # Generate BreadcrumbList JSON-LD from page ancestors
-        def breadcrumb(page : Models::Page, config : Models::Config) : String
+        def breadcrumb(page : Models::Page, config : Models::Config, site : Models::Site? = nil) : String
           base = config.base_url
 
           items = [] of Hash(String, String | Int32)
@@ -143,7 +146,12 @@ module Hwaro
           # Home — language-prefixed so a non-default-language page's Home crumb
           # points at the localized homepage (/ko/, /ja/) rather than the
           # default-language root, matching the localized ancestor crumbs below.
-          lang_prefix = (l = page.language) && l != config.default_language && config.multilingual? ? "/#{l}" : ""
+          # A partial translation with no homepage of its own falls back to the
+          # site root, as its ancestors fall back to the default language's.
+          l = page.language
+          localized = l && l != config.default_language && config.multilingual? &&
+                      (site.nil? || site.home_language?(l))
+          lang_prefix = localized ? "/#{l}" : ""
           items << {
             "@type"    => "ListItem",
             "position" => 1,
@@ -151,12 +159,14 @@ module Hwaro
             "item"     => Utils::TextUtils.encode_url_path("#{base}#{lang_prefix}/"),
           }
 
-          # Ancestors
-          page.ancestors.each_with_index do |ancestor, idx|
+          # Ancestors. A headless (`render = false`) section publishes no page,
+          # so its crumb would point `item` at a 404; it is left out.
+          page.ancestors.each do |ancestor|
+            next unless ancestor.render
             ancestor_url = Utils::TextUtils.encode_url_path(abs_path(base, ancestor.url))
             items << {
               "@type"    => "ListItem",
-              "position" => idx + 2,
+              "position" => items.size + 1,
               "name"     => ancestor.breadcrumb_title,
               "item"     => ancestor_url,
             }
@@ -367,7 +377,7 @@ module Hwaro
         def all_tags(page : Models::Page, config : Models::Config) : String
           parts = [] of String
           parts << article(page, config)
-          parts << breadcrumb(page, config) unless page.ancestors.empty? && page.is_index
+          parts << breadcrumb(page, config) unless page.home?
 
           extra_schema = for_page(page, config)
           parts << extra_schema unless extra_schema.empty?

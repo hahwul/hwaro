@@ -391,7 +391,7 @@ module Hwaro
           end
         end
 
-        generate_taxonomy_feed(taxonomy, term, pages, site, output_dir, base_url, verbose, templates, builder) if taxonomy.feed
+        generate_taxonomy_feed(taxonomy, term, pages, site, output_dir, base_url, verbose, templates, builder, language) if taxonomy.feed
 
         index_page
       end
@@ -524,6 +524,7 @@ module Hwaro
         verbose : Bool = false,
         templates : Hash(String, String)? = nil,
         builder : Core::Build::Builder? = nil,
+        language : String? = nil,
       )
         # No base_url guard on emission: like the main and section feeds,
         # taxonomy feeds emit with relative URLs when base_url is empty.
@@ -556,6 +557,7 @@ module Hwaro
           feed_title,
           base_url,
           verbose,
+          Content::Seo::Feeds.feed_language(site.config, language),
           templates: templates,
           renderer: builder.try(&.feed_template_renderer),
           kind: "taxonomy",

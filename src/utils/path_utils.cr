@@ -139,6 +139,7 @@ module Hwaro
         end
 
         decoded_parts = [] of String
+        names = [] of String
         separator_refused = false
 
         path.split('/').each do |raw|
@@ -164,12 +165,18 @@ module Hwaro
           end
 
           decoded_parts << decoded
+          # The NAME is decoded once, as a web server decodes a request path:
+          # a page named `a%2520b.md` is requested as `/a%2520b/`, which
+          # reaches the file `a%20b`, never the fully decoded `a b` this
+          # used to write. The full decode above stays the refusal judge.
+          names << (raw.includes?('%') ? URI.decode(raw).gsub("\u0000", "").scrub : decoded)
         end
 
         # The dots-and-spaces predicate stays in ONE place for both paths —
         # see the note above about hand-copied policies drifting.
-        segments, dots_refused = collect_safe_segments(decoded_parts)
-        {segments, separator_refused || dots_refused}
+        _, dots_refused = collect_safe_segments(decoded_parts)
+        segments, name_refused = collect_safe_segments(names)
+        {segments, separator_refused || dots_refused || name_refused}
       end
 
       private def collect_safe_segments(parts : Array(String)) : {Array(String), Bool}

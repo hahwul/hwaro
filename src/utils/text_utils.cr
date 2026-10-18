@@ -816,16 +816,19 @@ module Hwaro
       # closer is searched here and a tag with no closer left is not retried.
       private def drop_elements(text : String, opener : Regex, ignore_case : Bool) : String
         return text unless opener.matches?(text)
+        # That match validated the UTF-8 (or raised); PCRE2 would redo it over
+        # the whole subject on every later call, quadratic in the match count.
+        opts = Regex::MatchOptions::NO_UTF_CHECK
         closers = {} of String => Regex
         dead = Set(String).new
         pos = 0
         copied = 0
         String.build do |io|
-          while m = opener.match_at_byte_index(text, pos)
+          while m = opener.match_at_byte_index(text, pos, opts)
             start = m.byte_begin
             tag = ignore_case ? m[1].downcase : m[1]
             closer = closers[tag] ||= Regex.new("</#{Regex.escape(m[1])}\\s*>", ignore_case ? Regex::Options::IGNORE_CASE : Regex::Options::None)
-            if !dead.includes?(tag) && (c = closer.match_at_byte_index(text, m.byte_end))
+            if !dead.includes?(tag) && (c = closer.match_at_byte_index(text, m.byte_end, opts))
               io.write(text.to_slice[copied, start - copied])
               io << ' '
               copied = pos = c.byte_end
@@ -994,10 +997,10 @@ module Hwaro
       EXCERPT_SKIP_VOID    = /<img(?:\s#{HTML_TAG_ATTRS})?\/?>/i
       # Markup the Markdown extensions emit whose text is not prose either:
       # display math (TeX source until KaTeX/MathJax runs in the browser),
-      # footnote reference markers (`[1]`) and the trailing footnotes
-      # section. Inline math (`math-inline`) is part of the sentence and
-      # keeps its `\(x\)` source.
-      EXCERPT_SKIP_CLASSED = /<(span|div|sup|section)\s+class="(?:math(?! math-inline)|footnote-ref|footnotes)[^"]*"[^>]*>/i
+      # mermaid diagrams (a code fence, like `<pre>`), footnote reference
+      # markers (`[1]`) and the trailing footnotes section. Inline math
+      # (`math-inline`) is part of the sentence and keeps its `\(x\)` source.
+      EXCERPT_SKIP_CLASSED = /<(span|div|sup|section)\s+class="(?:math(?! math-inline)|mermaid|footnote-ref|footnotes)[^"]*"[^>]*>/i
 
       # Plain prose of a rendered HTML body, for the automatic summary:
       # code-block/figure/heading/display-math/footnote blocks dropped, tags stripped,

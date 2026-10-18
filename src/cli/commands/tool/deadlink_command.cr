@@ -19,6 +19,7 @@ require "../../../utils/logger"
 require "../../../utils/build_output"
 require "../../../utils/markdown_code"
 require "../../../content/processors/internal_link_resolver"
+require "../../../content/seo/pwa"
 
 require "./deadlink_command/scanner"
 require "./deadlink_command/internal_resolver"

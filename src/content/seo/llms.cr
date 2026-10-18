@@ -78,11 +78,16 @@ module Hwaro
           # page-bundle leaf (`foo/bar/index.md`) is also `is_index == true`,
           # so testing `is_index` here let an arbitrary leaf's title clobber
           # the section heading.
+          #
+          # A section's translations share its key; the default language's
+          # title names the group. Last-wins let `_index.zh.md` (which sorts
+          # after `_index.md`) retitle an English section in Chinese.
           headings = {} of String => String
           eligible.each do |p|
             next unless p.is_a?(Models::Section)
-            next if p.section.empty?
-            headings[p.section] = p.title unless p.untitled?
+            next if p.section.empty? || p.untitled?
+            default_lang = (p.language || config.default_language) == config.default_language
+            headings[p.section] = p.title if default_lang || !headings.has_key?(p.section)
           end
 
           # Fold section-level `_index.md` pages (a `Models::Section` with a
@@ -121,7 +126,7 @@ module Hwaro
                         else
                           headings[section_name]? || section_name.split("/").last.capitalize
                         end
-              str << "## " << heading << "\n\n"
+              str << "## " << one_line(heading) << "\n\n"
 
               by_section[section_name].sort_by(&.url).each do |p|
                 # Percent-encode like the sitemap does: a Markdown link
@@ -132,13 +137,13 @@ module Hwaro
                 # The root index commonly has `title = ""` so its heading
                 # falls through to the site title; without this fallback
                 # the homepage rendered as `- [](url)` (no link label).
-                raw_label = p.title.empty? ? config.title : p.title
+                raw_label = one_line(p.title.empty? ? config.title : p.title)
                 # Escape link-label metacharacters so a title with a stray
                 # `[`/`]` doesn't break the `- [label](url)` Markdown link.
                 # (escape backslash first, then the brackets)
                 label = raw_label.gsub('\\', "\\\\").gsub('[', "\\[").gsub(']', "\\]")
                 str << "- [" << label << "](" << link << ")"
-                if d = p.description
+                if d = p.description.try { |text| one_line(text) }
                   str << ": " << d unless d.empty?
                 end
                 str << "\n"
@@ -146,6 +151,13 @@ module Hwaro
               str << "\n"
             end
           end
+        end
+
+        # A heading, link label or description is one Markdown line: a line
+        # break in front matter text (a `"""` description) would otherwise
+        # end the list item, or open a heading/list of its own.
+        private def self.one_line(text : String) : String
+          text.gsub(/\s+/, " ").strip
         end
 
         # Resolved output basename for llms.txt — shared by the writer, the

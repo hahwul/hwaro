@@ -6,6 +6,7 @@ require "../models/config"
 require "../utils/date_utils"
 require "../utils/errors"
 require "../utils/file_safe"
+require "../utils/frontmatter_scanner"
 require "../utils/frontmatter_writer"
 require "../utils/logger"
 require "../utils/path_utils"
@@ -781,28 +782,36 @@ module Hwaro
         # the same way `tags` already is — otherwise a title/date containing a
         # double quote (e.g. `My "Quoted" Post`) yields invalid TOML and the
         # generated file fails to build.
-        safe_title = escape_string(title)
-        safe_date = escape_string(date)
+        tags_str = tags.empty? ? "[]" : "[#{tags.map { |t| "\"#{escape_string(t)}\"" }.join(", ")}]"
         # An unset description substitutes to "" so an archetype that ships a
         # `description = "{{ description }}"` line still produces valid output.
-        safe_description = escape_string(description || "")
-        tags_str = tags.empty? ? "[]" : "[#{tags.map { |t| "\"#{escape_string(t)}\"" }.join(", ")}]"
-        values = {
-          "title"       => safe_title,
-          "date"        => safe_date,
-          "description" => safe_description,
+        front_values = {
+          "title"       => escape_string(title),
+          "date"        => escape_string(date),
+          "description" => escape_string(description || ""),
           "draft"       => is_draft.to_s,
           "tags"        => tags_str,
         }
-        # One pass over the archetype: chained `.gsub`s rescanned text an
-        # earlier one had just inserted, so a title like "Using {{ tags }}"
-        # was expanded again (injecting a raw array into a quoted string).
-        # Only `{{ name }}` and `{{name}}` are placeholders.
-        content = archetype_content.gsub(/\{\{(?: (title|date|description|draft|tags) |(title|date|description|draft|tags))\}\}/) do |_, match|
+        # The body is Markdown, not a quoted string: escaping there printed
+        # `# My \"Quoted\" Post` for the documented `# {{ title }}` heading.
+        body_values = front_values.merge({
+          "title"       => title.gsub("\n", " "),
+          "date"        => date,
+          "description" => (description || "").gsub("\n", " "),
+        })
+        body = Utils::FrontmatterScanner.strip_frontmatter(archetype_content)
+        front = archetype_content.byte_slice(0, archetype_content.bytesize - body.bytesize)
+        fill_placeholders(front, front_values) + fill_placeholders(body, body_values)
+      end
+
+      # One pass over the text: chained `.gsub`s rescanned text an earlier one
+      # had just inserted, so a title like "Using {{ tags }}" was expanded
+      # again (injecting a raw array into a quoted string). Only `{{ name }}`
+      # and `{{name}}` are placeholders.
+      private def fill_placeholders(text : String, values : Hash(String, String)) : String
+        text.gsub(/\{\{(?: (title|date|description|draft|tags) |(title|date|description|draft|tags))\}\}/) do |_, match|
           values[match[1]? || match[2]]
         end
-
-        content
       end
 
       # Built-in scaffold used when no archetype matches. Format and extra

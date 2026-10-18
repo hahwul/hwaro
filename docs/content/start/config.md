@@ -7,7 +7,7 @@ toc = true
 
 All site configuration lives in `config.toml` at the project root.
 
-Any option documented as a list of strings also accepts a single string, which is read as a one-item list: `sections = "posts"` means `sections = ["posts"]`. An empty string, such as `exclude = "${SITEMAP_EXCLUDE:-}"` with the variable unset, counts as not set and keeps the default. A value that is neither a string nor a list (`fields = true`) is ignored with a warning.
+Any option documented as a list of strings also accepts a single string, which is read as a one-item list: `sections = "posts"` means `sections = ["posts"]`. An empty string, such as `exclude = "${SITEMAP_EXCLUDE:-}"` with the variable unset, counts as not set and keeps the default. A value that is neither a string nor a list (`fields = true`) is ignored with a warning. So is a boolean option given anything but `true` or `false`: `safe = "true"` (a quoted bool) keeps the default and warns.
 
 Unknown top-level keys are reported instead of silently ignored. A typo'd
 `[markdonw]` or `titel = "…"` would otherwise disable a feature with no
@@ -23,7 +23,9 @@ keys against the tables below. A known section written in the wrong
 shape, such as `highlight = false` instead of a `[highlight]` table or
 `taxonomies = ["tags"]` instead of `[[taxonomies]]` entries, is ignored with a
 warning as well. `sitemap = true` is the one short form still accepted: it
-means `[sitemap] enabled = true`.
+means `[sitemap] enabled = true`. A list of tables inside a section written with
+single brackets, such as `[robots.rules]` or `[menus.main]` instead of
+`[[robots.rules]]` or `[[menus.main]]`, is ignored with a warning too.
 
 ## Site Settings
 
@@ -56,7 +58,7 @@ description = "${SITE_DESC:-My awesome site}"
 | `$VAR` | Same as above (bare form) |
 | `${VAR:-default}` | Use `default` if `VAR` is unset or empty |
 
-Missing variables without defaults are left as-is and produce a build warning. See [Environment Variables](/features/env-variables/) for template usage.
+Missing variables without defaults are left as-is and produce a build warning. An unset variable in `base_url` stops `hwaro build` with an error naming it unless `--base-url` is passed; `hwaro serve`, which uses its own local URL, and the other commands keep working. See [Environment Variables](/features/env-variables/) for template usage.
 
 ## Build Options
 

@@ -231,6 +231,13 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
       ).should eq %(<img src="/myrepo/img/logo.png">)
     end
 
+    it "prefixes every root-relative srcset candidate" do
+      html = %(<picture><source srcset="/img/a.webp 1x, /myrepo/img/b.webp 2x"><img src="/img/a.png" srcset="/img/a.png 1x,https://cdn.example/a2.png 2x, //cdn.example/a3.png 3x, rel.png 4x"></picture>)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(
+        html, "https://user.github.io/myrepo"
+      ).should eq %(<picture><source srcset="/myrepo/img/a.webp 1x, /myrepo/img/b.webp 2x"><img src="/myrepo/img/a.png" srcset="/myrepo/img/a.png 1x,https://cdn.example/a2.png 2x, //cdn.example/a3.png 3x, rel.png 4x"></picture>)
+    end
+
     it "prefixes a bare root link" do
       html = %(<a href="/">Home</a>)
       Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(

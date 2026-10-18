@@ -474,9 +474,25 @@ describe Hwaro::Content::Processors::TemplateEngine do
           vars = {} of String => Crinja::Value
 
           template = "[{{ load_data(path=\"data/notes.txt\") }}]"
-          result = render_crinja(template, vars)
-          # Unsupported extension -> result stays Crinja nil -> renders "none".
-          result.should eq("[none]")
+          Hwaro::Content::Processors::TemplateEngine.clear_load_data_cache
+          log = with_captured_log do
+            # Unsupported extension -> result stays Crinja nil -> renders "none".
+            render_crinja(template, vars).should eq("[none]")
+          end
+          log.should contain(%(load_data("data/notes.txt") has an unsupported file type))
+        end
+      end
+    end
+
+    it "load_data matches the extension case-insensitively, like site.data" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("data")
+          File.write("data/Team.JSON", %({"lead": "kim"}))
+          File.write("data/Rows.CSV", "a,b\n1,2\n")
+          Hwaro::Content::Processors::TemplateEngine.clear_load_data_cache
+
+          render_crinja(%({{ load_data(path="data/Team.JSON").lead }}|{{ load_data(path="data/Rows.CSV")[1][1] }})).should eq("kim|2")
         end
       end
     end

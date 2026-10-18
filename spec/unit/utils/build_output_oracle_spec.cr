@@ -71,6 +71,7 @@ describe Hwaro::Utils::BuildOutput do
       File.write(File.join(dir, "public", "css", "app.css"), "body{}")
       File.write(File.join(dir, "content", "post.md"), "x")
       File.touch(File.join(dir, "public", "css", "app.css"), Time.utc(2026, 1, 1))
+      File.touch(File.join(dir, "public", "css"), Time.utc(2026, 1, 1))
       File.touch(File.join(dir, "content"), Time.utc(2026, 1, 1))
       File.touch(File.join(dir, "content", "post.md"), Time.utc(2026, 2, 1))
 
@@ -110,6 +111,7 @@ describe Hwaro::Utils::BuildOutput do
       File.write(File.join(dir, "public", "old", "index.html"), "<html></html>")
       File.write(File.join(dir, "content", "keep.md"), "x")
       File.touch(File.join(dir, "public", "old", "index.html"), Time.utc(2026, 1, 1))
+      File.touch(File.join(dir, "public", "old"), Time.utc(2026, 1, 1))
       File.touch(File.join(dir, "content", "keep.md"), Time.utc(2026, 1, 1))
       # `content/old.md` was deleted after the build: only the directory moved.
       File.touch(File.join(dir, "content"), Time.utc(2026, 2, 1))
@@ -117,6 +119,26 @@ describe Hwaro::Utils::BuildOutput do
       oracle = Hwaro::Utils::BuildOutput.oracle("public", root: dir, sources: [File.join(dir, "content")])
       oracle.exists?("old/index.html").should be_true
       oracle.hint.to_s.should contain("older than the newest source")
+    end
+  end
+
+  # A bundle asset or static copy keeps its source's mtime, so the copy
+  # itself predates every later-saved source although the build just wrote
+  # it; the rename into its directory is what dates the write.
+  it "dates a copy that kept its source mtime by its directory" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "public", "post"))
+      FileUtils.mkdir_p(File.join(dir, "content"))
+      File.write(File.join(dir, "content", "post.md"), "x")
+      File.write(File.join(dir, "public", "post", "photo.png"), "png")
+      File.touch(File.join(dir, "public", "post", "photo.png"), Time.utc(2026, 1, 1))
+      File.touch(File.join(dir, "content", "post.md"), Time.utc(2026, 2, 1))
+      File.touch(File.join(dir, "content"), Time.utc(2026, 2, 1))
+      File.touch(File.join(dir, "public", "post"), Time.utc(2026, 3, 1))
+
+      oracle = Hwaro::Utils::BuildOutput.oracle("public", root: dir, sources: [File.join(dir, "content")])
+      oracle.exists?("post/photo.png").should be_true
+      oracle.hint.should be_nil
     end
   end
 

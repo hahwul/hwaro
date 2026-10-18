@@ -31,14 +31,8 @@ module Hwaro
         config.deployment.target = s["target"]?.try(&.as_s?)
         config.deployment.confirm = bool_value(s["confirm"]?, config.deployment.confirm)
 
-        dry_any = s["dryRun"]? || s["dry_run"]?
-        if dry_val = dry_any.try(&.as_bool?)
-          config.deployment.dry_run = dry_val
-        end
-
-        if force_val = s["force"]?.try(&.as_bool?)
-          config.deployment.force = force_val
-        end
+        config.deployment.dry_run = bool_value(s["dryRun"]? || s["dry_run"]?, config.deployment.dry_run)
+        config.deployment.force = bool_value(s["force"]?, config.deployment.force)
 
         max_deletes_any = s["maxDeletes"]? || s["max_deletes"]?
         if max_deletes_val = max_deletes_any.try { |v| int_or_nil(v) }
@@ -59,7 +53,7 @@ module Hwaro
       end
 
       private def self.load_deployment_targets(config : Config, s : Hash(String, TOML::Any))
-        return unless targets_any = s["targets"]?.try(&.as_a?)
+        return unless targets_any = table_array?(s["targets"]?, "deployment.targets")
 
         config.deployment.targets = targets_any.each_with_index.to_a.compact_map do |(target_any, idx)|
           next unless target_h = target_any.as_h?
@@ -86,11 +80,16 @@ module Hwaro
           target.exclude = target_glob(target_h, name, "exclude")
 
           strip_any = target_h["stripIndexHTML"]? || target_h["strip_index_html"]?
-          if strip_val = strip_any.try(&.as_bool?)
-            target.strip_index_html = strip_val
-          elsif strip_any
-            # Fail-open default applies; say so rather than ignore silently.
-            Logger.warn "[[deployment.targets]] #{name}: 'stripIndexHTML' must be a boolean; ignoring #{strip_any.raw.inspect}."
+          if strip_any
+            # `as_bool?` is nil only for a non-boolean: an explicit `false`
+            # must not read as "not a boolean" (it used to warn).
+            strip_val = strip_any.as_bool?
+            if strip_val.nil?
+              # Fail-open default applies; say so rather than ignore silently.
+              Logger.warn "[[deployment.targets]] #{name}: 'stripIndexHTML' must be a boolean; ignoring #{strip_any.raw.inspect}."
+            else
+              target.strip_index_html = strip_val
+            end
           end
 
           target
@@ -108,7 +107,7 @@ module Hwaro
       end
 
       private def self.load_deployment_matchers(config : Config, s : Hash(String, TOML::Any))
-        return unless matchers_any = s["matchers"]?.try(&.as_a?)
+        return unless matchers_any = table_array?(s["matchers"]?, "deployment.matchers")
 
         config.deployment.matchers = matchers_any.compact_map do |matcher_any|
           next unless matcher_h = matcher_any.as_h?
@@ -121,9 +120,7 @@ module Hwaro
           matcher.cache_control = matcher_h["cacheControl"]?.try(&.as_s?) || matcher_h["cache_control"]?.try(&.as_s?)
           matcher.content_type = matcher_h["contentType"]?.try(&.as_s?) || matcher_h["content_type"]?.try(&.as_s?)
           matcher.gzip = matcher_h["gzip"]?.try(&.as_bool?)
-          if force_val = matcher_h["force"]?.try(&.as_bool?)
-            matcher.force = force_val
-          end
+          matcher.force = bool_value(matcher_h["force"]?, matcher.force)
           matcher
         end
       end

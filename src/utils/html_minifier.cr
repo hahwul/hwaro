@@ -316,8 +316,21 @@ module Hwaro
             if b == '<'.ord && i + 3 < n && bytes[i + 1] == '!'.ord && bytes[i + 2] == '-'.ord && bytes[i + 3] == '-'.ord
               close = i + 4 >= unterminated_from ? -1 : comment_end(bytes, i + 4, n)
               unterminated_from = i + 4 if close < 0 && i + 4 < unterminated_from
-              if close >= 0 && !kept_comment?(bytes, i + 4, close - 3)
-                i = close # dropped; pending whitespace stays pending
+              if close >= 0
+                unless kept_comment?(bytes, i + 4, close - 3)
+                  i = close # dropped; pending whitespace stays pending
+                  next
+                end
+                # A kept comment is copied whole. Re-scanning its body read
+                # the `<!-->` that ends `<!--[if !IE]><!-->` as a new comment
+                # and dropped everything up to the next `-->` — the content
+                # every non-IE browser shows.
+                unless pending.empty?
+                  io.write(pending.to_slice)
+                  pending.clear
+                end
+                io.write(bytes[i, close - i])
+                i = close
                 next
               end
             end
@@ -343,6 +356,9 @@ module Hwaro
       # Index just past the `-->` closing a comment whose body starts at
       # `from`, or -1 when unterminated (left verbatim, like the old regex).
       private def comment_end(bytes : Bytes, from : Int32, n : Int32) : Int32
+        # `<!-->` and `<!--->` are complete (empty) comments to an HTML parser.
+        return from + 1 if from < n && bytes[from] == '>'.ord
+        return from + 2 if from + 1 < n && bytes[from] == '-'.ord && bytes[from + 1] == '>'.ord
         i = from
         while i + 2 < n
           return i + 3 if bytes[i] == '-'.ord && bytes[i + 1] == '-'.ord && bytes[i + 2] == '>'.ord
@@ -363,6 +379,8 @@ module Hwaro
         first = bytes[from]
         return true if first == '#'.ord
         return true if first == '['.ord && size >= 3 && bytes[from + 1] == 'i'.ord && bytes[from + 2] == 'f'.ord
+        # The `<!--<![endif]-->` closing a downlevel-revealed `<!--[if …]><!-->`.
+        return true if size >= 7 && bytes[body_end - 7, 7] == "[endif]".to_slice
         # `more` plus any whitespace; skip the regex for anything shorter.
         return false if size < 4
         REGEX_MORE_MARKER.matches?(String.new(bytes[from, size]).scrub)

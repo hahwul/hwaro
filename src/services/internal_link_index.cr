@@ -42,7 +42,8 @@ module Hwaro
       def unresolved_reason(key : String) : String?
         return "empty link" if key.empty?
         # Same order as InternalLinkResolver.page_for.
-        state = (states[URI.decode(key)]? if key.includes?('%')) || states[key]?
+        decoded = key.includes?('%') ? URI.decode(key) : key
+        state = (states[decoded]? if key.includes?('%')) || states[key]? || folded_state(decoded)
         return "not found" unless state
         state == PublishState::Published.label ? nil : state
       end
@@ -57,6 +58,16 @@ module Hwaro
         end
       end
 
+      # The build's NFC retry (`InternalLinkResolver.folded_page_for`): a
+      # decomposed (NFD) file name from macOS or a zip is still reached by a
+      # link typed precomposed, so the tools must not call it dead.
+      private def folded_state(path : String) : String?
+        return if path.ascii_only?
+        folded = path.unicode_normalize(:nfc)
+        states.each { |key, state| return state if !key.ascii_only? && key.unicode_normalize(:nfc) == folded }
+        nil
+      end
+
       # Content path (relative to the content dir) → publish state label.
       # Built on first use: most runs never meet an `@/` link.
       private def states : Hash(String, String)
@@ -68,6 +79,11 @@ module Hwaro
             path = info.generated_from ? info.path : Path[info.path].relative_to(@content_dir).to_s
             # An authored file owns its path, as in the build.
             map[path] = info.status if info.generated_from.nil? || !map.has_key?(path)
+          end
+          # `@/about.md` also reaches `about.en.md` on an `en` site; a
+          # literal file of the bare name keeps its key, as in the build.
+          map.to_a.each do |path, status|
+            lister.default_language_bare_path(path).try { |bare| map[bare] ||= status }
           end
           map
         end

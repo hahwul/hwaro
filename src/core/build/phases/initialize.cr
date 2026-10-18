@@ -399,7 +399,13 @@ module Hwaro::Core::Build::Phases::Initialize
 
     if lstat.symlink?
       info = static_target_info(src_path)
-      return if info.nil? || info.directory?
+      return if info.nil?
+      # The walk does not descend into a linked directory; say so instead of
+      # dropping every file under it without a trace.
+      if info.directory?
+        Logger.warn "Skipping static directory symlink (directory symlinks are not followed): #{src_path}"
+        return
+      end
 
       unless Hwaro::Utils::PathUtils.resolves_within?(src_path, Dir.current)
         Logger.warn "Skipping static symlink pointing outside the project: #{src_path}"
@@ -770,26 +776,57 @@ module Hwaro::Core::Build::Phases::Initialize
       closure = deps.closure(name)
       sources = closure.compact_map { |dep| templates[dep]? }
       next unless sources.size == closure.size
-      next unless sources.all? { |src| @template_shortcode_scan[src.hash]? == false }
+      # A template that may hold shortcodes keeps every SEO/JSON-LD variable:
+      # shortcodes render with the same vars. The closure already holds each
+      # user shortcode it invokes (names are always literal; the built-ins
+      # never read `section`), so the lexed `section` check below holds.
+      shortcode_free = sources.all? { |src| @template_shortcode_scan[src.hash]? == false }
 
       union = sources.join('\n')
       # NOTE: "og_all_tags" is NOT a substring of "og_tags" (or vice versa) —
       # both must be listed, or a template using only {{ og_all_tags }}
       # would lose its OG block.
       @template_var_features[name] = Builder::TemplateVarFeatures.new(
-        needs_seo: union.includes?("og_tags") || union.includes?("og_all_tags") ||
+        needs_seo: !shortcode_free || union.includes?("og_tags") || union.includes?("og_all_tags") ||
                    union.includes?("twitter_tags") ||
                    union.includes?("canonical_tag") || union.includes?("hreflang_tags") ||
                    union.includes?("alternate_output_tags") ||
                    union.includes?("seo"),
-        needs_jsonld: union.includes?("jsonld"),
-        needs_section_pages: union.includes?("section"),
+        needs_jsonld: !shortcode_free || union.includes?("jsonld"),
+        # A user shortcode's output is compiled into the template that calls
+        # it, so any `section` text it prints (raw, quoted) is a read too.
+        needs_section_pages: closure.any? { |dep|
+          src = templates[dep]
+          dep.starts_with?("shortcodes/") ? src.includes?("section") : template_reads_variable?(src, "section")
+        },
         # Targeted on purpose — see the record's doc comment. These feed the
         # render worker heuristic, where a false positive costs parallelism.
         listing_fanout_site: union.includes?("site.pages"),
         listing_fanout_section: union.includes?("section.pages"),
       )
     end
+  end
+
+  # Whether `source` can read the top-level variable `name`. A substring test
+  # also hit `page.section`, `<section>` and comments, so nearly every
+  # template paid the O(section size) per-page `section.pages` copy —
+  # quadratic on a large section. Lexed instead: only an identifier token
+  # that is not an attribute (`x.section`) counts. Over-approximates
+  # (`{% set section = … %}` counts) and a lexer error counts as a read.
+  private def template_reads_variable?(source : String, name : String) : Bool
+    return false unless source.includes?(name)
+    lexer = Crinja::Parser::TemplateLexer.new(Content::Processors::Template.engine.env.config, source)
+    after_point = false
+    # Each token consumes input; the cap only guards against a lexer stall.
+    (source.bytesize + 2).times do
+      token = lexer.next_token
+      return false if token.kind.eof?
+      return true if token.kind.identifier? && token.value == name && !after_point
+      after_point = token.kind.point?
+    end
+    true
+  rescue
+    true
   end
 
   # Setup Crinja environment with custom filters, tests, and functions
@@ -866,7 +903,7 @@ module Hwaro::Core::Build::Phases::Initialize
 
   # Extensions the digest below covers. WIDER than `DataDisk.load_tree`'s
   # glob on purpose: `site.data` never reads CSV, but `load_data()` does
-  # (see the template function's `parse_data_content`), and a template
+  # (see the template function's `data_format`), and a template
   # calling `load_data(path="data/team.csv")` renders from a file that the
   # digest has to see. Missing it meant editing a `data/*.csv` moved nothing
   # in the cache key, so `build --cache` re-published every page with the

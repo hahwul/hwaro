@@ -40,7 +40,8 @@ module Hwaro
           {html_with_anchors, toc}
         end
 
-        # Byte spans covered by `<!-- … -->` comments in the rendered HTML.
+        # Byte spans covered by `<!-- … -->` comments (and raw-text elements,
+        # see below) in the rendered HTML.
         #
         # A heading that lives inside a comment is invisible in the browser, so
         # the heading passes below must leave it alone: otherwise a
@@ -65,13 +66,34 @@ module Hwaro
             spans << (open...(close + 3))
             pos = close + 3
           end
-          spans
+
+          # `<script>`/`<style>`/`<textarea>` bodies are text, not markup: an
+          # `"<h2>…</h2>"` JS string must not get an `id="…"` (which ends the
+          # string) or a TOC entry. Unterminated ones are left alone, as above.
+          spans.concat(MarkdownExtensions.raw_text_spans(html))
+
+          # Sorted and merged (the two passes overlap and interleave) so
+          # `in_comment?` can binary-search: a linear scan per heading was
+          # quadratic on a page with thousands of headings and scripts.
+          spans.sort_by!(&.begin)
+          merged = [] of Range(Int32, Int32)
+          spans.each do |span|
+            last = merged.last?
+            if last && span.begin <= last.end
+              merged[-1] = last.begin...span.end if span.end > last.end
+            else
+              merged << span
+            end
+          end
+          merged
         end
 
         # True when a match starting at `offset` (a BYTE offset, as reported by
-        # `Regex::MatchData#byte_begin`) opens inside one of `spans`.
+        # `Regex::MatchData#byte_begin`) opens inside one of `spans` (sorted,
+        # disjoint — see `html_comment_spans`).
         private def in_comment?(spans : Array(Range(Int32, Int32)), offset : Int32) : Bool
-          spans.any?(&.includes?(offset))
+          span = spans.bsearch { |candidate| candidate.end > offset }
+          !span.nil? && span.begin <= offset
         end
 
         # Insert anchor links into headings
@@ -116,15 +138,17 @@ module Hwaro
         # Lightweight regex-based post-processing.
         # Replaces the previous XML.parse_html approach which constructed a full
         # DOM tree for every page — very expensive for large sites.
-        private def post_process_html(html : String, generate_toc : Bool, process_images : Bool) : Tuple(String, Array(Models::TocHeader))
+        private def post_process_html(html : String, generate_toc : Bool, process_images : Bool, emoji : Bool = false) : Tuple(String, Array(Models::TocHeader))
           result = html
 
           # 1. Lazy-load images: add loading="lazy" to <img> tags missing it
           if process_images
-            result = result.gsub(IMG_LAZY_REGEX) do |_|
-              attrs = $1
-              # Insert loading="lazy" before the closing /> or >
-              "<img loading=\"lazy\"#{attrs} />"
+            result = MarkdownExtensions.outside_raw_text(result) do |chunk|
+              chunk.gsub(IMG_LAZY_REGEX) do |_|
+                attrs = $1
+                # Insert loading="lazy" before the closing /> or >
+                "<img loading=\"lazy\"#{attrs} />"
+              end
             end
           end
 
@@ -150,29 +174,7 @@ module Hwaro
               attrs = $3? || "" # existing attributes (may be empty)
               inner_html = $4   # inner content (may contain inline HTML)
 
-              # Extract plain text for TOC title (inline char-level strip
-              # avoids regex + alloc). Quote-aware: a `>` inside a quoted
-              # attribute value must not end the tag, or the value's tail
-              # leaks into the title.
-              title = String.build(inner_html.bytesize) do |io|
-                in_tag = false
-                quote = nil.as(Char?)
-                inner_html.each_char do |c|
-                  if in_tag
-                    if quote
-                      quote = nil if c == quote
-                    elsif c == '"' || c == '\''
-                      quote = c
-                    elsif c == '>'
-                      in_tag = false
-                    end
-                  elsif c == '<'
-                    in_tag = true
-                  else
-                    io << c
-                  end
-                end
-              end.strip
+              title = heading_text(inner_html)
 
               # Use existing id or generate one
               existing_id = if id_match = attrs.match(ID_ATTR_REGEX)
@@ -187,10 +189,12 @@ module Hwaro
 
               permalink = "##{id}"
 
+              # The id slugs the source text (stable anchors); the TOC title
+              # shows what the heading shows, emoji included.
               toc_item = Models::TocHeader.new(
                 level: level,
                 id: id,
-                title: title,
+                title: emoji ? heading_text(apply_emoji(inner_html)) : title,
                 permalink: permalink
               )
 
@@ -232,7 +236,33 @@ module Hwaro
           {result, roots}
         end
 
-        # Apply emoji shortcode conversion to HTML, skipping <code> and <pre> blocks.
+        # Plain text of a heading's inner HTML (tags stripped). Quote-aware:
+        # a `>` inside a quoted attribute value must not end the tag, or the
+        # value's tail leaks into the title.
+        private def heading_text(inner_html : String) : String
+          String.build(inner_html.bytesize) do |io|
+            in_tag = false
+            quote = nil.as(Char?)
+            inner_html.each_char do |c|
+              if in_tag
+                if quote
+                  quote = nil if c == quote
+                elsif c == '"' || c == '\''
+                  quote = c
+                elsif c == '>'
+                  in_tag = false
+                end
+              elsif c == '<'
+                in_tag = true
+              else
+                io << c
+              end
+            end
+          end.strip
+        end
+
+        # Apply emoji shortcode conversion to HTML text, skipping code, raw-text,
+        # math and mermaid elements (see EMOJI_SKIP_RE).
         #
         # Scans by BYTE offset rather than char index. The tag/fence markers
         # ('<', '>', '<code', '<pre', '</code>', '</pre>') and the ':' shortcode
@@ -241,6 +271,8 @@ module Hwaro
         # `html.index(_, pos)`) is O(n) per access on any string containing a
         # multibyte codepoint, which turned this loop into O(n^2) — a single
         # accented/CJK character on a long page caused a ~1500x slowdown.
+        EMOJI_SKIP_RE = /<(?:(code|pre|script|style|textarea)\b|(span|div)\b[^>]*\bclass="(?:math|mermaid)\b)/
+
         private def apply_emoji(html : String) : String
           return html unless html.includes?(":")
 
@@ -249,15 +281,24 @@ module Hwaro
           len = bytes.size
           pos = 0
           lt = '<'.ord.to_u8
+          # Close tags already found missing from some offset on: they are
+          # missing from every later one too, so each unclosed opener does
+          # not rescan to the end of the page.
+          unclosed = Set(String).new
+          # PCRE2 validates the whole subject on every call unless told not
+          # to: once per '<' that made the pass quadratic in the tag count.
+          skip_opts = Regex::MatchOptions::ANCHORED
+          skip_opts |= Regex::MatchOptions::NO_UTF_CHECK if html.valid_encoding?
 
           while pos < len
-            # Check for <code or <pre tags (bounded check avoids O(n) substring)
+            # Copy code, raw-text elements (script/style/textarea), math
+            # spans and mermaid blocks verbatim: `a:link:hover` in CSS or
+            # `$f:x:y$` must not become `a🔗hover` / `f❌y`.
             if bytes[pos] == lt && pos + 1 < len
-              is_code = pos + 5 <= len && bytes[pos, 5] == "<code".to_slice
-              is_pre = !is_code && pos + 4 <= len && bytes[pos, 4] == "<pre".to_slice
-              if is_code || is_pre
-                close_tag = is_code ? "</code>" : "</pre>"
-                end_pos = html.byte_index(close_tag, pos)
+              if m = EMOJI_SKIP_RE.match_at_byte_index(html, pos, skip_opts)
+                close_tag = "</#{m[1]? || m[2]}>"
+                end_pos = html.byte_index(close_tag, pos) unless unclosed.includes?(close_tag)
+                unclosed << close_tag unless end_pos
                 if end_pos
                   block_end = end_pos + close_tag.bytesize
                   result.write(bytes[pos, block_end - pos])

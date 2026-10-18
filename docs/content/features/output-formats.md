@@ -104,7 +104,7 @@ part is kept as part of the template's name, e.g. `templates/page.json.jinja`
 loads as `page.json`.
 
 A page's own body markdown/content, `toc`, and every other value normally
-available to `page.html`/`section.html` (`page`, `section`, `site`, `config`,
+available to `page.html`/`section.html` (`page`, `section`, `site`, `base_url`,
 …) are available in the format template too, so write whatever the format
 needs, for example:
 

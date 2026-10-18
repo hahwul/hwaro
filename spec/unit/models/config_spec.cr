@@ -72,6 +72,23 @@ describe Hwaro::Models::Config do
         err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
       end
     end
+
+    it "defers a base_url naming an unset variable until a build needs it" do
+      config = nil
+      with_captured_log do
+        config = load_config(%(title = "X"\nbase_url = "${HWARO_SPEC_UNSET_SITE_URL}"\n))
+      end
+      config = config.not_nil!
+      config.base_url.should eq("")
+      config.unresolved_base_url_var.should eq("HWARO_SPEC_UNSET_SITE_URL")
+
+      # `--base-url` (or serve's own URL) replaces it, so nothing to refuse.
+      config.require_resolved_base_url!("https://example.com")
+      err = expect_raises(Hwaro::HwaroError, /HWARO_SPEC_UNSET_SITE_URL/) do
+        config.require_resolved_base_url!(nil)
+      end
+      err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+    end
   end
 
   describe ".validate_base_url!" do
@@ -291,6 +308,15 @@ describe Hwaro::Models::Config do
       config.description.should eq("")
       config.base_url.should eq("")
       config.default_language.should eq("en")
+    end
+
+    it "keeps the default language when default_language is blank" do
+      config = nil
+      log = with_captured_log do
+        config = load_config(%(title = "X"\ndefault_language = " "\n))
+      end
+      config.not_nil!.default_language.should eq("en")
+      log.should contain("Ignoring empty default_language")
     end
   end
 
@@ -1785,6 +1811,15 @@ describe Hwaro::Models::Config do
       config.serve.headers.has_key?("Good-Header").should be_true
       config.serve.headers.has_key?("Bad:Name").should be_false
       config.serve.headers.size.should eq(1)
+    end
+
+    it "warns about each header it ignores" do
+      log = with_captured_log do
+        load_config(%(title = "Test"\n[serve.headers]\n"Good-Header" = "v"\n"Bad:Name" = "x"\nX-Max-Age = 60\n))
+      end
+      log.should contain(%(Ignoring [serve.headers] "Bad:Name"))
+      log.should contain(%(Ignoring [serve.headers] "X-Max-Age"))
+      log.should_not contain("Good-Header")
     end
   end
 

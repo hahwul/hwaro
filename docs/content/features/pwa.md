@@ -90,7 +90,7 @@ registration to your base template:
 ```html
 <head>
   <link rel="manifest" href="{{ base_url }}/manifest.json">
-  <meta name="theme-color" content="{{ config.pwa.theme_color }}">
+  <meta name="theme-color" content="#1a1a2e"> <!-- your [pwa] theme_color -->
 </head>
 <body>
   ...

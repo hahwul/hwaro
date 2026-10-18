@@ -266,6 +266,17 @@ describe Hwaro::Content::Menus do
       trees["en"]["main"][0].url.should eq("/posts/")
     end
 
+    it "leaves a url-less entry (a dropdown header) without a url" do
+      config = Hwaro::Models::Config.new
+      config.menus = {"main" => [menu_item("Docs", identifier: "docs"), menu_item("Guide", "/docs/guide/", parent: "docs")]}
+
+      trees = Hwaro::Content::Menus.build(config, [] of Hwaro::Models::Page, [] of Hwaro::Models::Section)
+      header = trees["en"]["main"][0]
+      header.url.should eq("")
+      header.external.should be_false
+      header.children.map(&.url).should eq(["/docs/guide/"])
+    end
+
     it "does not add a trailing slash to a url whose last segment has an extension" do
       config = Hwaro::Models::Config.new
       config.menus = {"main" => [menu_item("Feed", "/feed.xml")]}

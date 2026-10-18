@@ -36,7 +36,7 @@ The AMP converter automatically applies these transformations:
 | Original | AMP Version |
 |----------|-------------|
 | `<html>` | `<html amp>` |
-| `<img>` | `<amp-img layout="responsive">` |
+| `<img>` | `<amp-img layout="responsive">` when it has `width` and `height`; otherwise `<amp-img layout="fill">` inside `<div class="amp-img-container">` |
 | `<video>` | `<amp-video layout="responsive">` |
 | `<iframe>` | `<amp-iframe layout="responsive">` |
 | `<script>` (inline) | Removed |

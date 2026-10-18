@@ -89,7 +89,7 @@ module Hwaro
             return {result_html, [] of Models::TocHeader}
           end
 
-          result_html, toc = post_process_html(html, has_headers, has_images)
+          result_html, toc = post_process_html(html, has_headers, has_images, emoji)
           result_html = apply_emoji(result_html) if emoji
           {result_html, toc}
         rescue ex : XML::Error

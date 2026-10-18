@@ -563,7 +563,7 @@ describe "importer stability" do
       )
       converted.should_not contain("<code")
       converted.should_not contain("</code>")
-      converted.should contain("```\nline\n")
+      converted.should contain("```x\nline\n")
     end
   end
 end

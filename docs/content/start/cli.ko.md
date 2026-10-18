@@ -444,6 +444,7 @@ hwaro serve --base-url http://localhost:3000/myblog/
 - `HEAD`는 대응하는 `GET`과 정확히 같은 헤더(라이브 리로드가 주입된 HTML의 `Content-Length`까지 포함)를 반환하며, 본문은 없습니다.
 - 텍스트 응답(`.txt`, `.json`, `.xml`, `.js`, `.css`, `.svg`, …)은 파일 크기와 관계없이 항상 `; charset=utf-8`을 포함합니다.
 - 디렉터리 리디렉션은 퍼센트 인코딩된 `Location`을 보냅니다(`/my%20page/`, `/%ED%95%9C%EA%B8%80/`). 백슬래시나 인코딩된 구분자(`%2F`, `%5C`)가 포함된 경로는 정적 호스트와 동일하게 서빙하지 않습니다.
+- macOS와 Windows에서도 경로는 대소문자를 구분합니다. 페이지가 `/about/`에 있으면 `/About/`은 대소문자를 구분하는 정적 호스트에서처럼 404입니다.
 
 **커스텀 응답 헤더 (`--header` / `[serve.headers]`):**
 

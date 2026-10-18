@@ -110,9 +110,11 @@ module Hwaro
               next_c = chars[i + 1]
 
               if next_c == '/'
-                # Single-line comment — skip until end of line
+                # Single-line comment — skip until the line terminator (a
+                # lone CR or U+2028/U+2029 ends it too; stopping only at LF
+                # deleted the rest of a CR-only file)
                 i += 2
-                while i < len && chars[i] != '\n'
+                while i < len && !line_terminator?(chars[i])
                   i += 1
                 end
                 next
@@ -284,7 +286,7 @@ module Hwaro
           elsif c == '/' && i + 1 < len && chars[i + 1] == '/'
             # Line comment (only reachable in a multiline template, where the
             # closing `}` sits on a later line) — copy verbatim to end of line.
-            while i < len && chars[i] != '\n'
+            while i < len && !line_terminator?(chars[i])
               lb << chars[i]
               i += 1
             end
@@ -318,6 +320,11 @@ module Hwaro
           end
         end
         i
+      end
+
+      # ECMAScript LineTerminator: LF, CR, LS, PS.
+      private def line_terminator?(c : Char) : Bool
+        c == '\n' || c == '\r' || c == '\u2028' || c == '\u2029'
       end
 
       # Scan a quoted string beginning at chars[i] (a `"` or `'`). Appends it

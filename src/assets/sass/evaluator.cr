@@ -105,6 +105,9 @@ module Hwaro
         # Line-break flags for @parent_selectors (see Css::Rule#breaks);
         # saved/restored wherever @parent_selectors is.
         @parent_breaks : Array(Bool)?
+        # The enclosing rule's selectors inside an `@at-root { }` block,
+        # where rules stand at the root but `&` still means that rule.
+        @at_root_parents : Array(String)? = nil
         @content : ContentBlock?
         @in_keyframes : Bool
         @include_depth : Int32
@@ -137,6 +140,9 @@ module Hwaro
           # Bumped when text spliced into a quoted string carries that
           # string's own quote (see `resolve_template`).
           @quote_conflicts = 0
+          # Bumped when a null variable is elided from verbatim text (see
+          # `resolve_template`).
+          @null_elisions = 0
           @forward_variables = {} of String => String
           @forward_mixins = {} of String => MixinClosure
           @forward_functions = {} of String => SassFn
@@ -293,11 +299,13 @@ module Hwaro
           saved_rule_sink = @current_rule_sink
           saved_parents = @parent_selectors
           saved_breaks = @parent_breaks
+          saved_at_root = @at_root_parents
           saved_env = @env
           @current_rule = rule
           @current_rule_sink = @sink
           @parent_selectors = selectors
           @parent_breaks = breaks
+          @at_root_parents = nil
           @env = Environment.new(saved_env)
           begin
             yield
@@ -306,6 +314,7 @@ module Hwaro
             @current_rule_sink = saved_rule_sink
             @parent_selectors = saved_parents
             @parent_breaks = saved_breaks
+            @at_root_parents = saved_at_root
             @env = saved_env
           end
         end
@@ -355,6 +364,9 @@ module Hwaro
                                       node : Ast::RuleNode) : {Array(String), Array(Bool)}
           parents = @parent_selectors
           if parents.nil?
+            if (root_parents = @at_root_parents) && parts.any? { |part| count_parent_refs(part) > 0 }
+              return at_root_selectors(parts, part_breaks, root_parents, node.line, node.column)
+            end
             parts.each do |part|
               if count_parent_refs(part) > 0
                 error_at(node.line, node.column, "top-level selectors may not contain \"&\"")
@@ -1130,13 +1142,12 @@ module Hwaro
             param_name = param_names[i]
             if param.variadic
               rest = positional.size > fixed ? positional[fixed..] : [] of String
-              joiner =
-                case rest_sep
-                in nil, ListV::Sep::Comma then ", "
-                in ListV::Sep::Space      then " "
-                in ListV::Sep::Slash      then " / "
-                end
-              call_env.variables[param_name] = rest.empty? ? "()" : rest.join(joiner)
+              # Stored as a real list: joining the texts flattened a lone
+              # `small only` argument into two members (Foundation's
+              # `breakpoint(small only)` lost its media query) and merged a
+              # comma-list argument into the arglist.
+              arglist = ListV.new(rest.map { |item| Expr.coerce(item).as(Value) }, rest_sep || ListV::Sep::Comma)
+              call_env.variables[param_name] = value_storage(arglist)
               call_env.variables[KEYWORDS_VAR_PREFIX + param_name] = keywords_storage(extra_kwargs)
               next
             end
@@ -1454,6 +1465,9 @@ module Hwaro
           saved_rule = @current_rule
           saved_parents = @parent_selectors
           saved_breaks = @parent_breaks
+          # Inside an outer `@at-root { }` block the enclosing rule is
+          # still the one `&` names.
+          parents = saved_parents || @at_root_parents
           @current_rule = nil
           @parent_selectors = nil
           @parent_breaks = nil
@@ -1466,20 +1480,25 @@ module Hwaro
               # TOP-LEVEL rule: a selector without `&` left in it must not
               # be re-nested under the parents.
               if template_has_parent_ref?(selector)
-                @parent_selectors = saved_parents
+                @parent_selectors = parents
                 @parent_breaks = saved_breaks
               end
-              eval_at_root_rule(selector, node, saved_parents)
+              eval_at_root_rule(selector, node, parents)
             else
               # A plain block scope, not `scoped`: `@at-root` is not a
               # flow-control rule, so assignments inside it must not write
               # through to the enclosing scope the way `@if`/`@while` do.
+              # Its rules resolve like `@at-root <selector>`: `&.b` still
+              # names the enclosing rule (Foundation's table mixin).
               saved_env = @env
+              saved_at_root = @at_root_parents
               @env = Environment.new(saved_env)
+              @at_root_parents = parents
               begin
                 eval_nodes(node.children)
               ensure
                 @env = saved_env
+                @at_root_parents = saved_at_root
               end
             end
           ensure
@@ -1497,7 +1516,23 @@ module Hwaro
           text = resolve_template(selector, allow_vars: false)
           parts, part_breaks = selector_parts(text)
           error_at(node.line, node.column, "expected selector") if parts.empty?
+          selectors, breaks = at_root_selectors(parts, part_breaks, parents, node.line, node.column)
 
+          rule = Css::Rule.new(selectors, breaks)
+          emit(rule)
+          with_rule_scope(rule, selectors, breaks) { eval_nodes(node.children) }
+          # A rule lifted to the root is its own output group — dart-sass
+          # separates it from what follows with a blank line.
+          if @at_frames.empty? && (last = @sink.last?)
+            last.group_end = true
+          end
+        end
+
+        # Selectors of a rule standing at the root: literal `&` substitutes
+        # the parent selectors, but a part without `&` takes no parent
+        # prefix (unlike a nested rule).
+        private def at_root_selectors(parts : Array(String), part_breaks : Array(Bool),
+                                      parents : Array(String)?, line : Int32, column : Int32) : {Array(String), Array(Bool)}
           selectors = [] of String
           breaks = [] of Bool
           parts.each_with_index do |part, part_i|
@@ -1514,7 +1549,7 @@ module Hwaro
             if amps == 0
               push.call(part)
             elsif parents.nil?
-              error_at(node.line, node.column, "top-level selectors may not contain \"&\"")
+              error_at(line, column, "top-level selectors may not contain \"&\"")
             else
               if amps <= MAX_PARENT_REF_SLOTS
                 projected = 1_i64
@@ -1523,7 +1558,7 @@ module Hwaro
                   break if projected > MAX_RULE_SELECTORS
                 end
                 if projected > MAX_RULE_SELECTORS
-                  error_at(node.line, node.column,
+                  error_at(line, column,
                     "selector expands to more than #{MAX_RULE_SELECTORS} selectors " \
                     "(#{parents.size} parent selectors, #{amps} \"&\" references); " \
                     "reduce the nesting or the comma-separated parent list")
@@ -1538,20 +1573,12 @@ module Hwaro
               combos.each { |combo| push.call(substitute_parent(part, combo)) }
             end
             if selectors.size > MAX_RULE_SELECTORS
-              error_at(node.line, node.column,
+              error_at(line, column,
                 "selector expands to more than #{MAX_RULE_SELECTORS} selectors; " \
                 "reduce the comma-separated parent list")
             end
           end
-
-          rule = Css::Rule.new(selectors, breaks)
-          emit(rule)
-          with_rule_scope(rule, selectors, breaks) { eval_nodes(node.children) }
-          # A rule lifted to the root is its own output group — dart-sass
-          # separates it from what follows with a blank line.
-          if @at_frames.empty? && (last = @sink.last?)
-            last.group_end = true
-          end
+          {selectors, breaks}
         end
 
         # `@at-root (with: ...)` / `(without: ...)`. Escaped at-rule
@@ -2250,9 +2277,12 @@ module Hwaro
             end
           end
           conflicts = @quote_conflicts
+          nulls = @null_elisions
           text = collapse_ws(resolve_template(template, allow_vars: true))
-          if @quote_conflicts != conflicts && (node = Expr.parse(template))
-            # `'#{"Don't"}'`: only the typed path can re-quote the string.
+          # `'#{"Don't"}'`: only the typed path can re-quote the string.
+          # `1px, $null, 2px`: only the typed path drops the null element —
+          # the text path leaves an empty `1px, , 2px` member behind.
+          if (@quote_conflicts != conflicts || (@null_elisions != nulls && comma_hole?(text))) && (node = Expr.parse(template))
             begin
               return value_storage(Expr::Evaluator.new(self, force_div: true).eval(node))
             rescue SoftEvalError
@@ -2286,8 +2316,9 @@ module Hwaro
           # The verbatim path only has text, where a stored null reads back
           # as "null" (see `value_storage`).
           conflicts = @quote_conflicts
+          nulls = @null_elisions
           text = collapse_ws(resolve_template(template, allow_vars: true))
-          if @quote_conflicts != conflicts && (node = Expr.parse(template))
+          if (@quote_conflicts != conflicts || (@null_elisions != nulls && comma_hole?(text))) && (node = Expr.parse(template))
             begin
               return ResolvedValue.new(Expr::Evaluator.new(self, fold_calc: fold_calc).eval(node).to_css, false)
             rescue SoftEvalError
@@ -2449,7 +2480,7 @@ module Hwaro
         # declaration. Null and the empty list keep parseable spellings
         # so they survive the string round-trip.
         private def value_storage(value : Value) : String
-          value.inspect_css
+          value.inspect_css(storage: true)
         end
 
         # Text to emit for a declaration value, plus whether it was a real
@@ -2743,7 +2774,11 @@ module Hwaro
                   # optional-modifier idiom `.btn#{$mod}` with `$mod: null`
                   # has to yield `.btn`, not `.btnnull`.
                   var_text = lookup_var_ref(piece)
-                  io << var_display_text(var_text) unless var_text == "null"
+                  if var_text == "null"
+                    @null_elisions += 1
+                  else
+                    io << var_display_text(var_text)
+                  end
                 end
               in Ast::Interp
                 spliced = unquote_interp(resolve_interp(piece.inner, amp: allow_vars || !quote.nil?))
@@ -2803,15 +2838,27 @@ module Hwaro
         # verbatim never-computed source) passes through untouched, which
         # is what keeps plain-CSS output byte-identical.
         private def var_display_text(storage : String) : String
-          return storage unless storage.includes?('(')
+          precise = Number.precise_spelling?(storage)
+          return storage unless precise || storage.includes?('(') || storage.includes?("null")
           value = Expr.coerce(storage)
+          # Full-precision storage numbers print in CSS's ten digits.
+          return value.to_css if precise && !value.is_a?(MapV)
+          # Storage also keeps a list's null members (`append(null, 1px)`
+          # stores `null 1px`); CSS output drops them.
           if value.is_a?(ListV) &&
-             (value.items.any? { |i| i.is_a?(ListV) && !i.bracketed } ||
+             (value.items.any? { |i| (i.is_a?(ListV) && !i.bracketed) || i.is_a?(NullV) } ||
              (value.sep == ListV::Sep::Comma && value.items.size == 1))
             value.to_css
           else
             storage
           end
+        end
+
+        # True when eliding a null variable left an empty comma-list member
+        # behind (`1px, , 2px`, `, 2px`). Space lists need no repair: the
+        # whitespace collapse already closes their gap.
+        private def comma_hole?(text : String) : Bool
+          text.starts_with?(',') || text.ends_with?(',') || text.includes?(", ,") || text.includes?(",,")
         end
 
         private def lookup_var_ref(ref : Ast::VarRef) : String

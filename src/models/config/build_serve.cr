@@ -289,9 +289,14 @@ module Hwaro
 
         if headers_table = s["headers"]?.try(&.as_h?)
           headers_table.each do |name, value|
-            next unless str = value.as_s?
-            next if name.each_char.any? { |c| c.ascii_control? || c == ':' } ||
-                    str.each_char.any?(&.ascii_control?)
+            str = value.as_s?
+            if str.nil? || name.each_char.any? { |c| c.ascii_control? || c == ':' } ||
+               str.each_char.any?(&.ascii_control?)
+              # Dropped in silence before: `X-Max-Age = 60` (unquoted) or a
+              # name holding `:` never reached a response, with no feedback.
+              Logger.warn "Ignoring [serve.headers] #{name.inspect}: a header needs a string value, and neither name nor value may contain control characters (or ':' in the name)."
+              next
+            end
 
             config.serve.headers[name] = str
           end

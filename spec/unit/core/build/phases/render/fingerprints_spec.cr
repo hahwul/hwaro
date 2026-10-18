@@ -120,6 +120,35 @@ describe "warm --cache: pages rendering other pages" do
     end
   end
 
+  it "re-renders a get_page reader whose precomposed path names a decomposed file" do
+    with_relations_site do
+      File.write("content/café.md", "+++\ntitle = \"Cafe one\"\ntemplate = \"plain\"\n+++\nx")
+      File.write("templates/nfc.html", %(NFC={{ get_page(path="café.md").title }}))
+      File.write("content/nfc.md", "+++\ntitle = \"N\"\ntemplate = \"nfc\"\n+++\n")
+      relations_cached_build
+      File.read("public/nfc/index.html").should contain("NFC=Cafe one")
+      retitle("content/café.md", "Cafe one", "Cafe two")
+      relations_cached_build
+      File.read("public/nfc/index.html").should contain("NFC=Cafe two")
+    end
+  end
+
+  it "tracks the page get_page returns when a folded path and an exact URL fallback disagree" do
+    with_relations_site do
+      # get_page tries the folded path before the `/…/` URL fallback, so it
+      # returns the decomposed file, not the page whose URL is /posts/café/.
+      File.write("content/posts/café.md", "+++\ntitle = \"Decomposed one\"\nslug = \"xx\"\ntemplate = \"plain\"\n+++\nx")
+      File.write("content/y.md", "+++\ntitle = \"Exact URL\"\npath = \"posts/café\"\ntemplate = \"plain\"\n+++\ny")
+      File.write("templates/nfcalt.html", %(NFC={{ get_page(path="posts/café.md").title }}))
+      File.write("content/nfcalt.md", "+++\ntitle = \"N\"\ntemplate = \"nfcalt\"\n+++\n")
+      relations_cached_build
+      File.read("public/nfcalt/index.html").should contain("NFC=Decomposed one")
+      retitle("content/posts/café.md", "Decomposed one", "Decomposed two")
+      relations_cached_build
+      File.read("public/nfcalt/index.html").should contain("NFC=Decomposed two")
+    end
+  end
+
   it "treats a get_page call with a computed path as a page-set read" do
     with_relations_site do
       File.write("templates/dyn.html", %(DYN={{ get_page(path=page.extra.ref).title }}))
@@ -352,6 +381,32 @@ describe "warm --cache: section-set changes" do
       end
     end
   end
+
+  it "re-renders sibling pages when a subsection turns transparent or back" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", "title = \"T\"\nbase_url = \"http://localhost\"\n")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "SIB={% for p in section.pages %}[{{ p.title }}]{% endfor %}")
+        File.write("templates/section.html", "{{ section.list }}")
+        FileUtils.mkdir_p("content/blog/sub")
+        File.write("content/blog/_index.md", "+++\ntitle = \"Blog\"\n+++\n")
+        File.write("content/blog/post.md", "+++\ntitle = \"Post\"\n+++\n")
+        File.write("content/blog/sub/_index.md", "+++\ntitle = \"Sub\"\n+++\n")
+        File.write("content/blog/sub/inner.md", "+++\ntitle = \"Inner\"\n+++\n")
+        relations_cached_build
+        File.read("public/blog/post/index.html").should eq("SIB=[Sub]")
+
+        File.write("content/blog/sub/_index.md", "+++\ntitle = \"Sub\"\ntransparent = true\n+++\n")
+        relations_cached_build
+        File.read("public/blog/post/index.html").should eq("SIB=[Inner]")
+
+        File.write("content/blog/sub/_index.md", "+++\ntitle = \"Sub\"\n+++\n")
+        relations_cached_build
+        File.read("public/blog/post/index.html").should eq("SIB=[Sub]")
+      end
+    end
+  end
 end
 
 describe "warm --cache: versioned canonical" do
@@ -397,6 +452,37 @@ end
 class Hwaro::Core::Build::Builder
   def test_menu_set_fingerprint(site : Hwaro::Models::Site) : String
     compute_menu_set_fingerprint(site)
+  end
+
+  def test_page_relations_hash(page, templates, site, link_targets) : String
+    page_relations_hash(page, templates, site, link_targets)
+  end
+end
+
+# A `get_page` literal in a shared layout puts its target in every page's
+# relations hash; resolving it with `site.pages.find` per page made a
+# `--cache` build quadratic (20k pages: 81s cold, 75s warm no-op).
+describe "relations hash get_page lookup" do
+  it "resolves get_page targets without scanning the page list per page" do
+    site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+    site.pages = (0...10_000).map do |i|
+      Hwaro::Models::Page.new("posts/p#{i}.md").tap do |p|
+        p.url = "/posts/p#{i}/"
+        p.title = "P#{i}"
+      end
+    end
+    templates = {"page" => %({{ get_page(path="/posts/p9999").title }}{{ get_page(path="missing.md").title }})}
+    builder = Hwaro::Core::Build::Builder.new
+    link_targets = {} of String => Hwaro::Models::Page
+
+    t = Time.instant
+    hashes = site.pages.map { |page| builder.test_page_relations_hash(page, templates, site, link_targets) }
+    (Time.instant - t).should be < 5.seconds
+    hashes.uniq.size.should eq(1)
+
+    # Still the page the slash-stripped URL names: retitling it moves the hash.
+    site.pages.last.title = "Renamed"
+    builder.test_page_relations_hash(site.pages.first, templates, site, {} of String => Hwaro::Models::Page).should_not eq(hashes.first)
   end
 end
 

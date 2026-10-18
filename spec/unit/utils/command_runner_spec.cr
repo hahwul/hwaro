@@ -152,6 +152,14 @@ describe Hwaro::Utils::CommandRunner do
       end
     end
 
+    it "shows a successful command's stderr" do
+      log = with_captured_log do
+        Hwaro::Utils::CommandRunner.run_all(["echo hook-warning>&2"]).should be_true
+      end
+      # The indented output line, not the "Running" line echoing the command.
+      log.should contain("  hook-warning")
+    end
+
     it "returns true when all commands succeed" do
       commands = [
         "echo 'first'",

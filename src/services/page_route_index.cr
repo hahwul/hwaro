@@ -46,6 +46,9 @@ module Hwaro
       # belong to that bundle, not to the section around it
       # (`Page#nested_bundle?`).
       @index_dirs = Set(String).new
+      # Published sections that write pager pages: normalized section URL →
+      # `{paginate_path, per_page, source directory}`.
+      @pagers = {} of String => {String, Int32, String}
 
       def initialize(content_dir : String, config : Models::Config?)
         # Reading every page through the build's parsers replays the build's
@@ -78,6 +81,12 @@ module Hwaro
       # `future`, `expired`, or NOT_RENDERED), nil when unknown.
       def state_for(source : String) : String?
         @states[File.expand_path(source)]?
+      end
+
+      # `{paginate_path, per_page, source directory}` of the published
+      # section at `url` when it writes `/<paginate_path>/N/` pages.
+      def pager_for(url : String) : {String, Int32, String}?
+        @pagers[PageRouteIndex.normalize(url)]?
       end
 
       # Does a default build write a page or alias at `url`?
@@ -172,6 +181,9 @@ module Hwaro
         return unless info.published? && data[:render]
 
         @published << PageRouteIndex.normalize(url)
+        if File.basename(source, File.extname(source)).split('.').first == "_index" && (per_page = pager_size(data, config))
+          @pagers[PageRouteIndex.normalize(url)] = {data[:paginate_path], per_page, File.dirname(source)}
+        end
         data[:aliases].each do |alias_path|
           # The build's own rule: external URLs (`mailto:`, `https://`, `//`)
           # and traversing segments (`../up`) never become redirect stubs.
@@ -183,6 +195,23 @@ module Hwaro
         # check-links says nothing new about it — callers fall back to the
         # plain source-file test for a page this index does not know.
         Logger.debug "check-links: no route for #{info.path}: #{ex.message}"
+      end
+
+      # Items per pager page when the section at `url` paginates, else nil.
+      # Mirrors `Paginator#pagination_enabled_for_section?` and
+      # `#per_page_for_section`, gated like `Render#paginated_section?`: a
+      # redirect, or a custom template under the site-wide default, writes
+      # no pager pages.
+      private def pager_size(data, config : Models::Config?) : Int32?
+        return if data[:redirect_to]
+        paginate = data[:paginate]
+        enabled = data[:pagination_enabled]
+        template = data[:template]
+        return if template && template != "section" && enabled != true && (paginate || 0) <= 0
+        global = config.try(&.pagination) || Models::PaginationConfig.new
+        enabled = paginate ? paginate > 0 : global.enabled && global.per_page > 0 if enabled.nil?
+        return unless enabled
+        {paginate && paginate > 0 ? paginate : global.per_page, 1}.max
       end
 
       # `[[content.generate]]` pages have no source file, so they only ever

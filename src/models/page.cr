@@ -560,19 +560,37 @@ module Hwaro
       # place a page's URL is assigned, so templates that use `page.url`
       # directly are right too and not just the permalink.
       #
-      # Nothing else is escaped. The output path is derived from this string
+      # Little else is escaped. The output path is derived from this string
       # by decoding it again (`PathUtils.split_safe_segments`), so `%23` still
       # lands in the directory named `a#b` that the URL now addresses —
       # whereas encoding more (a non-ASCII slug, say) would rename the
-      # directory every existing site already publishes to. Leaving `%` itself
-      # alone also keeps this idempotent when a URL is assigned twice.
+      # directory every existing site already publishes to. A valid `%XX`
+      # escape is kept as is, which also keeps this idempotent when a URL is
+      # assigned twice.
+      #
+      # `"` is escaped for the same reason from the HTML side: templates print
+      # `page.url` into double-quoted attributes unescaped (autoescape is
+      # off), so `with"quote.md` cut its own `href` short and linked a 404.
+      #
+      # A `%` that starts no escape (`100%.md`) is escaped: `/posts/100%/` is
+      # not a valid URL, and servers that reject it answer 400. So is every
+      # `%` when the name's `%XX` runs do not decode to UTF-8 (`100%deal.md`):
+      # the output path decodes them and scrubs the invalid bytes, so
+      # `/posts/100%deal/` was written to a `100<U+FFFD>al/` directory no
+      # request for that URL reaches. Either way the URL then names the
+      # literal file name.
       def url=(value : String)
-        @url = if value.includes?('#') || value.includes?('?')
-                 value.gsub('#', "%23").gsub('?', "%3F")
+        if value.includes?('%')
+          value = URI.decode(value).valid_encoding? ? value.gsub(/%(?![0-9A-Fa-f]{2})/, "%25") : value.gsub('%', "%25")
+        end
+        @url = if value.includes?('#') || value.includes?('?') || value.includes?('"')
+                 value.gsub(URL_DELIMITER_ESCAPES)
                else
                  value
                end
       end
+
+      private URL_DELIMITER_ESCAPES = {'#' => "%23", '?' => "%3F", '"' => "%22"}
 
       # Generate permalink (absolute URL)
       def generate_permalink(base_url : String) : String

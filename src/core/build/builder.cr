@@ -195,11 +195,14 @@ module Hwaro
         # closure can actually reach. build_template_variables skips building
         # the ones it provably can't (SEO/OG strings, JSON-LD strings, the
         # per-page section-pages array copy — O(section size) per page).
-        # Detection is substring-based over the closure's source union, so it
-        # only ever over-approximates: any occurrence of the identifier keeps
-        # the variable. A template is only gated when its whole closure is
-        # statically resolvable AND it cannot contain shortcodes (template
-        # shortcodes render with the same vars hash and could read anything).
+        # Detection only ever over-approximates: any read keeps the variable,
+        # and a template is only gated when its whole closure is statically
+        # resolvable. `needs_seo`/`needs_jsonld` are substring checks and are
+        # forced on when the closure can hold shortcodes (template shortcodes
+        # render with the same vars hash and could read anything).
+        # `needs_section_pages` lexes the closure for a `section` identifier,
+        # except in shortcode templates, whose output is compiled as template
+        # text — a plain substring check covers what they print.
         #
         # `listing_fanout_*` are the exception: they gate no output at all,
         # only the render phase's auto worker count (see
@@ -312,6 +315,10 @@ module Hwaro
         # filter-time one. Cleared after the render fan-out; guarded by
         # @page_template_hash_mutex.
         @filter_relations_hashes : Hash(String, String) = {} of String => String
+        # `get_page` lookup index of one render pass, keyed by that pass's
+        # `link_targets` map (fresh per pass; holding it keeps its address
+        # from being reused). Guarded by @page_template_hash_mutex.
+        @get_page_index : {Hash(String, Models::Page), {Hash(String, Models::Page), Hash(String, Models::Page)}}? = nil
         # `[markdown] wikilinks` lookup over the current published page set;
         # rebuilt whenever that set may have changed (refresh_wikilink_index).
         @wikilink_index : Content::Processors::Wikilinks::Index? = nil
@@ -775,6 +782,8 @@ module Hwaro
           # build pipeline rewrapping the exception.
           previous_config = @config
           config = Models::Config.load(env: options.env)
+          # Before anything is written: a cold build wipes the output first.
+          config.require_resolved_base_url!(options.base_url)
           @config = config
           # `[build]` supplies output_dir/drafts/parallel/cache for anything the
           # command line left at its default. Applied before the BuildContext is
@@ -1048,7 +1057,10 @@ module Hwaro
           result = execute_generate_phase(ctx, profiler)
           return result if result != Lifecycle::HookResult::Continue
 
-          if ctx.options.streaming?
+          # Not under serve: its incremental rebuilds re-render pages the
+          # edit didn't touch from this same page set, and an emptied source
+          # renders as an empty body with no backlinks.
+          if ctx.options.streaming? && !ctx.options.serve_mode
             ctx.all_pages.each(&.raw_content=(""))
             GC.collect
           end

@@ -227,4 +227,73 @@ describe "Sass value fixes" do
       css.should contain(%(c3: "abcd";))
     end
   end
+
+  describe "null list members" do
+    it "drops a null member from a list built by append (rfs idiom)" do
+      css = compile_source(<<-SCSS)
+        .a { $v: null; @each $x in 1px 2px { $v: append($v, $x); } p: $v; q: length($v); }
+        SCSS
+      css.should contain("p: 1px 2px;")
+      css.should contain("q: 3;")
+    end
+
+    it "drops a null variable from a comma list" do
+      css = compile_source(<<-SCSS)
+        $n: null;
+        $l: 1px, $n, 2px;
+        .a { k: 1px, $n, 2px; l: length($l); m: $l; }
+        SCSS
+      css.should contain("k: 1px, 2px;")
+      css.should contain("l: 3;")
+      css.should contain("m: 1px, 2px;")
+    end
+  end
+
+  describe "selector lists built with append" do
+    it "keeps unquoted selector strings as separate list members" do
+      css = compile_source(<<-'SCSS')
+        @function inputs($mod: '') {
+          $r: ();
+          @each $t in text password { $r: append($r, unquote('[type=\'#{$t}\']#{$mod}'), comma); }
+          @return $r;
+        }
+        #{inputs()} { a: b; }
+        #{inputs(':focus')} { c: d; }
+        $one: append((), unquote('.x'), comma);
+        .y { l: length(append($one, unquote('.z'), comma)); n: nth($one, 1); }
+        SCSS
+      css.should contain("[type='text'], [type='password'] {")
+      css.should contain("[type='text']:focus, [type='password']:focus {")
+      css.should contain("l: 2;")
+      css.should contain("n: .x;")
+      css.should_not contain(",)")
+    end
+
+    it "keeps a sliced string with commas a single string" do
+      css = compile_source(<<-SCSS)
+        $svg: unquote("data:image/svg+xml,<svg fill='rgba(0, 0, 0, 0.25)'/>");
+        $cut: str-slice($svg, 40);
+        .b { i: str-index($svg, "<"); j: str-index($cut, ")"); l: length($cut); }
+        SCSS
+      css.should contain("i: 20;")
+      css.should contain("j: 10;")
+      css.should contain("l: 1;")
+    end
+
+    # Every append re-reads the stored list, so each unparseable member used
+    # to raise once per iteration (and non-ASCII text made the scan cubic):
+    # 600 members took over 5s.
+    it "stays fast for a long list of non-ASCII selector strings" do
+      css = ""
+      elapsed = Time.measure do
+        css = compile_source(<<-'SCSS')
+          $l: ();
+          @for $i from 1 through 600 { $l: append($l, unquote("[data-é='#{$i}']"), comma); }
+          .n { l: length($l); }
+          SCSS
+      end
+      css.should contain("l: 600;")
+      elapsed.should be < 2.5.seconds
+    end
+  end
 end

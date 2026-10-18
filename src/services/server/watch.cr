@@ -444,12 +444,14 @@ module Hwaro
           end
         end
 
-        # Files an include call or a transclusion read from outside the roots
+        # Files an include call, a transclusion, a literal `load_data()` or
+        # the auto OG images read from outside the roots
         # (`examples/site/config.toml`), learned from the last build. Stamped
         # one by one; a missing one gets MISSING_STAMP, so creating it later
         # registers as a change.
-        @builder.include_sources.each do |path|
+        (@builder.include_sources + @builder.load_data_sources.to_a + @builder.og_image_assets).each do |path|
           next if watched_root_path?(path) || Server.watcher_ignored?(path)
+          next if Utils::PathUtils.absolute?(path) || Utils::PathUtils.escapes_parent?(path)
           begin
             info = File.info?(path)
             mtimes[path] = info && info.file? ? {info.modification_time, info.size.to_i64, watch_digest(path, info, prev, now_ms, racy)} : MISSING_STAMP

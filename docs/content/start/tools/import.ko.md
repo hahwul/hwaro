@@ -85,14 +85,14 @@ hwaro tool import hugo path/to/site --verbose
 ## 동작
 
 - 프론트 매터는 hwaro 기본 형식인 TOML(`+++`)로 변환됩니다. hwaro는 YAML 프론트 매터(`---`)도 지원합니다: 가져온 뒤 `hwaro tool convert to-yaml`을 실행하거나, 이후 `hwaro new`가 생성할 형식을 바꾸려면 `config.toml`에 `[content.new].front_matter_format = "yaml"`을 설정합니다. 다만 `front_matter_format`은 내장 템플릿에만 적용됩니다. 아키타입은 자신의 프론트 매터를 그대로 사용하고 모든 스캐폴드가 `archetypes/default.md`를 포함하므로, 이 설정을 적용하려면 해당 파일(또는 매칭되는 아키타입)을 삭제해야 합니다. [아키타입](/ko/writing/archetypes/) 문서를 참고합니다.
-- HTML 콘텐츠(예: WordPress)는 마크다운으로 변환됩니다. 목록 항목과 표 셀 안의 링크·강조·코드는 그대로 유지되고, `[caption]` 숏코드는 이미지와 그 아래 캡션으로 바뀝니다. `&lt;script&gt;`처럼 엔티티로 인코딩된 마크업은 보이는 텍스트로 남습니다.
+- HTML 콘텐츠(예: WordPress)는 마크다운으로 변환됩니다. 목록 항목과 표 셀 안의 링크·강조·코드는 그대로 유지되고, `[caption]` 숏코드는 이미지와 그 아래 캡션으로 바뀝니다. `&lt;script&gt;`처럼 엔티티로 인코딩된 마크업은 보이는 텍스트로 남습니다. 마크다운이 마크업으로 읽을 본문 문자(`*`, 백틱, `- `나 `2024. `로 시작하는 문단)는 백슬래시로 이스케이프되어 쓰인 그대로 보입니다.
 - WordPress의 "더 보기(Read more)" 태그와 Hexo의 `more` 주석은 hwaro의 요약 구분자로 유지되므로, 글의 [요약](/ko/writing/pages/)은 작성자가 정한 위치에서 그대로 끊깁니다.
 - 날짜는 원본 생성기가 받아들이는 형식으로 읽습니다. RFC 3339, `2024-01-15 10:30:00 +0900`, 분 단위(`2024-01-15 10:30`), 슬래시 날짜(`2024/01/15 10:30:00`, 오프셋 포함 여부 무관), 영문 날짜(`July 8, 2022`, Astro 블로그 템플릿의 `Jul 08 2022`)를 지원합니다.
 - 대상 경로에 이미 있는 파일은 덮어쓰지 않고 **건너뜁니다**. 다시 가져오려면 먼저 삭제하거나 이름을 바꾸거나, `--force`를 사용합니다.
 - 두 소스 파일이 **같은** 대상 경로로 해석될 때(슬러그 중복, 제목이 같은 두 노트, `YYYY-MM-DD-` 날짜 접두사 제거, 컬렉션 하위 폴더 두 개가 한 섹션으로 병합되는 경우 등), 두 번째부터는 하나가 다른 하나를 조용히 덮어쓰지 않고 `slug-1.md`, `slug-2.md`, … 로 나란히 저장됩니다. 이름이 바뀐 대상의 개수는 파일마다 한 줄씩이 아니라 실행이 끝날 때 한 번만 보고됩니다.
 - `--force`는 "이번 가져오기 이전부터 있던 파일을 덮어쓴다"는 뜻입니다. **같은 실행**에서 방금 쓴 파일을 다른 파일이 덮어쓰게 하지는 않습니다. 그런 경우는 위의 `-1` / `-2` 접미사가 붙습니다. 따라서 가져오기를 다시 실행해도 결과가 같습니다: 각 소스는 처음에 선택한 대상으로 다시 해석되어 건너뛰거나(`--force`면 덮어쓰기) 처리되며, 실행할 때마다 `-1` 사본이 쌓이지 않습니다.
 - 알려진 글 유형만 가져옵니다 (예: WordPress의 `post`와 `page`).
-- 페이지는 게시 주소를 유지합니다. Hugo `url`과 Jekyll·Eleventy의 리터럴 `permalink`(`:placeholder`나 `{{ }}` 패턴이 아닌 것)는 `path`가 되고, Eleventy `permalink: false`는 `render = false`가 됩니다. `.html` 주소는 확장자 없는 `path`와 옛 주소의 별칭이 되고, 끝의 `index.html`은 별칭 없이 그 디렉터리로 매핑됩니다. 쿼리와 프래그먼트는 버립니다. 다른 종류의 파일을 가리키는 URL(`/feed.xml`)은 경고와 함께 매핑하지 않습니다. Jekyll `redirect_from` 항목은 `aliases`가 됩니다.
+- 페이지는 게시 주소를 유지합니다. Hugo `url`과 Jekyll·Hexo·Eleventy의 리터럴 `permalink`(`:placeholder`나 `{{ }}` 패턴이 아닌 것)는 `path`가 되고, Eleventy `permalink: false`는 `render = false`가 됩니다. `.html` 주소는 확장자 없는 `path`와 옛 주소의 별칭이 되고, 끝의 `index.html`은 별칭 없이 그 디렉터리로 매핑됩니다. 쿼리와 프래그먼트는 버립니다. 다른 종류의 파일을 가리키는 URL(`/feed.xml`)은 경고와 함께 매핑하지 않습니다. Jekyll `redirect_from` 항목은 `aliases`가 됩니다.
 - Hugo: Hugo와 마찬가지로 프론트 매터 키의 대소문자를 구분하지 않습니다(`Title`, `Draft`, `publishdate` 모두 인식). JSON 프론트 매터도 TOML·YAML처럼 읽으며, `slug`가 있는 리프 번들은 슬러그 디렉터리 아래 번들(`posts/<slug>/index.md`)로 씁니다. 그 디렉터리에 이미 다른 번들이 있으면 경고와 함께 원래 디렉터리에 그대로 둡니다.
 - Hugo: 미래의 `publishDate`로 예약된 페이지는 그 값을 `date`로 받아 그때까지 게시되지 않습니다(지난 `publishDate`라면 `date`를 유지). 출력이 없는 페이지(`headless = true`, 또는 `build`/`_build`의 `render = "never"`)는 `render = false`가 되고, `sitemap.disable = true`는 `in_sitemap = false`가 됩니다.
 - Hexo: `published: false`인 글은 초안으로 가져옵니다.

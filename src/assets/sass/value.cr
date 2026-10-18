@@ -65,7 +65,10 @@ module Hwaro
         # as `to_css`: CSS output drops nulls from lists and never
         # parenthesizes a sublist, both of which destroy structure.
         # Mirrors dart-sass's `inspect` vs `toCssString` split.
-        def inspect_css : String
+        #
+        # `storage` asks for the spelling variable storage needs on top of
+        # that: numbers at full precision (see `Number#inspect_css`).
+        def inspect_css(storage : Bool = false) : String
           to_css
         end
 
@@ -107,6 +110,27 @@ module Hwaro
           end
         end
 
+        # Storage keeps every bit of a computed number. The ten-digit CSS
+        # spelling turned a running `$factor: $factor * 0.1` into 0 after
+        # eleven steps (Foundation's long-division `divide()` returned 0px
+        # for 10px / 3) and let rounding error pile up across loops. The
+        # precise spelling is never emitted: see `precise_spelling?`.
+        def inspect_css(storage : Bool = false) : String
+          text = to_css
+          return text unless storage && @lexeme.nil? && @value.finite?
+          return text if Number.format(@value).to_f64? == @value
+          "#{@value}#{@unit}"
+        end
+
+        PRECISE_SPELLING = /\d[eE][+-]?\d|\.\d{11}/
+
+        # True for number text only full-precision storage produces (an
+        # exponent, or more than ten fractional digits). Read back, such a
+        # number formats like a computed one instead of echoing its lexeme.
+        def self.precise_spelling?(text : String) : Bool
+          text.matches?(PRECISE_SPELLING)
+        end
+
         # dart-sass-style number formatting: integers without a decimal
         # point, floats rounded to 10 digits with trailing zeros trimmed.
         #
@@ -127,13 +151,17 @@ module Hwaro
           # anyway — print the shortest-representation digits, zero-padded
           # (dart-sass prints `math.$max-number` the same way).
           return format_large(value) if value.abs >= 1e15
+          # `round(10)` scales by 1e10, which is inexact once the integer
+          # part has a few digits: 33333333333 came back as
+          # 33333333333.000004 and printed that way. It only decides the
+          # fuzzy-integer case; the digits come from the value itself.
+          return value.to_i64.to_s if value == value.trunc # also "-0" → "0"
           rounded = value.round(10)
-          rounded = 0.0 if rounded == 0 # avoid "-0"
           return rounded.to_i64.to_s if rounded == rounded.trunc
 
-          s = sprintf("%.10f", rounded)
+          s = sprintf("%.10f", value)
           s = s.rstrip('0').rstrip('.') if s.includes?('.')
-          s
+          s == "-0" ? "0" : s
         end
 
         private def self.format_large(value : Float64) : String
@@ -280,6 +308,33 @@ module Hwaro
           "#{quote}#{escaped}#{quote}"
         end
 
+        # `text` as unquote() hands it out: a single-character escape
+        # (`\"`, `\'`, `\\`, `\:`) is only an escape inside quotes, so it
+        # becomes that character, and an escaped newline is a line
+        # continuation. Hex escapes (`\f101`) stay verbatim: they mean the
+        # same code point unquoted (dart-sass prints them back the same).
+        def self.unquote_text(text : String) : String
+          return text unless text.includes?('\\')
+          String.build do |io|
+            esc = false
+            text.each_char do |ch|
+              if esc
+                esc = false
+                if ch.hex?
+                  io << '\\' << ch
+                elsif ch != '\n'
+                  io << ch
+                end
+              elsif ch == '\\'
+                esc = true
+              else
+                io << ch
+              end
+            end
+            io << '\\' if esc
+          end
+        end
+
         def self.contains_unescaped?(text : String, quote : Char) : Bool
           esc = false
           text.each_char do |ch|
@@ -407,7 +462,7 @@ module Hwaro
         end
 
         # Null vanishes in CSS output but must survive storage as a value.
-        def inspect_css : String
+        def inspect_css(storage : Bool = false) : String
           "null"
         end
 
@@ -465,7 +520,7 @@ module Hwaro
         # Unlike `to_css`: keeps null members (they are real elements, so
         # dropping them changes `length`) and parenthesizes unbracketed
         # sublists so nesting survives a storage round-trip.
-        def inspect_css : String
+        def inspect_css(storage : Bool = false) : String
           return "()" if @items.empty?
           if @sep == Sep::Comma && @items.size == 1 && !@bracketed
             # A single-element comma list has no comma to reveal its
@@ -473,7 +528,7 @@ module Hwaro
             # only spelling that survives a storage round-trip without
             # degrading into a plain value.
             item = @items[0]
-            text = item.inspect_css
+            text = item.inspect_css(storage)
             text = "(#{text})" if element_needs_parens?(Sep::Comma, item)
             return "(#{text},)"
           end
@@ -484,7 +539,7 @@ module Hwaro
             in Sep::Slash then " / "
             end
           inner = @items.map do |item|
-            text = item.inspect_css
+            text = item.inspect_css(storage)
             element_needs_parens?(@sep, item) ? "(#{text})" : text
           end.join(joiner)
           @bracketed ? "[#{inner}]" : inner
@@ -545,16 +600,16 @@ module Hwaro
         # map stays parseable as one entry — with `to_css` the commas of a
         # nested list merge into the map's own separator and the text no
         # longer re-parses as a map.
-        def inspect_css : String
+        def inspect_css(storage : Bool = false) : String
           "(" + @entries.map do |e|
             value = e.value
-            text = value.inspect_css
+            text = value.inspect_css(storage)
             # dart-sass wraps ANY unbracketed comma list in a map value —
             # a singleton included (`(a: ((5,)))`), unlike list nesting.
             if value.is_a?(ListV) && !value.bracketed && value.sep == ListV::Sep::Comma
               text = "(#{text})"
             end
-            "#{e.key.inspect_css}: #{text}"
+            "#{e.key.inspect_css(storage)}: #{text}"
           end.join(", ") + ")"
         end
 

@@ -1322,6 +1322,13 @@ module Hwaro
                 return d.innerHTML;
               }
 
+              // Encode what a raw href must not carry (quotes, spaces) but keep
+              // the escapes the index already holds: a page named `a#b.md` is
+              // indexed as `/a%23b/`, and plain encodeURI linked `/a%2523b/`.
+              function resultHref(url) {
+                return encodeURI(url).replace(/%25([0-9A-Fa-f]{2})/g, '%$1');
+              }
+
               // Match on the raw text and escape each piece afterwards: running the
               // query over already-escaped HTML split entities (`&amp;`) with a
               // <mark> and could never match a query containing & < >.
@@ -1385,7 +1392,7 @@ module Hwaro
                 for (var j = 0; j < results.length; j++) {
                   var r = results[j].item;
                   var snippet = getSnippet(r.content, query.trim());
-                  html += '<a class="search-result-item" href="' + encodeURI(r.url) + '" data-index="' + j + '">'
+                  html += '<a class="search-result-item" href="' + resultHref(r.url) + '" data-index="' + j + '">'
                     + '<div class="search-result-title">' + highlightMatch(r.title, query.trim()) + '</div>'
                     + '<div class="search-result-snippet">' + highlightMatch(snippet, query.trim()) + '</div>'
                     + '</a>';

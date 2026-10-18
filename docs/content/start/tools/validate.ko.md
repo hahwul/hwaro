@@ -33,7 +33,7 @@ hwaro tool validate --json
 
 ## 검사 항목
 
-- 프론트 매터에 `title` 누락
+- 프론트 매터에 `title` 누락 또는 빈 값 (홈페이지는 비워 둘 수 있음)
 - 프론트 매터에 `description` 누락
 - 대체 텍스트가 비어 있는 Markdown 이미지(`![](url)`)와 `alt` 속성이 없는 원시 HTML `<img>` 요소 (장식용 이미지를 뜻하는 `alt=""`는 허용). 코드 블록, 인라인 코드, HTML 주석 안은 검사하지 않음
 - 깨진 내부 링크: 빌드가 해석할 수 없는 `@/` 경로 (`tool check-links`와 같이 게시되는 페이지의 정확한 원본 경로만 인정)
@@ -80,7 +80,7 @@ checked: 0 errors, 2 warnings, 2 info
 
 | ID | 수준 | 설명 |
 |----|-------|-------------|
-| `content-title-missing` | warning | title이 없거나 "Untitled"임 |
+| `content-title-missing` | warning | title이 없거나 비어 있거나 "Untitled"임 |
 | `content-description-missing` | warning | description 누락 |
 | `content-alt-text-missing` | warning | 대체 텍스트가 없는 이미지 |
 | `content-internal-link-broken` | warning | 깨진 `@/` 내부 링크 |

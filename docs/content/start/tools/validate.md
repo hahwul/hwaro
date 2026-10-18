@@ -33,7 +33,7 @@ hwaro tool validate --json
 
 ## What It Checks
 
-- Missing `title` in frontmatter
+- Missing or blank `title` in frontmatter (the homepage may leave it blank)
 - Missing `description` in frontmatter
 - Markdown images with empty alt text (`![](url)`) and raw HTML `<img>` elements with no `alt` attribute (an explicit `alt=""` marks a decorative image and is accepted); code blocks, inline code and HTML comments are not scanned
 - Broken internal links: `@/` paths the build cannot resolve — the exact source path of a published page, as with `tool check-links`
@@ -80,7 +80,7 @@ says why it failed.
 
 | ID | Level | Description |
 |----|-------|-------------|
-| `content-title-missing` | warning | Missing or "Untitled" title |
+| `content-title-missing` | warning | Missing, blank or "Untitled" title |
 | `content-description-missing` | warning | Missing description |
 | `content-alt-text-missing` | warning | Image without alt text |
 | `content-internal-link-broken` | warning | Broken `@/` internal link |

@@ -35,7 +35,7 @@ require "./doctor/referenced_paths"
 module Hwaro
   module Services
     class Doctor
-      VALID_CHANGEFREQS    = %w[always hourly daily weekly monthly yearly never]
+      VALID_CHANGEFREQS    = Models::SitemapConfig::VALID_CHANGEFREQS
       VALID_SEARCH_FORMATS = %w[fuse_json fuse_javascript elasticlunr_json elasticlunr_javascript]
       # Mirrors `MarkdownConfig#initialize` defaults — only katex/mathjax
       # render math at runtime; other strings load nothing.

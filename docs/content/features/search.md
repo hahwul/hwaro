@@ -124,6 +124,17 @@ The stylesheet uses CSS custom properties and follows `prefers-color-scheme` (an
 
 The other properties are `--hwaro-search-bg`, `-fg`, `-muted`, `-border`, `-active`, `-mark` and `-backdrop`.
 
+An override applies in both color schemes. When you change a color such as `-bg` or `-fg`, set its dark-mode value too, or light text can end up on your light background:
+
+```css
+@media (prefers-color-scheme: dark) {
+  .hwaro-search-overlay, .hwaro-search-inline {
+    --hwaro-search-bg: #1c1917;
+    --hwaro-search-fg: #f5f5f4;
+  }
+}
+```
+
 The build always writes its own `assets/hwaro-search/` files. A file at the same path under `static/` is replaced, and the build warns about it.
 
 ### Translations

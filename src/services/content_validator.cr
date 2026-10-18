@@ -86,9 +86,13 @@ module Hwaro
         draft = frontmatter["draft"]?
 
         # title check
-        if title.nil? || title == "Untitled"
+        # A blank `title = ""` reads as missing — except on the homepage, where
+        # it is the documented way to drop the page title (the blog scaffold
+        # ships it; every scaffold's <title> falls back to site.title).
+        blank = title.is_a?(String) && title.strip.empty? && !home_page?(file_path)
+        if title.nil? || blank || title == "Untitled"
           issues << Issue.new(id: "content-title-missing", level: :warning, category: "content", file: file_path,
-            message: title.nil? ? "Missing title in frontmatter" : "Title is \"Untitled\"")
+            message: title.nil? ? "Missing title in frontmatter" : (blank ? "Title is empty" : "Title is \"Untitled\""))
         end
 
         # description check
@@ -364,6 +368,12 @@ module Hwaro
 
       private def link_index : InternalLinkIndex
         @link_index ||= InternalLinkIndex.new(@content_dir)
+      end
+
+      # `index.md` / `_index.md` (or a language variant) at the content root.
+      private def home_page?(file_path : String) : Bool
+        File.dirname(file_path) == File.dirname(File.join(@content_dir, "_")) &&
+          File.basename(file_path).matches?(/\A_?index(?:\.[\w-]+)?\.(?:md|markdown)\z/i)
       end
 
       # CommonMark destinations may be followed by a title, or be wrapped in

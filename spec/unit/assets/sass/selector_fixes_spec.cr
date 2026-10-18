@@ -94,4 +94,27 @@ describe "Sass selector fixes" do
       css.should contain(".v:not(.a):is(.a), .v:not(.a, .e1, .e2, .e3):is(.a, .e1, .e2, .e3) {")
     end
   end
+
+  describe "& inside an @at-root block" do
+    it "still names the enclosing rule, through mixins too" do
+      css = compile_source(<<-SCSS)
+        @mixin striped { &.unstriped tbody { a: b; } }
+        .a { @at-root { .x { y: z; } &.b { c: d; } .p & { q: r; } } }
+        table { @at-root { @include striped; } }
+        SCSS
+      css.should contain(".x {\n  y: z;")
+      css.should contain(".a.b {\n  c: d;")
+      css.should contain(".p .a {\n  q: r;")
+      css.should contain("table.unstriped tbody {\n  a: b;")
+    end
+
+    it "still names the enclosing rule inside a nested @at-root" do
+      css = compile_source(<<-SCSS)
+        .a { @at-root { @at-root { &.b { x: 1; } } } }
+        .c { @at-root { @at-root .p & { y: 2; } } }
+        SCSS
+      css.should contain(".a.b {\n  x: 1;")
+      css.should contain(".p .c {\n  y: 2;")
+    end
+  end
 end

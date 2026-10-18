@@ -454,6 +454,10 @@ templates/shortcodes/
     └── github.html
 ```
 
+하위 디렉터리의 숏코드는 명시적 형식으로 `templates/shortcodes/` 아래 경로를
+적어 호출합니다: `{{ shortcode("code/tabs", lang="crystal") }}`. 짧은 형식은
+이름만 받으므로 `{{ code/tabs() }}`는 글자 그대로 남습니다.
+
 ## 함께 보기
 
 - [문법](/ko/templates/syntax/) — 커스텀 숏코드를 위한 Jinja2 레퍼런스

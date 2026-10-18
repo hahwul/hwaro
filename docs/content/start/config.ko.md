@@ -7,7 +7,7 @@ toc = true
 
 모든 사이트 설정은 프로젝트 루트의 `config.toml`에 있습니다.
 
-문자열 목록으로 문서화된 옵션에는 문자열 하나를 써도 되며, 항목이 하나인 목록으로 읽습니다. `sections = "posts"`는 `sections = ["posts"]`와 같습니다. 변수가 없을 때의 `exclude = "${SITEMAP_EXCLUDE:-}"`처럼 빈 문자열은 설정하지 않은 것으로 보고 기본값을 유지합니다. 문자열도 목록도 아닌 값(`fields = true`)은 경고와 함께 무시합니다.
+문자열 목록으로 문서화된 옵션에는 문자열 하나를 써도 되며, 항목이 하나인 목록으로 읽습니다. `sections = "posts"`는 `sections = ["posts"]`와 같습니다. 변수가 없을 때의 `exclude = "${SITEMAP_EXCLUDE:-}"`처럼 빈 문자열은 설정하지 않은 것으로 보고 기본값을 유지합니다. 문자열도 목록도 아닌 값(`fields = true`)은 경고와 함께 무시합니다. 불리언 옵션에 `true`나 `false`가 아닌 값(따옴표로 감싼 `safe = "true"` 등)을 쓴 경우도 경고와 함께 기본값을 유지합니다.
 
 최상위 키에 오타가 있으면 조용히 무시하지 않고 경고합니다. `[markdonw]`나
 `titel = "…"` 같은 오타는 아무 안내 없이 기능을 꺼버리기 때문입니다. 실제
@@ -22,6 +22,8 @@ Unknown key 'markdonw' in config.toml — hwaro does not read it. Did you mean '
 `[[taxonomies]]` 항목 대신 `taxonomies = ["tags"]`를 쓰는 것처럼 알려진
 섹션의 형태가 틀린 경우에도 경고와 함께 무시합니다. 예외적으로
 `sitemap = true`는 `[sitemap] enabled = true`와 같은 뜻으로 계속 받아들입니다.
+섹션 안의 테이블 목록을 `[[robots.rules]]`나 `[[menus.main]]` 대신
+`[robots.rules]`, `[menus.main]`처럼 대괄호 하나로 쓴 경우도 경고와 함께 무시합니다.
 
 ## 사이트 설정
 
@@ -54,7 +56,7 @@ description = "${SITE_DESC:-My awesome site}"
 | `$VAR` | 위와 동일 (축약형) |
 | `${VAR:-default}` | `VAR`가 없거나 비어 있으면 `default` 사용 |
 
-기본값 없이 누락된 변수는 그대로 남고 빌드 경고가 발생합니다. 템플릿에서의 사용법은 [환경 변수](/ko/features/env-variables/)를 참고합니다.
+기본값 없이 누락된 변수는 그대로 남고 빌드 경고가 발생합니다. `base_url`에 쓴 변수가 없으면 `--base-url`을 주지 않는 한 `hwaro build`가 그 변수 이름을 알리며 중단됩니다. 자체 로컬 URL을 쓰는 `hwaro serve`와 다른 명령은 그대로 동작합니다. 템플릿에서의 사용법은 [환경 변수](/ko/features/env-variables/)를 참고합니다.
 
 ## 빌드 옵션
 

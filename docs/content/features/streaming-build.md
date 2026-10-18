@@ -79,7 +79,7 @@ hwaro build --stream --memory-limit 512M
 3. After each batch is written to disk, `page.content` is cleared to free memory —
    but only when nothing downstream reads it back (see below)
 4. The garbage collector is invoked to reclaim the released memory
-5. After the Generate phase (feeds, sitemap, search index), `page.raw_content` is also cleared
+5. After the Generate phase (feeds, sitemap, search index), `page.raw_content` is also cleared — except under `hwaro serve`, which keeps it to re-render pages on later edits
 
 ### When `page.content` is kept
 

@@ -638,6 +638,22 @@ module Hwaro
         end
       end
 
+      # The bare content path (`about.md`) the build also indexes a
+      # default-language file that spells its suffix out (`about.en.md`)
+      # under, as `InternalLinkResolver.add_default_language_aliases` does;
+      # nil when `relative` is no such file.
+      def default_language_bare_path(relative : String) : String?
+        setup = language_setup
+        return unless setup.multilingual
+        ext = File.extname(relative)
+        stem = relative.rchop(ext)
+        suffix = ".#{setup.default}"
+        return unless stem.ends_with?(suffix)
+        bare = stem.rchop(suffix)
+        return if bare.empty? || bare.ends_with?('/')
+        "#{bare}#{ext}"
+      end
+
       # A section `_index` the way ReadContent decides it: the basename with
       # any recognised language suffix removed is `_index` + extension. An
       # undeclared suffix (`_index.old.md`) makes a regular page.

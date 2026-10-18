@@ -431,3 +431,93 @@ describe "Builder#run_incremental get_taxonomy and collision losers" do
     end
   end
 end
+
+# `--stream` empties every page's source after the cold build. Serve keeps
+# that page set for its incremental rebuilds, which re-render neighbours the
+# edit did not re-parse — they came out with an empty body.
+describe "Builder#run_incremental under --stream" do
+  it "keeps the bodies of re-rendered neighbours" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content/posts")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}|{% if page.lower %}{{ page.lower.title }}{% endif %}")
+        File.write("content/posts/a.md", "+++\ntitle = \"A\"\ndate = 2024-01-01\n+++\nbody a\n")
+        File.write("content/posts/b.md", "+++\ntitle = \"B\"\ndate = 2024-01-02\n+++\nbody b\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, stream: true)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/posts/b.md"], options)
+
+        # b's title moves a's `page.lower`, so a re-renders without a re-parse.
+        File.write("content/posts/b.md", "+++\ntitle = \"B2\"\ndate = 2024-01-02\n+++\nbody b\n")
+        builder.run_incremental(["content/posts/b.md"], options)
+        File.read("public/posts/a/index.html").should eq("<p>body a</p>\n|B2")
+      end
+    end
+  end
+end
+
+# A page dated into the future leaves the related-posts candidates even under
+# --include-future; the incremental recompute skipped it and the page kept the
+# list it had while published.
+describe "Builder#run_incremental related posts" do
+  it "clears the list of a page that turned into a future preview" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[related]\nenabled = true\n[[taxonomies]]\nname = "tags"))
+        FileUtils.mkdir_p("content/posts")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{% for r in page.related_posts %}{{ r.title }};{% endfor %}")
+        File.write("content/posts/a.md", "+++\ntitle = \"A\"\ndate = 2024-01-01\ntags = [\"x\"]\n+++\n")
+        File.write("content/posts/b.md", "+++\ntitle = \"B\"\ndate = 2024-01-02\ntags = [\"x\"]\n+++\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, include_future: true)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/posts/b.md"], options)
+        File.read("public/posts/b/index.html").should eq("A;")
+
+        File.write("content/posts/b.md", "+++\ntitle = \"B\"\ndate = 2999-01-02\ntags = [\"x\"]\n+++\n")
+        builder.run_incremental(["content/posts/b.md"], options)
+        File.read("public/posts/b/index.html").should eq("")
+        File.read("public/posts/a/index.html").should eq("")
+      end
+    end
+  end
+end
+
+# On a case-folding filesystem a serve pass that moves a page to a URL
+# differing only by case wrote into the existing `Foo/` directory, so the dev
+# server (which 404s case-mismatched paths) answered 404 for the new URL.
+describe "Builder#run_incremental case-only URL change" do
+  it "respells the output directory to the new URL's case" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("probe/Case")
+        pending!("needs a case-insensitive filesystem") unless Hwaro::Utils::PathUtils.case_folding_fs?(File.join(dir, "probe"))
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content/posts")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}")
+        File.write("content/posts/a.md", "+++\ntitle = \"A\"\npath = \"posts/Foo\"\n+++\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/posts/a.md"], options)
+        Dir.children("public/posts").should eq(["Foo"])
+
+        File.write("content/posts/a.md", "+++\ntitle = \"A\"\npath = \"posts/foo\"\n+++\n")
+        builder.run_incremental(["content/posts/a.md"], options)
+        Dir.children("public/posts").should eq(["foo"])
+        File.read("public/posts/foo/index.html").should eq("A")
+      end
+    end
+  end
+end

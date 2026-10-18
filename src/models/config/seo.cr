@@ -8,6 +8,9 @@
 module Hwaro
   module Models
     class SitemapConfig
+      # The sitemap protocol's `<changefreq>` values (case-sensitive).
+      VALID_CHANGEFREQS = %w[always hourly daily weekly monthly yearly never]
+
       property enabled : Bool
       property filename : String
       property changefreq : String
@@ -109,7 +112,16 @@ module Hwaro
           config.sitemap.enabled = bool_value(s["enabled"]?, config.sitemap.enabled)
           config.sitemap.filename = s["filename"]?.try(&.as_s?) || config.sitemap.filename
           validate_output_filename!("sitemap", "filename", config.sitemap.filename, "sitemap.xml", allow_empty: false)
-          config.sitemap.changefreq = s["changefreq"]?.try(&.as_s?) || config.sitemap.changefreq
+          if changefreq = s["changefreq"]?.try(&.as_s?)
+            # Copied verbatim into every <changefreq>, so a value outside the
+            # protocol's list (`"biweekly"`, `"Weekly"`) made the whole
+            # sitemap invalid for search engines. "" keeps omitting the tag.
+            if changefreq.empty? || SitemapConfig::VALID_CHANGEFREQS.includes?(changefreq)
+              config.sitemap.changefreq = changefreq
+            else
+              Logger.warn "Unknown [sitemap] changefreq '#{changefreq}' — expected one of #{SitemapConfig::VALID_CHANGEFREQS.join(", ")}. Using \"#{config.sitemap.changefreq}\"."
+            end
+          end
           # Keep the priority raw here (NOT clamped) so `hwaro doctor` can detect
           # an out-of-range value and warn/offer a fix. The sitemap EMITTER
           # (sitemap.cr) clamps to [0.0, 1.0] so the generated XML stays valid
@@ -132,7 +144,7 @@ module Hwaro
         config.robots.filename = s["filename"]?.try(&.as_s?) || config.robots.filename
         validate_output_filename!("robots", "filename", config.robots.filename, "robots.txt", allow_empty: false)
 
-        if rules = s["rules"]?.try(&.as_a?)
+        if rules = table_array?(s["rules"]?, "robots.rules")
           config.robots.rules = rules.compact_map do |rule_any|
             if rule_h = rule_any.as_h?
               user_agent = rule_h["user_agent"]?.try(&.as_s?) || "*"
@@ -199,13 +211,8 @@ module Hwaro
         return unless s = config.raw["feeds"]?.try(&.as_h?)
 
         # Backward compatibility for 'generate' property
-        enabled = s["enabled"]?.try(&.as_bool?)
-        generate = s["generate"]?.try(&.as_bool?)
-
-        if !enabled.nil?
-          config.feeds.enabled = enabled
-        elsif !generate.nil?
-          config.feeds.enabled = generate
+        if enabled = s["enabled"]? || s["generate"]?
+          config.feeds.enabled = bool_value(enabled, config.feeds.enabled)
         end
 
         config.feeds.filename = s["filename"]?.try(&.as_s?) || config.feeds.filename

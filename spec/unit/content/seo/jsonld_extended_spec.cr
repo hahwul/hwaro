@@ -203,6 +203,18 @@ describe Hwaro::Content::Seo::JsonLd do
       config = Hwaro::Models::Config.new
       Hwaro::Content::Seo::JsonLd.organization(config).should eq("")
     end
+
+    # Regression: the logo (og.default_image) kept a raw space while og:image
+    # percent-encoded the same value.
+    it "percent-encodes a site-path logo like og:image" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      logo = "/images/my logo.png?v=2"
+
+      data = JSON.parse(Hwaro::Content::Seo::JsonLd.organization(config, logo)[/\{.*\}/m])
+      data["logo"].as_s.should eq(config.og.resolve_image_url(logo, config.base_url))
+      data["logo"].as_s.should eq("https://example.com/images/my%20logo.png?v=2")
+    end
   end
 
   describe ".person" do
@@ -292,6 +304,60 @@ describe Hwaro::Content::Seo::JsonLd do
       end
       crumbs = JSON.parse(Hwaro::Content::Seo::JsonLd.breadcrumb(page, config)[/\{.*\}/m])["itemListElement"]
       crumbs[1]["item"].as_s.should eq("https://example.com/%ED%95%9C%EA%B5%AD/")
+    end
+  end
+
+  describe ".breadcrumb" do
+    # Regression: a headless (`render = false`) ancestor section publishes no
+    # page, yet its crumb pointed `item` at that unwritten URL (a 404).
+    it "leaves out a headless ancestor and keeps positions contiguous" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      config.title = "Site"
+      docs = Hwaro::Models::Section.new("docs/_index.md")
+      docs.title = "Docs"
+      docs.url = "/docs/"
+      group = Hwaro::Models::Section.new("docs/api/_index.md")
+      group.title = "API"
+      group.url = "/docs/api/"
+      group.render = false
+      page = Hwaro::Models::Page.new("docs/api/endpoints.md")
+      page.title = "Endpoints"
+      page.url = "/docs/api/endpoints/"
+      page.ancestors = [docs, group] of Hwaro::Models::Page
+
+      crumbs = JSON.parse(Hwaro::Content::Seo::JsonLd.breadcrumb(page, config)[/\{.*\}/m])["itemListElement"].as_a
+      crumbs.map(&.["name"].as_s).should eq(["Site", "Docs", "Endpoints"])
+      crumbs.map(&.["position"].as_i).should eq([1, 2, 3])
+      crumbs.compact_map(&.["item"]?.try(&.as_s)).should_not contain("https://example.com/docs/api/")
+    end
+
+    # Regression: a partially translated site (no `index.ko.md`) pointed
+    # every Korean page's Home crumb at the unwritten `/ko/`.
+    it "points Home at the site root when the page's language has no homepage" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      config.default_language = "en"
+      config.languages["ko"] = Hwaro::Models::LanguageConfig.new("ko")
+      page = Hwaro::Models::Page.new("about.ko.md")
+      page.title = "소개"
+      page.url = "/ko/about/"
+      page.language = "ko"
+      site = Hwaro::Models::Site.new(config)
+      site.pages = [page]
+
+      home_item = ->(s : Hwaro::Models::Site) {
+        s.build_lookup_index
+        JSON.parse(Hwaro::Content::Seo::JsonLd.breadcrumb(page, config, s)[/\{.*\}/m])["itemListElement"][0]["item"].as_s
+      }
+      home_item.call(site).should eq("https://example.com/")
+
+      home = Hwaro::Models::Page.new("index.ko.md")
+      home.is_index = true
+      home.url = "/ko/"
+      home.language = "ko"
+      site.pages = [page, home]
+      home_item.call(site).should eq("https://example.com/ko/")
     end
   end
 

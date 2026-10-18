@@ -254,6 +254,13 @@ describe Hwaro::Utils::PathUtils do
       refused.should be_true
     end
 
+    # A server decodes a request path once: `/posts/a%2520b/` reaches the
+    # file `a%20b`, so that is the name a writer must use — not `a b`.
+    it "decodes each name exactly once" do
+      Hwaro::Utils::PathUtils.split_safe_segments("posts/a%2520b").should eq({["posts", "a%20b"], false})
+      Hwaro::Utils::PathUtils.split_safe_segments("posts/a%20b").should eq({["posts", "a b"], false})
+    end
+
     # Newly REFUSED versus the pre-2026-08 rule, which let all-space segments
     # through.
     it "flags a refusal for an all-space segment" do

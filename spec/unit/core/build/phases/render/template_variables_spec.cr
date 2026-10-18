@@ -122,3 +122,72 @@ describe "title-less ancestor sections" do
     end
   end
 end
+
+describe "jsonld breadcrumb coverage" do
+  # Regression: the breadcrumb was skipped for any `is_index` page without
+  # ancestors, meant to exclude the homepage. That also dropped it from
+  # every top-level section and page bundle: `about/index.md` lost the
+  # BreadcrumbList that `about.md` gets.
+  it "is emitted for every page but the homepage" do
+    build_site(
+      "title = \"T\"\nbase_url = \"https://ex.com\"\n",
+      content_files: {
+        "_index.md"       => "+++\ntitle = \"Home\"\n+++\n",
+        "flat.md"         => "+++\ntitle = \"Flat\"\n+++\n",
+        "bundle/index.md" => "+++\ntitle = \"Bundle\"\n+++\n",
+        "posts/_index.md" => "+++\ntitle = \"Posts\"\n+++\n",
+      },
+      template_files: {
+        "page.html"    => "{{ jsonld_breadcrumb }}",
+        "section.html" => "{{ jsonld_breadcrumb }}",
+      },
+    ) do
+      File.read("public/index.html").should eq("")
+      File.read("public/flat/index.html").should contain(%("name":"Flat"))
+      File.read("public/bundle/index.html").should contain(%({"@type":"ListItem","position":2,"name":"Bundle"}))
+      File.read("public/posts/index.html").should contain(%({"@type":"ListItem","position":2,"name":"Posts"}))
+    end
+  end
+
+  it "is not emitted for a top-level version root published at the home URL" do
+    build_site(
+      "title = \"T\"\nbase_url = \"https://ex.com\"\n\n[[versions.list]]\nname = \"v2\"\nlatest = true\n\n[[versions.list]]\nname = \"v1\"\n",
+      content_files: {
+        "v2/_index.md" => "+++\ntitle = \"Root\"\n+++\n",
+        "v1/_index.md" => "+++\ntitle = \"Old\"\n+++\n",
+      },
+      template_files: {
+        "page.html"    => "{{ jsonld }}",
+        "section.html" => "{{ jsonld }}",
+      },
+    ) do
+      # The root is the site's home page: WebSite, no CollectionPage or trail.
+      root = File.read("public/index.html")
+      root.should contain(%("@type":"WebSite"))
+      root.should_not contain("CollectionPage")
+      root.should_not contain("BreadcrumbList")
+      File.read("public/v1/index.html").should contain("BreadcrumbList")
+    end
+  end
+end
+
+describe "seo.twitter_card" do
+  # Regression: `twitter_tags` downgrades summary_large_image to summary when
+  # a page resolves no image (a large card with no image renders blank), but
+  # the `seo` object kept advertising summary_large_image.
+  it "matches the card type twitter_tags emits" do
+    build_site(
+      "title = \"T\"\nbase_url = \"https://ex.com\"\n",
+      content_files: {
+        "plain.md" => "+++\ntitle = \"Plain\"\n+++\n",
+        "pic.md"   => "+++\ntitle = \"Pic\"\nimage = \"/pic.png\"\n+++\n",
+      },
+      template_files: {"page.html" => "{{ seo.twitter_card }}|{{ twitter_tags }}"},
+    ) do
+      plain = File.read("public/plain/index.html")
+      plain.should start_with("summary|")
+      plain.should contain(%(name="twitter:card" content="summary"))
+      File.read("public/pic/index.html").should start_with("summary_large_image|")
+    end
+  end
+end

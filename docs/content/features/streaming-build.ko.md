@@ -78,7 +78,7 @@ hwaro build --stream --memory-limit 512M
 2. 각 배치는 일반 빌드와 동일한 병렬/순차 로직으로 렌더링됩니다
 3. 배치를 디스크에 쓴 뒤 `page.content`를 비워 메모리를 해제합니다 — 단, 이후 단계에서 다시 읽지 않을 때만 그렇습니다(아래 참고)
 4. 가비지 컬렉터를 호출해 해제된 메모리를 회수합니다
-5. Generate 단계(피드, 사이트맵, 검색 인덱스)가 끝나면 `page.raw_content`도 비웁니다
+5. Generate 단계(피드, 사이트맵, 검색 인덱스)가 끝나면 `page.raw_content`도 비웁니다 — 단, `hwaro serve`에서는 이후 수정 시 페이지를 다시 렌더링하기 위해 유지합니다
 
 ### `page.content`를 유지하는 경우
 

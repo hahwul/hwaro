@@ -25,7 +25,7 @@ exclude = ["/private", "/drafts"]
 |-----|------|---------|-------------|
 | enabled | bool | false | `sitemap.xml` 생성 여부 |
 | filename | string | "sitemap.xml" | 출력 파일 이름 |
-| changefreq | string | "weekly" | 전체 페이지의 기본 변경 주기 |
+| changefreq | string | "weekly" | 전체 페이지의 기본 변경 주기: `always`, `hourly`, `daily`, `weekly`, `monthly`, `yearly`, `never` 중 하나 (다른 값은 경고 후 `"weekly"` 유지, `""`는 태그 생략) |
 | priority | float | 0.5 | 전체 페이지의 기본 우선순위(0.0–1.0) |
 | exclude | array | [] | 제외할 경로 접두사 (예: `["/private"]`는 `/private`, `/private/page.html`을 제외) |
 
@@ -418,7 +418,7 @@ twitter_creator = "@authorusername"
 
 | 키 | 설명 |
 |-----|-------------|
-| twitter_card | 카드 타입: summary, summary_large_image |
+| twitter_card | 카드 타입: summary, summary_large_image (이미지가 없는 페이지는 `summary`. 이미지 없는 큰 카드는 빈 미리보기로 표시됩니다) |
 | twitter_site | 사이트의 Twitter 핸들 |
 | twitter_creator | 작성자의 Twitter 핸들 |
 
@@ -492,7 +492,7 @@ FAQ, HowTo, WebSite, Organization 같은 추가 스키마 타입도 사용할 �
 | seo.canonical_url | String | 전체 canonical URL |
 | seo.og_type | String | OpenGraph 타입 (기본값: "article") |
 | seo.og_image | String | 해석된 절대 이미지 URL |
-| seo.twitter_card | String | Twitter 카드 타입 |
+| seo.twitter_card | String | 이 페이지에 `twitter_tags`가 출력하는 Twitter 카드 타입 |
 | seo.twitter_site | String | Twitter 사이트 핸들 |
 | seo.twitter_creator | String | Twitter 작성자 핸들 |
 | seo.fb_app_id | String | Facebook 앱 ID |

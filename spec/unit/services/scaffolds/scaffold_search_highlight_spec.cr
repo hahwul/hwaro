@@ -39,3 +39,25 @@ describe "scaffold search highlightMatch" do
     run_highlight(js, "x", "").should eq("x")
   end
 end
+
+# Search results link to `search.json` URLs, which already carry `%23`/`%3F`
+# for a page whose file name holds `#`/`?`. Plain `encodeURI` re-encoded the
+# `%`, linking every such result to a 404.
+describe "scaffold search resultHref" do
+  node = Process.find_executable("node")
+  js = Hwaro::Services::Scaffolds::Docs.new.static_files["js/search.js"]
+
+  it "keeps existing escapes and encodes raw characters" do
+    pending!("node not installed") unless node
+    fn = js.match(/function resultHref\(.*?\n\n/m).try(&.[0]) || raise "resultHref not found"
+    run = ->(url : String) do
+      io = IO::Memory.new
+      Process.run("node", ["-e", "#{fn}\nprocess.stdout.write(resultHref(#{url.to_json}));"], output: io, error: Process::Redirect::Inherit)
+      io.to_s
+    end
+    run.call("/posts/a%23b/").should eq("/posts/a%23b/")
+    run.call("/posts/q%3Fx/").should eq("/posts/q%3Fx/")
+    run.call("/posts/한 \"x\"/").should eq("/posts/%ED%95%9C%20%22x%22/")
+    run.call("/posts/100%/").should eq("/posts/100%25/")
+  end
+end
