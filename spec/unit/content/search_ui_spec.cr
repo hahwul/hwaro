@@ -27,6 +27,17 @@ private def payload(tags : String) : JSON::Any
 end
 
 describe Hwaro::Content::SearchUi do
+  describe "the stylesheet" do
+    it "keeps its theme defaults at zero specificity so a plain override wins in dark mode" do
+      # The documented `.hwaro-search-overlay { --hwaro-search-accent: … }`
+      # override lost to `:root:not([data-theme="light"]) .hwaro-search-overlay`
+      # whenever the dark palette applied.
+      Hwaro::Content::SearchUi::CSS.scan(/([^{}]*)\{[^{}]*--hwaro-search-accent:/).each do |m|
+        m[1].split("*/").last.strip.should start_with(":where(")
+      end
+    end
+  end
+
   describe "the client source" do
     js = Hwaro::Content::SearchUi::JS
 

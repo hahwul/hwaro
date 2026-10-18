@@ -1,5 +1,7 @@
-/* Hwaro built-in search UI. Override any --hwaro-search-* property to theme it. */
-.hwaro-search-overlay, .hwaro-search-inline {
+/* Hwaro built-in search UI. Override any --hwaro-search-* property to theme it.
+   The defaults sit in :where() (zero specificity), so any author rule that
+   sets one wins, in dark mode too. */
+:where(.hwaro-search-overlay, .hwaro-search-inline) {
   --hwaro-search-bg: #ffffff;
   --hwaro-search-fg: #1f2328;
   --hwaro-search-muted: #656d76;
@@ -12,8 +14,8 @@
   --hwaro-search-font: inherit;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .hwaro-search-overlay,
-  :root:not([data-theme="light"]) .hwaro-search-inline {
+  :where(:root:not([data-theme="light"]) .hwaro-search-overlay,
+    :root:not([data-theme="light"]) .hwaro-search-inline) {
     --hwaro-search-bg: #161b22;
     --hwaro-search-fg: #e6edf3;
     --hwaro-search-muted: #8d96a0;
@@ -24,8 +26,8 @@
     --hwaro-search-backdrop: rgba(0, 0, 0, 0.6);
   }
 }
-:root[data-theme="dark"] .hwaro-search-overlay,
-:root[data-theme="dark"] .hwaro-search-inline {
+:where(:root[data-theme="dark"] .hwaro-search-overlay,
+  :root[data-theme="dark"] .hwaro-search-inline) {
   --hwaro-search-bg: #161b22;
   --hwaro-search-fg: #e6edf3;
   --hwaro-search-muted: #8d96a0;
