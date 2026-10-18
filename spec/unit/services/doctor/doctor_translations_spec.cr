@@ -106,6 +106,25 @@ describe "Hwaro::Services::Doctor translations" do
     ])
   end
 
+  # The build pairs an authored `products/blue.ko.md` with the generated
+  # `products/blue.md`; a generated page has no file to translate.
+  it "counts [[content.generate]] pages as originals" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "config.toml"), TRANSLATIONS_CONFIG + %(\n[[content.generate]]\nsource = "items"\nsection = "products"\nslug = "id"\ntitle = "name"\n))
+      FileUtils.mkdir_p(File.join(dir, "data"))
+      FileUtils.mkdir_p(File.join(dir, "content", "products"))
+      File.write(File.join(dir, "data", "items.json"), %([{"id": "blue", "name": "Blue"}, {"id": "red", "name": "Red"}]))
+      {"_index.md", "_index.ko.md", "_index.ja.md", "blue.ko.md", "gone.ko.md"}.each do |name|
+        File.write(File.join(dir, "content", "products", name), PAGE)
+      end
+      # Generated pages are planned from the project in the working directory.
+      Dir.cd(dir) do
+        issues = Hwaro::Services::Doctor.new(content_dir: "content", config_path: "config.toml").run.select(&.category.==("i18n"))
+        issues.map { |i| "#{i.language} #{i.id} #{i.file}" }.should eq(["ko translation-orphan content/products/gone.ko.md"])
+      end
+    end
+  end
+
   it "reports nothing on a single-language site" do
     translation_issues({"a.md" => PAGE, "a.ko.md" => PAGE}, %(title = "T"\nbase_url = "https://example.com"\n)).should be_empty
   end

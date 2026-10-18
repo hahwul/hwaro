@@ -305,15 +305,21 @@ module Hwaro
         default = config.default_language
         others = Content::Multilingual.ordered_language_codes(config) - [default]
         menus = MenuScope.new(config)
-        entries = ContentLister.new(@content_dir).list_all.select(&.published?).sort_by!(&.path).map do |info|
-          relative = Path[info.path].relative_to(@content_dir).to_s
+        # `[[content.generate]]` pages pair with authored translations in the
+        # build (`products/blue.ko.md` ↔ generated `products/blue.md`), so they
+        # count as originals; they have no file to report as untranslated.
+        generated = {} of String => String
+        entries = ContentLister.new(@content_dir, GeneratedContent.infos(@content_dir)).list_all.select(&.published?).sort_by!(&.path).map do |info|
+          relative = info.generated_from ? info.path : Path[info.path].relative_to(@content_dir).to_s
+          file = info.generated_from ? File.join(@content_dir, info.path) : info.path
+          info.generated_source.try { |source| generated[file] = source }
           # `_index` files are sections: their own `[cascade]` skips them.
           page = File.basename(relative).starts_with?("_index.") ? Models::Section.new(relative) : Models::Page.new(relative)
-          language = menus.filename_language(info.path)
+          language = menus.filename_language(file)
           page.language = language == default ? nil : language
-          {page, info.path}
+          {page, file}
         end
-        apply_render_state(entries)
+        apply_render_state(entries, generated)
         Content::Multilingual.link_translations!(entries.map(&.[0]), config)
 
         # Grouped per language, in configured order.
@@ -325,6 +331,7 @@ module Hwaro
             code = Content::Multilingual.language_code(page, config)
             codes = page.translations.empty? ? [code] : page.translations.map(&.code)
             if code == default && !codes.includes?(other)
+              next if generated.has_key?(file)
               issues << Issue.new(id: "translation-missing", level: :info, category: "i18n", file: file,
                 message: "No '#{other}' translation", language: other)
             elsif code == other && !codes.includes?(default)
@@ -338,13 +345,13 @@ module Hwaro
       # Fill in what `link_translations!` reads besides the path: `render`
       # (front matter, or a section `[cascade]`, as the build resolves it) and
       # `redirect_to`. Without them every page looks renderable and linkable.
-      private def apply_render_state(entries : Array({Models::Page, String})) : Nil
+      private def apply_render_state(entries : Array({Models::Page, String}), sources : Hash(String, String)) : Nil
         previous = Logger.level
         Logger.level = Logger::Level::Error # the build reports front-matter warnings
         begin
           parsed = entries.compact_map do |page, file|
             data = begin
-              Processor::Markdown.parse(File.read(file), file)
+              Processor::Markdown.parse(sources[file]? || File.read(file), file)
             rescue Hwaro::HwaroError | File::Error
               next # doctor's parse check and the build report it
             end
