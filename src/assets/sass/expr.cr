@@ -1508,6 +1508,9 @@ module Hwaro
         end
 
         private def self.remember_unparseable(text : String) : Nil
+          # List members are what repeat; a whole long list is read back
+          # once per change and would only pin memory in a long serve.
+          return if text.bytesize > 1024
           UNPARSEABLE_LOCK.synchronize do
             UNPARSEABLE.clear if UNPARSEABLE.size >= UNPARSEABLE_LIMIT
             UNPARSEABLE << text
