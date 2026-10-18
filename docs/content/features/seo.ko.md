@@ -25,7 +25,7 @@ exclude = ["/private", "/drafts"]
 |-----|------|---------|-------------|
 | enabled | bool | false | `sitemap.xml` 생성 여부 |
 | filename | string | "sitemap.xml" | 출력 파일 이름 |
-| changefreq | string | "weekly" | 전체 페이지의 기본 변경 주기 |
+| changefreq | string | "weekly" | 전체 페이지의 기본 변경 주기: `always`, `hourly`, `daily`, `weekly`, `monthly`, `yearly`, `never` 중 하나 (다른 값은 경고 후 `"weekly"` 유지, `""`는 태그 생략) |
 | priority | float | 0.5 | 전체 페이지의 기본 우선순위(0.0–1.0) |
 | exclude | array | [] | 제외할 경로 접두사 (예: `["/private"]`는 `/private`, `/private/page.html`을 제외) |
 

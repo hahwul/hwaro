@@ -25,7 +25,7 @@ exclude = ["/private", "/drafts"]
 |-----|------|---------|-------------|
 | enabled | bool | false | Generate `sitemap.xml` |
 | filename | string | "sitemap.xml" | Output filename |
-| changefreq | string | "weekly" | Default change frequency for all pages |
+| changefreq | string | "weekly" | Default change frequency for all pages: `always`, `hourly`, `daily`, `weekly`, `monthly`, `yearly` or `never` (any other value warns and keeps `"weekly"`; `""` omits the tag) |
 | priority | float | 0.5 | Default priority for all pages (0.0 to 1.0) |
 | exclude | array | [] | Path prefixes to exclude (e.g., `["/private"]` excludes `/private`, `/private/page.html`) |
 

@@ -80,10 +80,12 @@ module Hwaro
       end
 
       private def check_sitemap_changefreq(issues : Array(Issue), config : Models::Config) : Nil
-        # sitemap changefreq validity
-        unless VALID_CHANGEFREQS.includes?(config.sitemap.changefreq)
+        # sitemap changefreq validity. Read the RAW value: `Config.load`
+        # falls an unknown value back to the default, like math_engine.
+        changefreq = config.raw["sitemap"]?.try(&.as_h?).try(&.["changefreq"]?).try(&.as_s?) || config.sitemap.changefreq
+        unless VALID_CHANGEFREQS.includes?(changefreq)
           issues << Issue.new(id: "sitemap-changefreq-invalid", level: :warning, category: "config", file: @config_path,
-            message: "sitemap.changefreq \"#{config.sitemap.changefreq}\" is not valid (expected: #{VALID_CHANGEFREQS.join(", ")})")
+            message: "sitemap.changefreq \"#{changefreq}\" is not valid (expected: #{VALID_CHANGEFREQS.join(", ")})")
         end
       end
 

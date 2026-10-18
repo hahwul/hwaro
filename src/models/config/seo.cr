@@ -8,6 +8,9 @@
 module Hwaro
   module Models
     class SitemapConfig
+      # The sitemap protocol's `<changefreq>` values (case-sensitive).
+      VALID_CHANGEFREQS = %w[always hourly daily weekly monthly yearly never]
+
       property enabled : Bool
       property filename : String
       property changefreq : String
@@ -109,7 +112,16 @@ module Hwaro
           config.sitemap.enabled = bool_value(s["enabled"]?, config.sitemap.enabled)
           config.sitemap.filename = s["filename"]?.try(&.as_s?) || config.sitemap.filename
           validate_output_filename!("sitemap", "filename", config.sitemap.filename, "sitemap.xml", allow_empty: false)
-          config.sitemap.changefreq = s["changefreq"]?.try(&.as_s?) || config.sitemap.changefreq
+          if changefreq = s["changefreq"]?.try(&.as_s?)
+            # Copied verbatim into every <changefreq>, so a value outside the
+            # protocol's list (`"biweekly"`, `"Weekly"`) made the whole
+            # sitemap invalid for search engines. "" keeps omitting the tag.
+            if changefreq.empty? || SitemapConfig::VALID_CHANGEFREQS.includes?(changefreq)
+              config.sitemap.changefreq = changefreq
+            else
+              Logger.warn "Unknown [sitemap] changefreq '#{changefreq}' — expected one of #{SitemapConfig::VALID_CHANGEFREQS.join(", ")}. Using \"#{config.sitemap.changefreq}\"."
+            end
+          end
           # Keep the priority raw here (NOT clamped) so `hwaro doctor` can detect
           # an out-of-range value and warn/offer a fix. The sitemap EMITTER
           # (sitemap.cr) clamps to [0.0, 1.0] so the generated XML stays valid

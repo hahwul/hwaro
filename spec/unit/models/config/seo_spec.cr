@@ -942,3 +942,19 @@ describe Hwaro::Models::Config do
     end
   end
 end
+
+describe "Hwaro::Models::Config [sitemap] changefreq" do
+  it "keeps the default and warns on a value outside the sitemap protocol" do
+    config = nil
+    log = with_captured_log do
+      config = load_config(%(title = "X"\n[sitemap]\nenabled = true\nchangefreq = "biweekly"\n))
+    end
+    config.not_nil!.sitemap.changefreq.should eq("weekly")
+    log.should contain("Unknown [sitemap] changefreq 'biweekly'")
+  end
+
+  it "accepts protocol values and an empty value" do
+    load_config(%(title = "X"\n[sitemap]\nchangefreq = "daily"\n)).sitemap.changefreq.should eq("daily")
+    load_config(%(title = "X"\n[sitemap]\nchangefreq = ""\n)).sitemap.changefreq.should eq("")
+  end
+end
