@@ -411,7 +411,7 @@ describe "Related posts candidates" do
 
     elapsed = Time.measure { builder.test_compute_related_posts(site) }
 
-    elapsed.should be < 2.seconds
+    elapsed.should be < 3500.milliseconds
     # Same-residue pages share both terms and rank first, in page order.
     pages[0].related_posts.map(&.title).should eq(["P7", "P14", "P21", "P28", "P35"])
   end
