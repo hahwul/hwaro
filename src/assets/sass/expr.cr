@@ -958,7 +958,8 @@ module Hwaro
             case tok.kind
             when TokKind::Number
               @pos += 1
-              Lit.new(Number.new(tok.num_value, tok.num_unit, tok.text))
+              lexeme = Number.precise_spelling?(tok.text) ? nil : tok.text
+              Lit.new(Number.new(tok.num_value, tok.num_unit, lexeme))
             when TokKind::Str
               @pos += 1
               parts = tok.str_parts || fail

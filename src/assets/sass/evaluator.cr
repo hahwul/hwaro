@@ -2456,7 +2456,7 @@ module Hwaro
         # declaration. Null and the empty list keep parseable spellings
         # so they survive the string round-trip.
         private def value_storage(value : Value) : String
-          value.inspect_css
+          value.inspect_css(storage: true)
         end
 
         # Text to emit for a declaration value, plus whether it was a real
@@ -2814,8 +2814,11 @@ module Hwaro
         # verbatim never-computed source) passes through untouched, which
         # is what keeps plain-CSS output byte-identical.
         private def var_display_text(storage : String) : String
-          return storage unless storage.includes?('(') || storage.includes?("null")
+          precise = Number.precise_spelling?(storage)
+          return storage unless precise || storage.includes?('(') || storage.includes?("null")
           value = Expr.coerce(storage)
+          # Full-precision storage numbers print in CSS's ten digits.
+          return value.to_css if precise && !value.is_a?(MapV)
           # Storage also keeps a list's null members (`append(null, 1px)`
           # stores `null 1px`); CSS output drops them.
           if value.is_a?(ListV) &&

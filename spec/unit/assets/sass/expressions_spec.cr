@@ -286,4 +286,17 @@ describe "Sass namespaced-reference failures" do
     css.should contain("n: 2;")
     css.should contain("v: \\f63f;")
   end
+
+  it "keeps full precision in variables between evaluations" do
+    css = compile(<<-'SCSS')
+      @function tiny() { $x: 1; @for $i from 1 through 12 { $x: $x * 0.1; } @return $x * 1000000000000; }
+      $t: 0.1 + 0.2;
+      .a { w: tiny() * 1px; v: $t; t: $t == 0.3; m: $t * 10; i: "#{$t}"; }
+      SCSS
+    css.should contain("w: 1px;")
+    css.should contain("v: 0.3;")
+    css.should contain("t: true;")
+    css.should contain("m: 3;")
+    css.should contain(%(i: "0.3";))
+  end
 end
