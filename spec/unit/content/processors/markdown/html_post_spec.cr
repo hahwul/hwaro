@@ -73,6 +73,16 @@ describe Hwaro::Content::Processors::Markdown do
       (Time.instant - t).should be < 5.seconds # a UTF-8 check per tag took 10s+; slack for a loaded suite
     end
 
+    it "stays linear on a long page with many tags" do
+      # PCRE2 re-validated the whole page's UTF-8 at every `<`: a 1 MB page
+      # took over 30 seconds.
+      content = "Café :smile: **bold** `code` [l](/x)\n\n" * 20_000
+      t = Time.instant
+      html, _ = Hwaro::Processor::Markdown.render(content, emoji: true)
+      (Time.instant - t).should be < 10.seconds
+      html.scan("\u{1F604}").size.should eq(20_000)
+    end
+
     it "shows the converted emoji in TOC titles, keeping the source-derived id" do
       html, toc = Hwaro::Processor::Markdown.render("## Hot :fire: `:x:` take", emoji: true)
       html.should contain(%(<h2 id="hot-fire-x-take">Hot 🔥 <code>:x:</code> take</h2>))
