@@ -126,6 +126,14 @@ describe Hwaro::Services::Importers::HtmlToMarkdown do
       result.should contain("puts 1")
     end
 
+    it "keeps a code block's language class as the fence info string" do
+      convert = ->(html : String) { Hwaro::Services::Importers::HtmlToMarkdown.convert(html) }
+      convert.call(%(<pre><code class="language-ruby">puts 1</code></pre>)).should eq("```ruby\nputs 1\n```")
+      convert.call(%(<pre class="wp-block-code lang-js"><code>x()</code></pre>)).should eq("```js\nx()\n```")
+      convert.call(%(<pre class="language-c++">int x;</pre>)).should eq("```c++\nint x;\n```")
+      convert.call(%(<pre class="wp-block-code"><code>plain</code></pre>)).should eq("```\nplain\n```")
+    end
+
     it "converts inline code" do
       result = Hwaro::Services::Importers::HtmlToMarkdown.convert("<code>foo</code>")
       result.should eq("`foo`")

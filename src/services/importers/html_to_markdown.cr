@@ -145,18 +145,23 @@ module Hwaro
               code_placeholder(code_stash.size - 1)
             end
           end
-          result = result.gsub(/<pre[^>]*>\s*<code[^>]*>(.{0,#{MAX_CODE_BODY_CHARS}}?)<\/code>\s*<\/pre>/mi) do
-            code = decode_html_entities($1)
-            code_stash << "```\n#{code.strip}\n```\n\n"
+          result = result.gsub(/<pre([^>]*)>\s*<code([^>]*)>(.{0,#{MAX_CODE_BODY_CHARS}}?)<\/code>\s*<\/pre>/mi) do
+            pre_attrs, code_attrs, body = $1, $2, $3
+            lang = code_language(code_attrs) || code_language(pre_attrs)
+            code = decode_html_entities(body)
+            code_stash << "```#{lang}\n#{code.strip}\n```\n\n"
             code_placeholder(code_stash.size - 1)
           end
-          result = result.gsub(/<pre[^>]*>(.*?)<\/pre>/mi) do
+          result = result.gsub(/<pre([^>]*)>(.*?)<\/pre>/mi) do
             # A <pre><code> body longer than MAX_CODE_BODY_CHARS falls through
             # to this pass with its <code> wrapper still attached — strip it
             # here (both tags have single-literal tails, so this stays linear).
-            body = $1.sub(/\A\s*<code[^>]*>/mi, "").sub(/<\/code>\s*\z/mi, "")
+            pre_attrs, inner = $1, $2
+            code_attrs = inner[/\A\s*<code([^>]*)>/mi, 1]?
+            body = inner.sub(/\A\s*<code[^>]*>/mi, "").sub(/<\/code>\s*\z/mi, "")
+            lang = code_attrs.try { |a| code_language(a) } || code_language(pre_attrs)
             code = decode_html_entities(body)
-            code_stash << "```\n#{code.strip}\n```\n\n"
+            code_stash << "```#{lang}\n#{code.strip}\n```\n\n"
             code_placeholder(code_stash.size - 1)
           end
 
@@ -398,6 +403,14 @@ module Hwaro
             %( #{name}="#{value}") if value && value.matches?(/\A\d+%?\z/)
           end.join
           %(<#{tag} src="#{HTML.escape(src)}"#{dims}#{extra}></#{tag}>)
+        end
+
+        # The fence info string for a code block: the `language-ruby` /
+        # `lang-ruby` class highlighters (Prism, highlight.js, Gutenberg
+        # code-block plugins) put on `<code>` or `<pre>`. Dropping it left
+        # every imported sample unhighlighted.
+        private def self.code_language(attrs : String) : String?
+          attr_value(attrs, "class").try(&.[/(?<![\w-])lang(?:uage)?-([\w+#.-]+)/i, 1]?)
         end
 
         private def self.attr_value(attrs : String, name : String) : String?
