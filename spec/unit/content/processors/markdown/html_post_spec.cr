@@ -1,6 +1,17 @@
 require "../../../../spec_helper"
 
 describe Hwaro::Content::Processors::Markdown do
+  describe "heading passes" do
+    it "leave headings inside script/style/textarea text alone" do
+      content = "## Real\n\n<script>\nel.innerHTML = \"<h2>Injected</h2>\";\n</script>\n\n<textarea><h3>Typed</h3></textarea>\n"
+      html, toc = Hwaro::Content::Processors::Markdown.new.render_with_anchors(content, anchor_style: "after")
+      html.should contain(%("<h2>Injected</h2>"))
+      html.should contain("<textarea><h3>Typed</h3></textarea>")
+      html.should contain(%(<h2 id="real">Real <a class="anchor"))
+      toc.map(&.id).should eq(["real"])
+    end
+  end
+
   describe "emoji conversion" do
     it "leaves raw-text elements, math and mermaid untouched" do
       md_config = Hwaro::Models::MarkdownConfig.new
