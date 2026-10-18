@@ -299,4 +299,14 @@ describe "Sass namespaced-reference failures" do
     css.should contain("m: 3;")
     css.should contain(%(i: "0.3";))
   end
+
+  it "evaluates a user function whose name ends in calc" do
+    css = compile(<<-SCSS)
+      @function rem-calc($v) { @return $v * 2; }
+      .a { w: rem-calc(2px); x: -webkit-calc(1px + 2px); y: calc(100% - 2px); }
+      SCSS
+    css.should contain("w: 4px;")
+    css.should contain("x: -webkit-calc(1px + 2px);")
+    css.should contain("y: calc(100% - 2px);")
+  end
 end

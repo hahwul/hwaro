@@ -479,7 +479,11 @@ module Hwaro
 
           private def raw_span_fn?(name : String) : Bool
             down = name.downcase
-            RAW_SPAN_FNS.includes?(down) || down.ends_with?("calc")
+            # `calc` and its vendor spellings (`-webkit-calc`), as dart-sass
+            # strips the prefix. Not any name ending in "calc": Foundation's
+            # own `rem-calc()` / `unitless-calc()` are Sass functions, and a
+            # verbatim span shipped `rem-calc(0, $base: 16px)` as text.
+            RAW_SPAN_FNS.includes?(down) || down == "calc" || down.matches?(/\A-[a-z0-9]+-calc\z/)
           end
 
           # Balanced-paren verbatim span starting at `start` (cursor on
