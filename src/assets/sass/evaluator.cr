@@ -1142,13 +1142,12 @@ module Hwaro
             param_name = param_names[i]
             if param.variadic
               rest = positional.size > fixed ? positional[fixed..] : [] of String
-              joiner =
-                case rest_sep
-                in nil, ListV::Sep::Comma then ", "
-                in ListV::Sep::Space      then " "
-                in ListV::Sep::Slash      then " / "
-                end
-              call_env.variables[param_name] = rest.empty? ? "()" : rest.join(joiner)
+              # Stored as a real list: joining the texts flattened a lone
+              # `small only` argument into two members (Foundation's
+              # `breakpoint(small only)` lost its media query) and merged a
+              # comma-list argument into the arglist.
+              arglist = ListV.new(rest.map { |item| Expr.coerce(item).as(Value) }, rest_sep || ListV::Sep::Comma)
+              call_env.variables[param_name] = value_storage(arglist)
               call_env.variables[KEYWORDS_VAR_PREFIX + param_name] = keywords_storage(extra_kwargs)
               next
             end

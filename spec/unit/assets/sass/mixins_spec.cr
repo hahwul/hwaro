@@ -209,4 +209,17 @@ describe "Hwaro::Assets::Sass mixins" do
       compile("@mixin m { @content; }\n.x { @include m using ($a) { width: $a; } }")
     end
   end
+
+  it "keeps a lone space-list argument as one variadic member" do
+    css = compile(<<-SCSS)
+      @mixin bp($values...) { .t { n: length($values); v: nth($values, 1); } }
+      @include bp(small only);
+      @function f($args...) { @return length($args); }
+      .x { a: f((a, b), c); b: f(1px 2px); }
+      SCSS
+    css.should contain("n: 1;")
+    css.should contain("v: small only;")
+    css.should contain("a: 2;")
+    css.should contain("b: 1;")
+  end
 end
