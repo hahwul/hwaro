@@ -13,6 +13,12 @@ describe Hwaro::Utils::JsMinifier do
       result.should contain("var y = 2;")
     end
 
+    it "ends a single-line comment at a lone CR or U+2028" do
+      Hwaro::Utils::JsMinifier.minify("var a = 1; // c\rf(a);").should eq("var a = 1; \rf(a);")
+      Hwaro::Utils::JsMinifier.minify("var a = 1; // c f(a);").should eq("var a = 1;  f(a);")
+      Hwaro::Utils::JsMinifier.minify("var t = `${a // c\rb}`;").should eq("var t = `${a // c\rb}`;")
+    end
+
     it "removes single-line comment at start of line" do
       js = "// full line comment\nvar x = 1;"
       result = Hwaro::Utils::JsMinifier.minify(js)
