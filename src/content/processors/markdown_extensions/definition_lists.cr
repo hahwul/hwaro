@@ -25,8 +25,10 @@ module Hwaro
           lines = content.split("\n")
 
           # This extension treats a raw-HTML line used as term text as content
-          # and escapes it; preserve that established behavior here.
-          tracker = FenceTracker.new(raw_html_code: false)
+          # and escapes it; preserve that established behavior here. Lines
+          # inside `<pre>`/`<script>`/`<style>`/`<textarea>` stay verbatim (a
+          # multi-line JS ternary's `  : b` is not a definition).
+          tracker = FenceTracker.new(html_blocks: false)
           fenced = lines.map { |line| tracker.fence_line?(line) }
 
           result = [] of String

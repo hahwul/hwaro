@@ -158,10 +158,13 @@ module Hwaro
         # generic HTML-block tracking.
         # Only the Markdown-extension walkers treat `<pre>`/`<script>`/
         # `<style>`/`<textarea>` blocks as opaque; shortcode expansion (and
-        # the checks that must agree with it) and definition-list
-        # extraction keep their long-standing behaviour of seeing inside.
-        def initialize(raw_html_code : Bool = true)
+        # the checks that must agree with it) keeps its long-standing
+        # behaviour of seeing inside. `html_blocks: false` keeps the raw
+        # code blocks opaque but turns generic HTML-block tracking off
+        # (definition-list extraction, which escapes raw-HTML term lines).
+        def initialize(raw_html_code : Bool = true, html_blocks : Bool = raw_html_code)
           @track_raw_html_code = raw_html_code
+          @track_html_blocks = raw_html_code && html_blocks
         end
 
         # Feed the next line (with or without its trailing newline).
@@ -201,7 +204,7 @@ module Hwaro
           #
           # Inside a generic HTML block every line is raw HTML — a `>` there
           # is text — so none of that applies.
-          in_html_block = @track_raw_html_code && inside_html_block?(content, depth, blank)
+          in_html_block = @track_html_blocks && inside_html_block?(content, depth, blank)
           quote_opened = !in_html_block && depth > @open_quote_depth
           if !blank && !paragraph_open && !in_html_block
             # A line outside a quote with no paragraph to continue lazily
@@ -281,7 +284,7 @@ module Hwaro
           marker_item = blank ? nil : track_list_item(content, depth, column, text_start, prefix)
           @list_item_line = !marker_item.nil? && (!in_paragraph || interrupting_item?(content, text_start))
           container_column = marker_item || list_content_column(depth, column)
-          opened_html = !blank && !in_html_block && @track_raw_html_code &&
+          opened_html = !blank && !in_html_block && @track_html_blocks &&
                         open_html_block(content, depth, column, container_column, paragraph_open && depth == @paragraph_depth && column >= @paragraph_column)
 
           @html_block_line = in_html_block || opened_html
