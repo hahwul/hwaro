@@ -460,3 +460,33 @@ describe "Builder#run_incremental under --stream" do
     end
   end
 end
+
+# A page dated into the future leaves the related-posts candidates even under
+# --include-future; the incremental recompute skipped it and the page kept the
+# list it had while published.
+describe "Builder#run_incremental related posts" do
+  it "clears the list of a page that turned into a future preview" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[related]\nenabled = true\n[[taxonomies]]\nname = "tags"))
+        FileUtils.mkdir_p("content/posts")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{% for r in page.related_posts %}{{ r.title }};{% endfor %}")
+        File.write("content/posts/a.md", "+++\ntitle = \"A\"\ndate = 2024-01-01\ntags = [\"x\"]\n+++\n")
+        File.write("content/posts/b.md", "+++\ntitle = \"B\"\ndate = 2024-01-02\ntags = [\"x\"]\n+++\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, include_future: true)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/posts/b.md"], options)
+        File.read("public/posts/b/index.html").should eq("A;")
+
+        File.write("content/posts/b.md", "+++\ntitle = \"B\"\ndate = 2999-01-02\ntags = [\"x\"]\n+++\n")
+        builder.run_incremental(["content/posts/b.md"], options)
+        File.read("public/posts/b/index.html").should eq("")
+        File.read("public/posts/a/index.html").should eq("")
+      end
+    end
+  end
+end

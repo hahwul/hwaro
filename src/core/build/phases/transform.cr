@@ -638,6 +638,13 @@ module Hwaro::Core::Build::Phases::Transform
     changed_paths = changed_pages.map(&.path).to_set
     pages_to_update = Set(String).new(changed_paths)
 
+    # A changed page that just left the candidate set (an --include-future
+    # preview, render = false) is skipped by the loop below; drop the list it
+    # carried over, as a cold build never gives it one.
+    changed_pages.each do |page|
+      page.related_posts = [] of Models::Page unless index_of.has_key?(page.path)
+    end
+
     # A page turned draft/future/expired is removed from site.pages, so it is
     # neither a changed page nor in the inverted index — but pages that listed it
     # as a related post still link to a now-deleted output. Seed discovery with
