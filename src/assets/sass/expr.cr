@@ -1479,14 +1479,92 @@ module Hwaro
           return Raw.new(text) if stripped.empty?
           template = Ast::TextTemplate.new([stripped.as(Ast::Piece)], 1, 1)
           node = parse(template)
-          return Raw.new(stripped) unless node
+          return coerce_unparsed(stripped) unless node
           # coercing: true — slash text arriving through storage is always
           # a CONSTRUCTED list (a literal lazy pair would have divided at
           # its force_div declaration), so it must not re-acquire lazy
           # division here. dart-sass errors on math over such a list.
           Evaluator.new(CoerceHost.new, coercing: true).eval(node)
         rescue SoftEvalError
-          Raw.new(text.strip)
+          coerce_unparsed(text.strip)
+        end
+
+        # Storage text the expression grammar can't read — typically
+        # unquoted strings holding selector syntax (`[type='text']`, `.a`)
+        # — still keeps the comma-list structure storage spelled out:
+        # `(x,)` is a one-element list and `, ` separates members. As one
+        # Raw, Foundation's `text-inputs()` (a selector list built with
+        # `append(..., comma)`) emitted `([type='text'],), [type='password']`,
+        # an invalid selector. A comma without the space is part of a
+        # string (`data:image/svg+xml,<svg …>`), never a list separator.
+        private def self.coerce_unparsed(text : String) : Value
+          if text.starts_with?('(') && text.ends_with?(",)") && closing_paren(text) == text.size - 1
+            return ListV.new([coerce(text[1...-2]).as(Value)], ListV::Sep::Comma)
+          end
+          parts = split_storage_commas(text)
+          return Raw.new(text) unless parts && parts.size >= 2 && parts.none?(&.empty?)
+          ListV.new(parts.map { |part| coerce(part).as(Value) }, ListV::Sep::Comma)
+        end
+
+        # Index of the paren closing the one that opens `text`, skipping
+        # quoted strings; nil when unbalanced.
+        private def self.closing_paren(text : String) : Int32?
+          depth = 0
+          quote : Char? = nil
+          i = 0
+          while i < text.size
+            c = text[i]
+            if quote
+              i += 1 if c == '\\'
+              quote = nil if c == quote
+            elsif c == '"' || c == '\''
+              quote = c
+            elsif c == '('
+              depth += 1
+            elsif c == ')'
+              depth -= 1
+              return i if depth == 0
+            end
+            i += 1
+          end
+          nil
+        end
+
+        # `text` split on the `, ` storage separators outside quotes and
+        # brackets; nil when the text cannot be a stored list — a top-level
+        # comma without the space, or unbalanced quotes/brackets (a
+        # `str-slice` cut through some string).
+        private def self.split_storage_commas(text : String) : Array(String)?
+          parts = [] of String
+          depth = 0
+          quote : Char? = nil
+          start = 0
+          i = 0
+          while i < text.size
+            c = text[i]
+            if quote
+              if c == '\\'
+                i += 1
+              elsif c == quote
+                quote = nil
+              end
+            elsif c == '"' || c == '\''
+              quote = c
+            elsif c == '(' || c == '['
+              depth += 1
+            elsif c == ')' || c == ']'
+              return if depth == 0
+              depth -= 1
+            elsif c == ',' && depth == 0
+              return unless text[i + 1]? == ' '
+              parts << text[start...i].strip
+              start = i + 1
+            end
+            i += 1
+          end
+          return if quote || depth != 0
+          parts << text[start..].strip
+          parts
         end
 
         # :nodoc:

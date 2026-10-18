@@ -248,4 +248,36 @@ describe "Sass value fixes" do
       css.should contain("m: 1px, 2px;")
     end
   end
+
+  describe "selector lists built with append" do
+    it "keeps unquoted selector strings as separate list members" do
+      css = compile_source(<<-'SCSS')
+        @function inputs($mod: '') {
+          $r: ();
+          @each $t in text password { $r: append($r, unquote('[type=\'#{$t}\']#{$mod}'), comma); }
+          @return $r;
+        }
+        #{inputs()} { a: b; }
+        #{inputs(':focus')} { c: d; }
+        $one: append((), unquote('.x'), comma);
+        .y { l: length(append($one, unquote('.z'), comma)); n: nth($one, 1); }
+        SCSS
+      css.should contain("[type='text'], [type='password'] {")
+      css.should contain("[type='text']:focus, [type='password']:focus {")
+      css.should contain("l: 2;")
+      css.should contain("n: .x;")
+      css.should_not contain(",)")
+    end
+
+    it "keeps a sliced string with commas a single string" do
+      css = compile_source(<<-SCSS)
+        $svg: unquote("data:image/svg+xml,<svg fill='rgba(0, 0, 0, 0.25)'/>");
+        $cut: str-slice($svg, 40);
+        .b { i: str-index($svg, "<"); j: str-index($cut, ")"); l: length($cut); }
+        SCSS
+      css.should contain("i: 20;")
+      css.should contain("j: 10;")
+      css.should contain("l: 1;")
+    end
+  end
 end
