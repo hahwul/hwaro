@@ -17,6 +17,15 @@ describe Hwaro::Utils::HtmlMinifier do
       result.should contain("<!--[if IE]>")
     end
 
+    it "keeps the content of a downlevel-revealed conditional comment" do
+      html = "<!--[if gt IE 8]><!--> <html class=\"no-js\"> <!--<![endif]-->\n<p>x</p>"
+      Hwaro::Utils::HtmlMinifier.minify(html).should eq("<!--[if gt IE 8]><!--> <html class=\"no-js\"><p>x</p>")
+    end
+
+    it "treats <!--> as a complete empty comment" do
+      Hwaro::Utils::HtmlMinifier.minify("<p>a<!-->b</p><p>c-->d</p>").should eq("<p>ab</p><p>c-->d</p>")
+    end
+
     it "preserves <!-- more --> markers" do
       html = "<p>Intro</p><!-- more --><p>Rest</p>"
       result = Hwaro::Utils::HtmlMinifier.minify(html)
