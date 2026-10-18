@@ -29,6 +29,21 @@ describe Hwaro::Content::Processors::Markdown do
     end
   end
 
+  describe "raw-text element scans" do
+    it "stay linear in the number of script elements" do
+      # Each `<script>` matched let PCRE2 re-validate the whole page's UTF-8.
+      md_config = Hwaro::Models::MarkdownConfig.new
+      md_config.external_links_target_blank = true
+      content = "## H\n\n<script>x</script>\n\nCafé ![i](/i.png) [e](https://e.com)\n\n" * 20_000
+      t = Time.instant
+      html, toc = Hwaro::Processor::Markdown.render(content, lazy_loading: true, markdown_config: md_config)
+      (Time.instant - t).should be < 10.seconds
+      toc.size.should eq(20_000)
+      html.scan(%(<img loading="lazy")).size.should eq(20_000)
+      html.scan(%(target="_blank")).size.should eq(20_000)
+    end
+  end
+
   describe "lazy loading and external links" do
     it "leave <img>/<a> strings inside a script alone" do
       md_config = Hwaro::Models::MarkdownConfig.new
