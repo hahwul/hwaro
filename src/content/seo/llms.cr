@@ -78,11 +78,16 @@ module Hwaro
           # page-bundle leaf (`foo/bar/index.md`) is also `is_index == true`,
           # so testing `is_index` here let an arbitrary leaf's title clobber
           # the section heading.
+          #
+          # A section's translations share its key; the default language's
+          # title names the group. Last-wins let `_index.zh.md` (which sorts
+          # after `_index.md`) retitle an English section in Chinese.
           headings = {} of String => String
           eligible.each do |p|
             next unless p.is_a?(Models::Section)
-            next if p.section.empty?
-            headings[p.section] = p.title unless p.untitled?
+            next if p.section.empty? || p.untitled?
+            default_lang = (p.language || config.default_language) == config.default_language
+            headings[p.section] = p.title if default_lang || !headings.has_key?(p.section)
           end
 
           # Fold section-level `_index.md` pages (a `Models::Section` with a

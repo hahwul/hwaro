@@ -159,6 +159,38 @@ describe Hwaro::Content::Seo::Llms do
     # site built entirely from page bundles (the dominant Hugo/Zola layout)
     # every content page was dropped and llms.txt listed only the home page.
     # Distinguish by type (`Models::Section`) instead.
+    # Regression: the heading was the LAST eligible section index's title, so
+    # `_index.zh.md` (sorting after `_index.md`) renamed the English section.
+    it "titles a section heading in the default language when it has translations" do
+      config = Hwaro::Models::Config.new
+      config.llms.enabled = true
+      config.title = "Site"
+      config.base_url = "https://example.com"
+      config.default_language = "en"
+      config.languages["zh"] = Hwaro::Models::LanguageConfig.new("zh")
+
+      ref = Hwaro::Models::Section.new("reference/_index.md")
+      ref.title = "Reference"
+      ref.url = "/reference/"
+      ref.section = "reference"
+      ref_zh = Hwaro::Models::Section.new("reference/_index.zh.md")
+      ref_zh.title = "参考"
+      ref_zh.url = "/zh/reference/"
+      ref_zh.section = "reference"
+      ref_zh.language = "zh"
+      cli = Hwaro::Models::Page.new("reference/cli.md")
+      cli.title = "CLI"
+      cli.url = "/reference/cli/"
+      cli.section = "reference"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Llms.generate(config, [cli, ref, ref_zh], output_dir)
+        content = File.read(File.join(output_dir, "llms.txt"))
+        content.should contain("## Reference\n")
+        content.should_not contain("## 参考")
+      end
+    end
+
     it "lists page-bundle leaves and folds only section indexes into headings" do
       config = Hwaro::Models::Config.new
       config.llms.enabled = true
