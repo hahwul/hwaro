@@ -306,6 +306,16 @@ describe Hwaro::Services::Doctor do
         issues.any? { |i| i.id == "config-parse-error" && (i.message || "").includes?("Invalid base_url") }.should be_true
       end
 
+      # A base_url naming an unset variable no longer fails config load (serve
+      # and --base-url replace it), so doctor said "base_url is not set" about
+      # a config that sets it, and never named the variable a build needs.
+      it "names the unset variable a base_url refers to" do
+        ENV.delete("HWARO_DOCTOR_UNSET_URL")
+        issues = run_doctor(%(title = "My Site"\nbase_url = "${HWARO_DOCTOR_UNSET_URL}"\n))
+        issue = issues.find { |i| i.id == "base-url-missing" }.should_not be_nil
+        issue.message.should contain("HWARO_DOCTOR_UNSET_URL")
+      end
+
       it "warns when base_url has trailing slash" do
         issues = run_doctor(%(title = "My Site"\nbase_url = "https://example.com/"\n))
         issues.any?(&.message.includes?("trailing slash")).should be_true

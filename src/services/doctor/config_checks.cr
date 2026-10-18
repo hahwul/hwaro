@@ -57,7 +57,10 @@ module Hwaro
         # inspect the RAW config value for the trailing-slash advisory — the
         # build is already correct, but `--fix` still tidies the file.
         raw_base_url = config.raw["base_url"]?.try(&.as_s?)
-        if config.base_url.empty?
+        if name = config.unresolved_base_url_var
+          issues << Issue.new(id: "base-url-missing", level: :warning, category: "config", file: @config_path,
+            message: "base_url names the unset environment variable '#{name}'; hwaro build refuses to run without it or --base-url")
+        elsif config.base_url.empty?
           issues << Issue.new(id: "base-url-missing", level: :warning, category: "config", file: @config_path, message: "base_url is not set")
         elsif raw_base_url && raw_base_url.ends_with?("/")
           issues << Issue.new(id: "base-url-trailing-slash", level: :warning, category: "config", file: @config_path,
