@@ -671,6 +671,22 @@ describe Hwaro::Core::Build::Phases::Transform do
       pages_raw.size.should eq(1) # only the published page, not the draft
     end
 
+    it "excludes headless pages, which are never written" do
+      site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+      shown = make_page("shown.md")
+      shown.authors = ["alice"]
+      headless = make_page("headless.md")
+      headless.authors = ["alice"]
+      headless.render = false
+      site.pages = [shown, headless]
+
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_aggregate_site_authors(site)
+
+      pages_raw = site.authors["alice"].raw.as(Hash(Crinja::Value, Crinja::Value))["pages"].raw.as(Array(Crinja::Value))
+      pages_raw.size.should eq(1)
+    end
+
     # Regression: `sort_pages(…, "date", true)` reversed an already
     # newest-first comparator, so `author.pages` listed the oldest post first.
     it "lists an author's pages newest first" do

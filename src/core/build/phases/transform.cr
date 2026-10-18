@@ -692,12 +692,13 @@ module Hwaro::Core::Build::Phases::Transform
       pages: Array(Models::Page),
       extra: Hash(String, Crinja::Value))
 
-    # 1. Collect authors from all pages. Skip drafts/generated to match the
-    # /authors/ taxonomy generator (build_taxonomy_index skips both); otherwise
-    # under `--drafts` site.authors would list draft posts the generated author
-    # page omits — two views of the same author disagreeing.
+    # 1. Collect authors from all pages. Skip what the /authors/ taxonomy
+    # generator skips (build_taxonomy_index): otherwise under `--drafts`
+    # site.authors would list draft posts the generated author page omits,
+    # and a headless (`render = false`) page — never written — showed up as
+    # a dead link in `author.pages`.
     site.pages.each do |page|
-      next if page.draft || page.unpublished || page.generated
+      next if page.excluded_from_listings?
       page.authors.each do |author_id|
         # Normalize ID: lower case, stripped
         id = author_id.strip.downcase
