@@ -58,7 +58,7 @@ description = "${SITE_DESC:-My awesome site}"
 | `$VAR` | Same as above (bare form) |
 | `${VAR:-default}` | Use `default` if `VAR` is unset or empty |
 
-Missing variables without defaults are left as-is and produce a build warning. See [Environment Variables](/features/env-variables/) for template usage.
+Missing variables without defaults are left as-is and produce a build warning. An unset variable in `base_url` stops `hwaro build` with an error naming it unless `--base-url` is passed; `hwaro serve`, which uses its own local URL, and the other commands keep working. See [Environment Variables](/features/env-variables/) for template usage.
 
 ## Build Options
 

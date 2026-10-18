@@ -775,6 +775,8 @@ module Hwaro
           # build pipeline rewrapping the exception.
           previous_config = @config
           config = Models::Config.load(env: options.env)
+          # Before anything is written: a cold build wipes the output first.
+          config.require_resolved_base_url!(options.base_url)
           @config = config
           # `[build]` supplies output_dir/drafts/parallel/cache for anything the
           # command line left at its default. Applied before the BuildContext is

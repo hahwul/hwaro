@@ -72,6 +72,23 @@ describe Hwaro::Models::Config do
         err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
       end
     end
+
+    it "defers a base_url naming an unset variable until a build needs it" do
+      config = nil
+      with_captured_log do
+        config = load_config(%(title = "X"\nbase_url = "${HWARO_SPEC_UNSET_SITE_URL}"\n))
+      end
+      config = config.not_nil!
+      config.base_url.should eq("")
+      config.unresolved_base_url_var.should eq("HWARO_SPEC_UNSET_SITE_URL")
+
+      # `--base-url` (or serve's own URL) replaces it, so nothing to refuse.
+      config.require_resolved_base_url!("https://example.com")
+      err = expect_raises(Hwaro::HwaroError, /HWARO_SPEC_UNSET_SITE_URL/) do
+        config.require_resolved_base_url!(nil)
+      end
+      err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+    end
   end
 
   describe ".validate_base_url!" do

@@ -56,7 +56,7 @@ description = "${SITE_DESC:-My awesome site}"
 | `$VAR` | 위와 동일 (축약형) |
 | `${VAR:-default}` | `VAR`가 없거나 비어 있으면 `default` 사용 |
 
-기본값 없이 누락된 변수는 그대로 남고 빌드 경고가 발생합니다. 템플릿에서의 사용법은 [환경 변수](/ko/features/env-variables/)를 참고합니다.
+기본값 없이 누락된 변수는 그대로 남고 빌드 경고가 발생합니다. `base_url`에 쓴 변수가 없으면 `--base-url`을 주지 않는 한 `hwaro build`가 그 변수 이름을 알리며 중단됩니다. 자체 로컬 URL을 쓰는 `hwaro serve`와 다른 명령은 그대로 동작합니다. 템플릿에서의 사용법은 [환경 변수](/ko/features/env-variables/)를 참고합니다.
 
 ## 빌드 옵션
 
