@@ -195,11 +195,14 @@ module Hwaro
         # closure can actually reach. build_template_variables skips building
         # the ones it provably can't (SEO/OG strings, JSON-LD strings, the
         # per-page section-pages array copy — O(section size) per page).
-        # Detection is substring-based over the closure's source union, so it
-        # only ever over-approximates: any occurrence of the identifier keeps
-        # the variable. A template is only gated when its whole closure is
-        # statically resolvable AND it cannot contain shortcodes (template
-        # shortcodes render with the same vars hash and could read anything).
+        # Detection only ever over-approximates: any read keeps the variable,
+        # and a template is only gated when its whole closure is statically
+        # resolvable. `needs_seo`/`needs_jsonld` are substring checks and are
+        # forced on when the closure can hold shortcodes (template shortcodes
+        # render with the same vars hash and could read anything).
+        # `needs_section_pages` lexes the closure for a `section` identifier,
+        # except in shortcode templates, whose output is compiled as template
+        # text — a plain substring check covers what they print.
         #
         # `listing_fanout_*` are the exception: they gate no output at all,
         # only the render phase's auto worker count (see
