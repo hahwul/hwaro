@@ -39,13 +39,14 @@ class Crinja::Parser::ExpressionParser
   end
 
   # A filter or test written without parentheses swallowed a following
-  # `if` / `else` as its argument (`x | lower if x else ""`,
-  # `x is defined else ""`); those keywords end the call instead. A bare
-  # argument is no conditional either: `n is divisibleby 2 if c else d` is
-  # `(n is divisibleby 2) if c else d`, as in Jinja2.
+  # `if` / `else` / `in` as its argument (`x | lower if x else ""`,
+  # `x is defined else ""`, `lang | lower in ["en", "ko"]`); those keywords
+  # end the call instead. A bare argument is no conditional either:
+  # `n is divisibleby 2 if c else d` is `(n is divisibleby 2) if c else d`,
+  # as in Jinja2.
   private def parse_call_expression(identifier, with_parenthesis = true)
     return previous_def if with_parenthesis
-    if current_token.kind == Kind::IDENTIFIER && current_token.value.in?("if", "else")
+    if current_token.kind == Kind::IDENTIFIER && current_token.value.in?("if", "else", "in")
       return AST::CallExpression.new(identifier, AST::ExpressionList.new([] of AST::ExpressionNode),
         Hash(AST::IdentifierLiteral, AST::ExpressionNode).new).at(identifier.location_start, current_token.location)
     end

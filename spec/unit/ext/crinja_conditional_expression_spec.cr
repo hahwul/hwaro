@@ -36,4 +36,9 @@ describe "Crinja conditional expression" do
     render_cond(%({{ 4 is divisibleby 2 if true else "no" }})).should eq("true")
     render_cond(%({{ 4 is defined }}|{{ "x" if true else "y" }})).should eq("true|x")
   end
+
+  it "ends a filter written without parentheses at `in`" do
+    render_cond(%({{ t | lower in ["t", "u"] }}|{{ l | length in [3] }}|{{ t | lower not in ["t"] }})).should eq("true|true|false")
+    render_cond(%({% if t | lower in "xtx" %}yes{% endif %})).should eq("yes")
+  end
 end
