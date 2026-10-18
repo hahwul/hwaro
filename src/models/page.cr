@@ -566,13 +566,19 @@ module Hwaro
       # whereas encoding more (a non-ASCII slug, say) would rename the
       # directory every existing site already publishes to. Leaving `%` itself
       # alone also keeps this idempotent when a URL is assigned twice.
+      #
+      # `"` is escaped for the same reason from the HTML side: templates print
+      # `page.url` into double-quoted attributes unescaped (autoescape is
+      # off), so `with"quote.md` cut its own `href` short and linked a 404.
       def url=(value : String)
-        @url = if value.includes?('#') || value.includes?('?')
-                 value.gsub('#', "%23").gsub('?', "%3F")
+        @url = if value.includes?('#') || value.includes?('?') || value.includes?('"')
+                 value.gsub(URL_DELIMITER_ESCAPES)
                else
                  value
                end
       end
+
+      private URL_DELIMITER_ESCAPES = {'#' => "%23", '?' => "%3F", '"' => "%22"}
 
       # Generate permalink (absolute URL)
       def generate_permalink(base_url : String) : String

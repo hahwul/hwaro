@@ -330,6 +330,15 @@ describe Hwaro::Models::Page do
       page.url.should eq("/posts/a%3Fb/")
     end
 
+    # Templates print `page.url` into double-quoted attributes unescaped, so a
+    # raw `"` from the filename ended the `href` early.
+    it "percent-encodes a double quote" do
+      page = Hwaro::Models::Page.new(%(posts/say "hi".md))
+      page.url = %(/posts/say "hi"/)
+      page.url.should eq("/posts/say %22hi%22/")
+      Hwaro::Utils::PathUtils.split_safe_segments(page.url.lchop("/"))[0].should eq(["posts", %(say "hi")])
+    end
+
     it "leaves an ordinary URL byte-identical" do
       page = Hwaro::Models::Page.new("posts/a.md")
       ["/posts/hello-world/", "/ko/posts/한글/", "/404.html", "/"].each do |url|
