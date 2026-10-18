@@ -274,20 +274,44 @@ module Hwaro
         # HTML passes must not rewrite an `"<img …>"` or `"<a href=…>"` JS
         # string (their double-quoted attributes would end it).
         RAW_TEXT_OPEN_RE = /<(script|style|textarea)\b/i
+        # `<!--` alternates with the openers so the scan steps over comments:
+        # a commented-out `<!-- <script src="old.js"> -->` opens nothing.
+        RAW_TEXT_SCAN_RE = /<(?:!--|(script|style|textarea)\b)/i
+
+        # Byte ranges of raw-text elements, from the opening `<` up to the
+        # close tag. An unterminated element ends the scan and an unterminated
+        # comment is no comment; neither runs to the end.
+        def raw_text_spans(html : String) : Array(Range(Int32, Int32))
+          spans = [] of Range(Int32, Int32)
+          pos = 0
+          comments_close = true
+          while m = RAW_TEXT_SCAN_RE.match_at_byte_index(html, pos)
+            if name = m[1]?
+              close = Utils::ByteScan.byte_index(html, "</#{name.downcase}", m.byte_end(0))
+              break unless close
+              spans << (m.byte_begin(0)...close)
+              pos = close
+            else
+              # No `-->` after one `<!--` means none after any later one.
+              close = Utils::ByteScan.byte_index(html, "-->", m.byte_end(0)) if comments_close
+              comments_close = !close.nil?
+              pos = close ? close + 3 : m.byte_end(0)
+            end
+          end
+          spans
+        end
 
         # Yields every stretch of `html` outside raw-text elements and joins
-        # the results with those elements kept verbatim. An unterminated one
-        # is not treated as running to the end.
+        # the results with those elements kept verbatim.
         def outside_raw_text(html : String, & : String -> String) : String
           return yield html unless html.matches?(RAW_TEXT_OPEN_RE)
 
           String.build(html.bytesize) do |io|
             pos = 0
-            while (m = RAW_TEXT_OPEN_RE.match_at_byte_index(html, pos)) &&
-                  (close = Utils::ByteScan.byte_index(html, "</#{m[1].downcase}", m.byte_end(0)))
-              io << yield html.byte_slice(pos, m.byte_begin(0) - pos)
-              io << html.byte_slice(m.byte_begin(0), close - m.byte_begin(0))
-              pos = close
+            raw_text_spans(html).each do |span|
+              io << yield html.byte_slice(pos, span.begin - pos)
+              io << html.byte_slice(span.begin, span.end - span.begin)
+              pos = span.end
             end
             io << yield html.byte_slice(pos)
           end

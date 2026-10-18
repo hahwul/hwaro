@@ -70,14 +70,7 @@ module Hwaro
           # `<script>`/`<style>`/`<textarea>` bodies are text, not markup: an
           # `"<h2>…</h2>"` JS string must not get an `id="…"` (which ends the
           # string) or a TOC entry. Unterminated ones are left alone, as above.
-          pos = 0
-          while m = MarkdownExtensions::RAW_TEXT_OPEN_RE.match_at_byte_index(html, pos)
-            close = Utils::ByteScan.byte_index(html, "</#{m[1].downcase}", m.byte_end(0))
-            break unless close
-            spans << (m.byte_begin(0)...close)
-            pos = close
-          end
-          spans
+          spans.concat(MarkdownExtensions.raw_text_spans(html))
         end
 
         # True when a match starting at `offset` (a BYTE offset, as reported by

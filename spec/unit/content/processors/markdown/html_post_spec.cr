@@ -10,6 +10,16 @@ describe Hwaro::Content::Processors::Markdown do
       html.should contain(%(<h2 id="real">Real <a class="anchor"))
       toc.map(&.id).should eq(["real"])
     end
+
+    # Regression: a `<script` inside a comment opened a raw-text span that ran
+    # to the next real `</script>`, hiding every heading and image between.
+    it "ignore a raw-text opener inside an HTML comment" do
+      content = "<!-- <script src=\"old.js\"> -->\n\n## Visible\n\n![pic](a.png)\n\n<script>\nx();\n</script>\n"
+      html, toc = Hwaro::Processor::Markdown.render(content, lazy_loading: true)
+      toc.map(&.id).should eq(["visible"])
+      html.should contain(%(<h2 id="visible">))
+      html.should contain(%(<img loading="lazy" src="a.png"))
+    end
   end
 
   describe "lazy loading and external links" do
