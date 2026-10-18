@@ -86,11 +86,16 @@ module Hwaro
           target.exclude = target_glob(target_h, name, "exclude")
 
           strip_any = target_h["stripIndexHTML"]? || target_h["strip_index_html"]?
-          if strip_val = strip_any.try(&.as_bool?)
-            target.strip_index_html = strip_val
-          elsif strip_any
-            # Fail-open default applies; say so rather than ignore silently.
-            Logger.warn "[[deployment.targets]] #{name}: 'stripIndexHTML' must be a boolean; ignoring #{strip_any.raw.inspect}."
+          if strip_any
+            # `as_bool?` is nil only for a non-boolean: an explicit `false`
+            # must not read as "not a boolean" (it used to warn).
+            strip_val = strip_any.as_bool?
+            if strip_val.nil?
+              # Fail-open default applies; say so rather than ignore silently.
+              Logger.warn "[[deployment.targets]] #{name}: 'stripIndexHTML' must be a boolean; ignoring #{strip_any.raw.inspect}."
+            else
+              target.strip_index_html = strip_val
+            end
           end
 
           target
