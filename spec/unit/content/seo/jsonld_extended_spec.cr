@@ -295,6 +295,32 @@ describe Hwaro::Content::Seo::JsonLd do
     end
   end
 
+  describe ".breadcrumb" do
+    # Regression: a headless (`render = false`) ancestor section publishes no
+    # page, yet its crumb pointed `item` at that unwritten URL (a 404).
+    it "leaves out a headless ancestor and keeps positions contiguous" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      config.title = "Site"
+      docs = Hwaro::Models::Section.new("docs/_index.md")
+      docs.title = "Docs"
+      docs.url = "/docs/"
+      group = Hwaro::Models::Section.new("docs/api/_index.md")
+      group.title = "API"
+      group.url = "/docs/api/"
+      group.render = false
+      page = Hwaro::Models::Page.new("docs/api/endpoints.md")
+      page.title = "Endpoints"
+      page.url = "/docs/api/endpoints/"
+      page.ancestors = [docs, group] of Hwaro::Models::Page
+
+      crumbs = JSON.parse(Hwaro::Content::Seo::JsonLd.breadcrumb(page, config)[/\{.*\}/m])["itemListElement"].as_a
+      crumbs.map(&.["name"].as_s).should eq(["Site", "Docs", "Endpoints"])
+      crumbs.map(&.["position"].as_i).should eq([1, 2, 3])
+      crumbs.compact_map(&.["item"]?.try(&.as_s)).should_not contain("https://example.com/docs/api/")
+    end
+  end
+
   describe ".for_page" do
     it "auto-detects FAQ schema type" do
       page = Hwaro::Models::Page.new("test.md")

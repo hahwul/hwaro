@@ -860,11 +860,13 @@ module Hwaro::Core::Build::Phases::Render
     if rel.ancestors
       fp_value(digest, "c#{page.ancestors.size}")
       # `page.ancestors` and the JSON-LD breadcrumb expose nothing but each
-      # ancestor's title and URL (build_ancestors_crinja).
+      # ancestor's title and URL (build_ancestors_crinja) — and whether it
+      # renders, which decides if the breadcrumb lists it.
       page.ancestors.each do |a|
         fp_value(digest, a.path)
         fp_value(digest, a.url)
         fp_value(digest, a.title)
+        fp_value(digest, a.render ? "1" : "0")
       end
     end
     unless rel.get_page_targets.empty?

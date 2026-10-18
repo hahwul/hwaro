@@ -151,12 +151,14 @@ module Hwaro
             "item"     => Utils::TextUtils.encode_url_path("#{base}#{lang_prefix}/"),
           }
 
-          # Ancestors
-          page.ancestors.each_with_index do |ancestor, idx|
+          # Ancestors. A headless (`render = false`) section publishes no page,
+          # so its crumb would point `item` at a 404; it is left out.
+          page.ancestors.each do |ancestor|
+            next unless ancestor.render
             ancestor_url = Utils::TextUtils.encode_url_path(abs_path(base, ancestor.url))
             items << {
               "@type"    => "ListItem",
-              "position" => idx + 2,
+              "position" => items.size + 1,
               "name"     => ancestor.breadcrumb_title,
               "item"     => ancestor_url,
             }
