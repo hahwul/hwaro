@@ -339,6 +339,23 @@ describe Hwaro::Models::Page do
       Hwaro::Utils::PathUtils.split_safe_segments(page.url.lchop("/"))[0].should eq(["posts", %(say "hi")])
     end
 
+    # `%de` decodes to a lone 0xDE byte, which the output path scrubbed to
+    # U+FFFD: the page was written where its URL could never reach.
+    it "escapes a % whose run does not decode to UTF-8" do
+      page = Hwaro::Models::Page.new("posts/100%deal.md")
+      page.url = "/posts/100%deal/"
+      page.url.should eq("/posts/100%25deal/")
+      Hwaro::Utils::PathUtils.split_safe_segments(page.url.lchop("/"))[0].should eq(["posts", "100%deal"])
+      page.url = page.url
+      page.url.should eq("/posts/100%25deal/")
+
+      page.url = "/posts/My%20Notes/"
+      page.url.should eq("/posts/My%20Notes/")
+
+      page.url = "/posts/100%/"
+      page.url.should eq("/posts/100%25/")
+    end
+
     it "leaves an ordinary URL byte-identical" do
       page = Hwaro::Models::Page.new("posts/a.md")
       ["/posts/hello-world/", "/ko/posts/한글/", "/404.html", "/"].each do |url|
