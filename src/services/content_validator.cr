@@ -86,9 +86,12 @@ module Hwaro
         draft = frontmatter["draft"]?
 
         # title check
-        if title.nil? || title == "Untitled"
+        # A blank `title = ""` ships a page with an empty <title>, as missing
+        # as no title at all.
+        blank = title.is_a?(String) && title.strip.empty?
+        if title.nil? || blank || title == "Untitled"
           issues << Issue.new(id: "content-title-missing", level: :warning, category: "content", file: file_path,
-            message: title.nil? ? "Missing title in frontmatter" : "Title is \"Untitled\"")
+            message: title.nil? ? "Missing title in frontmatter" : (blank ? "Title is empty" : "Title is \"Untitled\""))
         end
 
         # description check

@@ -76,6 +76,17 @@ describe Hwaro::Services::ContentValidator do
       end
     end
 
+    it "detects a blank title" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "blank.md"), "+++\ntitle = \"  \"\ndescription = \"d\"\n+++\nx\n")
+
+        issues = Hwaro::Services::ContentValidator.new(content_dir).run
+        issues.any? { |i| i.id == "content-title-missing" && i.message == "Title is empty" }.should be_true
+      end
+    end
+
     it "detects missing description" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")
