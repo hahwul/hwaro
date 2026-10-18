@@ -202,7 +202,7 @@ module Hwaro
 
               feed_title = "#{config.title} - #{page.title}"
 
-              yield FeedSpec.new(section_pages, section_output_dir, "", feed_title, page.url, nil, "section", page.url)
+              yield FeedSpec.new(section_pages, section_output_dir, "", feed_title, page.url, feed_language(config, page.language), "section", page.url)
             end
           end
 
@@ -351,6 +351,14 @@ module Hwaro
           Hwaro::Utils::FileSafe.atomic_write(feed_path, feed_content)
           Logger.action :create, feed_path if verbose
           feed_path
+        end
+
+        # The language a feed declares (RSS `<language>`, Atom `xml:lang`,
+        # JSON `language`): a non-default language's code. Default-language
+        # feeds declare none, like the main site feed, so section and term
+        # feeds under `/ko/` say `ko` exactly as `/ko/rss.xml` does.
+        def self.feed_language(config : Models::Config, language : String?) : String?
+          language if config.multilingual? && language && language != config.default_language
         end
 
         # Keep the page the build actually wrote when two pages collide on

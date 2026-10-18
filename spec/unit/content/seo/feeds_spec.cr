@@ -1,4 +1,5 @@
 require "../../../spec_helper"
+require "../../../support/build_helper"
 
 describe Hwaro::Content::Seo::Feeds do
   describe "multilingual feeds" do
@@ -3034,6 +3035,38 @@ describe Hwaro::Content::Seo::Feeds do
       Hwaro::Content::Seo::Feeds.safe_feed_filename("", "json").should eq("feed.json")
       Hwaro::Content::Seo::Feeds.safe_feed_filename("", "atom").should eq("atom.xml")
       Hwaro::Content::Seo::Feeds.safe_feed_filename("", "rss").should eq("rss.xml")
+    end
+  end
+end
+
+describe "Non-default-language section and term feeds" do
+  it "declare their language like the language's main feed does" do
+    config = <<-TOML
+      title = "T"
+      base_url = "https://example.com"
+      default_language = "en"
+      [languages.en]
+      language_name = "English"
+      [languages.ko]
+      language_name = "Korean"
+      [feeds]
+      enabled = true
+      [[taxonomies]]
+      name = "tags"
+      feed = true
+      TOML
+    build_site(config, content_files: {
+      "blog/_index.md"    => "+++\ntitle = \"Blog\"\ngenerate_feeds = true\n+++\n",
+      "blog/_index.ko.md" => "+++\ntitle = \"블로그\"\ngenerate_feeds = true\n+++\n",
+      "blog/a.md"         => "+++\ntitle = \"A\"\ndate = 2024-01-01\ntags = [\"x\"]\n+++\nen\n",
+      "blog/a.ko.md"      => "+++\ntitle = \"가\"\ndate = 2024-01-01\ntags = [\"x\"]\n+++\nko\n",
+    }) do |dir|
+      File.read(File.join(dir, "public/ko/rss.xml")).should contain("<language>ko</language>")
+      File.read(File.join(dir, "public/ko/blog/rss.xml")).should contain("<language>ko</language>")
+      File.read(File.join(dir, "public/ko/tags/x/rss.xml")).should contain("<language>ko</language>")
+      # Default-language feeds keep declaring none, as the main feed does.
+      File.read(File.join(dir, "public/blog/rss.xml")).should_not contain("<language>")
+      File.read(File.join(dir, "public/tags/x/rss.xml")).should_not contain("<language>")
     end
   end
 end

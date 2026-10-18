@@ -382,6 +382,7 @@ default_language_only = true
 - **RSS 피드**에는 `<language>` 태그가 포함됩니다 (예: `<language>ko</language>`)
 - **Atom 피드**에는 `xml:lang` 속성이 포함됩니다 (예: `<feed xmlns="..." xml:lang="ko">`)
 - **JSON 피드**에는 최상위 `"language"` 필드가 포함됩니다 (예: `"language": "ko"`)
+- 기본 언어가 아닌 언어의 섹션 피드(`/ko/blog/rss.xml`)와 택소노미 용어 피드(`/ko/tags/crystal/rss.xml`)도 같은 방식으로 언어를 선언합니다. 기본 언어 피드는 언어를 선언하지 않습니다
 - 피드 제목에 언어 이름이 붙습니다: `"My Site (한국어)"`
 - 자기 참조 링크는 해당 언어 경로를 가리킵니다 (예: `https://example.com/ko/rss.xml`)
 - 초안 페이지와 섹션 인덱스 페이지는 제외됩니다
