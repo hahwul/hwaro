@@ -671,6 +671,23 @@ describe Hwaro::Core::Build::Phases::Transform do
       pages_raw.size.should eq(1) # only the published page, not the draft
     end
 
+    it "enriches an author whose data key is written with capitals" do
+      site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+      page = make_page("a.md")
+      page.authors = ["JohnDoe"]
+      site.pages = [page]
+      site.data["authors"] = Crinja::Value.new({
+        "JohnDoe" => Crinja::Value.new({"name" => Crinja::Value.new("John Doe"), "bio" => Crinja::Value.new("Creator")}),
+      })
+
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_aggregate_site_authors(site)
+
+      author = site.authors["johndoe"].raw.as(Hash(Crinja::Value, Crinja::Value))
+      author[Crinja::Value.new("name")].to_s.should eq("John Doe")
+      author[Crinja::Value.new("bio")].to_s.should eq("Creator")
+    end
+
     it "excludes headless pages, which are never written" do
       site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
       shown = make_page("shown.md")

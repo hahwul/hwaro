@@ -727,9 +727,20 @@ module Hwaro::Core::Build::Phases::Transform
       # an author as a template variable, implied a template was involved, and
       # never mentioned the data file. Enrichment is optional metadata, so a
       # wrong shape degrades to a warning naming the file instead.
-      if authors_data.raw.is_a?(Hash)
+      if (data_hash = authors_data.raw).is_a?(Hash)
+        # Author ids are normalized (stripped, downcased) above, so the data
+        # keys are too: `authors = ["JohnDoe"]` with a `JohnDoe:` entry — the
+        # id exactly as written — never matched the lookup of "johndoe" and
+        # the author silently lost its name and fields. An exact lowercase key
+        # wins over a differently cased one.
+        by_id = {} of String => Crinja::Value
+        data_hash.each do |key, value|
+          raw_key = key.to_s
+          id = raw_key.strip.downcase
+          by_id[id] = value if raw_key == id || !by_id.has_key?(id)
+        end
         temp_authors.each_key do |id|
-          author_info = authors_data[id]
+          author_info = by_id[id]? || next
           next if author_info.raw.nil?
 
           # Normalize Crinja hash entries to {String, Crinja::Value} pairs
