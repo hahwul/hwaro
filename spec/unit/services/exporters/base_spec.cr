@@ -528,4 +528,19 @@ describe Hwaro::Services::Exporters::Base do
       end
     end
   end
+
+  describe "file manifest" do
+    it "records destinations as the caller named them, not canonicalized" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content/posts")
+          File.write("content/posts/a.md", "+++\ntitle = \"A\"\ndate = \"2024-01-01\"\n+++\n\nBody\n")
+          exporter = Hwaro::Services::Exporters::JekyllExporter.new
+          exporter.run(Hwaro::Config::Options::ExportOptions.new(
+            target_type: "jekyll", content_dir: "content", output_dir: "export"))
+          exporter.file_actions.map(&.path).should eq(["export/_posts/2024-01-01-a.md"])
+        end
+      end
+    end
+  end
 end

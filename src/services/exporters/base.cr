@@ -525,7 +525,10 @@ module Hwaro
             Hwaro::Utils::FileSafe.mkdir_p(File.dirname(safe_path))
             File.write(safe_path, content)
           end
-          @file_actions << FileAction.new(safe_path, action)
+          # The path as the caller named it (relative to the working directory
+          # when `-o` is), like the import manifest: the canonical `safe_path`
+          # put absolute paths in a manifest documented as `export/...`.
+          @file_actions << FileAction.new(path, action)
           Logger.debug "#{@dry_run ? "Would export" : "Exported"}: #{path}" if verbose
           true
         end
