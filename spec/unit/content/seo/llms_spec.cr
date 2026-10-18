@@ -191,6 +191,27 @@ describe Hwaro::Content::Seo::Llms do
       end
     end
 
+    # Regression: a multi-line (`"""`) description was written verbatim, so a
+    # blank line ended the list item and `## Notes` opened a new section.
+    it "keeps each entry on one line" do
+      config = Hwaro::Models::Config.new
+      config.llms.enabled = true
+      config.title = "Site"
+      config.base_url = "https://example.com"
+
+      page = Hwaro::Models::Page.new("guide.md")
+      page.title = "Guide\nPart 1"
+      page.url = "/guide/"
+      page.description = "Intro.\n\n## Notes\n- item"
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Llms.generate(config, [page], output_dir)
+        content = File.read(File.join(output_dir, "llms.txt"))
+        content.should contain("- [Guide Part 1](https://example.com/guide/): Intro. ## Notes - item\n")
+        content.lines.select(&.starts_with?("## ")).should eq(["## Pages"])
+      end
+    end
+
     it "lists page-bundle leaves and folds only section indexes into headings" do
       config = Hwaro::Models::Config.new
       config.llms.enabled = true
