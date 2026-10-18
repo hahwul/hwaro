@@ -51,6 +51,10 @@ module Hwaro::Core::Build
     def test_get_templates
       @templates
     end
+
+    def test_template_var_features
+      @template_var_features
+    end
   end
 end
 
@@ -391,6 +395,30 @@ describe Hwaro::Core::Build::Phases::Initialize do
   end
 
   describe "#load_templates" do
+    it "skips the section.pages copy only for templates that never read `section`" do
+      # A substring test matched `page.section`, `<section>` and comments, and
+      # a `{{ fn() }}` call disabled the gate: every page of a large section
+      # copied the whole section listing (quadratic).
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("templates")
+          File.write("templates/header.html", %(<body data-section="{{ page.section }}">))
+          File.write("templates/post.html", %({% include "header.html" %}<section>{# section nav #}{{ page.section }} {{ get_url(path="/") }}</section>))
+          File.write("templates/list.html", %(<p>{{ section.pages | length }}</p>))
+          File.write("templates/alias.html", %({% set s = section %}{{ s.title }}))
+
+          builder = Hwaro::Core::Build::Builder.new
+          builder.test_load_templates
+          features = builder.test_template_var_features
+          features["post"]?.try(&.needs_section_pages).should be_false
+          features["list"]?.try(&.needs_section_pages).should be_true
+          features["alias"]?.try(&.needs_section_pages).should be_true
+          # A template that may hold shortcodes keeps the SEO/JSON-LD vars.
+          features["post"]?.try(&.needs_seo).should be_true
+        end
+      end
+    end
+
     it "returns an empty hash when no templates directory exists" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
