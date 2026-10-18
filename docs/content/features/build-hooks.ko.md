@@ -87,6 +87,8 @@ Running pre-build hooks...
 Pre-build hooks completed successfully.
 ```
 
+각 명령의 출력은 stdout과 stderr 모두, 명령이 끝난 뒤 해당 줄 아래에 들여쓰기로 표시됩니다. `--quiet`에서는 실패한 명령의 stderr만 표시됩니다.
+
 ## serve 모드
 
 빌드 훅은 `hwaro serve` 중에도 실행되지만, **전체 재빌드**에서만 실행됩니다.

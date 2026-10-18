@@ -87,6 +87,8 @@ Running pre-build hooks...
 Pre-build hooks completed successfully.
 ```
 
+Each command's output, stdout and stderr alike, is printed indented under its line once the command finishes. With `--quiet` only a failing command's stderr is shown.
+
 ## Serve Mode
 
 Build hooks also run during `hwaro serve`, but only on **full** rebuilds:

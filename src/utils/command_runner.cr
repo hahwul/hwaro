@@ -95,6 +95,13 @@ module Hwaro
             end
             return false
           end
+
+          # A successful command's stderr is still its output: compiler
+          # warnings, deprecation notices and most tools' progress lines go
+          # there, and they used to vanish without a trace.
+          result.error.each_line do |line|
+            Logger.info "  #{line}"
+          end
         end
 
         true
