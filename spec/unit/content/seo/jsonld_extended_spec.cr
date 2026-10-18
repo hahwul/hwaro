@@ -203,6 +203,18 @@ describe Hwaro::Content::Seo::JsonLd do
       config = Hwaro::Models::Config.new
       Hwaro::Content::Seo::JsonLd.organization(config).should eq("")
     end
+
+    # Regression: the logo (og.default_image) kept a raw space while og:image
+    # percent-encoded the same value.
+    it "percent-encodes a site-path logo like og:image" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      logo = "/images/my logo.png?v=2"
+
+      data = JSON.parse(Hwaro::Content::Seo::JsonLd.organization(config, logo)[/\{.*\}/m])
+      data["logo"].as_s.should eq(config.og.resolve_image_url(logo, config.base_url))
+      data["logo"].as_s.should eq("https://example.com/images/my%20logo.png?v=2")
+    end
   end
 
   describe ".person" do

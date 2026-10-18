@@ -41,9 +41,12 @@ module Hwaro
         end
 
         # Like abs_path, but leaves a value that already carries its own origin
-        # (any `scheme:` URL, or a protocol-relative `//host/…`) untouched.
+        # (any `scheme:` URL, or a protocol-relative `//host/…`) untouched. A
+        # site path is percent-encoded like og:image (the Organization logo is
+        # the same `og.default_image`): `my logo.png` is not a valid URL raw.
         private def abs_or_external(base : String, value : String) : String
-          Processors::InternalLinkResolver.has_own_origin?(value) ? value : abs_path(base, value)
+          return value if Processors::InternalLinkResolver.has_own_origin?(value)
+          abs_path(base, Utils::TextUtils.encode_url_path_keep_query(value))
         end
 
         # Generate Article JSON-LD for a page
