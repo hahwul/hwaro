@@ -190,6 +190,24 @@ describe Hwaro::Services::Creator do
       end
     end
 
+    # Regression: the front-matter escaping was applied to the body too, so the
+    # documented `# {{ title }}` heading printed `# My \"Quoted\" Post`.
+    it "substitutes body placeholders unescaped" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("archetypes")
+          File.write("archetypes/custom.md", "---\ntitle: \"{{ title }}\"\n---\n\n# {{ title }}\n")
+
+          options = Hwaro::Config::Options::NewOptions.new(
+            path: "post.md", title: %(My "Quoted" C:\\ Post), archetype: "custom")
+          Hwaro::Services::Creator.new.run(options)
+
+          File.read("content/post.md").should eq(%(---\ntitle: "My \\"Quoted\\" C:\\\\ Post"\n---\n\n# My "Quoted" C:\\ Post\n))
+        end
+      end
+    end
+
     # Regression: placeholders were substituted one after another, so a title
     # about templating (`Using {{ date }} and {{ tags }}`) was re-expanded by
     # the later passes, injecting the raw tags array into a quoted string.
