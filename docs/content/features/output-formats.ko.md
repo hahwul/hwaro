@@ -81,7 +81,7 @@ templates/page.xml.jinja
 
 Hwaro가 템플릿을 로드할 때는 마지막의 인식되는 템플릿 확장자(`.html`, `.j2`, `.jinja2`, `.jinja`, `.ecr`)만 제거하고, `.json`/`.xml` 부분은 템플릿 이름의 일부로 남습니다. 예를 들어 `templates/page.json.jinja`는 `page.json`으로 로드됩니다.
 
-페이지 자신의 본문 마크다운/콘텐츠, `toc`, 그리고 `page.html`/`section.html`에서 평소 쓸 수 있는 다른 모든 값(`page`, `section`, `site`, `config`, …)을 포맷 템플릿에서도 쓸 수 있습니다. 포맷에 필요한 것을 자유롭게 작성하면 됩니다. 예:
+페이지 자신의 본문 마크다운/콘텐츠, `toc`, 그리고 `page.html`/`section.html`에서 평소 쓸 수 있는 다른 모든 값(`page`, `section`, `site`, `base_url`, …)을 포맷 템플릿에서도 쓸 수 있습니다. 포맷에 필요한 것을 자유롭게 작성하면 됩니다. 예:
 
 ```jinja
 {# templates/page.json.jinja #}
