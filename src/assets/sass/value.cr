@@ -127,13 +127,17 @@ module Hwaro
           # anyway — print the shortest-representation digits, zero-padded
           # (dart-sass prints `math.$max-number` the same way).
           return format_large(value) if value.abs >= 1e15
+          # `round(10)` scales by 1e10, which is inexact once the integer
+          # part has a few digits: 33333333333 came back as
+          # 33333333333.000004 and printed that way. It only decides the
+          # fuzzy-integer case; the digits come from the value itself.
+          return value.to_i64.to_s if value == value.trunc # also "-0" → "0"
           rounded = value.round(10)
-          rounded = 0.0 if rounded == 0 # avoid "-0"
           return rounded.to_i64.to_s if rounded == rounded.trunc
 
-          s = sprintf("%.10f", rounded)
+          s = sprintf("%.10f", value)
           s = s.rstrip('0').rstrip('.') if s.includes?('.')
-          s
+          s == "-0" ? "0" : s
         end
 
         private def self.format_large(value : Float64) : String
