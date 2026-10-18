@@ -868,6 +868,11 @@ module Hwaro::Core::Build::Phases::Render
         fp_value(digest, a.title)
         fp_value(digest, a.render ? "1" : "0")
       end
+      # The breadcrumb's Home crumb is the page language's homepage only
+      # while one exists.
+      if (lang = page.language) && lang != site.config.default_language && site.config.multilingual?
+        fp_value(digest, site.home_language?(lang) ? "h1" : "h0")
+      end
     end
     unless rel.get_page_targets.empty?
       fp_value(digest, "g#{rel.get_page_targets.size}")

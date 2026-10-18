@@ -319,6 +319,34 @@ describe Hwaro::Content::Seo::JsonLd do
       crumbs.map(&.["position"].as_i).should eq([1, 2, 3])
       crumbs.compact_map(&.["item"]?.try(&.as_s)).should_not contain("https://example.com/docs/api/")
     end
+
+    # Regression: a partially translated site (no `index.ko.md`) pointed
+    # every Korean page's Home crumb at the unwritten `/ko/`.
+    it "points Home at the site root when the page's language has no homepage" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      config.default_language = "en"
+      config.languages["ko"] = Hwaro::Models::LanguageConfig.new("ko")
+      page = Hwaro::Models::Page.new("about.ko.md")
+      page.title = "소개"
+      page.url = "/ko/about/"
+      page.language = "ko"
+      site = Hwaro::Models::Site.new(config)
+      site.pages = [page]
+
+      home_item = ->(s : Hwaro::Models::Site) {
+        s.build_lookup_index
+        JSON.parse(Hwaro::Content::Seo::JsonLd.breadcrumb(page, config, s)[/\{.*\}/m])["itemListElement"][0]["item"].as_s
+      }
+      home_item.call(site).should eq("https://example.com/")
+
+      home = Hwaro::Models::Page.new("index.ko.md")
+      home.is_index = true
+      home.url = "/ko/"
+      home.language = "ko"
+      site.pages = [page, home]
+      home_item.call(site).should eq("https://example.com/ko/")
+    end
   end
 
   describe ".for_page" do

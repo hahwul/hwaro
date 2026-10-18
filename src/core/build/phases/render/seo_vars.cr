@@ -28,7 +28,7 @@ module Hwaro::Core::Build::Phases::Render
     # The synthesized 404 page carries no page-level structured data (matching
     # the Article/CollectionPage suppression above) — skip its breadcrumb too.
     needs_breadcrumb = page.path != "404.html" && (!page.ancestors.empty? || !page.is_index)
-    jsonld_breadcrumb = needs_breadcrumb ? Content::Seo::JsonLd.breadcrumb(page, config) : ""
+    jsonld_breadcrumb = needs_breadcrumb ? Content::Seo::JsonLd.breadcrumb(page, config, site) : ""
 
     # Extended schema types (FAQ, HowTo) auto-detected from extra.schema_type
     jsonld_extra = Content::Seo::JsonLd.for_page(page, config)

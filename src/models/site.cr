@@ -27,6 +27,7 @@ module Hwaro
       property pages_for_section_cache : Hash(Tuple(String, String?), Array(Page))
       @lookup_index_built : Bool = false
       @all_content_cache : Array(Page)?
+      @home_languages_cache : Set(String?)?
       # Guards the lazy memo Hashes above: pages_for_section runs inside
       # parallel render fibers (render_section_with_pagination), and an
       # unsynchronized Hash insert there is undefined behavior under
@@ -64,12 +65,24 @@ module Hwaro
         end
       end
 
+      # Does `language` have a written homepage (`/`, `/<lang>/`)? A partial
+      # translation often has none, and its pages must not link `/<lang>/`.
+      def home_language?(language : String?) : Bool
+        homes = @memo_mutex.synchronize { @home_languages_cache }
+        unless homes
+          homes = all_content.select { |p| p.home? && p.render && !p.draft }.map(&.language).to_set
+          @memo_mutex.synchronize { @home_languages_cache = homes }
+        end
+        homes.includes?(language)
+      end
+
       def build_lookup_index
         @pages_by_section.clear
         @sections_by_parent.clear
         @sections_by_name.clear
         @pages_for_section_cache.clear
         @all_content_cache = nil
+        @home_languages_cache = nil
 
         @pages.each do |p|
           list = @pages_by_section[p.section]?

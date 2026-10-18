@@ -135,7 +135,7 @@ module Hwaro
         end
 
         # Generate BreadcrumbList JSON-LD from page ancestors
-        def breadcrumb(page : Models::Page, config : Models::Config) : String
+        def breadcrumb(page : Models::Page, config : Models::Config, site : Models::Site? = nil) : String
           base = config.base_url
 
           items = [] of Hash(String, String | Int32)
@@ -143,7 +143,12 @@ module Hwaro
           # Home — language-prefixed so a non-default-language page's Home crumb
           # points at the localized homepage (/ko/, /ja/) rather than the
           # default-language root, matching the localized ancestor crumbs below.
-          lang_prefix = (l = page.language) && l != config.default_language && config.multilingual? ? "/#{l}" : ""
+          # A partial translation with no homepage of its own falls back to the
+          # site root, as its ancestors fall back to the default language's.
+          l = page.language
+          localized = l && l != config.default_language && config.multilingual? &&
+                      (site.nil? || site.home_language?(l))
+          lang_prefix = localized ? "/#{l}" : ""
           items << {
             "@type"    => "ListItem",
             "position" => 1,
