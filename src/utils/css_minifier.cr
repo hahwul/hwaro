@@ -345,9 +345,19 @@ module Hwaro
       end
 
       # Declaration: every `:` is a property/value separator.
+      #
+      # A custom property with an empty value keeps one space after its
+      # colon. `--tw-pan-x: ;` is the "empty value" Tailwind emits on
+      # purpose; `--tw-pan-x:;` is a parse error to every engine predating
+      # the spec relaxation (and to dart-sass), which drops the declaration
+      # and with it every `var(--tw-pan-x)` that relies on it.
       private def collapse_declaration(run : String) : String
         return run unless run.includes?(':')
-        run.gsub(WS_COLON, ":")
+        collapsed = run.gsub(WS_COLON, ":")
+        if collapsed.ends_with?(':') && collapsed.lstrip(" \t\r\n\f").starts_with?("--")
+          collapsed += " "
+        end
+        collapsed
       end
     end
   end
