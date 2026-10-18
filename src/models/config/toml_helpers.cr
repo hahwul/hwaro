@@ -185,9 +185,15 @@ module Hwaro
 
       # Safe boolean loader: returns the parsed Bool if present, otherwise the default.
       # This avoids the `||` pitfall where `false || default` silently ignores `false`.
+      # A present-but-non-boolean value (`safe = "true"`, `enabled = 1`) warns
+      # like int_value does: quoting a bool is an easy TOML slip, and dropping
+      # it in silence left `[markdown] safe` or `[csp] enabled` off unnoticed.
       private def self.bool_value(raw : TOML::Any?, default : Bool) : Bool
-        val = raw.try(&.as_bool?)
-        val.nil? ? default : val
+        return default unless raw
+        val = raw.as_bool?
+        return val unless val.nil?
+        Logger.warn "Ignoring non-boolean config value #{raw.raw.inspect}; using default #{default}"
+        default
       end
 
       # Safe integer loader: handles both integer and float TOML values.

@@ -199,13 +199,8 @@ module Hwaro
         return unless s = config.raw["feeds"]?.try(&.as_h?)
 
         # Backward compatibility for 'generate' property
-        enabled = s["enabled"]?.try(&.as_bool?)
-        generate = s["generate"]?.try(&.as_bool?)
-
-        if !enabled.nil?
-          config.feeds.enabled = enabled
-        elsif !generate.nil?
-          config.feeds.enabled = generate
+        if enabled = s["enabled"]? || s["generate"]?
+          config.feeds.enabled = bool_value(enabled, config.feeds.enabled)
         end
 
         config.feeds.filename = s["filename"]?.try(&.as_s?) || config.feeds.filename
