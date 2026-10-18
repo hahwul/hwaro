@@ -282,7 +282,7 @@ describe "Sass value fixes" do
 
     # Every append re-reads the stored list, so each unparseable member used
     # to raise once per iteration (and non-ASCII text made the scan cubic):
-    # 600 members took over 5s.
+    # 600 members took ~48s; Windows CI runs the fixed code in ~2.6s.
     it "stays fast for a long list of non-ASCII selector strings" do
       css = ""
       elapsed = Time.measure do
@@ -293,7 +293,7 @@ describe "Sass value fixes" do
           SCSS
       end
       css.should contain("l: 600;")
-      elapsed.should be < 2.5.seconds
+      elapsed.should be < 10.seconds
     end
   end
 end
