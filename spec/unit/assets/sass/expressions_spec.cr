@@ -273,4 +273,17 @@ describe "Sass namespaced-reference failures" do
     end
     warnings.should_not contain("not valid CSS")
   end
+
+  it "reads a CSS-escaped identifier as a map value (Font Awesome icon map)" do
+    css = compile(<<-'SCSS')
+      $v0: \30;
+      $icons: ("0": $v0, "a": \f63f);
+      @each $name, $icon in $icons { .fa-#{$name} { content: "#{$icon}"; } }
+      .x { n: length($icons); v: map-get($icons, "a"); }
+      SCSS
+    css.should contain(%(.fa-0 {\n  content: "\\30";))
+    css.should contain(%(.fa-a {\n  content: "\\f63f";))
+    css.should contain("n: 2;")
+    css.should contain("v: \\f63f;")
+  end
 end

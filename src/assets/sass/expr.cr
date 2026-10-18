@@ -329,9 +329,19 @@ module Hwaro
 
           private def ident_start?(c : Char) : Bool
             return true if c.ascii_letter? || c == '_' || c.ord > 0x7F
+            return escape_at?(0) if c == '\\'
             return false unless c == '-'
             n = peek(1)
-            !n.nil? && (n.ascii_letter? || n == '_' || n == '-' || n.ord > 0x7F)
+            !n.nil? && (n.ascii_letter? || n == '_' || n == '-' || n.ord > 0x7F || (n == '\\' && escape_at?(1)))
+          end
+
+          # True when the backslash at `offset` starts a CSS escape (`\30`,
+          # `\f101`, `\:`), which belongs to an identifier: Font Awesome's
+          # `$fa-var-0: \30;` icon map. A backslash before a newline or the
+          # end of the text is not one.
+          private def escape_at?(offset : Int32) : Bool
+            n = peek(offset + 1)
+            !n.nil? && n != '\n' && n != '\r' && n != '\f'
           end
 
           private def lex_number : Nil
@@ -431,9 +441,9 @@ module Hwaro
 
           private def lex_ident : Nil
             start = @char_i
-            advance
-            while Scanner.ident_char?(peek)
+            while (c = peek) && (Scanner.ident_char?(c) || (c == '\\' && escape_at?(0)))
               advance
+              advance if c == '\\' # the escaped character
             end
             name = text[start...@char_i]
 
