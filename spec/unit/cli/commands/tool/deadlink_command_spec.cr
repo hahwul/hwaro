@@ -633,8 +633,8 @@ class Hwaro::CLI::Commands::Tool::DeadlinkCommand
     find_internal_links(dir)
   end
 
-  def check_internal_links_for_test(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String, base_path : String = "") : Array(Result)
-    check_internal_links(links, content_dir, taxonomy_names, base_path)
+  def check_internal_links_for_test(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String, base_path : String = "", config : Hwaro::Models::Config? = nil) : Array(Result)
+    check_internal_links(links, content_dir, taxonomy_names, base_path, config: config)
   end
 
   def check_links_concurrently_for_test(links : Array(Link), timeout_seconds : Int32, max_concurrency : Int32) : Array(Result)
@@ -1047,6 +1047,27 @@ describe "check-links uppercase Markdown extensions" do
 
       dl_dead(dir, "/sec/page/3/").should be_empty
       dl_dead(dir, "/sec/page/4/").should eq(["/sec/page/4/"])
+    end
+  end
+
+  # Pager routes follow the build's pagination rule (`paginate`, the
+  # site-wide `[pagination]`), at the section's published URL — here a
+  # translated one under a custom `paginate_path`.
+  it "accepts pager pages the build writes from paginate and [pagination]" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "blog"))
+      FileUtils.mkdir_p(File.join(dir, "news"))
+      config = load_config(%(default_language = "en"\n[languages.en]\n[languages.ko]\n[pagination]\nenabled = true\nper_page = 1\n))
+      File.write(File.join(dir, "blog", "_index.md"), "+++\ntitle = \"B\"\npaginate_path = \"p\"\n+++\n")
+      File.write(File.join(dir, "blog", "_index.ko.md"), "+++\ntitle = \"B\"\npaginate_path = \"p\"\n+++\n")
+      File.write(File.join(dir, "news", "_index.md"), "+++\ntitle = \"N\"\npaginate = 1\npagination_enabled = true\n+++\n")
+      {"blog/a.md", "blog/b.md", "blog/a.ko.md", "blog/b.ko.md", "news/a.md", "news/b.md"}.each do |name|
+        File.write(File.join(dir, name), "+++\ntitle = \"x\"\n+++\n")
+      end
+
+      links = {"/blog/p/2/", "/ko/blog/p/2/", "/news/page/2/", "/blog/page/2/", "/news/page/9/"}.map { |url| dl_link(dir, url) }.to_a
+      dead = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new.check_internal_links_for_test(links, dir, config: config).map(&.link.url)
+      dead.should eq(["/blog/page/2/", "/news/page/9/"])
     end
   end
 
