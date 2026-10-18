@@ -232,7 +232,8 @@ module Hwaro
           {result, roots}
         end
 
-        # Apply emoji shortcode conversion to HTML, skipping <code> and <pre> blocks.
+        # Apply emoji shortcode conversion to HTML text, skipping code, raw-text,
+        # math and mermaid elements (see EMOJI_SKIP_RE).
         #
         # Scans by BYTE offset rather than char index. The tag/fence markers
         # ('<', '>', '<code', '<pre', '</code>', '</pre>') and the ':' shortcode
@@ -241,6 +242,8 @@ module Hwaro
         # `html.index(_, pos)`) is O(n) per access on any string containing a
         # multibyte codepoint, which turned this loop into O(n^2) — a single
         # accented/CJK character on a long page caused a ~1500x slowdown.
+        EMOJI_SKIP_RE = /<(?:(code|pre|script|style|textarea)\b|(span|div)\b[^>]*\bclass="(?:math|mermaid)\b)/
+
         private def apply_emoji(html : String) : String
           return html unless html.includes?(":")
 
@@ -251,12 +254,12 @@ module Hwaro
           lt = '<'.ord.to_u8
 
           while pos < len
-            # Check for <code or <pre tags (bounded check avoids O(n) substring)
+            # Copy code, raw-text elements (script/style/textarea), math
+            # spans and mermaid blocks verbatim: `a:link:hover` in CSS or
+            # `$f:x:y$` must not become `a🔗hover` / `f❌y`.
             if bytes[pos] == lt && pos + 1 < len
-              is_code = pos + 5 <= len && bytes[pos, 5] == "<code".to_slice
-              is_pre = !is_code && pos + 4 <= len && bytes[pos, 4] == "<pre".to_slice
-              if is_code || is_pre
-                close_tag = is_code ? "</code>" : "</pre>"
+              if m = EMOJI_SKIP_RE.match_at_byte_index(html, pos, Regex::MatchOptions::ANCHORED)
+                close_tag = "</#{m[1]? || m[2]}>"
                 end_pos = html.byte_index(close_tag, pos)
                 if end_pos
                   block_end = end_pos + close_tag.bytesize
