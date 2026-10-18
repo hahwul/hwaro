@@ -52,6 +52,13 @@ describe Hwaro::Content::Processors::Markdown do
       html.should contain("😄 text")
     end
 
+    it "stays linear on many unclosed code and raw-text openers" do
+      t = Time.instant
+      html, _ = Hwaro::Processor::Markdown.render(":smile: " + "<textarea> x " * 20_000, emoji: true)
+      html.should start_with("<p>😄 <textarea>")
+      (Time.instant - t).should be < 10.seconds # quadratic took 35s; slack for a loaded suite
+    end
+
     it "shows the converted emoji in TOC titles, keeping the source-derived id" do
       html, toc = Hwaro::Processor::Markdown.render("## Hot :fire: `:x:` take", emoji: true)
       html.should contain(%(<h2 id="hot-fire-x-take">Hot 🔥 <code>:x:</code> take</h2>))

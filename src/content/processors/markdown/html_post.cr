@@ -264,6 +264,10 @@ module Hwaro
           len = bytes.size
           pos = 0
           lt = '<'.ord.to_u8
+          # Close tags already found missing from some offset on: they are
+          # missing from every later one too, so each unclosed opener does
+          # not rescan to the end of the page.
+          unclosed = Set(String).new
 
           while pos < len
             # Copy code, raw-text elements (script/style/textarea), math
@@ -272,7 +276,8 @@ module Hwaro
             if bytes[pos] == lt && pos + 1 < len
               if m = EMOJI_SKIP_RE.match_at_byte_index(html, pos, Regex::MatchOptions::ANCHORED)
                 close_tag = "</#{m[1]? || m[2]}>"
-                end_pos = html.byte_index(close_tag, pos)
+                end_pos = html.byte_index(close_tag, pos) unless unclosed.includes?(close_tag)
+                unclosed << close_tag unless end_pos
                 if end_pos
                   block_end = end_pos + close_tag.bytesize
                   result.write(bytes[pos, block_end - pos])
