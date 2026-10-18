@@ -1812,6 +1812,15 @@ describe Hwaro::Models::Config do
       config.serve.headers.has_key?("Bad:Name").should be_false
       config.serve.headers.size.should eq(1)
     end
+
+    it "warns about each header it ignores" do
+      log = with_captured_log do
+        load_config(%(title = "Test"\n[serve.headers]\n"Good-Header" = "v"\n"Bad:Name" = "x"\nX-Max-Age = 60\n))
+      end
+      log.should contain(%(Ignoring [serve.headers] "Bad:Name"))
+      log.should contain(%(Ignoring [serve.headers] "X-Max-Age"))
+      log.should_not contain("Good-Header")
+    end
   end
 
   # ---------------------------------------------------------------------------
