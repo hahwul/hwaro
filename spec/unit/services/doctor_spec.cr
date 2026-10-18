@@ -1023,6 +1023,19 @@ describe Hwaro::Services::Doctor do
     end
 
     describe "directory structure" do
+      # Versioned docs forbid `docs/_index.md` beside `docs/v1` + `docs/v2`
+      # under `latest_at_root` (it collides with the latest root), so doctor
+      # must not ask for one.
+      it "does not ask for an _index.md in a [[versions.list]] parent" do
+        issues = run_doctor(base_config + %(\n[[versions.list]]\nname = "v2"\npath = "docs/v2"\nlatest = true\n\n[[versions.list]]\nname = "v1"\npath = "docs/v1"\n),
+          {"docs/v2/_index.md" => "+++\ntitle = \"V2\"\n+++\n", "docs/v2/install.md" => "+++\ntitle = \"I\"\n+++\n",
+           "docs/v1/_index.md" => "+++\ntitle = \"V1\"\n+++\n", "docs/v1/install.md" => "+++\ntitle = \"I\"\n+++\n",
+           "guides/a/b.md" => "+++\ntitle = \"B\"\n+++\n"})
+        missing = issues.select { |i| i.id == "structure-missing-index" }.map(&.message)
+        missing.any?(&.includes?("docs/")).should be_false
+        missing.any?(&.includes?("guides/")).should be_true
+      end
+
       it "reports info when section dir missing _index.md" do
         Dir.mktmpdir do |dir|
           config_path = File.join(dir, "config.toml")

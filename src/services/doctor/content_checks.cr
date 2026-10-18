@@ -33,7 +33,12 @@ module Hwaro
         # board renders this check as skipped (`CheckSpec#blocked_by`).
         return unless config
 
-        walk_section_dirs(@content_dir, issues, index_names(config))
+        # A `[[versions.list]]` parent (`docs/` over `docs/v1`, `docs/v2`) is
+        # not a section missing its index: with `latest_at_root` an authored
+        # `docs/_index.md` collides with the latest version's root, and
+        # without it the build writes a redirect stub there.
+        version_parents = config.versions.list.map(&.parent_dir).reject(&.empty?).to_set
+        walk_section_dirs(@content_dir, issues, index_names(config), version_parents)
       end
 
       # The base names that count as an index page for this site: always
@@ -59,7 +64,7 @@ module Hwaro
         names
       end
 
-      private def walk_section_dirs(root : String, issues : Array(Issue), index_names : Set(String))
+      private def walk_section_dirs(root : String, issues : Array(Issue), index_names : Set(String), version_parents : Set(String))
         Dir.each_child(root) do |entry|
           next if entry.starts_with?(".") || entry.starts_with?("_")
           child = File.join(root, entry)
@@ -86,13 +91,13 @@ module Hwaro
           # markdown content beneath it (suggesting it intends to be a section).
           has_nested_content = dir_has_markdown_in_subdirs?(child, index_names)
 
-          if !has_index && has_nested_content
-            relative = child.lchop(@content_dir).lchop(File::SEPARATOR)
+          relative = child.lchop(@content_dir).lchop(File::SEPARATOR)
+          if !has_index && has_nested_content && !version_parents.includes?(relative.gsub(File::SEPARATOR, '/'))
             issues << Issue.new(id: "structure-missing-index", level: :info, category: "structure", file: child,
               message: "Section directory missing _index.md: #{relative}/")
           end
 
-          walk_section_dirs(child, issues, index_names)
+          walk_section_dirs(child, issues, index_names, version_parents)
         end
       rescue ex : File::Error
         # Belt and braces: an unreadable (or concurrently removed) directory
