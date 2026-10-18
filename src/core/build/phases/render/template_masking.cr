@@ -258,6 +258,9 @@ module Hwaro::Core::Build::Phases::Render
     end
 
     names << "caller" if template.includes?("caller")
+    # `{% for … recursive %}` binds `loop` as a callable: `{{ loop(item.children) }}`
+    # is the recursion, not a shortcode.
+    names << "loop" if template.includes?("recursive")
     names
   end
 
