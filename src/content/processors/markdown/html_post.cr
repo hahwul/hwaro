@@ -71,12 +71,29 @@ module Hwaro
           # `"<h2>…</h2>"` JS string must not get an `id="…"` (which ends the
           # string) or a TOC entry. Unterminated ones are left alone, as above.
           spans.concat(MarkdownExtensions.raw_text_spans(html))
+
+          # Sorted and merged (the two passes overlap and interleave) so
+          # `in_comment?` can binary-search: a linear scan per heading was
+          # quadratic on a page with thousands of headings and scripts.
+          spans.sort_by!(&.begin)
+          merged = [] of Range(Int32, Int32)
+          spans.each do |span|
+            last = merged.last?
+            if last && span.begin <= last.end
+              merged[-1] = last.begin...span.end if span.end > last.end
+            else
+              merged << span
+            end
+          end
+          merged
         end
 
         # True when a match starting at `offset` (a BYTE offset, as reported by
-        # `Regex::MatchData#byte_begin`) opens inside one of `spans`.
+        # `Regex::MatchData#byte_begin`) opens inside one of `spans` (sorted,
+        # disjoint — see `html_comment_spans`).
         private def in_comment?(spans : Array(Range(Int32, Int32)), offset : Int32) : Bool
-          spans.any?(&.includes?(offset))
+          span = spans.bsearch { |candidate| candidate.end > offset }
+          !span.nil? && span.begin <= offset
         end
 
         # Insert anchor links into headings

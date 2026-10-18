@@ -44,6 +44,26 @@ describe Hwaro::Content::Processors::Markdown do
     end
   end
 
+  describe "comment spans" do
+    it "are looked up in log time per heading" do
+      # Every heading scanned every comment/raw-text span: quadratic.
+      content = "## H\n\n<!-- c -->\n\n" * 30_000
+      t = Time.instant
+      html, toc = Hwaro::Content::Processors::Markdown.new.render_with_anchors(content, anchor_style: "after")
+      (Time.instant - t).should be < 5.seconds
+      toc.size.should eq(30_000)
+      html.scan(%(<a class="anchor")).size.should eq(30_000)
+    end
+
+    it "still skip headings in overlapping comment and script spans" do
+      content = "<!-- a -->\n\n## A\n\n<script>\n// <!-- x -->\n\"<h2>B</h2>\"\n</script>\n\n<!--\n<h2>C</h2>\n-->\n\n## D\n"
+      html, toc = Hwaro::Content::Processors::Markdown.new.render_with_anchors(content, anchor_style: "after")
+      toc.map(&.id).should eq(["a", "d"])
+      html.should contain(%("<h2>B</h2>"))
+      html.should contain("<h2>C</h2>")
+    end
+  end
+
   describe "lazy loading and external links" do
     it "leave <img>/<a> strings inside a script alone" do
       md_config = Hwaro::Models::MarkdownConfig.new
