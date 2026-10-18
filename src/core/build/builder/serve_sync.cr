@@ -229,17 +229,24 @@ module Hwaro
         # every page printing the data kept the pre-edit values. A path built
         # at render time (`load_data(path=page.extra.file)`) is not seen.
         def load_data_source_changed?(paths : Array(String)) : Bool
-          templates = @templates
-          return false if templates.nil? || paths.empty?
-          changed = paths.map { |path| Path[path].normalize.to_s }.to_set
-          templates.each_value do |source|
+          return false if paths.empty?
+          sources = load_data_sources
+          paths.any? { |path| sources.includes?(Path[path].normalize.to_s) }
+        end
+
+        # Every literal `load_data()` path in the templates, normalized. The
+        # watcher stamps the ones outside its roots (`extra/menu.json`) like
+        # include sources, or editing one never rebuilt anything.
+        def load_data_sources : Set(String)
+          sources = Set(String).new
+          @templates.try &.each_value do |source|
             next unless source.includes?("load_data")
             source.scan(LOAD_DATA_LITERAL_RE) do |match|
               literal = match[1]? || match[2]? || ""
-              return true if changed.includes?(Path[literal].normalize.to_s)
+              sources << Path[literal].normalize.to_s unless literal.empty?
             end
           end
-          false
+          sources
         end
 
         # Project-relative paths every include call and transclusion has read

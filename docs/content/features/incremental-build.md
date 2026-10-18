@@ -136,7 +136,8 @@ excerpts) still re-renders just the edited page.
 
 Serve also watches an `[assets] source_dir` that lives outside `static/`, so
 bundle sources kept in their own directory rebuild on save like any other
-asset.
+asset. A file a template reads through a literal `load_data()` path is watched
+wherever it lives, and saving one runs a full rebuild.
 
 ### Removed pages
 
