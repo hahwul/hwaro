@@ -276,7 +276,7 @@ module Hwaro::Core::Build::Phases::Render
       toc_headers = [] of Models::TocHeader
     end
 
-    template_name = determine_template(page, templates, site)
+    template_name = determine_template(page, templates, site, warn: true)
     template_content = templates[template_name]? || templates["page"]?
     Logger.debug "Rendering #{page.path} (section=#{page.section.empty? ? "<root>" : page.section}, index=#{page.is_index}) using template '#{template_name}'" if verbose
 
@@ -368,13 +368,17 @@ module Hwaro::Core::Build::Phases::Render
         (template_name != "page" && !page.home? && (page.pagination_enabled == true || (page.paginate || 0) > 0)))
   end
 
-  private def determine_template(page : Models::Page, templates : Hash(String, String), site : Models::Site) : String
+  # Only `render_page` passes `warn: true`. Every other caller is a lookup
+  # (worker sizing, incremental selection, cache fingerprints) and several
+  # run before the render, which clears `build_warnings` first, so a warning
+  # logged there would be printed a second time by the render itself.
+  private def determine_template(page : Models::Page, templates : Hash(String, String), site : Models::Site, warn : Bool = false) : String
     if custom = page.template
       return custom if templates.has_key?(custom)
       msg = "Custom template '#{custom}' not found for #{page.path}. Falling back to default."
       # determine_template runs again after render for profiler bookkeeping;
       # only log/record the first time so the warning isn't printed twice.
-      unless page.build_warnings.includes?(msg)
+      if warn && !page.build_warnings.includes?(msg)
         Logger.warn "#{msg}"
         page.build_warnings << msg
       end

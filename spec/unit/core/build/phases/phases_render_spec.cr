@@ -1,5 +1,6 @@
 require "../../../../spec_helper"
 require "../../../../../src/core/build/builder"
+require "../../../../support/build_helper"
 
 # Reopen Builder to expose private Render helpers for testing.
 module Hwaro::Core::Build
@@ -10,7 +11,7 @@ module Hwaro::Core::Build
 
     def test_determine_template(page : Models::Page, templates : Hash(String, String),
                                 site : Models::Site = Models::Site.new(Models::Config.new))
-      determine_template(page, templates, site)
+      determine_template(page, templates, site, warn: true)
     end
 
     def test_filter_changed_pages(pages, output_dir, cache,
@@ -285,6 +286,21 @@ describe Hwaro::Core::Build::Phases::Render do
       templates = {"page" => "p"}
       builder.test_determine_template(page, templates).should eq("page")
       page.build_warnings.any?(&.includes?("missing")).should be_true
+    end
+
+    it "prints the missing-template warning once per build" do
+      log = with_captured_log do
+        build_site(
+          BASIC_CONFIG,
+          content_files: {
+            "landing.md" => "+++\ntitle = \"Landing\"\ntemplate = \"landing\"\n+++\nx\n",
+            "other.md"   => "+++\ntitle = \"Other\"\n+++\ny\n",
+          },
+          template_files: {"page.html" => "{{ content }}"},
+          parallel: true,
+        ) { }
+      end
+      log.scan("Custom template 'landing' not found").size.should eq(1)
     end
 
     it "inherits the parent section's page_template for child pages" do
