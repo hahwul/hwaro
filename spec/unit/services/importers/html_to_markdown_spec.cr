@@ -119,6 +119,17 @@ describe Hwaro::Services::Importers::HtmlToMarkdown do
       Hwaro::Services::Importers::HtmlToMarkdown.convert(html).should eq("3. Third\n4. Fourth")
     end
 
+    it "escapes prose that Markdown would read as markup" do
+      convert = ->(html : String) { Hwaro::Services::Importers::HtmlToMarkdown.convert(html) }
+      convert.call("<p>2*3*4 and _x_ and snake_case and `tick` and C:\\</p>")
+        .should eq("2\\*3\\*4 and \\_x\\_ and snake_case and \\`tick\\` and C:\\\\")
+      convert.call("<p>- dash</p><p>2024. year</p><p># hash</p><p>&gt; gt</p>")
+        .should eq("\\- dash\n\n2024\\. year\n\n\\# hash\n\n\\> gt")
+      # Generated markup and code are left alone.
+      convert.call("<p><em>a*b</em> <code>x*y_</code></p><pre>p*q</pre>")
+        .should eq("*a\\*b* `x*y_`\n\n```\np*q\n```")
+    end
+
     it "converts code blocks" do
       html = "<pre><code>puts 1</code></pre>"
       result = Hwaro::Services::Importers::HtmlToMarkdown.convert(html)

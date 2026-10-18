@@ -109,6 +109,10 @@ module Hwaro
           result = result.gsub(/<script\b[^>]*>.*?<\/script\s*>/mi, "")
           result = result.gsub(/<style\b[^>]*>.*?<\/style\s*>/mi, "")
 
+          # Prose is escaped while tags still delimit it, so the Markdown the
+          # passes below generate is never touched.
+          result = escape_prose(result)
+
           # Convert block elements first (order matters).
           #
           # Lazy-body policy: a pass whose tail is a single closing literal
@@ -291,7 +295,7 @@ module Hwaro
           result = result.gsub(/<hr\b[^>]*>/i, "\n---\n\n")
 
           # Paragraphs
-          result = result.gsub(/<p[^>]*>(.*?)<\/p>/mi) { "#{$1.strip}\n\n" }
+          result = result.gsub(/<p[^>]*>(.*?)<\/p>/mi) { "#{escape_block_start($1.strip)}\n\n" }
 
           # Line breaks
           result = result.gsub(/<br\b[^>]*>/i, "  \n")
@@ -403,6 +407,75 @@ module Hwaro
             %( #{name}="#{value}") if value && value.matches?(/\A\d+%?\z/)
           end.join
           %(<#{tag} src="#{HTML.escape(src)}"#{dims}#{extra}></#{tag}>)
+        end
+
+        # Backslash-escape the characters Markdown reads as inline markup in
+        # the prose of `html`: text outside tags and outside `<pre>`/`<code>`
+        # elements (which become code, where a backslash is literal). A post
+        # saying `2*3*4 = 24` imported as `2<em>3</em>4`. `_` is escaped only
+        # where it could delimit emphasis, so `snake_case` stays readable.
+        #
+        # A byte scan rather than a regex: every search starts where the last
+        # ended, and a closer once found missing is never searched for again,
+        # so unclosed-tag spam stays linear.
+        private def self.escape_prose(html : String) : String
+          lower = html.downcase(Unicode::CaseOptions::ASCII)
+          missing = Set(String).new
+          String.build(html.bytesize) do |io|
+            pos = 0
+            while pos < html.bytesize
+              lt = lower.byte_index('<'.ord.to_u8, pos)
+              gt = lt.try { |i| lower.byte_index('>'.ord.to_u8, i) }
+              unless lt && gt
+                escape_prose_text(html.byte_slice(pos), io)
+                break
+              end
+              escape_prose_text(html.byte_slice(pos, lt - pos), io)
+              stop = gt + 1
+              name = {"pre", "code"}.find do |tag|
+                lower.byte_slice(lt + 1, tag.bytesize) == tag &&
+                  !lower.byte_at?(lt + 1 + tag.bytesize).try(&.unsafe_chr.ascii_alphanumeric?)
+              end
+              if name && !missing.includes?(name)
+                close = lower.byte_index("</#{name}", stop).try { |i| lower.byte_index('>'.ord.to_u8, i) }
+                close ? (stop = close + 1) : missing << name
+              end
+              io << html.byte_slice(lt, stop - lt)
+              pos = stop
+            end
+          end
+        end
+
+        private def self.escape_prose_text(text : String, io : IO) : Nil
+          prev = ' '
+          reader = Char::Reader.new(text)
+          while reader.has_next?
+            char = reader.current_char
+            nxt = reader.peek_next_char
+            case char
+            when '*', '`'
+              io << '\\'
+            when '\\'
+              # Before punctuation it would escape it, and at the end of the
+              # text it would escape the markup generated next.
+              io << '\\' if nxt == '\0' || (nxt.ord.in?(33..126) && !nxt.ascii_alphanumeric?)
+            when '_'
+              io << '\\' unless prev.alphanumeric? && nxt.alphanumeric?
+            end
+            io << char
+            prev = char
+            reader.next_char
+          end
+        end
+
+        # A paragraph opening with what Markdown reads as a block marker
+        # (`- `, `+ `, `# `, `> `, `2024. `) is escaped so it stays a
+        # paragraph instead of turning into a list, heading or quote.
+        private def self.escape_block_start(text : String) : String
+          text
+            .sub(/\A([-+>]|\#{1,6})(?=[ \t]|\z)/) { "\\#{$1}" }
+            .sub(/\A&gt;(?=[ \t]|\z)/) { "\\>" }
+            .sub(/\A(\d{1,9})([.)])(?=[ \t]|\z)/) { "#{$1}\\#{$2}" }
         end
 
         # The fence info string for a code block: the `language-ruby` /
