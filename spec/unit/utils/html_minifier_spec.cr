@@ -19,7 +19,14 @@ describe Hwaro::Utils::HtmlMinifier do
 
     it "keeps the content of a downlevel-revealed conditional comment" do
       html = "<!--[if gt IE 8]><!--> <html class=\"no-js\"> <!--<![endif]-->\n<p>x</p>"
-      Hwaro::Utils::HtmlMinifier.minify(html).should eq("<!--[if gt IE 8]><!--> <html class=\"no-js\"><p>x</p>")
+      Hwaro::Utils::HtmlMinifier.minify(html).should eq("<!--[if gt IE 8]><!--> <html class=\"no-js\"> <!--<![endif]-->\n<p>x</p>")
+    end
+
+    it "keeps the closer of a downlevel-revealed conditional comment" do
+      # Dropping `<!--<![endif]-->` leaves the `[if !IE]` block open to IE,
+      # which then hides the rest of the page.
+      html = "<!--[if !IE]><!-->\n<link rel=\"stylesheet\" href=\"a.css\">\n<!--<![endif]-->\n<p>x</p>"
+      Hwaro::Utils::HtmlMinifier.minify(html).should contain("<!--<![endif]-->")
     end
 
     it "treats <!--> as a complete empty comment" do

@@ -379,6 +379,8 @@ module Hwaro
         first = bytes[from]
         return true if first == '#'.ord
         return true if first == '['.ord && size >= 3 && bytes[from + 1] == 'i'.ord && bytes[from + 2] == 'f'.ord
+        # The `<!--<![endif]-->` closing a downlevel-revealed `<!--[if …]><!-->`.
+        return true if size >= 7 && bytes[body_end - 7, 7] == "[endif]".to_slice
         # `more` plus any whitespace; skip the regex for anything shorter.
         return false if size < 4
         REGEX_MORE_MARKER.matches?(String.new(bytes[from, size]).scrub)
