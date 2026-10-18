@@ -96,3 +96,10 @@ Crinja.filter({length: 255, killwords: false, end: "...", leeway: nil}, :truncat
     trimmed + append
   end
 end
+
+# `format` hands numbers to `sprintf` unwrapped. Upstream passed the
+# `Crinja::Value`s themselves, so every float conversion (`"%.2f" |
+# format(price)`) raised `Expected a float` and failed the page.
+Crinja.filter(:format) do
+  sprintf target.to_s, arguments.varargs.map { |arg| arg.number? ? arg.as_number : arg }
+end

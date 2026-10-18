@@ -61,4 +61,11 @@ describe "Crinja built-in filter fixes" do
       render_filter("{{ 'hello world foo bar' | truncate(12, true, leeway=0) }}").should eq("hello wor...")
     end
   end
+
+  describe "format" do
+    it "formats numbers with float conversions" do
+      render_filter("{{ '%.2f' | format(3.14159) }}|{{ '%.1f' | format(4) }}|{{ '%5.1f%%' | format(12.345) }}|{{ '%03d' | format(7) }}|{{ '%s-%s' | format('a', 2) }}")
+        .should eq("3.14|4.0| 12.3%|007|a-2")
+    end
+  end
 end
