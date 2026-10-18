@@ -157,12 +157,16 @@ describe "jsonld breadcrumb coverage" do
         "v1/_index.md" => "+++\ntitle = \"Old\"\n+++\n",
       },
       template_files: {
-        "page.html"    => "{{ jsonld_breadcrumb }}",
-        "section.html" => "{{ jsonld_breadcrumb }}",
+        "page.html"    => "{{ jsonld }}",
+        "section.html" => "{{ jsonld }}",
       },
     ) do
-      File.read("public/index.html").should eq("")
-      File.read("public/v1/index.html").should contain(%("name":"Old"))
+      # The root is the site's home page: WebSite, no CollectionPage or trail.
+      root = File.read("public/index.html")
+      root.should contain(%("@type":"WebSite"))
+      root.should_not contain("CollectionPage")
+      root.should_not contain("BreadcrumbList")
+      File.read("public/v1/index.html").should contain("BreadcrumbList")
     end
   end
 end
