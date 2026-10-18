@@ -44,4 +44,21 @@ describe "Crinja built-in filter fixes" do
         .should eq("0|0|4|4")
     end
   end
+
+  describe "truncate" do
+    it "keeps the text when the cut has no space" do
+      render_filter("{{ 'abcdefghijklmnop' | truncate(10) }}").should eq("abcdefg...")
+      render_filter("{{ '안녕하세요반갑습니다여러분안녕하세요반갑습니다' | truncate(10) }}").should eq("안녕하세요반갑...")
+      render_filter("{{ 'abcdefghij' | truncate(5, leeway=0) }}").should eq("ab...")
+    end
+
+    it "returns a string within length + leeway whole" do
+      render_filter("{{ 'Hello' | truncate(3) }}").should eq("Hello")
+    end
+
+    it "still cuts at the last space" do
+      render_filter("{{ 'hello world foo bar' | truncate(12, leeway=0) }}").should eq("hello...")
+      render_filter("{{ 'hello world foo bar' | truncate(12, true, leeway=0) }}").should eq("hello wor...")
+    end
+  end
 end

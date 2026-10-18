@@ -71,3 +71,28 @@ end
 Crinja.filter(:wordcount) do
   target.to_s.scan(/[\p{L}\p{N}_]+/).size
 end
+
+# `truncate` as in Jinja2: a string within `length + leeway` is returned
+# whole, and without `killwords` the cut falls back to the last space only
+# when there is one. Upstream returned a bare `...` for any cut text with no
+# space (a long word, a URL, CJK prose) and for any `length` up to the
+# leeway (`"Hello" | truncate(3)`), dropping the text entirely.
+Crinja.filter({length: 255, killwords: false, end: "...", leeway: nil}, :truncate) do
+  length = arguments["length"].to_i
+  append = arguments["end"].to_s
+  raise "expected length >= #{append.size}, got #{length}" if length < append.size
+  leeway = arguments.fetch("leeway") { env.policies.fetch("truncate.leeway", 5) }.to_i
+  raise "expected leeway >= 0, got #{leeway}" if leeway < 0
+
+  s = target.to_s
+  if s.size - leeway <= length
+    s
+  else
+    trimmed = s[0, length - append.size]
+    unless arguments["killwords"].truthy?
+      cut = trimmed.rindex(' ')
+      trimmed = trimmed[0, cut] if cut
+    end
+    trimmed + append
+  end
+end
