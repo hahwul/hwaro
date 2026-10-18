@@ -48,6 +48,8 @@ class Crinja::Tag::Call < Crinja::Tag
       end
 
       call = parse_expression
+      # Any call, but a call: a forgotten `()` must not drop the body silently.
+      raise TemplateSyntaxError.new(call, "expected call") unless call.is_a?(AST::CallExpression)
       close
 
       {defaults, call}

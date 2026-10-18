@@ -32,4 +32,14 @@ describe "Crinja `caller` in a {% call %} block" do
     env.from_string(%({% import "forms.html" as forms %}{% call forms.box("T") %}body{% endcall %})).render
       .should eq("<div>T:body</div>")
   end
+
+  # Jinja2: "expected call". Without the check `{% call m %}` (parentheses
+  # forgotten) dropped the body silently and `{% call v %}` printed `v`.
+  it "rejects a call block whose expression is not a call" do
+    ["{% macro m() %}{{ caller() }}{% endmacro %}{% call m %}body{% endcall %}",
+     "{% set v = 1 %}{% call v %}body{% endcall %}",
+     "{% macro m() %}{{ caller() }}{% endmacro %}{% call m() | upper %}body{% endcall %}"].each do |source|
+      expect_raises(Crinja::TemplateSyntaxError, /expected call/) { render_call(source) }
+    end
+  end
 end
