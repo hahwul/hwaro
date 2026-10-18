@@ -380,6 +380,17 @@ describe Hwaro::Utils::TextUtils do
       (Time.instant - t).should be < 10.seconds # quadratic took 16s+; slack for a loaded suite
     end
 
+    it "stays linear on many closed aria-hidden elements" do
+      # Footnote back-references and heading anchors: one closed element per
+      # note. PCRE2 re-validated the whole subject's UTF-8 on every match.
+      html = %(<p>café<sup aria-hidden="true">x</sup></p>) * 40_000
+      t = Time.instant
+      text = Hwaro::Utils::TextUtils.strip_html(html)
+      (Time.instant - t).should be < 5.seconds # quadratic took 20s+
+      text.scan("café").size.should eq(40_000)
+      text.should_not contain("x")
+    end
+
     it "strips simple tags" do
       Hwaro::Utils::TextUtils.strip_html("<p>Hello</p>").should eq("Hello")
     end
