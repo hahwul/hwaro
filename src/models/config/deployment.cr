@@ -59,7 +59,7 @@ module Hwaro
       end
 
       private def self.load_deployment_targets(config : Config, s : Hash(String, TOML::Any))
-        return unless targets_any = s["targets"]?.try(&.as_a?)
+        return unless targets_any = table_array?(s["targets"]?, "deployment.targets")
 
         config.deployment.targets = targets_any.each_with_index.to_a.compact_map do |(target_any, idx)|
           next unless target_h = target_any.as_h?
@@ -113,7 +113,7 @@ module Hwaro
       end
 
       private def self.load_deployment_matchers(config : Config, s : Hash(String, TOML::Any))
-        return unless matchers_any = s["matchers"]?.try(&.as_a?)
+        return unless matchers_any = table_array?(s["matchers"]?, "deployment.matchers")
 
         config.deployment.matchers = matchers_any.compact_map do |matcher_any|
           next unless matcher_h = matcher_any.as_h?

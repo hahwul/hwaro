@@ -132,7 +132,7 @@ module Hwaro
         config.robots.filename = s["filename"]?.try(&.as_s?) || config.robots.filename
         validate_output_filename!("robots", "filename", config.robots.filename, "robots.txt", allow_empty: false)
 
-        if rules = s["rules"]?.try(&.as_a?)
+        if rules = table_array?(s["rules"]?, "robots.rules")
           config.robots.rules = rules.compact_map do |rule_any|
             if rule_h = rule_any.as_h?
               user_agent = rule_h["user_agent"]?.try(&.as_s?) || "*"

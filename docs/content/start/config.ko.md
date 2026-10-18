@@ -22,6 +22,8 @@ Unknown key 'markdonw' in config.toml — hwaro does not read it. Did you mean '
 `[[taxonomies]]` 항목 대신 `taxonomies = ["tags"]`를 쓰는 것처럼 알려진
 섹션의 형태가 틀린 경우에도 경고와 함께 무시합니다. 예외적으로
 `sitemap = true`는 `[sitemap] enabled = true`와 같은 뜻으로 계속 받아들입니다.
+섹션 안의 테이블 목록을 `[[robots.rules]]`나 `[[menus.main]]` 대신
+`[robots.rules]`, `[menus.main]`처럼 대괄호 하나로 쓴 경우도 경고와 함께 무시합니다.
 
 ## 사이트 설정
 

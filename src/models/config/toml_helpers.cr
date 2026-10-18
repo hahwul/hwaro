@@ -272,6 +272,20 @@ module Hwaro
         nil
       end
 
+      # An array-of-tables option (`[[robots.rules]]`, `[[menus.main]]`, …),
+      # or nil when absent. Any other shape — usually a single `[robots.rules]`
+      # table, the one-bracket slip — is ignored with a warning: it used to
+      # vanish in silence, so a robots rule meant to block crawlers published
+      # `Allow: /` and a menu rendered empty.
+      private def self.table_array?(raw : TOML::Any?, key : String) : Array(TOML::Any)?
+        return unless raw
+        if array = raw.as_a?
+          return array
+        end
+        Logger.warn "Ignoring #{key}: it must be an array of tables — write each entry as [[#{key}]]."
+        nil
+      end
+
       # Extracts a string-or-array TOML value into an Array(String). Unlike
       # `string_list?`, a blank string stays [""] and any other value is []:
       # the options read here (`[robots]` allow/disallow, where an empty

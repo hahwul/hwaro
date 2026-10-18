@@ -23,7 +23,9 @@ keys against the tables below. A known section written in the wrong
 shape, such as `highlight = false` instead of a `[highlight]` table or
 `taxonomies = ["tags"]` instead of `[[taxonomies]]` entries, is ignored with a
 warning as well. `sitemap = true` is the one short form still accepted: it
-means `[sitemap] enabled = true`.
+means `[sitemap] enabled = true`. A list of tables inside a section written with
+single brackets, such as `[robots.rules]` or `[menus.main]` instead of
+`[[robots.rules]]` or `[[menus.main]]`, is ignored with a warning too.
 
 ## Site Settings
 

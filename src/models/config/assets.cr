@@ -250,7 +250,7 @@ module Hwaro
         config.assets.source_dir = s["source_dir"]?.try(&.as_s?) || config.assets.source_dir
         config.assets.output_dir = s["output_dir"]?.try(&.as_s?) || config.assets.output_dir
 
-        if bundles = s["bundles"]?.try(&.as_a?)
+        if bundles = table_array?(s["bundles"]?, "assets.bundles")
           bundles.each do |bundle_any|
             next unless b = bundle_any.as_h?
             name = b["name"]?.try(&.as_s?) || ""
