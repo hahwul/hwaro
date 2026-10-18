@@ -56,7 +56,7 @@ module Hwaro
         # compile-size limit. A tag-spam body can still overflow the JIT
         # stack, which raises Regex::Error — `convert` catches that and
         # falls back to the linear tag strip.
-        INNERMOST_LIST_RE = /<(ul|ol)[^>]*>((?:[^<]++|<(?![uo]l[^>]*>))*?)<\/\1>/mi
+        INNERMOST_LIST_RE = /<(ul|ol)([^>]*)>((?:[^<]++|<(?![uo]l[^>]*>))*?)<\/\1>/mi
 
         # Maximum innermost-list conversion passes (one per nesting level).
         # Real content nests a handful of levels; a crafted thousand-deep
@@ -223,10 +223,14 @@ module Hwaro
           passes = 0
           while (passes += 1) <= MAX_LIST_PASSES && result.matches?(innermost_list)
             result = result.gsub(innermost_list) do
-              kind = $1.downcase
-              items = $2.scan(/<li[^>]*>(.*?)<\/li>/mi)
+              kind, list_attrs, list_body = $1.downcase, $2, $3
+              # `<ol start="3">` continues an earlier list; numbering it from
+              # 1 changed what the reader sees. CommonMark takes the first
+              # item's number as the start (at most 9 digits, never negative).
+              start = attr_value(list_attrs, "start").try(&.strip.to_i?).try(&.clamp(0, 999_999_999)) || 1
+              items = list_body.scan(/<li[^>]*>(.*?)<\/li>/mi)
               lines = items.map_with_index do |m, i|
-                marker = kind == "ol" ? "#{i + 1}. " : "- "
+                marker = kind == "ol" ? "#{start + i}. " : "- "
                 # Inline markup first: a bare `strip_tags` here ran before
                 # the document-wide inline passes, so every link, image and
                 # emphasis inside a list item was flattened to plain text.

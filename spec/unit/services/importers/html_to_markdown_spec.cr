@@ -114,6 +114,11 @@ describe Hwaro::Services::Importers::HtmlToMarkdown do
       result.should contain("2. Second")
     end
 
+    it "keeps an ordered list's start number" do
+      html = %(<ol start="3"><li>Third</li><li>Fourth</li></ol>)
+      Hwaro::Services::Importers::HtmlToMarkdown.convert(html).should eq("3. Third\n4. Fourth")
+    end
+
     it "converts code blocks" do
       html = "<pre><code>puts 1</code></pre>"
       result = Hwaro::Services::Importers::HtmlToMarkdown.convert(html)
