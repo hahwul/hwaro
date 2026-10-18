@@ -23,4 +23,13 @@ describe "Crinja `caller` in a {% call %} block" do
     render_call(%({% set v = "V" %}{% macro m() %}{{ caller(5) }}{% endmacro %}{% call(x) m() %}{{ v }}{{ x }}{% endcall %}))
       .should eq("V5")
   end
+
+  it "calls a macro imported under a namespace" do
+    env = Crinja.new
+    env.loader = Crinja::Loader::HashLoader.new({
+      "forms.html" => %({% macro box(t) %}<div>{{ t }}:{{ caller() }}</div>{% endmacro %}),
+    })
+    env.from_string(%({% import "forms.html" as forms %}{% call forms.box("T") %}body{% endcall %})).render
+      .should eq("<div>T:body</div>")
+  end
 end
