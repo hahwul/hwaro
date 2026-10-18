@@ -500,8 +500,9 @@ module Hwaro
           kept.each { |path| keep_output(path, cwd, exact, folded) }
 
           stale = [] of String
+          respell = Set(String).new
           candidates.to_a.uniq.each do |path|
-            next if kept_output?(path, cwd, exact, folded) || written_this_build?(path)
+            next if kept_output?(path, cwd, exact, folded, respell) || written_this_build?(path)
             relative = output_relative(path, output_dir, cwd)
             if relative && (source = static_source_for(relative))
               # The stale file was sitting on top of a static copy — a cold
@@ -517,6 +518,11 @@ module Hwaro
             end
           end
           delete_orphaned_outputs(stale, output_dir) unless stale.empty?
+          # A kept file still spelled the old way (`posts/Foo/` for a page now
+          # at `/posts/foo/`) sits in a directory the write landed in: rename
+          # it to the URL's case, as a cold build would spell it. The dev
+          # server 404s case-mismatched paths, so the new URL answered 404.
+          respell_folded_output_dirs(respell, output_dir) unless respell.empty?
         end
 
         # Add `path` to the keep-set of `prune_unclaimed_outputs`: exact
@@ -533,16 +539,19 @@ module Hwaro
         # filesystem kinds right: on a folding one `posts/Foo/` and
         # `posts/foo/` are one file, so deleting the old spelling would remove
         # the new page; on a case-sensitive one they are two files, and the
-        # old spelling is stale.
-        private def kept_output?(path : String, cwd : String, exact : Set(String), folded : Hash(String, Array(String))) : Bool
+        # old spelling is stale. A case-folded keep adds the kept spelling to
+        # `respell`.
+        private def kept_output?(path : String, cwd : String, exact : Set(String), folded : Hash(String, Array(String)), respell : Set(String)) : Bool
           expanded = expand_output_path(path, cwd)
           return true if exact.includes?(expanded)
           return false unless kept = folded[expanded.downcase]?
-          kept.any? do |other|
+          same = kept.find do |other|
             File.same?(expanded, other)
           rescue File::Error
             false
           end
+          respell << same if same
+          !same.nil?
         end
 
         private def expand_output_path(path : String, cwd : String) : String

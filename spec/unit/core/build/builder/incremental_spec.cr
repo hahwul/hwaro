@@ -490,3 +490,34 @@ describe "Builder#run_incremental related posts" do
     end
   end
 end
+
+# On a case-folding filesystem a serve pass that moves a page to a URL
+# differing only by case wrote into the existing `Foo/` directory, so the dev
+# server (which 404s case-mismatched paths) answered 404 for the new URL.
+describe "Builder#run_incremental case-only URL change" do
+  it "respells the output directory to the new URL's case" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("probe/Case")
+        pending!("needs a case-insensitive filesystem") unless Hwaro::Utils::PathUtils.case_folding_fs?(File.join(dir, "probe"))
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content/posts")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}")
+        File.write("content/posts/a.md", "+++\ntitle = \"A\"\npath = \"posts/Foo\"\n+++\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/posts/a.md"], options)
+        Dir.children("public/posts").should eq(["Foo"])
+
+        File.write("content/posts/a.md", "+++\ntitle = \"A\"\npath = \"posts/foo\"\n+++\n")
+        builder.run_incremental(["content/posts/a.md"], options)
+        Dir.children("public/posts").should eq(["foo"])
+        File.read("public/posts/foo/index.html").should eq("A")
+      end
+    end
+  end
+end
