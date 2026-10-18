@@ -994,10 +994,10 @@ module Hwaro
       EXCERPT_SKIP_VOID    = /<img(?:\s#{HTML_TAG_ATTRS})?\/?>/i
       # Markup the Markdown extensions emit whose text is not prose either:
       # display math (TeX source until KaTeX/MathJax runs in the browser),
-      # footnote reference markers (`[1]`) and the trailing footnotes
-      # section. Inline math (`math-inline`) is part of the sentence and
-      # keeps its `\(x\)` source.
-      EXCERPT_SKIP_CLASSED = /<(span|div|sup|section)\s+class="(?:math(?! math-inline)|footnote-ref|footnotes)[^"]*"[^>]*>/i
+      # mermaid diagrams (a code fence, like `<pre>`), footnote reference
+      # markers (`[1]`) and the trailing footnotes section. Inline math
+      # (`math-inline`) is part of the sentence and keeps its `\(x\)` source.
+      EXCERPT_SKIP_CLASSED = /<(span|div|sup|section)\s+class="(?:math(?! math-inline)|mermaid|footnote-ref|footnotes)[^"]*"[^>]*>/i
 
       # Plain prose of a rendered HTML body, for the automatic summary:
       # code-block/figure/heading/display-math/footnote blocks dropped, tags stripped,
