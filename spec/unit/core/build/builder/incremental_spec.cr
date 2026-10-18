@@ -431,3 +431,32 @@ describe "Builder#run_incremental get_taxonomy and collision losers" do
     end
   end
 end
+
+# `--stream` empties every page's source after the cold build. Serve keeps
+# that page set for its incremental rebuilds, which re-render neighbours the
+# edit did not re-parse — they came out with an empty body.
+describe "Builder#run_incremental under --stream" do
+  it "keeps the bodies of re-rendered neighbours" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content/posts")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}|{% if page.lower %}{{ page.lower.title }}{% endif %}")
+        File.write("content/posts/a.md", "+++\ntitle = \"A\"\ndate = 2024-01-01\n+++\nbody a\n")
+        File.write("content/posts/b.md", "+++\ntitle = \"B\"\ndate = 2024-01-02\n+++\nbody b\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, stream: true)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/posts/b.md"], options)
+
+        # b's title moves a's `page.lower`, so a re-renders without a re-parse.
+        File.write("content/posts/b.md", "+++\ntitle = \"B2\"\ndate = 2024-01-02\n+++\nbody b\n")
+        builder.run_incremental(["content/posts/b.md"], options)
+        File.read("public/posts/a/index.html").should eq("<p>body a</p>\n|B2")
+      end
+    end
+  end
+end

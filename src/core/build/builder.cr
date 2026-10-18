@@ -1048,7 +1048,10 @@ module Hwaro
           result = execute_generate_phase(ctx, profiler)
           return result if result != Lifecycle::HookResult::Continue
 
-          if ctx.options.streaming?
+          # Not under serve: its incremental rebuilds re-render pages the
+          # edit didn't touch from this same page set, and an emptied source
+          # renders as an empty body with no backlinks.
+          if ctx.options.streaming? && !ctx.options.serve_mode
             ctx.all_pages.each(&.raw_content=(""))
             GC.collect
           end
