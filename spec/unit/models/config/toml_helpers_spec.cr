@@ -72,3 +72,26 @@ describe "Hwaro::Models::Config array-of-tables options" do
     log.should_not contain("array of tables")
   end
 end
+
+describe "Hwaro::Models::Config optional numbers" do
+  it "warns when an optional number holds a non-numeric value" do
+    config = nil
+    log = with_captured_log do
+      config = load_config(%(title = "X"\n[deployment]\nmax_deletes = "10"\n[[taxonomies]]\nname = "tags"\npaginate_by = "5"\n))
+    end
+    config.not_nil!.deployment.max_deletes.should eq(256)
+    config.not_nil!.taxonomies.first.paginate_by.should be_nil
+    log.should contain(%(Ignoring non-numeric config value "10"))
+    log.should contain(%(Ignoring non-numeric config value "5"))
+  end
+
+  it "reads numbers without a warning" do
+    config = nil
+    log = with_captured_log do
+      config = load_config(%(title = "X"\n[deployment]\nmax_deletes = 10\n[[taxonomies]]\nname = "tags"\npaginate_by = 5\n))
+    end
+    config.not_nil!.deployment.max_deletes.should eq(10)
+    config.not_nil!.taxonomies.first.paginate_by.should eq(5)
+    log.should_not contain("non-numeric")
+  end
+end

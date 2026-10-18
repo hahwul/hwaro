@@ -241,12 +241,19 @@ module Hwaro
         val
       end
 
-      # Non-raising Int32 extraction from a single TOML value (nil if absent or
+      # Non-raising Int32 extraction from a single present TOML value (nil if
       # non-numeric). Clamps to Int32 range like int_value so an oversized value
       # never raises OverflowError out of as_i?/to_i at the inline call sites.
+      # A non-numeric value warns like int_value: a quoted
+      # `[deployment] max_deletes = "10"` used to leave the 256-file default
+      # in force without a word.
       private def self.int_or_nil(raw : TOML::Any) : Int32?
         val = raw.as_i64? || raw.as_f?.try { |f| f.finite? ? f.clamp(Int32::MIN.to_f64, Int32::MAX.to_f64).to_i64 : nil }
-        val.try(&.clamp(Int32::MIN.to_i64, Int32::MAX.to_i64).to_i32)
+        unless val
+          Logger.warn "Ignoring non-numeric config value #{raw.raw.inspect}"
+          return
+        end
+        val.clamp(Int32::MIN.to_i64, Int32::MAX.to_i64).to_i32
       end
 
       # Reads a string-list option. An array keeps its string entries as
