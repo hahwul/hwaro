@@ -133,6 +133,22 @@ describe "warm --cache: pages rendering other pages" do
     end
   end
 
+  it "tracks the page get_page returns when a folded path and an exact URL fallback disagree" do
+    with_relations_site do
+      # get_page tries the folded path before the `/…/` URL fallback, so it
+      # returns the decomposed file, not the page whose URL is /posts/café/.
+      File.write("content/posts/café.md", "+++\ntitle = \"Decomposed one\"\nslug = \"xx\"\ntemplate = \"plain\"\n+++\nx")
+      File.write("content/y.md", "+++\ntitle = \"Exact URL\"\npath = \"posts/café\"\ntemplate = \"plain\"\n+++\ny")
+      File.write("templates/nfcalt.html", %(NFC={{ get_page(path="posts/café.md").title }}))
+      File.write("content/nfcalt.md", "+++\ntitle = \"N\"\ntemplate = \"nfcalt\"\n+++\n")
+      relations_cached_build
+      File.read("public/nfcalt/index.html").should contain("NFC=Decomposed one")
+      retitle("content/posts/café.md", "Decomposed one", "Decomposed two")
+      relations_cached_build
+      File.read("public/nfcalt/index.html").should contain("NFC=Decomposed two")
+    end
+  end
+
   it "treats a get_page call with a computed path as a page-set read" do
     with_relations_site do
       File.write("templates/dyn.html", %(DYN={{ get_page(path=page.extra.ref).title }}))

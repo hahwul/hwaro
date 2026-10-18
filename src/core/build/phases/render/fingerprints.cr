@@ -932,21 +932,17 @@ module Hwaro::Core::Build::Phases::Render
   # The page `get_page(path: target)` returns — same lookup order as the
   # template function (content path, URL, URL without its trailing slash,
   # then `/<path minus .md>/`), over `site.pages` only. A non-ASCII target
-  # is NFC-folded and retried against folded keys, as the template function
-  # does (Render#add_nfc_keys). `index` is build_get_page_index's: a
+  # is NFC-folded and each key falls back to the folded keys before the next
+  # key is tried: the template function's one map holds both (exact entries
+  # win, Render#add_nfc_keys). `index` is build_get_page_index's: a
   # `site.pages.find` per page per target made a `--cache` build quadratic
-  # in the page count.
+  # in the page count. The `/…/` fallback can't hit a slash-stripped key, so
+  # one index serves both lookups.
   private def resolve_get_page_target(target : String, index : GetPageIndex) : Models::Page?
     exact, folded_keys = index
-    return get_page_index_match(target, exact) if target.ascii_only?
-    folded = target.unicode_normalize(:nfc)
-    get_page_index_match(folded, exact) || get_page_index_match(folded, folded_keys)
-  end
-
-  # The `/…/` fallback can't hit a slash-stripped key, so one index serves
-  # both lookups.
-  private def get_page_index_match(target : String, index : Hash(String, Models::Page)) : Models::Page?
-    index[target]? || index["/#{target.chomp(".markdown").chomp(".md")}/"]?
+    key = target.ascii_only? ? target : target.unicode_normalize(:nfc)
+    alt = "/#{key.chomp(".markdown").chomp(".md")}/"
+    exact[key]? || folded_keys[key]? || exact[alt]? || folded_keys[alt]?
   end
 
   # Each key → the first page (in `site.pages` order) whose content path,
