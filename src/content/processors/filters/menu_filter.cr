@@ -24,7 +24,9 @@ module Hwaro
             env.filters["active_path"] = Crinja.filter({ancestor: false}) do
               value = target.to_s
 
-              if external_url?(value)
+              # An empty url (a url-less menu header) points nowhere; it
+              # normalized to "/" and matched the homepage.
+              if value.empty? || external_url?(value)
                 false
               else
                 ancestor = arguments["ancestor"].truthy?

@@ -203,6 +203,10 @@ module Hwaro
       private def self.normalize_urls!(entries : Array(Entry))
         entries.each do |entry|
           url = entry.url
+          # No url (a dropdown header that only groups children) stays "":
+          # normalizing it to "/" linked the header to the homepage and made
+          # `active_path` light it up there.
+          next if url.empty?
           if external_url?(url)
             entry.external = true
             next
