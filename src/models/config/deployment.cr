@@ -31,14 +31,8 @@ module Hwaro
         config.deployment.target = s["target"]?.try(&.as_s?)
         config.deployment.confirm = bool_value(s["confirm"]?, config.deployment.confirm)
 
-        dry_any = s["dryRun"]? || s["dry_run"]?
-        if dry_val = dry_any.try(&.as_bool?)
-          config.deployment.dry_run = dry_val
-        end
-
-        if force_val = s["force"]?.try(&.as_bool?)
-          config.deployment.force = force_val
-        end
+        config.deployment.dry_run = bool_value(s["dryRun"]? || s["dry_run"]?, config.deployment.dry_run)
+        config.deployment.force = bool_value(s["force"]?, config.deployment.force)
 
         max_deletes_any = s["maxDeletes"]? || s["max_deletes"]?
         if max_deletes_val = max_deletes_any.try { |v| int_or_nil(v) }
@@ -126,9 +120,7 @@ module Hwaro
           matcher.cache_control = matcher_h["cacheControl"]?.try(&.as_s?) || matcher_h["cache_control"]?.try(&.as_s?)
           matcher.content_type = matcher_h["contentType"]?.try(&.as_s?) || matcher_h["content_type"]?.try(&.as_s?)
           matcher.gzip = matcher_h["gzip"]?.try(&.as_bool?)
-          if force_val = matcher_h["force"]?.try(&.as_bool?)
-            matcher.force = force_val
-          end
+          matcher.force = bool_value(matcher_h["force"]?, matcher.force)
           matcher
         end
       end

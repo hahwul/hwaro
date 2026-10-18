@@ -268,9 +268,7 @@ module Hwaro
           config.content_new.default_fields = fields
         end
 
-        if bundle = bundle_any.try(&.as_bool?)
-          config.content_new.bundle = bundle
-        end
+        config.content_new.bundle = bool_value(bundle_any, config.content_new.bundle)
       end
 
       private def self.load_pagination(config : Config)

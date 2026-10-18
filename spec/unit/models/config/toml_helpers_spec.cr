@@ -12,6 +12,17 @@ describe "Hwaro::Models::Config boolean values" do
     log.should contain(%(Ignoring non-boolean config value "yes"))
   end
 
+  it "warns for the [content.new] and [deployment] switches too" do
+    config = nil
+    log = with_captured_log do
+      config = load_config(%(title = "X"\n[content.new]\nbundle = "true"\n[deployment]\ndry_run = "yes"\n))
+    end
+    config.not_nil!.content_new.bundle.should be_false
+    config.not_nil!.deployment.dry_run.should be_false
+    log.should contain(%(Ignoring non-boolean config value "true"))
+    log.should contain(%(Ignoring non-boolean config value "yes"))
+  end
+
   it "applies real booleans, including false, without a warning" do
     config = nil
     log = with_captured_log do
