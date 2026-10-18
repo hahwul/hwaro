@@ -358,6 +358,40 @@ module Hwaro
       end
     end
 
+    # Answers 404 for a path that exists on disk only under another case.
+    #
+    # macOS and Windows file systems ignore case, so `/About/` resolved to
+    # `about/` and served 200 — a link that works locally and 404s on every
+    # case-sensitive static host. `File.realpath` returns the on-disk
+    # spelling, so a result that differs from the request only by case is
+    # treated like any other miss. A no-op on case-sensitive file systems.
+    class CaseMismatchHandler
+      include HTTP::Handler
+
+      def initialize(@public_dir : String, @not_found : NotFoundHandler)
+      end
+
+      def call(context)
+        relative = DevPath.safe_relative(context.request.path)
+        if relative && !relative.empty? && (actual = realpath?(File.join(@public_dir, relative)))
+          expected = Path[realpath?(@public_dir) || @public_dir, relative].to_posix.to_s
+          actual = Path[actual].to_posix.to_s
+          if actual != expected && actual.compare(expected, case_insensitive: true) == 0
+            @not_found.call(context)
+            return
+          end
+        end
+
+        call_next(context)
+      end
+
+      private def realpath?(path : String) : String?
+        File.realpath(path)
+      rescue File::Error
+        nil
+      end
+    end
+
     # Mounts the built output under `base_url`'s path component.
     #
     # `hwaro serve --base-url http://localhost:3000/myblog/` builds a site

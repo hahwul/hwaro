@@ -438,6 +438,7 @@ The site is built with `/myblog/`-prefixed links and served under that same pref
 - `HEAD` returns exactly the same headers as the matching `GET`, including the `Content-Length` of the live-reload-injected HTML, with no body.
 - Text responses (`.txt`, `.json`, `.xml`, `.js`, `.css`, `.svg`, …) always carry `; charset=utf-8`, regardless of file size.
 - Directory redirects emit a percent-encoded `Location` (`/my%20page/`, `/%ED%95%9C%EA%B8%80/`). Paths containing a backslash or an encoded separator (`%2F`, `%5C`) are not served, matching static-host behaviour.
+- Paths are case-sensitive even on macOS and Windows: `/About/` is a 404 when the page lives at `/about/`, as it is on a case-sensitive static host.
 
 **Custom response headers (`--header` / `[serve.headers]`):**
 

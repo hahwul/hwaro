@@ -701,6 +701,9 @@ module Hwaro
           @live_reload_handler = lr_handler
           handlers << lr_handler
         end
+        # Before IndexRewriteHandler, so `/About` 404s instead of being
+        # redirected to `/About/` first.
+        handlers << CaseMismatchHandler.new(output_dir, not_found)
         handlers << IndexRewriteHandler.new(output_dir)
         handlers << inject_handler if inject_handler
         # Just above the static handler: generates a lazily-deferred OG image
