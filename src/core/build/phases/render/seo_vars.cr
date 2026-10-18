@@ -27,7 +27,13 @@ module Hwaro::Core::Build::Phases::Render
                      end
     # The synthesized 404 page carries no page-level structured data (matching
     # the Article/CollectionPage suppression above) — skip its breadcrumb too.
-    needs_breadcrumb = page.path != "404.html" && (!page.ancestors.empty? || !page.is_index)
+    # Only the homepage itself has no trail — including a page published AT
+    # the home URL from elsewhere (a top-level `[[versions.list]]` root).
+    # Keying off `is_index` also dropped it from every top-level section and
+    # page bundle (`about/index.md` lost the crumbs `about.md` gets).
+    lang = page.language
+    at_home_url = page.url == "/" || (!lang.nil? && page.url == "/#{lang}/")
+    needs_breadcrumb = page.path != "404.html" && !is_homepage && !at_home_url
     jsonld_breadcrumb = needs_breadcrumb ? Content::Seo::JsonLd.breadcrumb(page, config, site) : ""
 
     # Extended schema types (FAQ, HowTo) auto-detected from extra.schema_type

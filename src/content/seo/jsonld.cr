@@ -377,7 +377,7 @@ module Hwaro
         def all_tags(page : Models::Page, config : Models::Config) : String
           parts = [] of String
           parts << article(page, config)
-          parts << breadcrumb(page, config) unless page.ancestors.empty? && page.is_index
+          parts << breadcrumb(page, config) unless page.home?
 
           extra_schema = for_page(page, config)
           parts << extra_schema unless extra_schema.empty?

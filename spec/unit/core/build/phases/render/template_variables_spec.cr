@@ -123,6 +123,50 @@ describe "title-less ancestor sections" do
   end
 end
 
+describe "jsonld breadcrumb coverage" do
+  # Regression: the breadcrumb was skipped for any `is_index` page without
+  # ancestors, meant to exclude the homepage. That also dropped it from
+  # every top-level section and page bundle: `about/index.md` lost the
+  # BreadcrumbList that `about.md` gets.
+  it "is emitted for every page but the homepage" do
+    build_site(
+      "title = \"T\"\nbase_url = \"https://ex.com\"\n",
+      content_files: {
+        "_index.md"       => "+++\ntitle = \"Home\"\n+++\n",
+        "flat.md"         => "+++\ntitle = \"Flat\"\n+++\n",
+        "bundle/index.md" => "+++\ntitle = \"Bundle\"\n+++\n",
+        "posts/_index.md" => "+++\ntitle = \"Posts\"\n+++\n",
+      },
+      template_files: {
+        "page.html"    => "{{ jsonld_breadcrumb }}",
+        "section.html" => "{{ jsonld_breadcrumb }}",
+      },
+    ) do
+      File.read("public/index.html").should eq("")
+      File.read("public/flat/index.html").should contain(%("name":"Flat"))
+      File.read("public/bundle/index.html").should contain(%({"@type":"ListItem","position":2,"name":"Bundle"}))
+      File.read("public/posts/index.html").should contain(%({"@type":"ListItem","position":2,"name":"Posts"}))
+    end
+  end
+
+  it "is not emitted for a top-level version root published at the home URL" do
+    build_site(
+      "title = \"T\"\nbase_url = \"https://ex.com\"\n\n[[versions.list]]\nname = \"v2\"\nlatest = true\n\n[[versions.list]]\nname = \"v1\"\n",
+      content_files: {
+        "v2/_index.md" => "+++\ntitle = \"Root\"\n+++\n",
+        "v1/_index.md" => "+++\ntitle = \"Old\"\n+++\n",
+      },
+      template_files: {
+        "page.html"    => "{{ jsonld_breadcrumb }}",
+        "section.html" => "{{ jsonld_breadcrumb }}",
+      },
+    ) do
+      File.read("public/index.html").should eq("")
+      File.read("public/v1/index.html").should contain(%("name":"Old"))
+    end
+  end
+end
+
 describe "seo.twitter_card" do
   # Regression: `twitter_tags` downgrades summary_large_image to summary when
   # a page resolves no image (a large card with no image renders blank), but
