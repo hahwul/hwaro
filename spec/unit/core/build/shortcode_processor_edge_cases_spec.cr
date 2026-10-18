@@ -29,6 +29,17 @@ module Hwaro::Core::Build
 end
 
 describe Hwaro::Core::Build::ShortcodeProcessor do
+  it "stays linear in the block shortcode count on a long page" do
+    # PCRE2 re-validated the whole page's UTF-8 for every tag scanned.
+    builder = Hwaro::Core::Build::Builder.new
+    templates = {"shortcodes/note" => %(<b>{{ body }}</b>)}
+    content = "Café {% note() %}x{% end %}\n\n" * 30_000
+    t = Time.instant
+    result = builder.test_sc_process(content, templates)
+    (Time.instant - t).should be < 10.seconds # quadratic took 17s
+    result.scan("<b>x</b>").size.should eq(30_000)
+  end
+
   describe "block shortcodes with arguments" do
     it "passes named args from a block shortcode opening tag" do
       builder = Hwaro::Core::Build::Builder.new
