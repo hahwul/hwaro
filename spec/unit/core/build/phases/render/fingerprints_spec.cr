@@ -437,6 +437,37 @@ class Hwaro::Core::Build::Builder
   def test_menu_set_fingerprint(site : Hwaro::Models::Site) : String
     compute_menu_set_fingerprint(site)
   end
+
+  def test_page_relations_hash(page, templates, site, link_targets) : String
+    page_relations_hash(page, templates, site, link_targets)
+  end
+end
+
+# A `get_page` literal in a shared layout puts its target in every page's
+# relations hash; resolving it with `site.pages.find` per page made a
+# `--cache` build quadratic (20k pages: 81s cold, 75s warm no-op).
+describe "relations hash get_page lookup" do
+  it "resolves get_page targets without scanning the page list per page" do
+    site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+    site.pages = (0...10_000).map do |i|
+      Hwaro::Models::Page.new("posts/p#{i}.md").tap do |p|
+        p.url = "/posts/p#{i}/"
+        p.title = "P#{i}"
+      end
+    end
+    templates = {"page" => %({{ get_page(path="/posts/p9999").title }}{{ get_page(path="missing.md").title }})}
+    builder = Hwaro::Core::Build::Builder.new
+    link_targets = {} of String => Hwaro::Models::Page
+
+    t = Time.instant
+    hashes = site.pages.map { |page| builder.test_page_relations_hash(page, templates, site, link_targets) }
+    (Time.instant - t).should be < 5.seconds
+    hashes.uniq.size.should eq(1)
+
+    # Still the page the slash-stripped URL names: retitling it moves the hash.
+    site.pages.last.title = "Renamed"
+    builder.test_page_relations_hash(site.pages.first, templates, site, {} of String => Hwaro::Models::Page).should_not eq(hashes.first)
+  end
 end
 
 # `hwaro serve` re-renders a nav partial only when the menu projection moves.

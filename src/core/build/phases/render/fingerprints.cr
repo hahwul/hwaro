@@ -881,9 +881,10 @@ module Hwaro::Core::Build::Phases::Render
     end
     unless rel.get_page_targets.empty?
       fp_value(digest, "g#{rel.get_page_targets.size}")
+      index = pass_get_page_index(site, link_targets)
       rel.get_page_targets.each do |target|
         fp_value(digest, target)
-        fp_relation(digest, resolve_get_page_target(target, site), rel.fields)
+        fp_relation(digest, resolve_get_page_target(target, index), rel.fields)
       end
     end
     unless links.empty?
@@ -910,9 +911,10 @@ module Hwaro::Core::Build::Phases::Render
   private def compute_get_page_lookup_fingerprint(site : Models::Site, targets : Array(String), fields : Builder::ListingPageFields) : String
     return "" if targets.empty?
     digest = Digest::MD5.new
+    index = build_get_page_index(site)
     targets.each do |target|
       fp_value(digest, target)
-      fp_relation(digest, resolve_get_page_target(target, site), fields)
+      fp_relation(digest, resolve_get_page_target(target, index), fields)
     end
     digest.final.hexstring
   end
@@ -931,20 +933,50 @@ module Hwaro::Core::Build::Phases::Render
   # template function (content path, URL, URL without its trailing slash,
   # then `/<path minus .md>/`), over `site.pages` only. A non-ASCII target
   # is NFC-folded and retried against folded keys, as the template function
-  # does (Render#add_nfc_keys).
-  private def resolve_get_page_target(target : String, site : Models::Site) : Models::Page?
-    return get_page_target_match(target, site) { |s| s } if target.ascii_only?
+  # does (Render#add_nfc_keys). `index` is build_get_page_index's: a
+  # `site.pages.find` per page per target made a `--cache` build quadratic
+  # in the page count.
+  private def resolve_get_page_target(target : String, index : GetPageIndex) : Models::Page?
+    exact, folded_keys = index
+    return get_page_index_match(target, exact) if target.ascii_only?
     folded = target.unicode_normalize(:nfc)
-    get_page_target_match(folded, site) { |s| s } ||
-      get_page_target_match(folded, site) { |s| s.ascii_only? ? s : s.unicode_normalize(:nfc) }
+    get_page_index_match(folded, exact) || get_page_index_match(folded, folded_keys)
   end
 
-  private def get_page_target_match(target : String, site : Models::Site, & : String -> String) : Models::Page?
-    site.pages.find { |p| yield(p.path) == target || yield(p.url) == target || (p.url.size > 1 && p.url.ends_with?('/') && yield(p.url.rstrip('/')) == target) } ||
-      begin
-        alt = "/#{target.chomp(".markdown").chomp(".md")}/"
-        site.pages.find { |p| yield(p.path) == alt || yield(p.url) == alt }
+  # The `/…/` fallback can't hit a slash-stripped key, so one index serves
+  # both lookups.
+  private def get_page_index_match(target : String, index : Hash(String, Models::Page)) : Models::Page?
+    index[target]? || index["/#{target.chomp(".markdown").chomp(".md")}/"]?
+  end
+
+  # Each key → the first page (in `site.pages` order) whose content path,
+  # URL, or URL without its trailing slash it is; the second hash holds the
+  # NFC-folded spelling of every non-ASCII key (an ASCII key folds to itself).
+  alias GetPageIndex = {Hash(String, Models::Page), Hash(String, Models::Page)}
+
+  private def build_get_page_index(site : Models::Site) : GetPageIndex
+    exact = {} of String => Models::Page
+    folded = {} of String => Models::Page
+    site.pages.each do |p|
+      keys = {p.path, p.url, (p.url.size > 1 && p.url.ends_with?('/')) ? p.url.rstrip('/') : nil}
+      keys.each do |key|
+        next unless key
+        exact[key] ||= p
+        folded[key.unicode_normalize(:nfc)] ||= p unless key.ascii_only?
       end
+    end
+    {exact, folded}
+  end
+
+  # build_get_page_index, once per render pass (see @get_page_index).
+  private def pass_get_page_index(site : Models::Site, link_targets : Hash(String, Models::Page)) : GetPageIndex
+    @page_template_hash_mutex.synchronize do
+      memo = @get_page_index
+      return memo[1] if memo && memo[0].same?(link_targets)
+      index = build_get_page_index(site)
+      @get_page_index = {link_targets, index}
+      index
+    end
   end
 
   # The `@/` link targets in a page's content (included text counted),

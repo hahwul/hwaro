@@ -312,6 +312,10 @@ module Hwaro
         # filter-time one. Cleared after the render fan-out; guarded by
         # @page_template_hash_mutex.
         @filter_relations_hashes : Hash(String, String) = {} of String => String
+        # `get_page` lookup index of one render pass, keyed by that pass's
+        # `link_targets` map (fresh per pass; holding it keeps its address
+        # from being reused). Guarded by @page_template_hash_mutex.
+        @get_page_index : {Hash(String, Models::Page), {Hash(String, Models::Page), Hash(String, Models::Page)}}? = nil
         # `[markdown] wikilinks` lookup over the current published page set;
         # rebuilt whenever that set may have changed (refresh_wikilink_index).
         @wikilink_index : Content::Processors::Wikilinks::Index? = nil
