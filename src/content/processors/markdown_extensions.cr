@@ -285,7 +285,9 @@ module Hwaro
           spans = [] of Range(Int32, Int32)
           pos = 0
           comments_close = true
-          while m = RAW_TEXT_SCAN_RE.match_at_byte_index(html, pos)
+          # Without NO_UTF_CHECK PCRE2 validates the whole page on every call.
+          opts = html.valid_encoding? ? Regex::MatchOptions::NO_UTF_CHECK : Regex::MatchOptions::None
+          while m = RAW_TEXT_SCAN_RE.match_at_byte_index(html, pos, opts)
             if name = m[1]?
               close = Utils::ByteScan.byte_index(html, "</#{name.downcase}", m.byte_end(0))
               break unless close

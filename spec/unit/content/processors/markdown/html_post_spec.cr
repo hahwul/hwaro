@@ -20,6 +20,13 @@ describe Hwaro::Content::Processors::Markdown do
       html.should contain(%(<h2 id="visible">))
       html.should contain(%(<img loading="lazy" src="a.png"))
     end
+
+    it "find raw-text elements in time linear in their count" do
+      t = Time.instant
+      spans = Hwaro::Content::Processors::MarkdownExtensions.raw_text_spans("<!-- c --><script>x</script>" * 40_000)
+      spans.size.should eq(40_000)
+      (Time.instant - t).should be < 5.seconds # a UTF-8 check per element took 10s+; slack for a loaded suite
+    end
   end
 
   describe "lazy loading and external links" do
