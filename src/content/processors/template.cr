@@ -167,6 +167,9 @@ module Hwaro
           #        {{ about.title }}
           @env.functions["get_page"] = Crinja.function({path: ""}) do
             path_arg = arguments["path"].to_s
+            # The lookup maps also hold every key NFC-folded (see
+            # Render#add_nfc_keys).
+            path_arg = path_arg.unicode_normalize(:nfc) unless path_arg.ascii_only?
 
             # Optimised O(1) lookup
             pages_map = env.resolve("__pages_by_path__")
@@ -211,6 +214,7 @@ module Hwaro
           #        {% for page in blog.pages %}
           @env.functions["get_section"] = Crinja.function({path: ""}) do
             path_arg = arguments["path"].to_s
+            path_arg = path_arg.unicode_normalize(:nfc) unless path_arg.ascii_only?
             # "blog", "/blog", "blog/" and "/blog/" all name the same section.
             url_key = "/#{path_arg.strip('/')}/"
 

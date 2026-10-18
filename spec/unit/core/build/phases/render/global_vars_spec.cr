@@ -37,3 +37,27 @@ describe "Render global vars: bundle asset URLs" do
     end
   end
 end
+
+# `@/` links already reached a decomposed (NFD) file name from a precomposed
+# path; get_page/get_section missed it, so the same site resolved one and not
+# the other.
+describe "Render global vars: Unicode-normalized lookups" do
+  it "finds a decomposed page and section from a precomposed path, and back" do
+    nfd = "café".unicode_normalize(:nfd)
+    nfc = "café".unicode_normalize(:nfc)
+    build_site(
+      "title = \"T\"\nbase_url = \"http://localhost\"\n",
+      content_files: {
+        "index.md"         => "+++\ntitle = \"Home\"\ntemplate = \"probe\"\n+++\n",
+        "#{nfd}/_index.md" => "+++\ntitle = \"Sec\"\n+++\n",
+        "#{nfd}/#{nfd}.md" => "+++\ntitle = \"Dec\"\n+++\n",
+        "posts/#{nfc}.md"  => "+++\ntitle = \"Pre\"\n+++\n",
+      },
+      template_files: {
+        "probe.html" => "[{{ get_page(path='#{nfc}/#{nfc}.md').title }}][{{ get_section(path='#{nfc}').title }}][{{ get_page(path='posts/#{nfd}.md').title }}]",
+      },
+    ) do
+      File.read("public/index.html").should eq("[Dec][Sec][Pre]")
+    end
+  end
+end
