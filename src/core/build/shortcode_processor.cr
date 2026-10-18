@@ -656,9 +656,9 @@ module Hwaro
         # counting them as block openers desynced the nesting scan — a block
         # shortcode whose body contained `{% if %}…{% endif %}` never found
         # its `{% end %}` and leaked its opening tag as literal text.
-        private def next_block_open(content : String, from : Int32) : Regex::MatchData?
+        private def next_block_open(content : String, from : Int32, options : Regex::MatchOptions = :none) : Regex::MatchData?
           pos = from
-          while m = BLOCK_OPEN_RE.match_at_byte_index(content, pos)
+          while m = BLOCK_OPEN_RE.match_at_byte_index(content, pos, options)
             return m unless control_tag_open?(m)
             pos = m.byte_begin + m[0].bytesize
           end
@@ -700,6 +700,10 @@ module Hwaro
           end
 
           close_re = BLOCK_CLOSE_RE
+          # PCRE2 re-validates the UTF-8 of the whole remaining subject on
+          # every match call, so a page with thousands of block shortcodes
+          # paid O(document) per tag — quadratic overall. Validate once.
+          match_opts = content.valid_encoding? ? Regex::MatchOptions::NO_UTF_CHECK : Regex::MatchOptions::None
 
           result = String::Builder.new
           pos = 0
@@ -718,13 +722,13 @@ module Hwaro
             open_match = if (c = cached_open) && c.byte_begin >= pos
                            c
                          else
-                           cached_open = next_block_open(content, pos)
+                           cached_open = next_block_open(content, pos, match_opts)
                          end
             # Find next closing tag (to handle stray {% end %} gracefully)
             close_match = if (c = cached_close) && c.byte_begin >= pos
                             c
                           else
-                            cached_close = close_re.match_at_byte_index(content, pos)
+                            cached_close = close_re.match_at_byte_index(content, pos, match_opts)
                           end
 
             # No more opening tags — append rest and done
@@ -776,12 +780,12 @@ module Hwaro
               next_open = if (c = nest_open) && c.byte_begin >= scan_pos
                             c
                           else
-                            nest_open = next_block_open(content, scan_pos)
+                            nest_open = next_block_open(content, scan_pos, match_opts)
                           end
               next_close = if (c = nest_close) && c.byte_begin >= scan_pos
                              c
                            else
-                             nest_close = close_re.match_at_byte_index(content, scan_pos)
+                             nest_close = close_re.match_at_byte_index(content, scan_pos, match_opts)
                            end
 
               break unless next_close

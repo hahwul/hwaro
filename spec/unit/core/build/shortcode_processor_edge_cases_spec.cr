@@ -795,4 +795,19 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
       result.should contain(%(<a href="https://example.com">link</a>))
     end
   end
+
+  describe "many block shortcodes on one page" do
+    # Every tag search re-validated the UTF-8 of the rest of the page, so
+    # the block pass was quadratic in the number of tags.
+    it "pairs thousands of blocks in linear time" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/box" => "{{ body }}"}
+      n = 20_000
+      content = "{% box() %}\nx\n{% end %}\n\n" * n
+      result = ""
+      elapsed = Time.measure { result = builder.test_sc_process(content, templates) }
+      result.should_not contain("{% end %}")
+      elapsed.should be < 3.seconds # ~0.2s; quadratic before
+    end
+  end
 end
