@@ -279,5 +279,21 @@ describe "Sass value fixes" do
       css.should contain("j: 10;")
       css.should contain("l: 1;")
     end
+
+    # Every append re-reads the stored list, so each unparseable member used
+    # to raise once per iteration (and non-ASCII text made the scan cubic):
+    # 600 members took over 5s.
+    it "stays fast for a long list of non-ASCII selector strings" do
+      css = ""
+      elapsed = Time.measure do
+        css = compile_source(<<-'SCSS')
+          $l: ();
+          @for $i from 1 through 600 { $l: append($l, unquote("[data-é='#{$i}']"), comma); }
+          .n { l: length($l); }
+          SCSS
+      end
+      css.should contain("l: 600;")
+      elapsed.should be < 2.5.seconds
+    end
   end
 end

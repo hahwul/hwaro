@@ -1477,16 +1477,41 @@ module Hwaro
         def self.coerce(text : String) : Value
           stripped = text.strip
           return Raw.new(text) if stripped.empty?
+          return coerce_unparsed(stripped) if unparseable?(stripped)
           template = Ast::TextTemplate.new([stripped.as(Ast::Piece)], 1, 1)
           node = parse(template)
-          return coerce_unparsed(stripped) unless node
+          unless node
+            remember_unparseable(stripped)
+            return coerce_unparsed(stripped)
+          end
           # coercing: true — slash text arriving through storage is always
           # a CONSTRUCTED list (a literal lazy pair would have divided at
           # its force_div declaration), so it must not re-acquire lazy
           # division here. dart-sass errors on math over such a list.
           Evaluator.new(CoerceHost.new, coercing: true).eval(node)
         rescue SoftEvalError
+          remember_unparseable(text.strip)
           coerce_unparsed(text.strip)
+        end
+
+        # Storage text that failed to parse or evaluate. Coercion runs
+        # against a context-free CoerceHost, so failure depends on the text
+        # alone; remembering it spares a raised SoftEvalError per member
+        # each time a stored list is read back — an append(..., comma) loop
+        # over unparseable strings re-coerces every member per iteration.
+        UNPARSEABLE       = Set(String).new
+        UNPARSEABLE_LOCK  = Mutex.new
+        UNPARSEABLE_LIMIT = 50_000
+
+        private def self.unparseable?(text : String) : Bool
+          UNPARSEABLE_LOCK.synchronize { UNPARSEABLE.includes?(text) }
+        end
+
+        private def self.remember_unparseable(text : String) : Nil
+          UNPARSEABLE_LOCK.synchronize do
+            UNPARSEABLE.clear if UNPARSEABLE.size >= UNPARSEABLE_LIMIT
+            UNPARSEABLE << text
+          end
         end
 
         # Storage text the expression grammar can't read — typically
@@ -1498,30 +1523,33 @@ module Hwaro
         # an invalid selector. A comma without the space is part of a
         # string (`data:image/svg+xml,<svg …>`), never a list separator.
         private def self.coerce_unparsed(text : String) : Value
-          if text.starts_with?('(') && text.ends_with?(",)") && closing_paren(text) == text.size - 1
-            return ListV.new([coerce(text[1...-2]).as(Value)], ListV::Sep::Comma)
+          if text.starts_with?('(') && text.ends_with?(",)") && closing_paren(text) == text.bytesize - 1
+            return ListV.new([coerce(text.byte_slice(1, text.bytesize - 3)).as(Value)], ListV::Sep::Comma)
           end
           parts = split_storage_commas(text)
           return Raw.new(text) unless parts && parts.size >= 2 && parts.none?(&.empty?)
           ListV.new(parts.map { |part| coerce(part).as(Value) }, ListV::Sep::Comma)
         end
 
-        # Index of the paren closing the one that opens `text`, skipping
-        # quoted strings; nil when unbalanced.
+        # Byte index of the paren closing the one that opens `text`,
+        # skipping quoted strings; nil when unbalanced. Scans bytes: every
+        # delimiter is ASCII, and `String#[](i)` is O(i) on non-ASCII text,
+        # which made long stored lists of such strings cubic.
         private def self.closing_paren(text : String) : Int32?
+          bytes = text.to_slice
           depth = 0
-          quote : Char? = nil
+          quote : UInt8? = nil
           i = 0
-          while i < text.size
-            c = text[i]
+          while i < bytes.size
+            c = bytes[i]
             if quote
-              i += 1 if c == '\\'
+              i += 1 if c == '\\'.ord
               quote = nil if c == quote
-            elsif c == '"' || c == '\''
+            elsif c == '"'.ord || c == '\''.ord
               quote = c
-            elsif c == '('
+            elsif c == '('.ord
               depth += 1
-            elsif c == ')'
+            elsif c == ')'.ord
               depth -= 1
               return i if depth == 0
             end
@@ -1533,37 +1561,39 @@ module Hwaro
         # `text` split on the `, ` storage separators outside quotes and
         # brackets; nil when the text cannot be a stored list — a top-level
         # comma without the space, or unbalanced quotes/brackets (a
-        # `str-slice` cut through some string).
+        # `str-slice` cut through some string). Scans bytes like
+        # closing_paren.
         private def self.split_storage_commas(text : String) : Array(String)?
+          bytes = text.to_slice
           parts = [] of String
           depth = 0
-          quote : Char? = nil
+          quote : UInt8? = nil
           start = 0
           i = 0
-          while i < text.size
-            c = text[i]
+          while i < bytes.size
+            c = bytes[i]
             if quote
-              if c == '\\'
+              if c == '\\'.ord
                 i += 1
               elsif c == quote
                 quote = nil
               end
-            elsif c == '"' || c == '\''
+            elsif c == '"'.ord || c == '\''.ord
               quote = c
-            elsif c == '(' || c == '['
+            elsif c == '('.ord || c == '['.ord
               depth += 1
-            elsif c == ')' || c == ']'
+            elsif c == ')'.ord || c == ']'.ord
               return if depth == 0
               depth -= 1
-            elsif c == ',' && depth == 0
-              return unless text[i + 1]? == ' '
-              parts << text[start...i].strip
+            elsif c == ','.ord && depth == 0
+              return unless bytes[i + 1]? == ' '.ord
+              parts << text.byte_slice(start, i - start).strip
               start = i + 1
             end
             i += 1
           end
           return if quote || depth != 0
-          parts << text[start..].strip
+          parts << text.byte_slice(start, bytes.size - start).strip
           parts
         end
 
