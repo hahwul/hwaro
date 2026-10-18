@@ -222,7 +222,7 @@ LQIP가 비활성화 상태면 `lqip`와 `dominant_color`는 빈 문자열을 �
 ```jinja
 {% set img = resize_image(path="/hwaro.png", width=256) %}
 <img src="{{ img.url }}">
-{# renders as: <img src="/hwaro_256w.png"> #}
+{# renders as: <img src="https://example.com/hwaro_256w.png"> (img.url is absolute, under base_url) #}
 ```
 
 ### LQIP 데모

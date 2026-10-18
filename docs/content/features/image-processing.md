@@ -222,7 +222,7 @@ These files are generated at build time, so no runtime resizing or external serv
 ```jinja
 {% set img = resize_image(path="/hwaro.png", width=256) %}
 <img src="{{ img.url }}">
-{# renders as: <img src="/hwaro_256w.png"> #}
+{# renders as: <img src="https://example.com/hwaro_256w.png"> (img.url is absolute, under base_url) #}
 ```
 
 ### LQIP Demo
