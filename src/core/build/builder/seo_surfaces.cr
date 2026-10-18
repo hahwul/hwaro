@@ -129,8 +129,15 @@ module Hwaro
         def og_image_asset_changed?(paths : Array(String), options : Config::Options::BuildOptions) : Bool
           return false unless ai = @config.try(&.og.auto_image)
           return false if !ai.enabled || options.skip_og_image || (ai.lazy_generate && options.serve_mode)
-          assets = [ai.logo, ai.background_image].compact.map { |path| File.expand_path(path) }
+          assets = og_image_assets.map { |path| File.expand_path(path) }
           paths.any? { |path| assets.includes?(File.expand_path(path)) }
+        end
+
+        # The logo and background image auto OG images embed, as configured.
+        # The watcher stamps the ones outside its roots (`brand/logo.png`).
+        def og_image_assets : Array(String)
+          return [] of String unless (ai = @config.try(&.og.auto_image)) && ai.enabled
+          [ai.logo, ai.background_image].compact.map { |path| Path[path].normalize.to_s }
         end
       end
     end

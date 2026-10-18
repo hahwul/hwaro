@@ -54,3 +54,28 @@ describe "serve: load_data sources outside the watch roots" do
     end
   end
 end
+
+# Same for the auto OG images' logo: `logo = "brand/logo.png"` sits outside
+# every root, so swapping it never regenerated the images.
+describe "serve: OG image assets outside the watch roots" do
+  it "reports a logo edit as a full-rebuild change" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "t"\nbase_url = "https://example.com"\n[og.auto_image]\nenabled = true\nlogo = "brand/logo.png"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("brand")
+        File.write("brand/logo.png", "old")
+        File.write("content/p.md", "+++\ntitle = \"P\"\n+++\n")
+
+        server = Hwaro::Services::Server.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, skip_og_image: true)
+        options.serve_mode = true
+        server.watch_spec_builder.run(options).should be_true
+
+        before = server.watch_spec_scan
+        File.write("brand/logo.png", "newer")
+        server.watch_spec_detect(before, server.watch_spec_scan).needs_full_rebuild?.should be_true
+      end
+    end
+  end
+end
