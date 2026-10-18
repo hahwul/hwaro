@@ -12,6 +12,19 @@ describe Hwaro::Content::Processors::Markdown do
     end
   end
 
+  describe "lazy loading and external links" do
+    it "leave <img>/<a> strings inside a script alone" do
+      md_config = Hwaro::Models::MarkdownConfig.new
+      md_config.external_links_target_blank = true
+      script = %(<script>\nel.innerHTML = "<img src='/b.png'>" + "<a href='http://e.com'>x</a>";\n</script>)
+      content = "![real](a.png) [ext](http://ext.com)\n\n#{script}\n"
+      html, _ = Hwaro::Processor::Markdown.render(content, lazy_loading: true, markdown_config: md_config)
+      html.should contain(script)
+      html.should contain(%(<img loading="lazy" src="a.png"))
+      html.should contain(%(<a href="http://ext.com" target="_blank" rel="noopener">))
+    end
+  end
+
   describe "emoji conversion" do
     it "leaves raw-text elements, math and mermaid untouched" do
       md_config = Hwaro::Models::MarkdownConfig.new

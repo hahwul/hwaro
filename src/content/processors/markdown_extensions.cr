@@ -270,6 +270,29 @@ module Hwaro
           html.includes?(TRUSTED_MARK) ? html.gsub(UNTRUST_RE, "") : html
         end
 
+        # `<script>`/`<style>`/`<textarea>` bodies are text, not markup: the
+        # HTML passes must not rewrite an `"<img …>"` or `"<a href=…>"` JS
+        # string (their double-quoted attributes would end it).
+        RAW_TEXT_OPEN_RE = /<(script|style|textarea)\b/i
+
+        # Yields every stretch of `html` outside raw-text elements and joins
+        # the results with those elements kept verbatim. An unterminated one
+        # is not treated as running to the end.
+        def outside_raw_text(html : String, & : String -> String) : String
+          return yield html unless html.matches?(RAW_TEXT_OPEN_RE)
+
+          String.build(html.bytesize) do |io|
+            pos = 0
+            while (m = RAW_TEXT_OPEN_RE.match_at_byte_index(html, pos)) &&
+                  (close = Utils::ByteScan.byte_index(html, "</#{m[1].downcase}", m.byte_end(0)))
+              io << yield html.byte_slice(pos, m.byte_begin(0) - pos)
+              io << html.byte_slice(m.byte_begin(0), close - m.byte_begin(0))
+              pos = close
+            end
+            io << yield html.byte_slice(pos)
+          end
+        end
+
         # `{…}` attribute blocks on images: the `attributes` switch, or
         # `wikilinks`, whose sized `![[img.png|300]]` embeds are emitted as
         # `![img.png](img.png){width=300}`. Heading blocks stay `attributes`-only.

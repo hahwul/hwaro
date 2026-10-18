@@ -38,6 +38,10 @@ module Hwaro
           # can't skip an anchor the rewrite below would handle.
           return html unless html.matches?(EXTERNAL_HREF_RE)
 
+          outside_raw_text(html) { |chunk| apply_external_link_policy(chunk, target_blank, rel_tokens) }
+        end
+
+        private def apply_external_link_policy(html : String, target_blank : Bool, rel_tokens : Array(String)) : String
           html.gsub(EXTERNAL_ANCHOR_RE) do |match|
             attrs = $1
             next match unless EXTERNAL_HREF_RE.matches?(attrs)

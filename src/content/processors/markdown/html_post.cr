@@ -71,7 +71,7 @@ module Hwaro
           # `"<h2>…</h2>"` JS string must not get an `id="…"` (which ends the
           # string) or a TOC entry. Unterminated ones are left alone, as above.
           pos = 0
-          while m = RAW_TEXT_OPEN_RE.match_at_byte_index(html, pos)
+          while m = MarkdownExtensions::RAW_TEXT_OPEN_RE.match_at_byte_index(html, pos)
             close = Utils::ByteScan.byte_index(html, "</#{m[1].downcase}", m.byte_end(0))
             break unless close
             spans << (m.byte_begin(0)...close)
@@ -79,8 +79,6 @@ module Hwaro
           end
           spans
         end
-
-        RAW_TEXT_OPEN_RE = /<(script|style|textarea)\b/i
 
         # True when a match starting at `offset` (a BYTE offset, as reported by
         # `Regex::MatchData#byte_begin`) opens inside one of `spans`.
@@ -135,10 +133,12 @@ module Hwaro
 
           # 1. Lazy-load images: add loading="lazy" to <img> tags missing it
           if process_images
-            result = result.gsub(IMG_LAZY_REGEX) do |_|
-              attrs = $1
-              # Insert loading="lazy" before the closing /> or >
-              "<img loading=\"lazy\"#{attrs} />"
+            result = MarkdownExtensions.outside_raw_text(result) do |chunk|
+              chunk.gsub(IMG_LAZY_REGEX) do |_|
+                attrs = $1
+                # Insert loading="lazy" before the closing /> or >
+                "<img loading=\"lazy\"#{attrs} />"
+              end
             end
           end
 
