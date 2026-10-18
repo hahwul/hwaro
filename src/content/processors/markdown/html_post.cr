@@ -116,7 +116,7 @@ module Hwaro
         # Lightweight regex-based post-processing.
         # Replaces the previous XML.parse_html approach which constructed a full
         # DOM tree for every page — very expensive for large sites.
-        private def post_process_html(html : String, generate_toc : Bool, process_images : Bool) : Tuple(String, Array(Models::TocHeader))
+        private def post_process_html(html : String, generate_toc : Bool, process_images : Bool, emoji : Bool = false) : Tuple(String, Array(Models::TocHeader))
           result = html
 
           # 1. Lazy-load images: add loading="lazy" to <img> tags missing it
@@ -150,29 +150,7 @@ module Hwaro
               attrs = $3? || "" # existing attributes (may be empty)
               inner_html = $4   # inner content (may contain inline HTML)
 
-              # Extract plain text for TOC title (inline char-level strip
-              # avoids regex + alloc). Quote-aware: a `>` inside a quoted
-              # attribute value must not end the tag, or the value's tail
-              # leaks into the title.
-              title = String.build(inner_html.bytesize) do |io|
-                in_tag = false
-                quote = nil.as(Char?)
-                inner_html.each_char do |c|
-                  if in_tag
-                    if quote
-                      quote = nil if c == quote
-                    elsif c == '"' || c == '\''
-                      quote = c
-                    elsif c == '>'
-                      in_tag = false
-                    end
-                  elsif c == '<'
-                    in_tag = true
-                  else
-                    io << c
-                  end
-                end
-              end.strip
+              title = heading_text(inner_html)
 
               # Use existing id or generate one
               existing_id = if id_match = attrs.match(ID_ATTR_REGEX)
@@ -187,10 +165,12 @@ module Hwaro
 
               permalink = "##{id}"
 
+              # The id slugs the source text (stable anchors); the TOC title
+              # shows what the heading shows, emoji included.
               toc_item = Models::TocHeader.new(
                 level: level,
                 id: id,
-                title: title,
+                title: emoji ? heading_text(apply_emoji(inner_html)) : title,
                 permalink: permalink
               )
 
@@ -230,6 +210,31 @@ module Hwaro
           end
 
           {result, roots}
+        end
+
+        # Plain text of a heading's inner HTML (tags stripped). Quote-aware:
+        # a `>` inside a quoted attribute value must not end the tag, or the
+        # value's tail leaks into the title.
+        private def heading_text(inner_html : String) : String
+          String.build(inner_html.bytesize) do |io|
+            in_tag = false
+            quote = nil.as(Char?)
+            inner_html.each_char do |c|
+              if in_tag
+                if quote
+                  quote = nil if c == quote
+                elsif c == '"' || c == '\''
+                  quote = c
+                elsif c == '>'
+                  in_tag = false
+                end
+              elsif c == '<'
+                in_tag = true
+              else
+                io << c
+              end
+            end
+          end.strip
         end
 
         # Apply emoji shortcode conversion to HTML text, skipping code, raw-text,
