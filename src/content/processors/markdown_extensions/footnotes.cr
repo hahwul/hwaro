@@ -158,8 +158,11 @@ module Hwaro
           end
 
           # Store footnotes data in a special HTML comment for postprocessing
-          if ref_order.present?
-            result += trust("\n<!--HWARO-FOOTNOTES-START-->\n", trusted)
+          # Appended with one builder: `result +=` per note recopied the whole
+          # page each time, quadratic in the footnote count.
+          return result if ref_order.empty?
+          String.build(result.bytesize + ref_order.size * 64) do |io|
+            io << result << trust("\n<!--HWARO-FOOTNOTES-START-->\n", trusted)
             ref_order.each do |key, num|
               text = footnotes[key]? || ""
               occ = ref_occurrences[key]? || 1
@@ -168,12 +171,10 @@ module Hwaro
               # the comment stays single-line for FOOTNOTE_COMMENT_RE.
               safe_key = key.gsub("--", "&#45;&#45;").gsub(":", "&#58;")
               safe_text = text.gsub("--", "&#45;&#45;").gsub(":", "&#58;").gsub("\n", "&#10;")
-              result += "#{trust("<!--HWARO-", trusted)}FN:#{safe_key}:#{num}.#{occ}:#{safe_text}-->\n"
+              io << trust("<!--HWARO-", trusted) << "FN:" << safe_key << ':' << num << '.' << occ << ':' << safe_text << "-->\n"
             end
-            result += trust("<!--HWARO-FOOTNOTES-END-->\n", trusted)
+            io << trust("<!--HWARO-FOOTNOTES-END-->\n", trusted)
           end
-
-          result
         end
 
         # Post-processing: convert footnote comments to HTML section.
