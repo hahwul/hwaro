@@ -418,7 +418,7 @@ twitter_creator = "@authorusername"
 
 | 키 | 설명 |
 |-----|-------------|
-| twitter_card | 카드 타입: summary, summary_large_image |
+| twitter_card | 카드 타입: summary, summary_large_image (이미지가 없는 페이지는 `summary`. 이미지 없는 큰 카드는 빈 미리보기로 표시됩니다) |
 | twitter_site | 사이트의 Twitter 핸들 |
 | twitter_creator | 작성자의 Twitter 핸들 |
 
@@ -492,7 +492,7 @@ FAQ, HowTo, WebSite, Organization 같은 추가 스키마 타입도 사용할 �
 | seo.canonical_url | String | 전체 canonical URL |
 | seo.og_type | String | OpenGraph 타입 (기본값: "article") |
 | seo.og_image | String | 해석된 절대 이미지 URL |
-| seo.twitter_card | String | Twitter 카드 타입 |
+| seo.twitter_card | String | 이 페이지에 `twitter_tags`가 출력하는 Twitter 카드 타입 |
 | seo.twitter_site | String | Twitter 사이트 핸들 |
 | seo.twitter_creator | String | Twitter 작성자 핸들 |
 | seo.fb_app_id | String | Facebook 앱 ID |

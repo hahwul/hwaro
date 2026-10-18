@@ -156,7 +156,7 @@ module Hwaro
         # page resolves to no image (e.g. auto OG images disabled and no
         # per-page or default image set).
         img_url = resolve_image_url(image, base_url)
-        card = (@twitter_card == "summary_large_image" && img_url.nil?) ? "summary" : @twitter_card
+        card = twitter_card_for(img_url)
 
         # See `og_tags` above for why subsequent lines are pre-indented.
         String.build(256) do |str|
@@ -175,6 +175,12 @@ module Hwaro
             append_meta(str, "name", "twitter:creator", creator)
           end
         end
+      end
+
+      # The card type for a page whose resolved image is `img_url`: shared by
+      # `twitter_tags` and the `seo.twitter_card` template field.
+      def twitter_card_for(img_url : String?) : String
+        (@twitter_card == "summary_large_image" && img_url.nil?) ? "summary" : @twitter_card
       end
 
       # Resolve an image path to an absolute URL, falling back to default_image.

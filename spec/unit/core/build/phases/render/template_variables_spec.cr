@@ -122,3 +122,24 @@ describe "title-less ancestor sections" do
     end
   end
 end
+
+describe "seo.twitter_card" do
+  # Regression: `twitter_tags` downgrades summary_large_image to summary when
+  # a page resolves no image (a large card with no image renders blank), but
+  # the `seo` object kept advertising summary_large_image.
+  it "matches the card type twitter_tags emits" do
+    build_site(
+      "title = \"T\"\nbase_url = \"https://ex.com\"\n",
+      content_files: {
+        "plain.md" => "+++\ntitle = \"Plain\"\n+++\n",
+        "pic.md"   => "+++\ntitle = \"Pic\"\nimage = \"/pic.png\"\n+++\n",
+      },
+      template_files: {"page.html" => "{{ seo.twitter_card }}|{{ twitter_tags }}"},
+    ) do
+      plain = File.read("public/plain/index.html")
+      plain.should start_with("summary|")
+      plain.should contain(%(name="twitter:card" content="summary"))
+      File.read("public/pic/index.html").should start_with("summary_large_image|")
+    end
+  end
+end

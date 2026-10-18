@@ -509,12 +509,12 @@ module Hwaro::Core::Build::Phases::Render
 
       # Structured SEO object for custom meta tag markup
       canonical_url = Content::Seo::Tags.canonical_url(page, config, canonical_override)
-      seo_image = config.og.resolve_image_url(page.social_image, config.base_url) || ""
+      seo_image = config.og.resolve_image_url(page.social_image, config.base_url)
       seo_obj = {
         "canonical_url"   => Crinja::Value.new(canonical_url),
         "og_type"         => Crinja::Value.new(og_type_override || config.og.og_type),
-        "og_image"        => Crinja::Value.new(seo_image),
-        "twitter_card"    => Crinja::Value.new(config.og.twitter_card),
+        "og_image"        => Crinja::Value.new(seo_image || ""),
+        "twitter_card"    => Crinja::Value.new(config.og.twitter_card_for(seo_image)),
         "twitter_site"    => Crinja::Value.new(config.og.twitter_site || ""),
         "twitter_creator" => Crinja::Value.new(config.og.twitter_creator || ""),
         "fb_app_id"       => Crinja::Value.new(config.og.fb_app_id || ""),

@@ -418,7 +418,7 @@ twitter_creator = "@authorusername"
 
 | Key | Description |
 |-----|-------------|
-| twitter_card | Card type: summary, summary_large_image |
+| twitter_card | Card type: summary, summary_large_image (a page with no image gets `summary`, since a large card without one renders blank) |
 | twitter_site | Site's Twitter handle |
 | twitter_creator | Author's Twitter handle |
 
@@ -492,7 +492,7 @@ The `seo` object provides individual field access for building custom meta tags:
 | seo.canonical_url | String | Full canonical URL |
 | seo.og_type | String | OpenGraph type (default: "article") |
 | seo.og_image | String | Resolved absolute image URL |
-| seo.twitter_card | String | Twitter card type |
+| seo.twitter_card | String | Twitter card type, as `twitter_tags` emits it for this page |
 | seo.twitter_site | String | Twitter site handle |
 | seo.twitter_creator | String | Twitter creator handle |
 | seo.fb_app_id | String | Facebook App ID |
