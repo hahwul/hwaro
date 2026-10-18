@@ -137,6 +137,9 @@ module Hwaro
           # Bumped when text spliced into a quoted string carries that
           # string's own quote (see `resolve_template`).
           @quote_conflicts = 0
+          # Bumped when a null variable is elided from verbatim text (see
+          # `resolve_template`).
+          @null_elisions = 0
           @forward_variables = {} of String => String
           @forward_mixins = {} of String => MixinClosure
           @forward_functions = {} of String => SassFn
@@ -2250,9 +2253,12 @@ module Hwaro
             end
           end
           conflicts = @quote_conflicts
+          nulls = @null_elisions
           text = collapse_ws(resolve_template(template, allow_vars: true))
-          if @quote_conflicts != conflicts && (node = Expr.parse(template))
-            # `'#{"Don't"}'`: only the typed path can re-quote the string.
+          # `'#{"Don't"}'`: only the typed path can re-quote the string.
+          # `1px, $null, 2px`: only the typed path drops the null element —
+          # the text path leaves an empty `1px, , 2px` member behind.
+          if (@quote_conflicts != conflicts || (@null_elisions != nulls && comma_hole?(text))) && (node = Expr.parse(template))
             begin
               return value_storage(Expr::Evaluator.new(self, force_div: true).eval(node))
             rescue SoftEvalError
@@ -2286,8 +2292,9 @@ module Hwaro
           # The verbatim path only has text, where a stored null reads back
           # as "null" (see `value_storage`).
           conflicts = @quote_conflicts
+          nulls = @null_elisions
           text = collapse_ws(resolve_template(template, allow_vars: true))
-          if @quote_conflicts != conflicts && (node = Expr.parse(template))
+          if (@quote_conflicts != conflicts || (@null_elisions != nulls && comma_hole?(text))) && (node = Expr.parse(template))
             begin
               return ResolvedValue.new(Expr::Evaluator.new(self, fold_calc: fold_calc).eval(node).to_css, false)
             rescue SoftEvalError
@@ -2743,7 +2750,11 @@ module Hwaro
                   # optional-modifier idiom `.btn#{$mod}` with `$mod: null`
                   # has to yield `.btn`, not `.btnnull`.
                   var_text = lookup_var_ref(piece)
-                  io << var_display_text(var_text) unless var_text == "null"
+                  if var_text == "null"
+                    @null_elisions += 1
+                  else
+                    io << var_display_text(var_text)
+                  end
                 end
               in Ast::Interp
                 spliced = unquote_interp(resolve_interp(piece.inner, amp: allow_vars || !quote.nil?))
@@ -2803,15 +2814,24 @@ module Hwaro
         # verbatim never-computed source) passes through untouched, which
         # is what keeps plain-CSS output byte-identical.
         private def var_display_text(storage : String) : String
-          return storage unless storage.includes?('(')
+          return storage unless storage.includes?('(') || storage.includes?("null")
           value = Expr.coerce(storage)
+          # Storage also keeps a list's null members (`append(null, 1px)`
+          # stores `null 1px`); CSS output drops them.
           if value.is_a?(ListV) &&
-             (value.items.any? { |i| i.is_a?(ListV) && !i.bracketed } ||
+             (value.items.any? { |i| (i.is_a?(ListV) && !i.bracketed) || i.is_a?(NullV) } ||
              (value.sep == ListV::Sep::Comma && value.items.size == 1))
             value.to_css
           else
             storage
           end
+        end
+
+        # True when eliding a null variable left an empty comma-list member
+        # behind (`1px, , 2px`, `, 2px`). Space lists need no repair: the
+        # whitespace collapse already closes their gap.
+        private def comma_hole?(text : String) : Bool
+          text.starts_with?(',') || text.ends_with?(',') || text.includes?(", ,") || text.includes?(",,")
         end
 
         private def lookup_var_ref(ref : Ast::VarRef) : String

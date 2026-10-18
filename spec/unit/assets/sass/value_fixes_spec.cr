@@ -227,4 +227,25 @@ describe "Sass value fixes" do
       css.should contain(%(c3: "abcd";))
     end
   end
+
+  describe "null list members" do
+    it "drops a null member from a list built by append (rfs idiom)" do
+      css = compile_source(<<-SCSS)
+        .a { $v: null; @each $x in 1px 2px { $v: append($v, $x); } p: $v; q: length($v); }
+        SCSS
+      css.should contain("p: 1px 2px;")
+      css.should contain("q: 3;")
+    end
+
+    it "drops a null variable from a comma list" do
+      css = compile_source(<<-SCSS)
+        $n: null;
+        $l: 1px, $n, 2px;
+        .a { k: 1px, $n, 2px; l: length($l); m: $l; }
+        SCSS
+      css.should contain("k: 1px, 2px;")
+      css.should contain("l: 3;")
+      css.should contain("m: 1px, 2px;")
+    end
+  end
 end
