@@ -390,4 +390,29 @@ describe "Related posts candidates" do
 
     me.related_posts.map(&.title).should eq(["Both", "Dup"])
   end
+
+  # A tag every post carries (`tags = ["blog"]`) makes every page a
+  # candidate of every other: the pair walk is O(pages²) by nature, and it
+  # used to do a string-keyed hash insert per pair (~5s here, ~8s for a
+  # 4,000-post site — longer than the rest of the build).
+  it "stays fast when one term is shared by every page" do
+    builder = Hwaro::Core::Build::Builder.new
+    config = Hwaro::Models::Config.new
+    config.related.enabled = true
+    site = Hwaro::Models::Site.new(config)
+
+    pages = (0...3000).map do |i|
+      page = Hwaro::Models::Page.new("posts/p#{i}.md")
+      page.title = "P#{i}"
+      page.tags = ["blog", "t#{i % 7}"]
+      page
+    end
+    site.pages = pages.map(&.as(Hwaro::Models::Page))
+
+    elapsed = Time.measure { builder.test_compute_related_posts(site) }
+
+    elapsed.should be < 2.seconds
+    # Same-residue pages share both terms and rank first, in page order.
+    pages[0].related_posts.map(&.title).should eq(["P7", "P14", "P21", "P28", "P35"])
+  end
 end
