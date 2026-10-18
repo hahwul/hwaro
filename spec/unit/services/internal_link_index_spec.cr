@@ -62,6 +62,25 @@ describe Hwaro::Services::InternalLinkIndex do
       end
     end
 
+    # The build's add_default_language_aliases: `@/blog/bun/index.md` reaches
+    # `blog/bun/index.ko.md` on a `ko`-default site.
+    it "resolves the bare path of a file spelling the default language out" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "config.toml"), "default_language = \"ko\"\n[languages.ko]\n[languages.en]\n")
+        content = File.join(dir, "content")
+        FileUtils.mkdir_p(File.join(content, "bun"))
+        File.write(File.join(content, "bun", "index.ko.md"), "+++\ntitle = \"B\"\n+++\n")
+        File.write(File.join(content, "about.ko.md"), "+++\ntitle = \"A\"\ndraft = true\n+++\n")
+        File.write(File.join(content, "about.md"), "+++\ntitle = \"A\"\n+++\n")
+        File.write(File.join(content, "x.en.md"), "+++\ntitle = \"X\"\n+++\n")
+
+        index = Hwaro::Services::InternalLinkIndex.new(content)
+        index.unresolved_reason("bun/index.md").should be_nil
+        index.unresolved_reason("about.md").should be_nil
+        index.unresolved_reason("x.md").should eq("not found")
+      end
+    end
+
     it "names the publish state of a target a default build drops" do
       Dir.mktmpdir do |dir|
         FileUtils.mkdir_p(File.join(dir, "drafts"))

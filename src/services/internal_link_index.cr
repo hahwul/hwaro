@@ -80,6 +80,11 @@ module Hwaro
             # An authored file owns its path, as in the build.
             map[path] = info.status if info.generated_from.nil? || !map.has_key?(path)
           end
+          # `@/about.md` also reaches `about.en.md` on an `en` site; a
+          # literal file of the bare name keeps its key, as in the build.
+          map.to_a.each do |path, status|
+            lister.default_language_bare_path(path).try { |bare| map[bare] ||= status }
+          end
           map
         end
       end
