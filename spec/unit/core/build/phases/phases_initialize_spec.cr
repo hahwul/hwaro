@@ -419,6 +419,23 @@ describe Hwaro::Core::Build::Phases::Initialize do
       end
     end
 
+    it "keeps the section.pages copy for a template whose shortcode prints a `section` read" do
+      # A template-invoked shortcode's output is compiled with the template,
+      # so a raw `{{ section.pages }}` it prints reads `section` although no
+      # lexed identifier in the closure does.
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("templates/shortcodes")
+          File.write("templates/shortcodes/count.html", %({% raw %}{{ section.pages | length }}{% endraw %}))
+          File.write("templates/post.html", %(<p>{{ count() }}</p>))
+
+          builder = Hwaro::Core::Build::Builder.new
+          builder.test_load_templates
+          builder.test_template_var_features["post"]?.try(&.needs_section_pages).should be_true
+        end
+      end
+    end
+
     it "returns an empty hash when no templates directory exists" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

@@ -793,7 +793,12 @@ module Hwaro::Core::Build::Phases::Initialize
                    union.includes?("alternate_output_tags") ||
                    union.includes?("seo"),
         needs_jsonld: !shortcode_free || union.includes?("jsonld"),
-        needs_section_pages: sources.any? { |src| template_reads_variable?(src, "section") },
+        # A user shortcode's output is compiled into the template that calls
+        # it, so any `section` text it prints (raw, quoted) is a read too.
+        needs_section_pages: closure.any? { |dep|
+          src = templates[dep]
+          dep.starts_with?("shortcodes/") ? src.includes?("section") : template_reads_variable?(src, "section")
+        },
         # Targeted on purpose — see the record's doc comment. These feed the
         # render worker heuristic, where a false positive costs parallelism.
         listing_fanout_site: union.includes?("site.pages"),
