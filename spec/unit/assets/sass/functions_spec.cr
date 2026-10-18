@@ -201,4 +201,16 @@ describe "Sass functions" do
       SCSS
     css.should contain("width: ok;")
   end
+
+  it "unquote() decodes single-character escapes like dart-sass" do
+    css = compile(<<-'SCSS')
+      $icon: \f102;
+      .a { a: unquote("\"#{$icon}\""); b: unquote('it\'s'); c: unquote("a\\b"); d: unquote("a\:b"); e: unquote("\f101"); }
+      SCSS
+    css.should contain(%(a: "\\f102";))
+    css.should contain("b: it's;")
+    css.should contain("c: a\\b;")
+    css.should contain("d: a:b;")
+    css.should contain("e: \\f101;")
+  end
 end

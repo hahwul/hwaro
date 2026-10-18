@@ -280,6 +280,33 @@ module Hwaro
           "#{quote}#{escaped}#{quote}"
         end
 
+        # `text` as unquote() hands it out: a single-character escape
+        # (`\"`, `\'`, `\\`, `\:`) is only an escape inside quotes, so it
+        # becomes that character, and an escaped newline is a line
+        # continuation. Hex escapes (`\f101`) stay verbatim: they mean the
+        # same code point unquoted (dart-sass prints them back the same).
+        def self.unquote_text(text : String) : String
+          return text unless text.includes?('\\')
+          String.build do |io|
+            esc = false
+            text.each_char do |ch|
+              if esc
+                esc = false
+                if ch.hex?
+                  io << '\\' << ch
+                elsif ch != '\n'
+                  io << ch
+                end
+              elsif ch == '\\'
+                esc = true
+              else
+                io << ch
+              end
+            end
+            io << '\\' if esc
+          end
+        end
+
         def self.contains_unescaped?(text : String, quote : Char) : Bool
           esc = false
           text.each_char do |ch|

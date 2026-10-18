@@ -540,7 +540,10 @@ module Hwaro
             args = args_with_kwargs("string.unquote", args, kwargs, %w[string])
             arity!("unquote", args, 1)
             s = string!("unquote", args[0])
-            Str.new(s.text, quoted: false)
+            # Font Awesome's `unquote("\"#{$icon}\"")` must yield
+            # `"\f101"`, not `\"\f101\"` (see Str.unquote_text).
+            text = s.quoted ? Str.unquote_text(s.text) : s.text
+            Str.new(text, quoted: false)
           end,
           "length" => Fn.new do |args, kwargs|
             args = args_with_kwargs("string.length", args, kwargs, %w[string])
