@@ -352,6 +352,32 @@ describe "warm --cache: section-set changes" do
       end
     end
   end
+
+  it "re-renders sibling pages when a subsection turns transparent or back" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", "title = \"T\"\nbase_url = \"http://localhost\"\n")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "SIB={% for p in section.pages %}[{{ p.title }}]{% endfor %}")
+        File.write("templates/section.html", "{{ section.list }}")
+        FileUtils.mkdir_p("content/blog/sub")
+        File.write("content/blog/_index.md", "+++\ntitle = \"Blog\"\n+++\n")
+        File.write("content/blog/post.md", "+++\ntitle = \"Post\"\n+++\n")
+        File.write("content/blog/sub/_index.md", "+++\ntitle = \"Sub\"\n+++\n")
+        File.write("content/blog/sub/inner.md", "+++\ntitle = \"Inner\"\n+++\n")
+        relations_cached_build
+        File.read("public/blog/post/index.html").should eq("SIB=[Sub]")
+
+        File.write("content/blog/sub/_index.md", "+++\ntitle = \"Sub\"\ntransparent = true\n+++\n")
+        relations_cached_build
+        File.read("public/blog/post/index.html").should eq("SIB=[Inner]")
+
+        File.write("content/blog/sub/_index.md", "+++\ntitle = \"Sub\"\n+++\n")
+        relations_cached_build
+        File.read("public/blog/post/index.html").should eq("SIB=[Sub]")
+      end
+    end
+  end
 end
 
 describe "warm --cache: versioned canonical" do

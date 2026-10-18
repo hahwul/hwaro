@@ -544,6 +544,11 @@ module Hwaro::Core::Build::Phases::Render
     if version = p.version
       fp_value(digest, "v:#{version.name}")
     end
+    # A transparent subsection lists its pages in the parent's
+    # `section.pages` instead of itself, so flipping it changes what every
+    # page of the parent section lists. Folded only when set, so sites
+    # without transparent sections keep their digest.
+    fp_value(digest, "transparent") if p.is_a?(Models::Section) && p.transparent
     fp_value(digest, extra_fp(p.extra)) if fields.extra
     if fields.content_derived
       fp_value(digest, p.summary || "")
