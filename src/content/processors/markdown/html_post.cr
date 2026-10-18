@@ -268,13 +268,17 @@ module Hwaro
           # missing from every later one too, so each unclosed opener does
           # not rescan to the end of the page.
           unclosed = Set(String).new
+          # PCRE2 validates the whole subject on every call unless told not
+          # to: once per '<' that made the pass quadratic in the tag count.
+          skip_opts = Regex::MatchOptions::ANCHORED
+          skip_opts |= Regex::MatchOptions::NO_UTF_CHECK if html.valid_encoding?
 
           while pos < len
             # Copy code, raw-text elements (script/style/textarea), math
             # spans and mermaid blocks verbatim: `a:link:hover` in CSS or
             # `$f:x:y$` must not become `a🔗hover` / `f❌y`.
             if bytes[pos] == lt && pos + 1 < len
-              if m = EMOJI_SKIP_RE.match_at_byte_index(html, pos, Regex::MatchOptions::ANCHORED)
+              if m = EMOJI_SKIP_RE.match_at_byte_index(html, pos, skip_opts)
                 close_tag = "</#{m[1]? || m[2]}>"
                 end_pos = html.byte_index(close_tag, pos) unless unclosed.includes?(close_tag)
                 unclosed << close_tag unless end_pos
