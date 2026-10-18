@@ -87,6 +87,29 @@ describe "warm --cache builds" do
     end
   end
 
+  it "removes the old output of a page moved onto another page's URL" do
+    with_cached_site do
+      cached_build
+      File.exists?("public/posts/keep/index.html").should be_true
+
+      # `posts/keep.md` sorts after `posts/gone.md`, so it loses the URL.
+      File.write("content/posts/keep.md", "+++\ntitle = \"Keep\"\npath = \"posts/gone\"\n+++\nkeep body")
+      cached_build
+
+      File.exists?("public/posts/keep/index.html").should be_false
+      File.read("public/posts/gone/index.html").should contain("gone body")
+
+      # Still the winner's file on the next warm build, and the loser
+      # publishes again once the collision is gone.
+      cached_build
+      File.read("public/posts/gone/index.html").should contain("gone body")
+      File.write("content/posts/keep.md", "+++\ntitle = \"Keep\"\n+++\nkeep body")
+      cached_build
+      File.read("public/posts/keep/index.html").should contain("keep body")
+      File.read("public/posts/gone/index.html").should contain("gone body")
+    end
+  end
+
   it "removes the output of a page turned draft" do
     with_cached_site do
       cached_build

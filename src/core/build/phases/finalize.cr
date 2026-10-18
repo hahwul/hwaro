@@ -98,6 +98,9 @@ module Hwaro::Core::Build::Phases::Finalize
         next
       end
       next unless page.render
+      # A collision loser writes nothing either (the winner owns its URL), so
+      # the file its entry recorded before it moved onto that URL is stale.
+      next if page.output_suppressed
       source, output = cache_paths_for(page, output_dir)
       next unless output
       live << source
