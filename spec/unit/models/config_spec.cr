@@ -292,6 +292,15 @@ describe Hwaro::Models::Config do
       config.base_url.should eq("")
       config.default_language.should eq("en")
     end
+
+    it "keeps the default language when default_language is blank" do
+      config = nil
+      log = with_captured_log do
+        config = load_config(%(title = "X"\ndefault_language = " "\n))
+      end
+      config.not_nil!.default_language.should eq("en")
+      log.should contain("Ignoring empty default_language")
+    end
   end
 
   # ---------------------------------------------------------------------------

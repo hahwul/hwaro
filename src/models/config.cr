@@ -363,7 +363,14 @@ module Hwaro
           end
           config.base_url = raw_base_url
         end
-        config.default_language = string_or_default(config.raw, "default_language", config.default_language)
+        # A blank code (`default_language = ""`, an unset `${LANG:-}`) is no
+        # language: it rendered `<html lang="">` on every page in silence.
+        default_language = string_or_default(config.raw, "default_language", config.default_language)
+        if default_language.blank?
+          Logger.warn "Ignoring empty default_language in #{config_path}; using #{config.default_language.inspect}"
+        else
+          config.default_language = default_language
+        end
 
         SECTION_LOADERS.each(&.load.call(config))
 
