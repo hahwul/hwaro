@@ -105,6 +105,9 @@ module Hwaro
         # Line-break flags for @parent_selectors (see Css::Rule#breaks);
         # saved/restored wherever @parent_selectors is.
         @parent_breaks : Array(Bool)?
+        # The enclosing rule's selectors inside an `@at-root { }` block,
+        # where rules stand at the root but `&` still means that rule.
+        @at_root_parents : Array(String)? = nil
         @content : ContentBlock?
         @in_keyframes : Bool
         @include_depth : Int32
@@ -296,11 +299,13 @@ module Hwaro
           saved_rule_sink = @current_rule_sink
           saved_parents = @parent_selectors
           saved_breaks = @parent_breaks
+          saved_at_root = @at_root_parents
           saved_env = @env
           @current_rule = rule
           @current_rule_sink = @sink
           @parent_selectors = selectors
           @parent_breaks = breaks
+          @at_root_parents = nil
           @env = Environment.new(saved_env)
           begin
             yield
@@ -309,6 +314,7 @@ module Hwaro
             @current_rule_sink = saved_rule_sink
             @parent_selectors = saved_parents
             @parent_breaks = saved_breaks
+            @at_root_parents = saved_at_root
             @env = saved_env
           end
         end
@@ -358,6 +364,9 @@ module Hwaro
                                       node : Ast::RuleNode) : {Array(String), Array(Bool)}
           parents = @parent_selectors
           if parents.nil?
+            if (root_parents = @at_root_parents) && parts.any? { |part| count_parent_refs(part) > 0 }
+              return at_root_selectors(parts, part_breaks, root_parents, node.line, node.column)
+            end
             parts.each do |part|
               if count_parent_refs(part) > 0
                 error_at(node.line, node.column, "top-level selectors may not contain \"&\"")
@@ -1477,12 +1486,17 @@ module Hwaro
               # A plain block scope, not `scoped`: `@at-root` is not a
               # flow-control rule, so assignments inside it must not write
               # through to the enclosing scope the way `@if`/`@while` do.
+              # Its rules resolve like `@at-root <selector>`: `&.b` still
+              # names the enclosing rule (Foundation's table mixin).
               saved_env = @env
+              saved_at_root = @at_root_parents
               @env = Environment.new(saved_env)
+              @at_root_parents = saved_parents
               begin
                 eval_nodes(node.children)
               ensure
                 @env = saved_env
+                @at_root_parents = saved_at_root
               end
             end
           ensure
@@ -1500,7 +1514,23 @@ module Hwaro
           text = resolve_template(selector, allow_vars: false)
           parts, part_breaks = selector_parts(text)
           error_at(node.line, node.column, "expected selector") if parts.empty?
+          selectors, breaks = at_root_selectors(parts, part_breaks, parents, node.line, node.column)
 
+          rule = Css::Rule.new(selectors, breaks)
+          emit(rule)
+          with_rule_scope(rule, selectors, breaks) { eval_nodes(node.children) }
+          # A rule lifted to the root is its own output group — dart-sass
+          # separates it from what follows with a blank line.
+          if @at_frames.empty? && (last = @sink.last?)
+            last.group_end = true
+          end
+        end
+
+        # Selectors of a rule standing at the root: literal `&` substitutes
+        # the parent selectors, but a part without `&` takes no parent
+        # prefix (unlike a nested rule).
+        private def at_root_selectors(parts : Array(String), part_breaks : Array(Bool),
+                                      parents : Array(String)?, line : Int32, column : Int32) : {Array(String), Array(Bool)}
           selectors = [] of String
           breaks = [] of Bool
           parts.each_with_index do |part, part_i|
@@ -1517,7 +1547,7 @@ module Hwaro
             if amps == 0
               push.call(part)
             elsif parents.nil?
-              error_at(node.line, node.column, "top-level selectors may not contain \"&\"")
+              error_at(line, column, "top-level selectors may not contain \"&\"")
             else
               if amps <= MAX_PARENT_REF_SLOTS
                 projected = 1_i64
@@ -1526,7 +1556,7 @@ module Hwaro
                   break if projected > MAX_RULE_SELECTORS
                 end
                 if projected > MAX_RULE_SELECTORS
-                  error_at(node.line, node.column,
+                  error_at(line, column,
                     "selector expands to more than #{MAX_RULE_SELECTORS} selectors " \
                     "(#{parents.size} parent selectors, #{amps} \"&\" references); " \
                     "reduce the nesting or the comma-separated parent list")
@@ -1541,20 +1571,12 @@ module Hwaro
               combos.each { |combo| push.call(substitute_parent(part, combo)) }
             end
             if selectors.size > MAX_RULE_SELECTORS
-              error_at(node.line, node.column,
+              error_at(line, column,
                 "selector expands to more than #{MAX_RULE_SELECTORS} selectors; " \
                 "reduce the comma-separated parent list")
             end
           end
-
-          rule = Css::Rule.new(selectors, breaks)
-          emit(rule)
-          with_rule_scope(rule, selectors, breaks) { eval_nodes(node.children) }
-          # A rule lifted to the root is its own output group — dart-sass
-          # separates it from what follows with a blank line.
-          if @at_frames.empty? && (last = @sink.last?)
-            last.group_end = true
-          end
+          {selectors, breaks}
         end
 
         # `@at-root (with: ...)` / `(without: ...)`. Escaped at-rule
