@@ -872,7 +872,7 @@ module Hwaro::Core::Build::Phases::Initialize
 
   # Extensions the digest below covers. WIDER than `DataDisk.load_tree`'s
   # glob on purpose: `site.data` never reads CSV, but `load_data()` does
-  # (see the template function's `parse_data_content`), and a template
+  # (see the template function's `data_format`), and a template
   # calling `load_data(path="data/team.csv")` renders from a file that the
   # digest has to see. Missing it meant editing a `data/*.csv` moved nothing
   # in the cache key, so `build --cache` re-published every page with the
