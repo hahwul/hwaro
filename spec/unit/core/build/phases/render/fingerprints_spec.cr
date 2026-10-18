@@ -120,6 +120,19 @@ describe "warm --cache: pages rendering other pages" do
     end
   end
 
+  it "re-renders a get_page reader whose precomposed path names a decomposed file" do
+    with_relations_site do
+      File.write("content/café.md", "+++\ntitle = \"Cafe one\"\ntemplate = \"plain\"\n+++\nx")
+      File.write("templates/nfc.html", %(NFC={{ get_page(path="café.md").title }}))
+      File.write("content/nfc.md", "+++\ntitle = \"N\"\ntemplate = \"nfc\"\n+++\n")
+      relations_cached_build
+      File.read("public/nfc/index.html").should contain("NFC=Cafe one")
+      retitle("content/café.md", "Cafe one", "Cafe two")
+      relations_cached_build
+      File.read("public/nfc/index.html").should contain("NFC=Cafe two")
+    end
+  end
+
   it "treats a get_page call with a computed path as a page-set read" do
     with_relations_site do
       File.write("templates/dyn.html", %(DYN={{ get_page(path=page.extra.ref).title }}))

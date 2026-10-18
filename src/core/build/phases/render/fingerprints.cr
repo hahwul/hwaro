@@ -929,12 +929,21 @@ module Hwaro::Core::Build::Phases::Render
 
   # The page `get_page(path: target)` returns — same lookup order as the
   # template function (content path, URL, URL without its trailing slash,
-  # then `/<path minus .md>/`), over `site.pages` only.
+  # then `/<path minus .md>/`), over `site.pages` only. A non-ASCII target
+  # is NFC-folded and retried against folded keys, as the template function
+  # does (Render#add_nfc_keys).
   private def resolve_get_page_target(target : String, site : Models::Site) : Models::Page?
-    site.pages.find { |p| p.path == target || p.url == target || (p.url.size > 1 && p.url.ends_with?('/') && p.url.rstrip('/') == target) } ||
+    return get_page_target_match(target, site) { |s| s } if target.ascii_only?
+    folded = target.unicode_normalize(:nfc)
+    get_page_target_match(folded, site) { |s| s } ||
+      get_page_target_match(folded, site) { |s| s.ascii_only? ? s : s.unicode_normalize(:nfc) }
+  end
+
+  private def get_page_target_match(target : String, site : Models::Site, & : String -> String) : Models::Page?
+    site.pages.find { |p| yield(p.path) == target || yield(p.url) == target || (p.url.size > 1 && p.url.ends_with?('/') && yield(p.url.rstrip('/')) == target) } ||
       begin
         alt = "/#{target.chomp(".markdown").chomp(".md")}/"
-        site.pages.find { |p| p.path == alt || p.url == alt }
+        site.pages.find { |p| yield(p.path) == alt || yield(p.url) == alt }
       end
   end
 
