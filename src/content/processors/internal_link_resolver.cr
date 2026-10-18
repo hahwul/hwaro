@@ -261,17 +261,29 @@ module Hwaro
           return html if base_path.empty?
 
           prefix_slash = "#{base_path}/"
+          needs_prefix = ->(value : String) do
+            value.starts_with?('/') && !value.starts_with?("//") &&
+            value != base_path && !value.starts_with?(prefix_slash)
+          end
 
-          html.gsub(ROOT_RELATIVE_ATTR_REGEX) do |match|
-            attr = $1
-            value = $2
-            # Leave values that already carry the base_path (e.g. links the
-            # InternalLinkResolver pass above already resolved) untouched.
-            if value == base_path || value.starts_with?(prefix_slash)
-              match
-            else
-              "#{attr}=\"#{base_path}#{value}\""
+          # Leave values that already carry the base_path (e.g. links the
+          # InternalLinkResolver pass above already resolved) untouched.
+          result = html.gsub(ROOT_RELATIVE_ATTR_REGEX) do |match|
+            needs_prefix.call($2) ? "#{$1}=\"#{base_path}#{$2}\"" : match
+          end
+          return result unless Utils::ByteScan.includes?(result, "srcset=\"")
+
+          # An author's `<img srcset>` / `<picture><source srcset>` names one
+          # URL per candidate; the browser prefers them over `src`, so every
+          # root-relative candidate needs the prefix too.
+          result.gsub(SRCSET_ATTR_REGEX) do |match|
+            value = $1
+            prefixed = value
+            Utils::TextUtils.srcset_url_spans(value).reverse_each do |(start, stop)|
+              next unless needs_prefix.call(value[start...stop])
+              prefixed = prefixed[0, start] + base_path + prefixed[start..]
             end
+            prefixed == value ? match : %(srcset="#{prefixed}")
           end
         rescue URI::Error
           html
