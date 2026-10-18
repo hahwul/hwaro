@@ -157,7 +157,7 @@ module Hwaro
         # Map a `[[Wiki-Link]]` target to either an absolute site URL (when
         # the target was found in the vault) or the slugified fallback (so
         # external references still produce *some* link rather than nothing).
-        private def resolve_wikilink(page : String, link_map : Hash(String, String)) : String
+        private def resolve_wikilink(page : String, link_map : Hash(String, String), note_dir : String = "") : String
           # Obsidian links can include a `#heading` anchor (`[[Note#Section]]`)
           # and `^block-ref` ids (`[[Note#^abc]]`). Strip those before lookup
           # and re-append the anchor in slugified form afterwards.
@@ -168,7 +168,19 @@ module Hwaro
           end
 
           key = name.strip.downcase
-          if url = link_map[key]?
+          url = link_map[key]?
+          # A link with a folder (`[[Sub/Note]]`, `[[../Other/Note]]`) is
+          # relative to the linking note's folder, or a partial path Obsidian
+          # matches against the end of a note's vault path. Only the
+          # whole-vault path was looked up, so these fell back to a broken
+          # relative slug.
+          # ponytail: the suffix match scans every key; index vault paths by
+          # basename if vaults with thousands of such links get slow.
+          if url.nil? && key.includes?('/')
+            url = link_map[Path.posix(note_dir.downcase, key).normalize.to_s]? ||
+                  link_map.find { |k, _| k.ends_with?("/#{key}") }.try(&.[1])
+          end
+          if url
             return anchor.empty? ? url : "#{url}##{Utils::TextUtils.slugify(anchor.lchop('#').lchop('^'))}"
           end
           # Unknown target: fall back to a relative slug. This keeps behavior
@@ -268,7 +280,8 @@ module Hwaro
           end
 
           # Convert Obsidian-specific syntax
-          body = convert_obsidian_syntax(body, link_map)
+          note_dir = File.dirname(file_path.sub(base_path, "").lstrip('/'))
+          body = convert_obsidian_syntax(body, link_map, note_dir)
 
           # Determine section from vault folder structure
           section, _ = section_from_path(file_path, base_path, "posts")
@@ -435,7 +448,7 @@ module Hwaro
           tags.uniq
         end
 
-        private def convert_obsidian_syntax(body : String, link_map : Hash(String, String) = {} of String => String) : String
+        private def convert_obsidian_syntax(body : String, link_map : Hash(String, String) = {} of String => String, note_dir : String = "") : String
           in_code_block = false
           in_math_block = false
           fence_close_re : Regex? = nil
@@ -484,7 +497,7 @@ module Hwaro
                       "![#{alt}](#{target})"
                     else
                       display = alt_or_width.empty? ? target : alt_or_width
-                      resolved_url = resolve_wikilink(target, link_map)
+                      resolved_url = resolve_wikilink(target, link_map, note_dir)
                       "[#{display}](#{resolved_url})"
                     end
                   end
@@ -498,7 +511,7 @@ module Hwaro
                   else
                     page = $1
                     display = $~[2]? || page
-                    target = resolve_wikilink(page, link_map)
+                    target = resolve_wikilink(page, link_map, note_dir)
                     "[#{display}](#{target})"
                   end
                 end

@@ -127,6 +127,31 @@ describe Hwaro::Services::Importers::ObsidianImporter do
       end
     end
 
+    it "resolves folder wiki-links relative to the note and by partial path" do
+      Dir.mktmpdir do |dir|
+        Dir.mkdir_p(File.join(dir, "Notes", "Sub"))
+        Dir.mkdir_p(File.join(dir, "Other"))
+        File.write(File.join(dir, "Notes", "Alpha.md"),
+          "[[Sub/Gamma|the gamma]] and [[../Other/Delta]] and [[Notes/Sub/Gamma#Part]]\n")
+        File.write(File.join(dir, "Other", "Beta.md"), "[[Sub/Gamma]]\n")
+        File.write(File.join(dir, "Other", "Delta.md"), "delta\n")
+        File.write(File.join(dir, "Notes", "Sub", "Gamma.md"), "gamma\n")
+
+        output_dir = File.join(dir, "output")
+        Hwaro::Services::Importers::ObsidianImporter.new.run(Hwaro::Config::Options::ImportOptions.new(
+          source_type: "obsidian",
+          path: dir,
+          output_dir: output_dir,
+        ))
+
+        alpha = File.read(File.join(output_dir, "notes", "alpha.md"))
+        alpha.should contain("[the gamma](/notes/sub/gamma/)")
+        alpha.should contain("[../Other/Delta](/other/delta/)")
+        alpha.should contain("[Notes/Sub/Gamma#Part](/notes/sub/gamma/#part)")
+        File.read(File.join(output_dir, "other", "beta.md")).should contain("[Sub/Gamma](/notes/sub/gamma/)")
+      end
+    end
+
     it "resolves wiki-links via the front-matter `aliases:` list" do
       # Obsidian's killer feature for wiki-links is renaming a note without
       # breaking inbound links — the alias list keeps the old names valid.
