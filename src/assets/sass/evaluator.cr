@@ -1465,6 +1465,9 @@ module Hwaro
           saved_rule = @current_rule
           saved_parents = @parent_selectors
           saved_breaks = @parent_breaks
+          # Inside an outer `@at-root { }` block the enclosing rule is
+          # still the one `&` names.
+          parents = saved_parents || @at_root_parents
           @current_rule = nil
           @parent_selectors = nil
           @parent_breaks = nil
@@ -1477,10 +1480,10 @@ module Hwaro
               # TOP-LEVEL rule: a selector without `&` left in it must not
               # be re-nested under the parents.
               if template_has_parent_ref?(selector)
-                @parent_selectors = saved_parents
+                @parent_selectors = parents
                 @parent_breaks = saved_breaks
               end
-              eval_at_root_rule(selector, node, saved_parents)
+              eval_at_root_rule(selector, node, parents)
             else
               # A plain block scope, not `scoped`: `@at-root` is not a
               # flow-control rule, so assignments inside it must not write
@@ -1490,7 +1493,7 @@ module Hwaro
               saved_env = @env
               saved_at_root = @at_root_parents
               @env = Environment.new(saved_env)
-              @at_root_parents = saved_parents
+              @at_root_parents = parents
               begin
                 eval_nodes(node.children)
               ensure

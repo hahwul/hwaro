@@ -107,5 +107,14 @@ describe "Sass selector fixes" do
       css.should contain(".p .a {\n  q: r;")
       css.should contain("table.unstriped tbody {\n  a: b;")
     end
+
+    it "still names the enclosing rule inside a nested @at-root" do
+      css = compile_source(<<-SCSS)
+        .a { @at-root { @at-root { &.b { x: 1; } } } }
+        .c { @at-root { @at-root .p & { y: 2; } } }
+        SCSS
+      css.should contain(".a.b {\n  x: 1;")
+      css.should contain(".p .c {\n  y: 2;")
+    end
   end
 end
