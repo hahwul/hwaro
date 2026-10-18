@@ -334,6 +334,21 @@ describe Hwaro::Core::Build::Phases::Initialize do
       end
     end
 
+    # The static walk does not follow a linked directory; the files under it
+    # used to vanish from the output without a word.
+    it "warns about a symlinked directory it does not copy" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p(["static", "shared/img", "public"])
+          File.write("shared/img/a.png", "png")
+          File.symlink(File.expand_path("shared/img"), "static/img")
+
+          log = with_captured_log { Hwaro::Core::Build::Builder.new.test_copy_static_files("public") }
+          log.should contain("Skipping static directory symlink (directory symlinks are not followed): static/img")
+        end
+      end
+    end
+
     it "honors a custom [static] exclude list from config" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

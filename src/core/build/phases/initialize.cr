@@ -399,7 +399,13 @@ module Hwaro::Core::Build::Phases::Initialize
 
     if lstat.symlink?
       info = static_target_info(src_path)
-      return if info.nil? || info.directory?
+      return if info.nil?
+      # The walk does not descend into a linked directory; say so instead of
+      # dropping every file under it without a trace.
+      if info.directory?
+        Logger.warn "Skipping static directory symlink (directory symlinks are not followed): #{src_path}"
+        return
+      end
 
       unless Hwaro::Utils::PathUtils.resolves_within?(src_path, Dir.current)
         Logger.warn "Skipping static symlink pointing outside the project: #{src_path}"

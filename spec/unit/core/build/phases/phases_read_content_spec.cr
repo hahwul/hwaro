@@ -113,6 +113,22 @@ describe Hwaro::Core::Build::Phases::ReadContent do
       end
     end
 
+    # The glob does not descend into a linked directory, so a symlinked
+    # section disappeared from the site without a warning.
+    it "warns about a symlinked content directory it does not read" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p(["content", "shared/notes"])
+          File.write("shared/notes/a.md", "---\ntitle: A\n---\nbody")
+          File.symlink(File.expand_path("shared/notes"), "content/notes")
+
+          ctx = make_ctx(Hwaro::Models::Config.new)
+          log = with_captured_log { Hwaro::Core::Build::Builder.new.test_collect_content_paths(ctx) }
+          log.should contain("Skipping content directory symlink (directory symlinks are not followed): content/notes")
+        end
+      end
+    end
+
     it "discovers pages and sections in byte order, whatever the directory order" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
