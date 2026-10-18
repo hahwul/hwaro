@@ -42,7 +42,8 @@ module Hwaro
       def unresolved_reason(key : String) : String?
         return "empty link" if key.empty?
         # Same order as InternalLinkResolver.page_for.
-        state = (states[URI.decode(key)]? if key.includes?('%')) || states[key]?
+        decoded = key.includes?('%') ? URI.decode(key) : key
+        state = (states[decoded]? if key.includes?('%')) || states[key]? || folded_state(decoded)
         return "not found" unless state
         state == PublishState::Published.label ? nil : state
       end
@@ -55,6 +56,16 @@ module Hwaro
         when "expired" then "target has expired"
         else                reason
         end
+      end
+
+      # The build's NFC retry (`InternalLinkResolver.folded_page_for`): a
+      # decomposed (NFD) file name from macOS or a zip is still reached by a
+      # link typed precomposed, so the tools must not call it dead.
+      private def folded_state(path : String) : String?
+        return if path.ascii_only?
+        folded = path.unicode_normalize(:nfc)
+        states.each { |key, state| return state if !key.ascii_only? && key.unicode_normalize(:nfc) == folded }
+        nil
       end
 
       # Content path (relative to the content dir) → publish state label.

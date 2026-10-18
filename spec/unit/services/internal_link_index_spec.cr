@@ -32,6 +32,18 @@ describe Hwaro::Services::InternalLinkIndex do
       end
     end
 
+    # The build retries a miss NFC-folded (InternalLinkResolver.page_for), so
+    # a precomposed link reaches a decomposed (macOS/zip) file name.
+    it "folds Unicode normalization like the build's page_for" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "café.md".unicode_normalize(:nfd)), "+++\ntitle = \"C\"\n+++\n")
+        index = Hwaro::Services::InternalLinkIndex.new(dir + "/")
+        index.unresolved_reason("café.md".unicode_normalize(:nfc)).should be_nil
+        index.unresolved_reason("caf%C3%A9.md").should be_nil
+        index.unresolved_reason("cafe.md").should eq("not found")
+      end
+    end
+
     it "resolves published pages and sections by their exact content path" do
       Dir.mktmpdir do |dir|
         FileUtils.mkdir_p(File.join(dir, "posts", "bundle"))
