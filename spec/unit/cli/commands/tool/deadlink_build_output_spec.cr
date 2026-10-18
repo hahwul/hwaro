@@ -62,6 +62,7 @@ describe "check-links build-output oracle" do
       File.write(File.join(content, "index.md"), "---\ntitle: I\n---\n[css](/css/app.css)")
       File.write(File.join(dir, "public", "css", "app.css"), "body{}")
       File.touch(File.join(dir, "public", "css", "app.css"), Time.utc(2026, 1, 1))
+      File.touch(File.join(dir, "public", "css"), Time.utc(2026, 1, 1))
       File.touch(File.join(content, "index.md"), Time.utc(2026, 2, 1))
 
       output = with_captured_log do

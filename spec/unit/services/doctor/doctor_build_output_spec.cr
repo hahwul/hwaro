@@ -90,6 +90,7 @@ describe "doctor build-output oracle" do
       File.write(File.join(dir, "public", "css", "app.css"), "body{}")
       File.write(File.join(dir, "content", "post.md"), "+++\ntitle = \"P\"\n+++\n")
       File.touch(File.join(dir, "public", "css", "app.css"), Time.utc(2026, 1, 1))
+      File.touch(File.join(dir, "public", "css"), Time.utc(2026, 1, 1))
       File.touch(File.join(dir, "content"), Time.utc(2026, 1, 1))
       File.touch(File.join(dir, "content", "post.md"), Time.utc(2026, 2, 1))
 
