@@ -103,3 +103,27 @@ end
 Crinja.filter(:format) do
   sprintf target.to_s, arguments.varargs.map { |arg| arg.number? ? arg.as_number : arg }
 end
+
+# `float` / `int` convert numbers and booleans as Python does. Upstream only
+# knew strings (and floats, for `int`), so `{{ 3 | float }}` printed `0.0`
+# and `{{ true | int }}` printed `0`.
+Crinja.filter({default: 0.0}, :float) do
+  case raw = target.raw
+  when Number then raw.to_f
+  when Bool   then raw ? 1.0 : 0.0
+  else
+    (raw.to_f? if raw.is_a?(String)) || arguments["default"].to_f
+  end
+end
+
+Crinja.filter({default: 0, base: 10}, :int) do
+  raw = target.raw
+  raw = raw.to_s if raw.is_a?(Crinja::SafeString)
+  result = case raw
+           when Bool   then raw ? 1 : 0
+           when String then raw['.']? ? raw.to_f?.try(&.to_i) : raw.to_i?(arguments["base"].to_i, prefix: true)
+           when Int    then raw
+           when Float  then raw.to_i
+           end
+  result ? Crinja::Value.new(result) : arguments["default"].to_i
+end

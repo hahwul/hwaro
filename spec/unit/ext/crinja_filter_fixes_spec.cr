@@ -68,4 +68,13 @@ describe "Crinja built-in filter fixes" do
         .should eq("3.14|4.0| 12.3%|007|a-2")
     end
   end
+
+  describe "float and int" do
+    it "converts numbers and booleans" do
+      render_filter("{{ 3 | float }}|{{ 1.5 | float }}|{{ true | float }}|{{ '2.5' | float }}|{{ 'x' | float }}")
+        .should eq("3.0|1.5|1.0|2.5|0.0")
+      render_filter("{{ true | int }}|{{ false | int }}|{{ 4.7 | int }}|{{ '42' | int }}|{{ 'x' | int(5) }}")
+        .should eq("1|0|4|42|5")
+    end
+  end
 end
