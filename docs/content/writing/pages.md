@@ -199,6 +199,9 @@ Redirects from old URLs to this page.
 ```
 
 Each alias is a path **on this site**, and the build writes a redirect stub at it.
+The stub carries `<meta name="robots" content="noindex">` and a
+`<link rel="canonical">` to the page's absolute URL (`base_url` + its path), so
+search engines fold the old URL into the page instead of indexing the stub.
 An absolute (`https://example.com/old/`) or protocol-relative (`//example.com/old/`)
 value is not something this build can publish, so it is skipped with a warning.
 

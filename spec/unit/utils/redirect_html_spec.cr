@@ -114,5 +114,20 @@ describe Hwaro::Utils::RedirectHtml do
       result.should contain("<title>")
       result.should contain("Redirecting")
     end
+
+    # #881: alias stubs had no charset, canonical or noindex, so crawlers
+    # could keep the retired URL indexed as a thin page.
+    it "declares charset, noindex and a canonical defaulting to the target" do
+      result = Hwaro::Utils::RedirectHtml.simple_redirect("/target/")
+      result.should contain(%(<meta charset="utf-8">))
+      result.should contain(%(<meta name="robots" content="noindex">))
+      result.should contain(%(<link rel="canonical" href="/target/">))
+    end
+
+    it "uses the given canonical URL, percent-encoded once" do
+      result = Hwaro::Utils::RedirectHtml.simple_redirect("/a b/한/", "https://example.com/a%20b/%ED%95%9C/")
+      result.should contain(%(<link rel="canonical" href="https://example.com/a%20b/%ED%95%9C/">))
+      result.should contain("url=/a%20b/%ED%95%9C/")
+    end
   end
 end

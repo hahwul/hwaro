@@ -199,7 +199,10 @@ Redirects from old URLs to this page.
 ```
 
 각 alias는 **이 사이트 안의 경로**입니다. 빌드가 해당 위치에 리다이렉트
-스텁을 씁니다. 절대 URL(`https://example.com/old/`)이나 프로토콜 상대
+스텁을 씁니다. 스텁에는 `<meta name="robots" content="noindex">`와 페이지의 절대
+URL(`base_url` + 경로)을 가리키는 `<link rel="canonical">`이 들어가므로,
+검색 엔진은 스텁을 색인하지 않고 옛 URL을 해당 페이지로 합칩니다.
+절대 URL(`https://example.com/old/`)이나 프로토콜 상대
 URL(`//example.com/old/`)은 이 빌드가 게시할 수 있는 대상이 아니므로
 경고와 함께 건너뜁니다.
 
