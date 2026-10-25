@@ -125,6 +125,28 @@ describe "Render output paths: authored vs generated collisions" do
     log.should contain(%(Skipping alias "/old/b#frag" on p.md))
   end
 
+  # #881: the alias stub's canonical is the target's absolute URL
+  # (base_url + target), refreshed when base_url changes on --cache.
+  it "gives an alias stub an absolute canonical and noindex" do
+    build_site(
+      "title = \"T\"\nbase_url = \"https://example.com/sub\"\n",
+      content_files: {"projects/dalfox.md" => "+++\ntitle = \"D\"\naliases = [\"/archive/dalfox/\"]\n+++\nD"},
+      template_files: {"page.html" => "{{ content }}"},
+      cache: true,
+    ) do
+      html = File.read("public/archive/dalfox/index.html")
+      html.should contain(%(<link rel="canonical" href="https://example.com/sub/projects/dalfox/">))
+      html.should contain(%(<meta name="robots" content="noindex">))
+      html.should contain(%(url=/sub/projects/dalfox/"))
+
+      File.write("config.toml", "title = \"T\"\nbase_url = \"https://example.org/sub\"\n")
+      builder = Hwaro::Core::Build::Builder.new
+      Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+      builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false))
+      File.read("public/archive/dalfox/index.html").should contain(%(href="https://example.org/sub/projects/dalfox/"))
+    end
+  end
+
   # `redirect_to = "@/…"` was written verbatim as `url=@/blog/b.md`.
   it "resolves an @/ redirect_to target base_path-aware, and refreshes it on --cache" do
     rebuild = -> {

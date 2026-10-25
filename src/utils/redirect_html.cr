@@ -77,25 +77,32 @@ module Hwaro
           HTML
       end
 
-      # Generate a simple redirect page with meta refresh only.
-      # Used for alias redirects where a simpler page suffices.
+      # Generate a simple redirect page: meta refresh, a canonical link to
+      # the target and `noindex`, so a crawler folds the old URL into the
+      # target instead of indexing the stub. Used for alias redirects.
+      # `canonical` is the target's absolute URL when `base_url` is known
+      # (the caller passes the page's canonical); it defaults to `url`.
       #
       # Example:
-      #   simple_redirect("/blog/new-post/")
+      #   simple_redirect("/blog/new-post/", "https://example.com/blog/new-post/")
       #   # => "<!DOCTYPE html>..."
       #
-      def simple_redirect(url : String) : String
+      def simple_redirect(url : String, canonical : String = url) : String
         # The target is a page URL hwaro computed from a filename or slug,
         # so it can carry a raw space or non-ASCII. A `<meta refresh>` URL
         # must be a valid URI: percent-encode the path (the sitemap and
         # llms.txt emit the same page URLs the same way).
         escaped_url = HTML.escape(TextUtils.encode_url_path(url))
+        escaped_canonical = HTML.escape(TextUtils.encode_url_path(canonical))
         <<-HTML
           <!DOCTYPE html>
           <html>
           <head>
-            <meta http-equiv="refresh" content="0; url=#{escaped_url}" />
+            <meta charset="utf-8">
             <title>Redirecting to #{escaped_url}</title>
+            <link rel="canonical" href="#{escaped_canonical}">
+            <meta name="robots" content="noindex">
+            <meta http-equiv="refresh" content="0; url=#{escaped_url}" />
           </head>
           <body>
             <p>Redirecting to <a href="#{escaped_url}">#{escaped_url}</a>.</p>

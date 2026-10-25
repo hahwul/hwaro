@@ -350,7 +350,10 @@ module Hwaro::Core::Build::Phases::Render
       # `with_base_path` is a no-op for a domain-root deployment.
       target = page.url.starts_with?('/') ? page.url : "/#{page.url}"
       redirect_url = site.config.with_base_path(target)
-      Hwaro::Utils::FileSafe.atomic_write(dest_path, Utils::RedirectHtml.simple_redirect(redirect_url))
+      # The canonical is absolute (base_url + target), the same URL the
+      # target page itself declares.
+      canonical = Content::Seo::Tags.canonical_url(page, site.config)
+      Hwaro::Utils::FileSafe.atomic_write(dest_path, Utils::RedirectHtml.simple_redirect(redirect_url, canonical))
       # The page's front matter is the only record that this stub exists, so a
       # page that is deleted (or drops the alias) has to take it along.
       record_page_derived_output(page.path, dest_path)
