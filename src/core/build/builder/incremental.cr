@@ -1192,7 +1192,11 @@ module Hwaro
           forced = force_pages || [] of Models::Page
           summaries_affected = !forced.empty? ||
                                changed_template_names.nil? ||
-                               content_semantics_changed
+                               content_semantics_changed ||
+                               # A layout edit that adds (or drops) the first
+                               # excerpt reader: render_page_summaries redoes
+                               # every page's excerpt.
+                               auto_summary_read?(site, all_pages) != @auto_summary_read
           if summaries_affected
             # force_pages with render:true are already in pages_to_render;
             # render:false ones are excluded from the render set but their

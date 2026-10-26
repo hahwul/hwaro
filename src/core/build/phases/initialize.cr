@@ -681,6 +681,10 @@ module Hwaro::Core::Build::Phases::Initialize
     end
 
     compute_template_var_features(templates)
+    # og:/twitter:description fall back to the excerpt; a template without a
+    # features entry is ungated (see compute_template_var_features).
+    @templates_read_summary = templates.empty? || Core::Build::SummaryReaders.read?(templates) ||
+                              templates.each_key.any? { |name| @template_var_features[name]?.try(&.needs_seo) != false }
 
     # Publish the snapshot BEFORE (re)building the Crinja environment so its
     # snapshot-backed loader captures this load's template set.

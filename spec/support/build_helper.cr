@@ -4,7 +4,8 @@ require "../spec_helper"
 # Shared helper for functional tests.
 #
 # Sets up a minimal project skeleton in a temp directory, runs Builder#run,
-# and yields the temp dir so the caller can assert on files.
+# and yields the temp dir (plus the builder, for examples that inspect its
+# state or drive a serve-style rebuild) so the caller can assert on files.
 # =============================================================================
 
 def build_site(
@@ -74,7 +75,7 @@ def build_site(
         stream: stream,
       ))
 
-      yield dir
+      yield dir, builder
     end
   end
 end

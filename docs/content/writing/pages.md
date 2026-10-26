@@ -295,6 +295,8 @@ summary_ellipsis = "…"   # appended only when text was actually cut
 
 `page.summary_truncated` is `true` only when the automatic excerpt was cut, so a template can show a "Read more" link only where it makes sense. Automatic summaries never replace a marker or a `description`; pages that have one keep their existing output.
 
+The excerpt costs a second render of every page, so hwaro only builds it when something can print it: a template that mentions `summary` (or serializes whole pages, e.g. `| tojson`), the OG/Twitter tags, or an RSS/JSON feed. A site that shows none of them builds faster and its output is unchanged.
+
 ## Markdown Syntax
 
 ### Text

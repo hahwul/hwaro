@@ -29,6 +29,7 @@ require "./privacy"
 require "./csp"
 require "./content_generate"
 require "./template_deps"
+require "./summary_readers"
 require "./template_loader"
 require "./shortcode_processor"
 require "./phases/initialize"
@@ -230,6 +231,14 @@ module Hwaro
         # Populated once in load_templates, read-only during render. Missing
         # key means "unknown": build everything, exactly as before.
         @template_var_features : Hash(String, TemplateVarFeatures) = {} of String => TemplateVarFeatures
+        # Whether anything could print the automatic excerpt when the pages'
+        # current `auto_summary` values were computed (nil before the first
+        # summary pass). See ParseContent#auto_summary_read?.
+        @auto_summary_read : Bool? = nil
+        # Whether the loaded template set can print an excerpt (a template
+        # reading it, or the OG/Twitter tags falling back to it). Computed
+        # with the templates in load_templates; true until then.
+        @templates_read_summary : Bool = true
         # Tracks shortcode template keys we've already warned about, so a
         # single typo used across many pages emits just one warning line.
         @shortcode_warnings_seen : Set(String)? = nil
