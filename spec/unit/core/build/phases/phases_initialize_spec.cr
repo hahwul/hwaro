@@ -64,7 +64,7 @@ describe Hwaro::Core::Build::Phases::Initialize do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
           builder = Hwaro::Core::Build::Builder.new
-          builder.test_setup_output_dir("public")
+          builder.test_setup_output_dir("public").should be_true
           Dir.exists?("public").should be_true
         end
       end
@@ -77,7 +77,7 @@ describe Hwaro::Core::Build::Phases::Initialize do
           File.write("public/stale.html", "stale")
 
           builder = Hwaro::Core::Build::Builder.new
-          builder.test_setup_output_dir("public", incremental: false)
+          builder.test_setup_output_dir("public", incremental: false).should be_true
 
           Dir.exists?("public").should be_true
           File.exists?("public/stale.html").should be_false
@@ -92,9 +92,32 @@ describe Hwaro::Core::Build::Phases::Initialize do
           File.write("public/keep.html", "keep")
 
           builder = Hwaro::Core::Build::Builder.new
-          builder.test_setup_output_dir("public", incremental: true)
+          # A kept tree is never fresh: its files may be read while replaced.
+          builder.test_setup_output_dir("public", incremental: true).should be_false
 
           File.exists?("public/keep.html").should be_true
+        end
+      end
+    end
+
+    it "reports a foreign directory it keeps as not fresh" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("dist")
+          File.write("dist/theirs.txt", "not hwaro's")
+
+          builder = Hwaro::Core::Build::Builder.new
+          builder.test_setup_output_dir("dist", incremental: false).should be_false
+          File.exists?("dist/theirs.txt").should be_true
+        end
+      end
+    end
+
+    it "reports a directory an incremental build creates as fresh" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          builder = Hwaro::Core::Build::Builder.new
+          builder.test_setup_output_dir("public", incremental: true).should be_true
         end
       end
     end

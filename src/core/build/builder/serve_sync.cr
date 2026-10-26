@@ -602,6 +602,9 @@ module Hwaro
           Utils::SriCache.clear
           @context.try { |ctx| publish_asset_sources(ctx) }
           forget_created_dirs
+          # The tree now holds the previous build's files, served live.
+          @output_tree_fresh = false
+          @output_cwd = Dir.current
           mark_build_output_epoch
           @generated_claims_current = false
         end

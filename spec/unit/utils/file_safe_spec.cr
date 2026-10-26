@@ -204,6 +204,27 @@ describe Hwaro::Utils::FileSafe do
     end
   end
 
+  describe ".write_new" do
+    it "writes content to a new file without a temp sibling" do
+      Dir.mktmpdir do |root|
+        path = File.join(root, "index.html")
+        Hwaro::Utils::FileSafe.write_new(path, "<p>hello</p>")
+        File.read(path).should eq("<p>hello</p>")
+        Dir.children(root).should eq(["index.html"])
+      end
+    end
+
+    it "raises the classified error when a directory stands at the target" do
+      Dir.mktmpdir do |root|
+        path = File.join(root, "sitemap.xml")
+        Dir.mkdir(path)
+        error = expect_raises(Hwaro::HwaroError) { Hwaro::Utils::FileSafe.write_new(path, "<urlset/>") }
+        error.code.should eq(Hwaro::Errors::HWARO_E_IO)
+        error.message.to_s.should contain("a directory already exists")
+      end
+    end
+  end
+
   # Characterisation coverage: `atomic_copy` is introduced by this fix, so
   # these examples cannot be run against the pre-fix tree. The pre-fix proof
   # for the defect it serves (a reader seeing a half-written file) is

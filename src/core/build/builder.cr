@@ -497,6 +497,17 @@ module Hwaro
         # kept tree can hold a leftover of the other kind where this build
         # writes (see `mkdir_output`).
         @kept_output_dir : String? = nil
+        # True while every file this build writes is new: a cold, non-serve
+        # build that emptied or created the output directory itself. Its
+        # writes skip the temp-file + rename of `FileSafe.atomic_write` — no
+        # reader can see a torn file where none existed, and nothing in this
+        # process serves the tree (see `publish_output`).
+        @output_tree_fresh : Bool = false
+        # The working directory output paths resolve against, captured when a
+        # build (or serve pass) starts: `get_output_path` runs for every
+        # output and `Dir.current` is a getcwd syscall each time. Per build,
+        # not per process — specs and tools `Dir.cd` between builds.
+        @output_cwd : String? = nil
         # Files a page wrote BESIDES its own output: its `aliases` redirect
         # stubs and, for a section, its `/page/N/` pagination pages. Both are
         # produced by the render pass, so a warm `--cache` build that skips a

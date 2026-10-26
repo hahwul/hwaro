@@ -31,11 +31,16 @@ module Hwaro::Core::Build::Phases::Render
   # to `output_dir/<filename>`: that fallback dropped EVERY rejected page onto
   # the site root `index.html`, so the homepage ended up holding whichever
   # page rendered last instead of the page being skipped.
+  # The working directory captured for this build (see `@output_cwd`).
+  private def output_cwd : String
+    @output_cwd || Dir.current
+  end
+
   private def get_output_path(page : Models::Page, output_dir : String, filename : String = "index.html") : String?
     url_path = url_output_path(page.url.lchop("/"))
     return unless url_path
     output_path = File.join(output_dir, url_path, filename)
-    Utils::OutputGuard.safe_output_path(output_path, output_dir)
+    Utils::OutputGuard.safe_output_path(output_path, output_dir, output_cwd)
   end
 
   # Source + output path pair the cache keys a page by. The output path is
@@ -259,7 +264,7 @@ module Hwaro::Core::Build::Phases::Render
       return
     end
     candidate = File.join(output_dir, url_path, "index.html")
-    output_path = Utils::OutputGuard.safe_output_path(candidate, output_dir)
+    output_path = Utils::OutputGuard.safe_output_path(candidate, output_dir, output_cwd)
     unless output_path
       Logger.warn "Skipping redirect outside output directory: #{candidate}"
       note_unpublished_page
@@ -267,7 +272,7 @@ module Hwaro::Core::Build::Phases::Render
     end
 
     ensure_dir(Path[output_path].dirname.to_s)
-    Hwaro::Utils::FileSafe.atomic_write(output_path, Utils::RedirectHtml.full_redirect(redirect_url))
+    publish_output(output_path, Utils::RedirectHtml.full_redirect(redirect_url))
     note_published_page
     Logger.action :create, output_path if verbose
   end
@@ -353,7 +358,7 @@ module Hwaro::Core::Build::Phases::Render
       # The canonical is absolute (base_url + target), the same URL the
       # target page itself declares.
       canonical = Content::Seo::Tags.canonical_url(page, site.config)
-      Hwaro::Utils::FileSafe.atomic_write(dest_path, Utils::RedirectHtml.simple_redirect(redirect_url, canonical))
+      publish_output(dest_path, Utils::RedirectHtml.simple_redirect(redirect_url, canonical))
       # The page's front matter is the only record that this stub exists, so a
       # page that is deleted (or drops the alias) has to take it along.
       record_page_derived_output(page.path, dest_path)
