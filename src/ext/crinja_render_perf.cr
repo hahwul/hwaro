@@ -140,7 +140,8 @@ end
 # Both patches key off the same static property of a for-loop, which we call
 # a *closed* body: every identifier the body (and the optional `if`
 # condition) reads is bound by the loop itself (the item variables or
-# `loop`), the body contains no nested tags, and no calls/filters/tests.
+# `loop`), the body contains no nested tags other than `if`/`elif`/`else`
+# with equally closed conditions, and no calls/filters/tests.
 # Such a body can neither observe per-page state nor capture the iteration
 # context (no `{% block scoped %}`, no macro definitions, no callables), so:
 #
@@ -201,14 +202,13 @@ class Crinja::Tag::For
 
   def interpret_output(renderer : Renderer, tag_node : TagNode)
     env = renderer.env
-    parser = Parser.new(tag_node.arguments, renderer.env.config)
-    item_vars, collection_expr, if_expr, recursive = parser.parse_for_tag
+    item_vars, collection_expr, if_expr, recursive = parsed_for_arguments(tag_node, env.config)
 
     runner = Runner.new(renderer, tag_node, item_vars)
 
     collection = env.evaluator.value(collection_expr)
 
-    closed = !recursive && closed_loop?(tag_node, item_vars, if_expr)
+    closed = !recursive && closed_loop?(tag_node, item_vars, if_expr, env.config)
 
     cache = nil
     key = {0_u64, 0_u64, false}
@@ -254,33 +254,64 @@ class Crinja::Tag::For
 
   # A loop is closed when its body and `if` condition read nothing but the
   # loop's own bindings. Memoized on the tag node.
-  private def closed_loop?(tag_node : TagNode, item_vars : Array(String), if_expr : AST::ExpressionNode?) : Bool
+  private def closed_loop?(tag_node : TagNode, item_vars : Array(String), if_expr : AST::ExpressionNode?, config : Config) : Bool
     cached = tag_node.__closed_body
     return cached unless cached.nil?
 
     bound = item_vars.dup << LOOP_VARIABLE
-    verdict = closed_nodes?(tag_node.block.children, bound) &&
+    verdict = closed_nodes?(tag_node.block.children, bound, config) &&
               (if_expr.nil? || closed_expression?(if_expr, bound))
     tag_node.__closed_body = verdict
     verdict
   end
 
-  private def closed_nodes?(nodes : Array(AST::TemplateNode), bound : Array(String)) : Bool
-    nodes.all? do |node|
-      case node
-      when AST::FixedString, AST::Note, AST::EndTagNode
+  private def closed_nodes?(nodes : Array(AST::TemplateNode), bound : Array(String), config : Config) : Bool
+    nodes.all? { |node| closed_node?(node, bound, config) }
+  end
+
+  private def closed_node?(node : AST::TemplateNode, bound : Array(String), config : Config) : Bool
+    case node
+    when AST::FixedString, AST::Note, AST::EndTagNode
+      true
+    when AST::NodeList
+      closed_nodes?(node.children, bound, config)
+    when AST::PrintStatement
+      closed_expression?(node.expression, bound)
+    when AST::TagNode
+      # `if` only reads its conditions and renders a branch: it binds and
+      # captures nothing, so it is closed when its conditions and branches
+      # are (`{% if loop.index <= 10 %}<li>{{ p.title }}</li>{% endif %}`).
+      # Every other tag (for/set/block/macro/filter/include/…) can bind or
+      # mutate state, capture the context or reach other templates, and
+      # disqualifies the loop.
+      node.name == "if" && closed_if?(node, bound, config)
+    else
+      false
+    end
+  end
+
+  # `elif`/`else` are children of the `if` node, so they are only accepted
+  # here: a for-loop's own `else` still disqualifies (see interpret_output).
+  private def closed_if?(node : TagNode, bound : Array(String), config : Config) : Bool
+    return false unless closed_condition?(node, bound, config)
+
+    node.block.children.all? do |child|
+      if child.is_a?(TagNode) && child.name == "elif"
+        closed_condition?(child, bound, config)
+      elsif child.is_a?(TagNode) && child.name == "else"
         true
-      when AST::NodeList
-        closed_nodes?(node.children, bound)
-      when AST::PrintStatement
-        closed_expression?(node.expression, bound)
       else
-        # Any nested tag (if/for/set/block/macro/filter/…) disqualifies:
-        # tags can bind or mutate state, capture the context, or carry
-        # unparsed argument tokens we can't analyze.
-        false
+        closed_node?(child, bound, config)
       end
     end
+  end
+
+  private def closed_condition?(node : TagNode, bound : Array(String), config : Config) : Bool
+    closed_expression?(Tag::If.parsed_condition(node, config), bound)
+  rescue Crinja::Error
+    # A malformed condition raises when (if ever) its branch is reached;
+    # the analysis must not raise it earlier, so the loop just stays open.
+    false
   end
 
   private def closed_expression?(expr : AST::ExpressionNode, bound : Array(String)) : Bool
@@ -308,6 +339,9 @@ class Crinja::Tag::For
       expr.children.all? { |child| closed_expression?(child, bound) }
     when AST::DictLiteral
       expr.children.all? { |k, v| closed_expression?(k, bound) && closed_expression?(v, bound) }
+    when AST::ConditionalExpression
+      closed_expression?(expr.test, bound) && closed_expression?(expr.if_true, bound) &&
+        ((if_false = expr.if_false).nil? || closed_expression?(if_false, bound))
     else
       # CallExpression / FilterExpression / TestExpression may reach
       # functions, filters or macros (free names, possibly impure).
