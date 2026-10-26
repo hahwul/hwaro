@@ -67,6 +67,7 @@ module Hwaro
         # Output-root-relative directory the bundle is published in
         # ("assets", or "assets/vendor" for a "vendor/x.css" bundle name).
         bundle_dir = Path.posix(@config.output_dir, File.dirname(bundle.name)).normalize.to_s
+        source_dir_real = File.expand_path(@config.source_dir)
         # Read and concatenate source files
         contents = String.build do |io|
           wrote_any = false
@@ -74,7 +75,6 @@ module Hwaro
             # Validate source path stays within source_dir
             source = File.join(@config.source_dir, file)
             source_real = File.expand_path(source)
-            source_dir_real = File.expand_path(@config.source_dir)
             unless Utils::PathUtils.within?(source_real, source_dir_real)
               Logger.warn "Asset pipeline: source file outside source directory: #{file}"
               next
