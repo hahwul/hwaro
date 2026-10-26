@@ -326,6 +326,9 @@ class Crinja::Tag::For
       closed_expression?(expr.identifier, bound)
     when AST::IndexExpression
       closed_expression?(expr.identifier, bound) && closed_expression?(expr.argument, bound)
+    when AST::SliceExpression
+      closed_expression?(expr.identifier, bound) &&
+        {expr.start, expr.stop, expr.step}.all? { |part| part.nil? || closed_expression?(part, bound) }
     when AST::BinaryExpression
       closed_expression?(expr.left, bound) && closed_expression?(expr.right, bound)
     when AST::ComparisonExpression
