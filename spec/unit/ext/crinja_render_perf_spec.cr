@@ -47,18 +47,73 @@ describe "ext/crinja_render_perf" do
       env.__for_fragment_cache.size.should eq(0)
     end
 
-    it "does not cache bodies with nested tags, filters, or calls" do
+    it "does not cache bodies with binding tags, filters, or calls" do
       env = Crinja.new
       items = Crinja::Value.new([Crinja::Value.new("a")] of Crinja::Value)
       {
-        "{% for x in items %}{% if x %}{{ x }}{% endif %}{% endfor %}",
+        "{% for x in items %}{% set y = x %}{{ y }}{% endfor %}",
+        "{% for x in items %}{% for y in x %}{{ y }}{% endfor %}{% endfor %}",
         "{% for x in items %}{{ x | upper }}{% endfor %}",
         "{% for x in items %}{{ range(2) }}{% endfor %}",
+        "{% for x in items %}{% if x %}{{ x | upper }}{% endif %}{% endfor %}",
+        "{% for x in items %}{% if x | length %}{{ x }}{% endif %}{% endfor %}",
       }.each do |source|
         template = env.from_string(source)
         template.render({"items" => items})
         env.__for_fragment_cache.size.should eq(0)
       end
+    end
+
+    it "caches a body whose if/elif/else conditions read only loop bindings" do
+      env = Crinja.new
+      items = Crinja::Value.new((1..5).map { |i| Crinja::Value.new(i) })
+      template = env.from_string(
+        "{% for x in items %}{% if loop.index <= 2 %}<{{ x }}>{% elif x == 4 %}" \
+        "[{{ x }}]{% else %}-{% endif %}{% endfor %}")
+
+      template.render({"items" => items}).should eq("<1><2>-[4]-")
+      template.render({"items" => items}).should eq("<1><2>-[4]-")
+      env.__for_fragment_cache.size.should eq(1)
+    end
+
+    it "caches nested ifs and conditional expressions over loop bindings" do
+      env = Crinja.new
+      items = Crinja::Value.new([Crinja::Value.new(1), Crinja::Value.new(2)] of Crinja::Value)
+      template = env.from_string(
+        "{% for x in items %}{% if x %}{% if loop.last %}{{ \"L\" if x == 2 else \"?\" }}" \
+        "{% else %}{{ x }}{% endif %}{% endif %}{% endfor %}")
+
+      template.render({"items" => items}).should eq("1L")
+      env.__for_fragment_cache.size.should eq(1)
+    end
+
+    it "does not cache an if whose condition or branch reads outer state" do
+      env = Crinja.new
+      items = Crinja::Value.new([Crinja::Value.new(0), Crinja::Value.new(2)] of Crinja::Value)
+      {
+        "{% for x in items %}{% if x == limit %}{{ x }}{% endif %}{% endfor %}",
+        "{% for x in items %}{% if x %}{{ x }}{% elif limit %}?{% endif %}{% endfor %}",
+        "{% for x in items %}{% if x == 2 %}{{ limit }}{% endif %}{% endfor %}",
+      }.each do |source|
+        template = env.from_string(source)
+        first = template.render({"items" => items, "limit" => 0})
+        # A stale cache would replay the first page's output here.
+        second = template.render({"items" => items, "limit" => 2})
+        first.should_not eq(second)
+      end
+      env.__for_fragment_cache.size.should eq(0)
+    end
+
+    it "keeps a loop with a malformed if in an unreached branch renderable" do
+      # The closed-body analysis parses every condition up front; it must not
+      # raise for a branch the render never reaches.
+      env = Crinja.new
+      items = Crinja::Value.new([Crinja::Value.new(1)] of Crinja::Value)
+      template = env.from_string("{% for x in items %}{% if false %}{% if %}{% endif %}{% endif %}{{ x }}{% endfor %}")
+
+      template.render({"items" => items}).should eq("1")
+      template.render({"items" => items}).should eq("1")
+      env.__for_fragment_cache.size.should eq(0)
     end
 
     it "caches a loop with an if condition over the loop variable" do

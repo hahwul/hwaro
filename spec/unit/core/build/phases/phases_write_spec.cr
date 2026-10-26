@@ -20,6 +20,10 @@ module Hwaro::Core::Build
     def test_ensure_dir(dir : String)
       ensure_dir(dir)
     end
+
+    def test_output_tree_fresh : Bool
+      @output_tree_fresh
+    end
   end
 end
 
@@ -705,6 +709,66 @@ describe "Phases::Write mkdir_output under parallel render" do
         RivalWorkerBuilder.new("public").test_mkdir_output("public/blog/a")
         Dir.exists?("public/blog/a").should be_true
       end
+    end
+  end
+end
+
+# Per-page outputs skip `atomic_write` only while the output tree is fresh:
+# a cold, non-serve build that emptied it. Anything that can hold files a
+# reader is looking at keeps temp + rename.
+describe "Phases::Write publish_output" do
+  options = ->(serve : Bool, cache : Bool) do
+    Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false,
+      serve_mode: serve, preserve_output: serve, cache: cache)
+  end
+  content = {"index.md" => "+++\ntitle = \"Home\"\n+++\nhi", "a.md" => "+++\ntitle = \"A\"\n+++\nbody"}
+  templates = {"page.html" => "{{ content }}", "index.html" => "{{ content }}", "section.html" => "{{ content }}"}
+
+  it "writes a cold build directly and keeps temp + rename for serve, a kept cache tree and serve passes" do
+    build_site(BASIC_CONFIG, content_files: content, template_files: templates) do |_, builder|
+      builder.test_output_tree_fresh.should be_true
+      File.read("public/a/index.html").should contain("body")
+
+      # A cold `--cache` build has no tracked tree yet, so it starts fresh too;
+      # the next one keeps the tree.
+      builder.run(options.call(false, true)).should be_true
+      builder.test_output_tree_fresh.should be_true
+      builder.run(options.call(false, true)).should be_true
+      builder.test_output_tree_fresh.should be_false
+
+      builder.run(options.call(true, false)).should be_true
+      builder.test_output_tree_fresh.should be_false
+
+      builder.run(options.call(false, false)).should be_true
+      builder.test_output_tree_fresh.should be_true
+      builder.run_rerender(options.call(false, false)).should be_true
+      builder.test_output_tree_fresh.should be_false
+      File.read("public/a/index.html").should contain("body")
+    end
+  end
+
+  it "keeps temp + rename when the output directory is a symlink" do
+    posix_only!("directory symlinks need privileges on Windows")
+    build_site(BASIC_CONFIG, content_files: content, template_files: templates) do |_, builder|
+      FileUtils.rm_rf("public")
+      Dir.mkdir("served")
+      File.symlink(File.expand_path("served"), "public")
+      builder.run(options.call(false, false)).should be_true
+      builder.test_output_tree_fresh.should be_false
+      File.read("served/a/index.html").should contain("body")
+    end
+  end
+
+  # A static copy keeps its source's mode; a page rendering over a read-only
+  # one must replace it (rename) as atomic_write always did, not open it.
+  it "replaces a read-only static file a page renders over" do
+    posix_only!("chmod 0444 does not stop the owner writing on Windows")
+    build_site(BASIC_CONFIG, content_files: content, template_files: templates,
+      static_files: {"a/index.html" => "static"}) do |_, builder|
+      File.chmod("static/a/index.html", 0o444)
+      builder.run(options.call(false, false)).should be_true
+      builder.test_output_tree_fresh.should be_true
+      File.read("public/a/index.html").should contain("body")
     end
   end
 end

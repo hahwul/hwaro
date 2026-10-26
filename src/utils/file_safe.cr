@@ -134,6 +134,17 @@ module Hwaro
         end
       end
 
+      # `atomic_write` for a target that does not exist yet and that no
+      # reader can be watching: a plain create-and-write. Same classified
+      # error when a directory stands where the file must go.
+      def self.write_new(path : String | Path, content : String) : Nil
+        File.write(path, content)
+      rescue ex
+        target = path.to_s
+        raise directory_in_the_way_error(target, ex) if Dir.exists?(target)
+        raise ex
+      end
+
       # A directory where a FILE must go is almost always a content page
       # whose slug/path names a generated file (`slug = "sitemap.xml"`
       # publishes `sitemap.xml/index.html`, and the sitemap generator then

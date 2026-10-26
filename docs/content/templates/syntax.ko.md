@@ -94,6 +94,21 @@ elif와 함께:
 | loop.cycle(a, b, …) | 주어진 값을 차례로 반복 |
 | loop.depth | `recursive` 반복의 중첩 깊이(최상위가 1, `loop.depth0`은 0부터) |
 
+### 슬라이싱
+
+Jinja2처럼 `[start:stop:step]`으로 리스트나 문자열의 일부를 꺼냅니다. 각 부분은 생략할 수 있고, 음수는 끝에서부터 세며, 범위를 벗어난 값은 양 끝에 맞춰집니다:
+
+```jinja
+{% for p in section.pages[:5] %}
+<li><a href="{{ p.url }}">{{ p.title }}</a></li>
+{% endfor %}
+
+{{ page.title[:40] }}
+{% for p in section.pages[::-1] %}…{% endfor %}
+```
+
+긴 목록에서 앞의 몇 개만 보여 줄 때는 `{% if loop.index <= 5 %}`로 나머지를 건너뛰지 말고 슬라이스를 쓰세요. `if` 방식은 페이지마다 목록 전체를 순회할 수 있습니다.
+
 ## 템플릿 상속
 
 ### 베이스 템플릿

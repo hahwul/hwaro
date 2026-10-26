@@ -15,7 +15,10 @@ module Hwaro
       #   safe_path("public/../etc/passwd", "public")  # => "public/index.html" (with warning)
       #   safe_path("public/blog/index.html", "public") # => "public/blog/index.html"
       #
-      def safe_output_path(output_path : String, output_dir : String) : String?
+      #
+      # `cwd` lets a caller that resolves many paths in one build pass the
+      # working directory it already holds.
+      def safe_output_path(output_path : String, output_dir : String, cwd : String = Dir.current) : String?
         # Canonicalize once — the previous within_output_dir? + canonical
         # sequence expanded output_path twice (a getcwd syscall and several
         # Path allocations each), and this runs for every written file.
@@ -27,7 +30,6 @@ module Hwaro
         # page was pure waste. Resolving it here (rather than memoizing it
         # process-wide) keeps the guard correct for callers that run under a
         # different working directory later in the same process.
-        cwd = Dir.current
         canonical_output = canonical?(output_path, cwd)
         canonical_dir = canonical?(output_dir, cwd)
         if canonical_output && canonical_dir && PathUtils.within?(canonical_output, canonical_dir)

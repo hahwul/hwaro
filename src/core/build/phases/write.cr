@@ -371,10 +371,26 @@ module Hwaro::Core::Build::Phases::Write
 
     content = privacy_rewrite(content, page.path)
     ensure_dir(Path[output_path].dirname.to_s)
-    Hwaro::Utils::FileSafe.atomic_write(output_path, content)
+    publish_output(output_path, content)
     record_html_stats(content)
     note_published_page
     Logger.action :create, output_path if verbose
+  end
+
+  # Write one per-page output (page, pagination page, output format, alias
+  # stub). `atomic_write` costs a temp file and a rename per file — on a cold
+  # build of small pages that is a large share of the render phase — and it
+  # only protects a reader of the PREVIOUS bytes. A fresh tree has none, so
+  # its writes go straight to the target (see `@output_tree_fresh`) — unless
+  # something already stands there (a static file copied this build, possibly
+  # read-only, or a symlink): replacing it stays a rename, so the result and
+  # its permissions are exactly what `atomic_write` produces.
+  private def publish_output(path : String, content : String) : Nil
+    if @output_tree_fresh && File.info?(path, follow_symlinks: false).nil?
+      Hwaro::Utils::FileSafe.write_new(path, content)
+    else
+      Hwaro::Utils::FileSafe.atomic_write(path, content)
+    end
   end
 
   # Create directory only if not already created during this build.

@@ -89,7 +89,7 @@ module Hwaro::Core::Build::Phases::Render
 
     content = privacy_rewrite(content, page.path)
     ensure_dir(Path[output_path].dirname.to_s)
-    Hwaro::Utils::FileSafe.atomic_write(output_path, content)
+    publish_output(output_path, content)
     record_html_stats(content)
     # A section that loses posts paginates into fewer pages; the file for the
     # page number it no longer fills is only ever named here.

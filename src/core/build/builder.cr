@@ -29,6 +29,7 @@ require "./privacy"
 require "./csp"
 require "./content_generate"
 require "./template_deps"
+require "./summary_readers"
 require "./template_loader"
 require "./shortcode_processor"
 require "./phases/initialize"
@@ -230,6 +231,14 @@ module Hwaro
         # Populated once in load_templates, read-only during render. Missing
         # key means "unknown": build everything, exactly as before.
         @template_var_features : Hash(String, TemplateVarFeatures) = {} of String => TemplateVarFeatures
+        # Whether anything could print the automatic excerpt when the pages'
+        # current `auto_summary` values were computed (nil before the first
+        # summary pass). See ParseContent#auto_summary_read?.
+        @auto_summary_read : Bool? = nil
+        # Whether the loaded template set can print an excerpt (a template
+        # reading it, or the OG/Twitter tags falling back to it). Computed
+        # with the templates in load_templates; true until then.
+        @templates_read_summary : Bool = true
         # Tracks shortcode template keys we've already warned about, so a
         # single typo used across many pages emits just one warning line.
         @shortcode_warnings_seen : Set(String)? = nil
@@ -488,6 +497,17 @@ module Hwaro
         # kept tree can hold a leftover of the other kind where this build
         # writes (see `mkdir_output`).
         @kept_output_dir : String? = nil
+        # True while every file this build writes is new: a cold, non-serve
+        # build that emptied or created the output directory itself. Its
+        # writes skip the temp-file + rename of `FileSafe.atomic_write` — no
+        # reader can see a torn file where none existed, and nothing in this
+        # process serves the tree (see `publish_output`).
+        @output_tree_fresh : Bool = false
+        # The working directory output paths resolve against, captured when a
+        # build (or serve pass) starts: `get_output_path` runs for every
+        # output and `Dir.current` is a getcwd syscall each time. Per build,
+        # not per process — specs and tools `Dir.cd` between builds.
+        @output_cwd : String? = nil
         # Files a page wrote BESIDES its own output: its `aliases` redirect
         # stubs and, for a section, its `/page/N/` pagination pages. Both are
         # produced by the render pass, so a warm `--cache` build that skips a

@@ -94,6 +94,21 @@ Loop variables:
 | loop.cycle(a, b, …) | Cycles through the given values |
 | loop.depth | Nesting depth in a `recursive` loop (1 at the top; `loop.depth0` starts at 0) |
 
+### Slicing
+
+Take part of a list or string with `[start:stop:step]`, as in Jinja2. Any part can be left out, negative numbers count from the end, and bounds past either end are clamped:
+
+```jinja
+{% for p in section.pages[:5] %}
+<li><a href="{{ p.url }}">{{ p.title }}</a></li>
+{% endfor %}
+
+{{ page.title[:40] }}
+{% for p in section.pages[::-1] %}…{% endfor %}
+```
+
+To show the first few items of a long list, slice it rather than skipping the rest with `{% if loop.index <= 5 %}`. The `if` version can walk the whole list on every page.
+
 ## Template Inheritance
 
 ### Base Template

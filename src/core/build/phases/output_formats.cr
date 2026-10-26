@@ -151,14 +151,14 @@ module Hwaro::Core::Build::Phases::OutputFormats
       return
     end
     candidate = File.join(output_dir, url_path, "index.#{fmt}")
-    output_path = Utils::OutputGuard.safe_output_path(candidate, output_dir)
+    output_path = Utils::OutputGuard.safe_output_path(candidate, output_dir, output_cwd)
     unless output_path
       Logger.warn "Skipping #{fmt} output outside output directory: #{candidate}"
       return
     end
 
     ensure_dir(Path[output_path].dirname.to_s)
-    Hwaro::Utils::FileSafe.atomic_write(output_path, content)
+    publish_output(output_path, content)
     Logger.action :create, output_path if verbose
   end
 
@@ -170,7 +170,7 @@ module Hwaro::Core::Build::Phases::OutputFormats
     return [] of String unless url_path
     formats.compact_map do |fmt|
       candidate = File.join(output_dir, url_path, "index.#{fmt}")
-      Utils::OutputGuard.safe_output_path(candidate, output_dir)
+      Utils::OutputGuard.safe_output_path(candidate, output_dir, output_cwd)
     end
   end
 

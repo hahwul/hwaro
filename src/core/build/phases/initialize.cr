@@ -69,8 +69,12 @@ module Hwaro::Core::Build::Phases::Initialize
       # own `static/.hwaro-dev` (published by copy_static_files below like any
       # hidden static file) is not mistaken for one.
       dev_marker_found = !ctx.options.serve_mode && Utils::DevMarker.present?(output_dir)
-      setup_output_dir(output_dir, keep_output)
+      fresh = setup_output_dir(output_dir, keep_output)
       @kept_output_dir = keep_output ? output_dir : nil
+      # A symlinked output directory is a publish-through-the-link setup: a
+      # web server may be serving the tree behind it while this build runs.
+      @output_tree_fresh = fresh && !ctx.options.serve_mode && !File.symlink?(output_dir.rstrip(File::SEPARATOR))
+      @output_cwd = Dir.current
       copy_static_files(output_dir, verbose, keep_output)
 
       if ctx.options.serve_mode
@@ -158,7 +162,9 @@ module Hwaro::Core::Build::Phases::Initialize
     result
   end
 
-  private def setup_output_dir(output_dir : String, incremental : Bool = false)
+  # True when the directory is empty now because this call created or
+  # cleared it (never for a kept tree).
+  private def setup_output_dir(output_dir : String, incremental : Bool = false) : Bool
     # Sanity-check the destination on EVERY path, not just the one that wipes
     # it. `--cache`, `--preserve-output` and `hwaro serve` all take the
     # incremental branch, and `build --cache -o content` used to exit 0 after
@@ -181,7 +187,8 @@ module Hwaro::Core::Build::Phases::Initialize
       end
       if !existing.empty? && !Hwaro::Utils::OutputOwnership.clearable?(output_dir, resolved, project_root)
         Logger.warn "Output directory #{output_dir} already holds #{existing.size} entr#{existing.size == 1 ? "y" : "ies"} hwaro did not write — keeping them. hwaro only clears the conventional public/ directory and directories it created or found empty, so files from an earlier build there may be stale; empty the directory once for a clean build."
-        return ensure_output_dir(output_dir)
+        ensure_output_dir(output_dir)
+        return false
       end
 
       # Trailing separators are stripped for the symlink test only: `-o public/`
@@ -233,6 +240,15 @@ module Hwaro::Core::Build::Phases::Initialize
         Hwaro::Utils::PathUtils.resolved_real_path(File.expand_path(Dir.current)),
       )
     end
+    # Verified, not assumed: `rm_rf` gives up silently on entries it cannot
+    # delete (a read-only tree), and those files are still there.
+    (!incremental || !existed_before) && output_dir_empty?(output_dir)
+  end
+
+  private def output_dir_empty?(output_dir : String) : Bool
+    Dir.empty?(output_dir)
+  rescue File::Error
+    false
   end
 
   private def ensure_output_dir(output_dir : String)
@@ -681,6 +697,10 @@ module Hwaro::Core::Build::Phases::Initialize
     end
 
     compute_template_var_features(templates)
+    # og:/twitter:description fall back to the excerpt; a template without a
+    # features entry is ungated (see compute_template_var_features).
+    @templates_read_summary = templates.empty? || Core::Build::SummaryReaders.read?(templates) ||
+                              templates.each_key.any? { |name| @template_var_features[name]?.try(&.needs_seo) != false }
 
     # Publish the snapshot BEFORE (re)building the Crinja environment so its
     # snapshot-backed loader captures this load's template set.

@@ -112,6 +112,24 @@ module Hwaro::Core::Build::Phases::ParseContent
     # the rest of the build.
     recomputed_paths = [] of String
 
+    # The excerpt is a second markdown render of every page, so it is only
+    # computed when something can print it. When that answer changed since
+    # the excerpts were last computed (a serve edit added the first reader),
+    # the pages outside this call were computed under the other answer:
+    # redo theirs too. Only the excerpt depends on the answer, and it reports
+    # no links, so this is safe for any page in the set.
+    auto_read = auto_summary_read?(site, link_targets)
+    if !(previous = @auto_summary_read).nil? && previous != auto_read
+      covered = pages.map(&.path).to_set
+      # Built once here: each shortcode page would otherwise build its own.
+      flip_globals = global_vars || build_global_vars(site)
+      link_targets.each do |page|
+        next if covered.includes?(page.path) || page.summary || page.extract_summary
+        recomputed_paths << page.path if assign_auto_summary(page, site, templates, flip_globals, auto_read)
+      end
+    end
+    @auto_summary_read = auto_read
+
     pages.each do |page|
       # The body render shares the set, so each warning prints once per page.
       page.warned_messages.clear unless rerender
@@ -125,7 +143,7 @@ module Hwaro::Core::Build::Phases::ParseContent
           # No marker: the automatic body excerpt, unless a description
           # already provides the summary (precedence: marker > description >
           # excerpt). Recorded in recomputed_paths for the same cache reason.
-          recomputed_paths << page.path if assign_auto_summary(page, site, templates, global_vars)
+          recomputed_paths << page.path if assign_auto_summary(page, site, templates, global_vars, auto_read)
           next
         end
         # The marker wins: drop an excerpt a serve rerender left on this
@@ -248,19 +266,36 @@ module Hwaro::Core::Build::Phases::ParseContent
   # failure here is not retried with a plain-Markdown pass the way the
   # marker path does: rendering the raw body would put `{{ … }}` syntax in
   # every listing, and the body pass will report the same error loudly.
+  # Can anything print a page's automatic excerpt? The loaded templates
+  # (SummaryReaders, plus the OG/Twitter tags that fall back to it —
+  # `@templates_read_summary`, computed with the templates), or the built-in
+  # RSS `<description>` and JSON Feed `summary` (Feeds.summary_for_feed; the
+  # Atom writer prints none). Nothing else reads `auto_summary` /
+  # `summary_truncated`. `pages` is the whole page set: `site.sections` is
+  # only assigned in Transform, after the full build's summary pass.
+  private def auto_summary_read?(site : Models::Site, pages : Array(Models::Page)) : Bool
+    config = site.config
+    return false unless config.summary.enabled?
+    return true if @templates_read_summary
+    return false if config.feeds.type.downcase == "atom"
+    config.feeds.enabled || config.taxonomies.any?(&.feed) ||
+      pages.any? { |page| page.is_a?(Models::Section) && page.generate_feeds }
+  end
+
   private def assign_auto_summary(
     page : Models::Page,
     site : Models::Site,
     templates : Hash(String, String),
     global_vars : Hash(String, Crinja::Value)?,
+    read : Bool,
   ) : Bool
     # `had` — a page object recomputed in place (serve rerender) whose
     # excerpt is now cleared must still drop its cached Crinja value.
     had = !page.auto_summary.nil?
     page.auto_summary = nil
     page.summary_truncated = false
+    return had unless read
     summary_cfg = site.config.summary
-    return had unless summary_cfg.enabled?
     return had if page.description
     raw = page.raw_content
     return had if raw.strip.empty?
