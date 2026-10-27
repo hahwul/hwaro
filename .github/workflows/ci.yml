@@ -194,6 +194,10 @@ jobs:
       # the cached URLs 404 until the runner image is rebuilt.
       - name: Refresh apt index
         run: sudo apt-get update -q
+      # dwebp: the WebP encoder specs decode their output with libwebp and
+      # compare it bit for bit (they mark themselves pending without it).
+      - name: Install the WebP reference decoder
+        run: sudo apt-get install -y -q webp
       - uses: crystal-lang/install-crystal@v1
         with:
           crystal: ${{ matrix.crystal-version }}

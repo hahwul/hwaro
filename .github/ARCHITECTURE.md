@@ -18,10 +18,12 @@ src/
   models/                 Page, Section, Site, Toc, Deployment, GitInfo, Config
     config/               one file per config.toml section family (class + loader)
   content/
-    processors/           Markdown processor, XML minifier, template engine, syntax highlighting
+    processors/           Markdown processor, XML minifier, template engine, syntax highlighting,
+                          image resizing, pure-Crystal WebP encoder
       markdown/           Markdown processor parts (front matter, taxonomy fields, html post)
       markdown_extensions/ one file per pre/post-processing pass (footnotes, math, …)
       filters/            Crinja filter modules (glob-required by template.cr)
+      webp_encoder/       VP8 (lossy) and VP8L (lossless) coders + RFC 6386 tables
     hooks/                lifecycle hookables (SEO, taxonomy, Sass, assets, PWA, AMP, OG, images)
     seo/                  sitemap, feeds, robots, llms, JSON-LD, meta tags, OG images (+ PNG renderer)
     pagination/           Paginator + paginated page renderer
