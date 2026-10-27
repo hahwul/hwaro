@@ -103,6 +103,19 @@ describe "Responsive content images" do
       end
     end
 
+    it "recognises an authored <PICTURE> in any case, but not custom elements named picture-*" do
+      with_resize_map(SAMPLE_MAP) do
+        with_webp_map(WEBP_MAP) do
+          upper = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(
+            %(<PICTURE><source srcset="/x.avif" type="image/avif"><img src="photo.png"></PICTURE>), bundle_page, enabled_config)
+          upper.should_not contain("image/webp")
+          custom = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(
+            %(<picture-gallery></picture-gallery><img src="photo.png">), bundle_page, enabled_config)
+          custom.should contain(%(<picture><source type="image/webp"))
+        end
+      end
+    end
+
     it "adds no <picture> when image processing is off" do
       with_webp_map(WEBP_MAP) do
         config = Hwaro::Models::Config.new

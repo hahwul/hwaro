@@ -25,7 +25,7 @@ module Hwaro::Core::Build::Phases::Render
   IMG_SRC_RE       = /\ssrc\s*=\s*("([^"]*)"|'([^']*)')/
   IMG_SIZE_RE      = /\s(?:width|height)\s*=/i
   IMG_SIZES_RE     = /\ssizes\s*=\s*("[^"]*"|'[^']*')/i
-  PICTURE_OPEN_RE  = /<picture\b/i
+  PICTURE_OPEN_RE  = /<picture(?=[\s>\/])/i
   PICTURE_CLOSE_RE = /<\/picture\s*>/i
   # An actual `srcset` attribute (or a lazy-loader's `data-srcset`) — not
   # alt/title text that merely says "srcset". A `data-srcset` image is the
@@ -43,7 +43,7 @@ module Hwaro::Core::Build::Phases::Render
     resize_map = config.image_processing.enabled ? Content::Hooks::ImageHooks.resize_map_readonly : {} of String => Hash(Int32, String)
     return html if resize_map.empty? && !dimensions
     webp_map = Content::Hooks::ImageHooks.format_map_readonly("webp") if config.image_processing.enabled
-    pictures = webp_map && Utils::ByteScan.includes?(html, "<picture") ? picture_spans(html) : nil
+    pictures = picture_spans(html) if webp_map
     srcset_for = ->(variants : Hash(Int32, String)) do
       # Prefix each candidate with the subpath (base_path) so responsive
       # images resolve on subpath deployments; the resize map stores bare

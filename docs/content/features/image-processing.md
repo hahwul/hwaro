@@ -67,7 +67,7 @@ formats = ["webp"]
 ```
 
 - Each variant gets a WebP copy next to it: `hero_640w.jpg` and `hero_640w.webp`.
-- `quality` 1-99 writes lossy WebP. Transparency is kept, stored losslessly. `quality = 100` writes lossless WebP.
+- WebP variants are lossy at `quality` (`100` is treated as `99`, since lossless WebP of a photo is larger than the JPEG). Transparency is kept, stored losslessly.
 - Content images that get a `srcset` are wrapped in `<picture>` with a WebP `<source>`. Browsers without WebP support keep using the `<img>`:
 
   ```html

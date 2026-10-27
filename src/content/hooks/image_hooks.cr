@@ -416,7 +416,7 @@ module Hwaro
 
           jobs.each do |job|
             job_fmts = job_formats[job.original_url]
-            encode_settings = ImageHooks.encode_settings(quality, lqip_width, lqip_quality, job_fmts)
+            encode_settings = ImageHooks.encode_settings(quality, lqip_width, lqip_quality)
             authored = authored_for.call(job)
             reused_widths = self.class.reusable_widths(job.source_path, job.dest_dir, widths, authored, encode_settings)
             reused_formats = {} of String => Hash(Int32, String)
@@ -514,8 +514,9 @@ module Hwaro
                                    format_maps : Hash(String, Hash(String, Hash(Int32, String)))) : Nil
           builder = ctx.builder
           return unless builder
+          all_maps = [map] + format_maps.values
           jobs.each do |job|
-            ([map] + format_maps.values).each do |variants|
+            all_maps.each do |variants|
               variants[job.original_url]?.try &.each_value do |url|
                 builder.claim_generated_output(File.join(job.dest_dir, File.basename(url)))
               end
@@ -525,11 +526,14 @@ module Hwaro
 
         # The extra formats each job writes, by original URL. Two sources
         # that differ only in extension (`hero.jpg`, `hero.png`) would write
-        # the same `hero_640w.webp`: the source that sorts first keeps the
+        # the same `hero_640w.webp` (so would `Hero.jpg` on a case-insensitive
+        # filesystem): the source that sorts first keeps the
         # names (whatever order the directory listing came in) and the other
         # gets none, with a warning — never one overwriting the other.
         private def formats_by_job(jobs : Array(ImageJob), formats : Array(String)) : Hash(String, Array(String))
-          stem = ->(job : ImageJob) { File.join(job.dest_dir, File.basename(job.source_path, File.extname(job.source_path))) }
+          # Downcased: `Hero.jpg` and `hero.png` write one file on a
+          # case-insensitive filesystem, and every platform must agree.
+          stem = ->(job : ImageJob) { File.join(job.dest_dir, File.basename(job.source_path, File.extname(job.source_path))).downcase }
           owners = {} of String => ImageJob
           jobs.each do |job|
             current = owners[stem.call(job)]?
@@ -610,9 +614,15 @@ module Hwaro
           # inferred ceiling, so e.g. adding 1024 to `widths = [320]` never
           # generated the 1024 variant on warm builds. The old inference
           # stays as the fallback for headers we can't read.
-          src_w = Processors::ImageProcessor.dimensions(source_path).try(&.[0]) || on_disk.keys.max
+          size = Processors::ImageProcessor.dimensions(source_path)
+          src_w = size.try(&.[0]) || on_disk.keys.max
           expected = widths.map { |w| Math.min(w, src_w) }.uniq!
           expected.reject! { |w| authored.try(&.call("#{basename}_#{w}w#{ext}")) }
+          # A WebP canvas tops out at 16383px: wider or taller variants are
+          # never written, so they are not missing either.
+          if ext == ".webp" && size
+            expected.reject! { |w| w > Processors::WebpEncoder::MAX_DIMENSION || size[1] * w / size[0] > Processors::WebpEncoder::MAX_DIMENSION }
+          end
           return unless expected.sort == on_disk.keys.sort!
 
           # With `encode_settings`, a variant is only reusable when it was
@@ -636,11 +646,10 @@ module Hwaro
         end
 
         # The encode settings a width variant set depends on (besides the
-        # source): the JPEG quality, the LQIP knobs and any extra formats
-        # (only spelled out when there are some, so existing stamps hold).
-        def self.encode_settings(quality : Int32, lqip_width : Int32, lqip_quality : Int32, formats : Array(String) = [] of String) : String
-          settings = "q#{quality}:l#{lqip_width}:#{lqip_quality}"
-          formats.empty? ? settings : "#{settings}:f#{formats.join(",")}"
+        # source): the JPEG quality and the LQIP knobs. Each stamp is per
+        # file, so the output format is already in the name it is kept under.
+        def self.encode_settings(quality : Int32, lqip_width : Int32, lqip_quality : Int32) : String
+          "q#{quality}:l#{lqip_width}:#{lqip_quality}"
         end
 
         # Resize a single image to all widths + generate LQIP (one decode pass)
@@ -650,7 +659,7 @@ module Hwaro
                                formats : Array(String)) : {Hash(Int32, String), Hash(String, String)?, Hash(String, Hash(Int32, String))}
           # Fingerprinted BEFORE the decode: a source rewritten mid-run then
           # mismatches on the next build and is regenerated.
-          stamp = ImageVariantStamps.fingerprint(job.source_path, ImageHooks.encode_settings(quality, lqip_width, lqip_quality, formats))
+          stamp = ImageVariantStamps.fingerprint(job.source_path, ImageHooks.encode_settings(quality, lqip_width, lqip_quality))
           extra = formats.to_h { |format| {format, {} of Int32 => String} }
           path_map, lqip_uri, dom_color = Processors::ImageProcessor.resize_and_lqip(
             job.source_path, job.dest_dir, widths, quality, lqip_width, lqip_quality, authored, extra
@@ -882,7 +891,7 @@ module Hwaro
           authored = ->(name : String) { !resolve_source(url_prefix + name, config).nil? }
           stem = File.basename(src_path, File.extname(src_path))
           formats = ip.formats.reject { |format| format_owned_elsewhere?(format, original_url, url_prefix, stem) }
-          stamp = ImageVariantStamps.fingerprint(src_path, encode_settings(ip.quality, lqip_width, ip.lqip_quality, formats))
+          stamp = ImageVariantStamps.fingerprint(src_path, encode_settings(ip.quality, lqip_width, ip.lqip_quality))
           extra = formats.to_h { |format| {format, {} of Int32 => String} }
           path_map, lqip_uri, dom_color = Processors::ImageProcessor.resize_and_lqip(
             src_path, dest_dir, ip.widths, ip.quality, lqip_width, ip.lqip_quality, authored, extra
@@ -891,7 +900,7 @@ module Hwaro
             path_map.each_value { |dest| ImageVariantStamps.record(dest, stamp) }
             extra.each_value &.each_value { |dest| ImageVariantStamps.record(dest, stamp) }
           end
-          return 0 if path_map.empty?
+          return 0 if path_map.empty? && extra.values.all?(&.empty?)
 
           width_urls = {} of Int32 => String
           path_map.each { |width, dest| width_urls[width] = url_prefix + File.basename(dest) }
@@ -914,7 +923,7 @@ module Hwaro
         # `<url_prefix><stem>_<w>w.<format>` (the owner the last full build
         # chose, see `formats_by_job`).
         private def self.format_owned_elsewhere?(format : String, original_url : String, url_prefix : String, stem : String) : Bool
-          name_re = /\A#{Regex.escape(url_prefix + stem)}_\d+w\.#{Regex.escape(format)}\z/
+          name_re = /\A#{Regex.escape(url_prefix + stem)}_\d+w\.#{Regex.escape(format)}\z/i
           @@resize_map_mutex.synchronize do
             @@format_maps[format]?.try(&.any? { |url, map| url != original_url && map.each_value.any?(&.matches?(name_re)) }) || false
           end

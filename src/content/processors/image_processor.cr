@@ -364,8 +364,9 @@ module Hwaro
                     end
                   end
 
-                  # Keep the smallest variant alive as LQIP source
-                  if lqip_width > 0 && smallest_pixels.null?
+                  # Keep the smallest variant alive as LQIP source (one the
+                  # source format writes, so extra formats never move it)
+                  if want && lqip_width > 0 && smallest_pixels.null?
                     smallest_pixels = out_pixels
                     smallest_w = out_w
                     smallest_h = out_h
@@ -705,8 +706,10 @@ module Hwaro
                  when ".bmp"
                    LibStb.stbi_write_bmp(tmp, w, h, channels, data.as(Void*)) != 0
                  when ".webp"
+                   # Always lossy (99 at most): `quality = 100` asks for the
+                   # best JPEG, and lossless WebP of a photo is far larger.
                    pixels = Bytes.new(data, w.to_i64 * h * channels, read_only: true)
-                   if webp = WebpEncoder.encode(pixels, w, h, channels, quality)
+                   if webp = WebpEncoder.encode(pixels, w, h, channels, Math.min(quality, 99))
                      File.write(tmp, webp)
                      true
                    else

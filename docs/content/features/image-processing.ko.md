@@ -67,7 +67,7 @@ formats = ["webp"]
 ```
 
 - 각 변형 옆에 WebP 사본이 생깁니다: `hero_640w.jpg`와 `hero_640w.webp`.
-- `quality`가 1-99이면 손실 WebP로 씁니다. 투명도는 무손실로 보존됩니다. `quality = 100`이면 무손실 WebP로 씁니다.
+- WebP 변형은 `quality`에 맞춘 손실 압축입니다(사진을 무손실 WebP로 쓰면 JPEG보다 커지므로 `100`은 `99`로 취급합니다). 투명도는 무손실로 보존됩니다.
 - `srcset`이 붙는 콘텐츠 이미지는 WebP `<source>`가 들어간 `<picture>`로 감쌉니다. WebP를 지원하지 않는 브라우저는 계속 `<img>`를 씁니다:
 
   ```html

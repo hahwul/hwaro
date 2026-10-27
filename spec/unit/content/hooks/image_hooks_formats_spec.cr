@@ -98,6 +98,24 @@ describe "image processing formats" do
     end
   end
 
+  it "treats names that differ only in case as the same WebP names" do
+    with_webp_site do
+      write_jpg("static/dup/Same.jpg", 20, 20)
+      write_png("static/dup/same.png", 40, 40)
+      log = with_captured_log { webp_build }
+      log.should contain("static/dup/same.png: no webp variants, static/dup/Same.jpg already writes those names")
+      File.exists?("public/dup/Same_20w.webp").should be_true
+      Dir.children("public/dup").count(&.downcase.==("same_16w.webp")).should eq(1)
+    end
+  end
+
+  it "keeps WebP variants lossy at quality 100" do
+    with_webp_site do
+      webp_build(WEBP_CONFIG.sub("enabled = true", "enabled = true\nquality = 100"))
+      String.new(File.read("public/photo_16w.webp").to_slice[12, 4]).should eq("VP8 ")
+    end
+  end
+
   it "never replaces a WebP file the site publishes under a variant's name" do
     with_webp_site do
       File.write("static/photo_16w.webp", "authored")
@@ -122,12 +140,25 @@ describe "image processing formats" do
   end
 end
 
-describe "ImageHooks.encode_settings" do
-  # Sites that write no extra format keep the stamps their variants were
-  # recorded with, so upgrading does not regenerate every image.
-  it "only spells out formats when there are some" do
-    Hwaro::Content::Hooks::ImageHooks.encode_settings(85, 32, 20).should eq("q85:l32:20")
-    Hwaro::Content::Hooks::ImageHooks.encode_settings(85, 32, 20, ["webp"]).should eq("q85:l32:20:fwebp")
+describe "ImageHooks.reusable_widths(.webp)" do
+  # WebP canvases stop at 16383px: a wider variant is never written, so it
+  # must not make the set look incomplete (and the image re-encode on every
+  # warm build).
+  it "does not expect WebP widths beyond the format's canvas limit" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        header = IO::Memory.new
+        header.write(Bytes[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52])
+        header.write_bytes(20_000_u32, IO::ByteFormat::BigEndian)
+        header.write_bytes(10_u32, IO::ByteFormat::BigEndian)
+        File.write("pano.png", header.to_slice)
+        File.touch("pano.png", Time.utc - 1.hour)
+        Dir.mkdir("out")
+        File.write("out/pano_16w.webp", "x")
+        Hwaro::Content::Hooks::ImageHooks.reusable_widths("pano.png", "out", [16, 20_000], nil, nil, ".webp")
+          .should eq({16 => "pano_16w.webp"})
+      end
+    end
   end
 end
 

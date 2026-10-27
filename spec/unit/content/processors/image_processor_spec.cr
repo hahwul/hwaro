@@ -239,6 +239,25 @@ describe Hwaro::Content::Processors::ImageProcessor do
     end
   end
 
+  describe ".resize_and_lqip extra formats" do
+    it "cuts the LQIP from the same variant whether or not extra formats are written" do
+      Dir.mktmpdir do |dir|
+        src = File.join(dir, "p.png")
+        rng = Random.new(7)
+        pixels = Bytes.new(64 * 48 * 3) { rng.rand(256).to_u8 }
+        LibStb.stbi_write_png(src, 64, 48, 3, pixels.to_unsafe.as(Void*), 64 * 3)
+        # The site ships its own p_16w.png: that width is not generated.
+        authored = ->(name : String) { name == "p_16w.png" }
+        plain = Hwaro::Content::Processors::ImageProcessor.resize_and_lqip(src, dir, [16, 32], 85, 8, 20, authored)
+        extra = {"webp" => {} of Int32 => String}
+        with_webp = Hwaro::Content::Processors::ImageProcessor.resize_and_lqip(src, dir, [16, 32], 85, 8, 20, authored, extra)
+        plain[1].should_not be_nil
+        with_webp[1].should eq(plain[1])
+        extra["webp"].keys.sort!.should eq([16, 32])
+      end
+    end
+  end
+
   describe ".resize_and_lqip widths" do
     it "decodes once and generates all widths" do
       Dir.mktmpdir do |dir|
