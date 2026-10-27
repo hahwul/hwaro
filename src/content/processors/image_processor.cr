@@ -4,10 +4,11 @@
 # - stb_image.h        (decode JPG/PNG/BMP/GIF/TGA/PSD/HDR/PIC)
 # - stb_image_write.h  (encode JPG/PNG/BMP)
 # - stb_image_resize2.h (high-quality resize)
+# and WebpEncoder (pure Crystal) for the optional `.webp` copies.
 #
-# Only JPG/PNG/BMP are supported for output because stb_image_write
-# can only encode those formats. GIF/TGA/PSD/HDR can be decoded but
-# not written back, so they are excluded from IMAGE_EXTENSIONS.
+# Sources are JPG/PNG/BMP: what stb can both read and write back.
+# GIF/TGA/PSD/HDR can be decoded but not written back, and stb cannot
+# decode WebP at all, so they are excluded from IMAGE_EXTENSIONS.
 #
 # Usage in templates:
 #   {{ resize_image(path="images/photo.jpg", width=800, height=600) }}
@@ -20,6 +21,7 @@
 
 require "base64"
 require "../../ext/stb_bindings"
+require "./webp_encoder"
 require "../../models/config"
 
 module Hwaro
@@ -122,7 +124,7 @@ module Hwaro
                 return if resized.null?
               end
               Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest))
-              return unless write_image(dest, File.extname(source).downcase, out_w, out_h, channels.to_i32, out_pixels, quality.clamp(1, 100))
+              return unless write_image(dest, File.extname(dest).downcase, out_w, out_h, channels.to_i32, out_pixels, quality.clamp(1, 100))
               {out_w, out_h}
             ensure
               LibC.free(out_pixels.as(Void*))
@@ -256,6 +258,10 @@ module Hwaro
         # `authored` (when given) is asked about each `<name>_<w>w.<ext>` this
         # would write: true means a file the site itself publishes under that
         # name, which is left alone — that width is simply not generated.
+        #
+        # `extra` names further output formats by its keys (`"webp"`); each
+        # width is then also written as `<name>_<w>w.<format>` from the same
+        # resized pixels, and the format's `width => path` map is filled in.
         def resize_and_lqip(
           source : String,
           dest_dir : String,
@@ -264,6 +270,7 @@ module Hwaro
           lqip_width : Int32 = 32,
           lqip_quality : Int32 = 20,
           authored : Proc(String, Bool)? = nil,
+          extra : Hash(String, Hash(Int32, String))? = nil,
         ) : {Hash(Int32, String), String?, String}
           result_map = {} of Int32 => String
           lqip_uri = nil
@@ -319,10 +326,19 @@ module Hwaro
                   Hwaro::Utils::FileSafe.atomic_copy(source, dest)
                   result_map[actual] = dest
                 end
+                # Another format cannot be copied: encode the source as is.
+                extra.try &.each do |format, map|
+                  name = "#{basename}_#{actual}w.#{format}"
+                  next if map.has_key?(actual) || authored.try(&.call(name))
+                  dest = File.join(dest_dir, name)
+                  map[actual] = dest if write_image(dest, ".#{format}", src_w, src_h, channels.to_i32, pixels, quality)
+                end
                 next
               end
 
-              next if authored.try(&.call("#{basename}_#{width}w#{ext}"))
+              want = !authored.try(&.call("#{basename}_#{width}w#{ext}"))
+              formats = extra.try(&.keys.reject { |format| authored.try(&.call("#{basename}_#{width}w.#{format}")) }) || [] of String
+              next unless want || formats.present?
               dest = File.join(dest_dir, "#{basename}_#{width}w#{ext}")
               pixel_count = out_w.to_i64 * out_h.to_i64
               next if pixel_count > MAX_PIXELS
@@ -338,8 +354,14 @@ module Hwaro
                   stbir_layout(channels)
                 )
                 unless resized.null?
-                  if write_image(dest, ext, out_w, out_h, channels.to_i32, out_pixels, quality)
+                  if want && write_image(dest, ext, out_w, out_h, channels.to_i32, out_pixels, quality)
                     result_map[width] = dest
+                  end
+                  formats.each do |format|
+                    format_dest = File.join(dest_dir, "#{basename}_#{width}w.#{format}")
+                    if extra && write_image(format_dest, ".#{format}", out_w, out_h, channels.to_i32, out_pixels, quality)
+                      extra[format][width] = format_dest
+                    end
                   end
 
                   # Keep the smallest variant alive as LQIP source
@@ -682,6 +704,14 @@ module Hwaro
                    LibStb.stbi_write_jpg(tmp, w, h, channels, data.as(Void*), quality) != 0
                  when ".bmp"
                    LibStb.stbi_write_bmp(tmp, w, h, channels, data.as(Void*)) != 0
+                 when ".webp"
+                   pixels = Bytes.new(data, w.to_i64 * h * channels, read_only: true)
+                   if webp = WebpEncoder.encode(pixels, w, h, channels, quality)
+                     File.write(tmp, webp)
+                     true
+                   else
+                     false
+                   end
                  else
                    false
                  end

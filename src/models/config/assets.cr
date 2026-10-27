@@ -142,18 +142,23 @@ module Hwaro
     # Image processing configuration
     #
     # Enables automatic image resizing during build using stb (statically linked).
-    # Supports JPG, PNG, BMP. No external tools required.
+    # Supports JPG, PNG, BMP. No external tools required. `formats = ["webp"]`
+    # also writes a WebP copy of every width variant (pure-Crystal encoder).
     #
     # Config example (config.toml):
     #   [image_processing]
     #   enabled = true
     #   widths = [320, 640, 1024, 1280]
     #   quality = 85
+    #   formats = ["webp"]  # extra output formats beside the source's own
     #   dimensions = true   # intrinsic width/height on content <img>
     #                       # (independent of `enabled`)
     class ImageProcessingConfig
+      VALID_FORMATS = {"webp"}
+
       property enabled : Bool
       property widths : Array(Int32)
+      property formats : Array(String)
       property quality : Int32
       property dimensions : Bool
       property lqip_enabled : Bool
@@ -163,6 +168,7 @@ module Hwaro
       def initialize
         @enabled = false
         @widths = [] of Int32
+        @formats = [] of String
         @quality = 85
         @dimensions = false
         @lqip_enabled = false
@@ -327,6 +333,16 @@ module Hwaro
             val && val > 0 ? val : nil
           }
         end
+        if formats_any = s["formats"]?
+          formats = formats_any.as_a? || raise image_config_error("[image_processing] formats must be an array, e.g. formats = [\"webp\"].")
+          config.image_processing.formats = formats.map { |f|
+            name = f.as_s?.try(&.strip.downcase)
+            unless name && ImageProcessingConfig::VALID_FORMATS.includes?(name)
+              raise image_config_error("[image_processing] unknown format #{f.raw.inspect} — expected one of: #{ImageProcessingConfig::VALID_FORMATS.join(", ")}.")
+            end
+            name
+          }.uniq!
+        end
 
         # LQIP sub-config: [image_processing.lqip]
         if lqip = s["lqip"]?.try(&.as_h?)
@@ -334,6 +350,14 @@ module Hwaro
           config.image_processing.lqip_width = int_value(lqip["width"]?, config.image_processing.lqip_width).clamp(8, 128)
           config.image_processing.lqip_quality = int_value(lqip["quality"]?, config.image_processing.lqip_quality).clamp(1, 100)
         end
+      end
+
+      private def self.image_config_error(message : String) : Hwaro::HwaroError
+        Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_CONFIG,
+          message: message,
+          hint: "[image_processing] formats lists extra output formats; supported: #{ImageProcessingConfig::VALID_FORMATS.join(", ")}.",
+        )
       end
     end
   end

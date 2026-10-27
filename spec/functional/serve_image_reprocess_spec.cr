@@ -42,7 +42,7 @@ private def img_options : Hwaro::Config::Options::BuildOptions
   options
 end
 
-private def write_image_site
+private def write_image_site(extra : String = "")
   File.write("config.toml", <<-TOML
     title = "Image Site"
     base_url = "https://example.com"
@@ -50,6 +50,7 @@ private def write_image_site
     [image_processing]
     enabled = true
     widths = [32]
+    #{extra}
 
     [content.files]
     allow_extensions = ["png"]
@@ -108,6 +109,29 @@ describe "serve image reprocessing on changed bytes (A12)" do
         File.read("public/img/photo.png").should eq(File.read("static/img/photo.png"))
         # … and the resized variant now reflects the new bytes too.
         File.read(variant).should_not eq(before)
+      end
+    end
+  end
+
+  it "regenerates the WebP copies too" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_image_site(%(formats = ["webp"]))
+        write_solid_png("static/img/photo.png", 64, 64, 255_u8, 0_u8, 0_u8)
+
+        server = Hwaro::Services::Server.new
+        options = img_options
+        server.img_fix_builder.run(options).should be_true
+
+        variant = "public/img/photo_32w.webp"
+        File.exists?(variant).should be_true
+        before = File.read(variant)
+
+        write_solid_png("static/img/photo.png", 64, 64, 0_u8, 0_u8, 255_u8)
+        server.img_fix_apply_changeset(static_changeset(["static/img/photo.png"]), options)
+
+        File.read(variant).should_not eq(before)
+        Hwaro::Content::Hooks::ImageHooks.find_closest_variant("/img/photo.png", 32, "webp").should eq({32, "/img/photo_32w.webp"})
       end
     end
   end

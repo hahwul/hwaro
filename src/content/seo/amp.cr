@@ -304,6 +304,13 @@ module Hwaro
           result = result.gsub(/\s+style=(?:"[^"]*"|'[^']*')/i, "")
           result = result.gsub(/\s+on\w+=(?:"[^"]*"|'[^']*')/i, "")
 
+          # <picture>/<source> are not AMP elements: keep only the <img>
+          # fallback (the WebP sources `formats = ["webp"]` adds, or an
+          # author's own picture), which the next step turns into amp-img.
+          result = result.gsub(/<picture\b[^>]*>([\s\S]*?)<\/picture\s*>/i) do |_, m|
+            m[1].gsub(/<source\b[^>]*>/i, "")
+          end
+
           # Convert <img> to <amp-img>. Quote-aware attribute scan (same
           # pattern as IMG_LAZY_REGEX in markdown.cr): a `>` inside a quoted
           # attribute value (legal HTML5, e.g. alt="Home > Docs") must not be

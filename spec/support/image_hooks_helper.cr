@@ -9,6 +9,14 @@ class Hwaro::Content::Hooks::ImageHooks
     @@resize_map_mutex.synchronize { @@resize_map = map }
   end
 
+  def self.format_maps : Hash(String, Hash(String, Hash(Int32, String)))
+    @@resize_map_mutex.synchronize { @@format_maps.dup }
+  end
+
+  def self.set_format_maps(maps : Hash(String, Hash(String, Hash(Int32, String))))
+    @@resize_map_mutex.synchronize { @@format_maps = maps }
+  end
+
   def self.lqip_map : Hash(String, Hash(String, String))
     @@lqip_map_mutex.synchronize { @@lqip_map.dup }
   end

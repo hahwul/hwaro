@@ -74,6 +74,18 @@ end
 
 describe Hwaro::Content::Seo::Amp do
   describe ".convert_to_amp" do
+    it "keeps only the <img> of a <picture>" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      html = %(<html><head></head><body><picture><source type="image/webp" srcset="/a_400w.webp 400w" sizes="100vw"><img src="/a.png" alt="a" width="4" height="3"></picture></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should_not contain("<picture")
+      result.should_not contain("<source")
+      result.should contain(%(<amp-img src="/a.png"))
+    end
+
     it "adds amp attribute to html tag" do
       page = Hwaro::Models::Page.new("test.md")
       page.url = "/test/"

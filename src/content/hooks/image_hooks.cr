@@ -32,6 +32,10 @@ module Hwaro
         # `--cache` build notices when that image is replaced (see
         # `TemplateEngine.record_render_read`).
         @@source_map = {} of String => String
+        # Extra output formats (`[image_processing] formats`): format =>
+        # original_url => { width => variant_url }. Guarded by
+        # @@resize_map_mutex and replaced with @@resize_map.
+        @@format_maps = {} of String => Hash(String, Hash(Int32, String))
         # Whether the last `image:resize` run processed images at all. When it
         # did not (`enabled = false`, no widths, `--skip-image-processing`),
         # `resize_image()` returns the URL it was given whatever the bytes,
@@ -93,6 +97,12 @@ module Hwaro
           @@resize_map_mutex.synchronize { @@resize_map }
         end
 
+        # The `format` variants by original URL, read-only like
+        # `resize_map_readonly`; nil when none were generated.
+        def self.format_map_readonly(format : String) : Hash(String, Hash(Int32, String))?
+          @@resize_map_mutex.synchronize { @@format_maps[format]? }
+        end
+
         # Source file behind `url` as of the last `image:resize` run, or nil
         # when no image job covered it.
         def self.processing_active? : Bool
@@ -114,9 +124,9 @@ module Hwaro
         # 900px file. `resize_image()` reported the REQUESTED width, which is
         # what a template writes into `<img width=…>` — a number the browser
         # then uses to lay out an image that is a different size.
-        def self.find_closest_variant(url : String, width : Int32) : {Int32, String}?
+        def self.find_closest_variant(url : String, width : Int32, format : String? = nil) : {Int32, String}?
           @@resize_map_mutex.synchronize do
-            widths_map = @@resize_map[url]?
+            widths_map = format ? @@format_maps[format]?.try(&.[url]?) : @@resize_map[url]?
             return unless widths_map
             if exact = widths_map[width]?
               return {width, exact}
@@ -239,10 +249,10 @@ module Hwaro
         # derived output so a warm `--cache` build that skips the page keeps
         # it. nil when ops are off for this build or the variant can't be made.
         def self.op_variant(url : String, source : String, width : Int32, height : Int32,
-                            op : String, anchor : String, page_path : String?) : {String, Int32, Int32}?
+                            op : String, anchor : String, page_path : String?, format : String? = nil) : {String, Int32, Int32}?
           return unless Processors::ImageProcessor.image?(source)
           ext = File.extname(url)
-          name = "#{File.basename(url, ext)}_#{width}x#{height}_#{op}_#{anchor}#{ext}"
+          name = "#{File.basename(url, ext)}_#{width}x#{height}_#{op}_#{anchor}#{format ? ".#{format}" : ext}"
           dir = File.dirname(url)
           variant_url = dir == "/" ? "/#{name}" : "#{dir}/#{name}"
           source_mtime = File.info(source).modification_time
@@ -318,6 +328,7 @@ module Hwaro
           @@resize_map_mutex.synchronize do
             @@resize_map = {} of String => Hash(Int32, String)
             @@source_map = {} of String => String
+            @@format_maps = {} of String => Hash(String, Hash(Int32, String))
           end
           @@lqip_map_mutex.synchronize { @@lqip_map = {} of String => Hash(String, String) }
         end
@@ -341,6 +352,7 @@ module Hwaro
           lqip_enabled = config.image_processing.lqip_enabled
           lqip_width = lqip_enabled ? config.image_processing.lqip_width : 0
           lqip_quality = config.image_processing.lqip_quality
+          formats = config.image_processing.formats
           output_dir = ctx.output_dir
           resolved_output = File.expand_path(output_dir)
 
@@ -381,6 +393,8 @@ module Hwaro
 
           new_map = {} of String => Hash(Int32, String)
           new_lqip_map = {} of String => Hash(String, String)
+          new_format_maps = formats.to_h { |format| {format, {} of String => Hash(Int32, String)} }
+          job_formats = formats_by_job(jobs, formats)
           jobs_to_process = [] of ImageJob
           reused_count = 0
 
@@ -389,20 +403,36 @@ module Hwaro
           # names). Keyed by URL directory, then file name.
           authored_names = {} of String => Set(String)
           jobs.each { |job| (authored_names[job.url_prefix] ||= Set(String).new) << File.basename(job.original_url) }
+          # Names of another format (`<name>_<w>w.webp`) are not in that set:
+          # those are looked up where the site would publish them.
+          site_config = config
           authored_for = ->(job : ImageJob) do
             names = authored_names[job.url_prefix]
-            ->(name : String) { names.includes?(name) }
+            ->(name : String) do
+              names.includes?(name) ||
+              (!Processors::ImageProcessor.image?(name) && !ImageHooks.resolve_source(job.url_prefix + name, site_config).nil?)
+            end
           end
 
-          encode_settings = ImageHooks.encode_settings(quality, lqip_width, lqip_quality)
           jobs.each do |job|
-            reused_widths = self.class.reusable_widths(job.source_path, job.dest_dir, widths, authored_for.call(job), encode_settings)
-            if reused_widths && (!lqip_enabled || previous_lqip_map.has_key?(job.original_url))
+            job_fmts = job_formats[job.original_url]
+            encode_settings = ImageHooks.encode_settings(quality, lqip_width, lqip_quality, job_fmts)
+            authored = authored_for.call(job)
+            reused_widths = self.class.reusable_widths(job.source_path, job.dest_dir, widths, authored, encode_settings)
+            reused_formats = {} of String => Hash(Int32, String)
+            formats_fresh = job_fmts.all? do |format|
+              files = self.class.reusable_widths(job.source_path, job.dest_dir, widths, authored, encode_settings, ".#{format}") if reused_widths
+              reused_formats[format] = files if files
+            end
+            if reused_widths && formats_fresh && (!lqip_enabled || previous_lqip_map.has_key?(job.original_url))
               width_urls = {} of Int32 => String
               reused_widths.each do |width, filename|
                 width_urls[width] = job.url_prefix + filename
               end
               new_map[job.original_url] = width_urls
+              reused_formats.each do |format, files|
+                new_format_maps[format][job.original_url] = files.transform_values { |filename| job.url_prefix + filename }
+              end
               if lqip_enabled && (lqip = previous_lqip_map[job.original_url]?)
                 new_lqip_map[job.original_url] = lqip
               end
@@ -418,9 +448,10 @@ module Hwaro
             @@resize_map_mutex.synchronize do
               @@resize_map = new_map
               @@source_map = source_map
+              @@format_maps = new_format_maps
             end
             @@lqip_map_mutex.synchronize { @@lqip_map = new_lqip_map }
-            claim_variants(ctx, jobs, new_map)
+            claim_variants(ctx, jobs, new_map, new_format_maps)
             Logger.info "  Reused #{reused_count} cached image result(s)." if reused_count > 0
             return
           end
@@ -432,15 +463,16 @@ module Hwaro
           # permissions/disk-full/vanished files: that job is reported and
           # the rest carry on.
           config = Core::Build::ParallelConfig.new(max_workers: CONCURRENCY, wake_idle: ctx.options.parallel)
-          results = Core::Build::Parallel(ImageJob, {Hash(Int32, String), Hash(String, String)?}).new(config).process(jobs_to_process) do |job, _idx|
-            resize_one(job, widths, quality, lqip_width, lqip_quality, authored_for.call(job))
+          results = Core::Build::Parallel(ImageJob, {Hash(Int32, String), Hash(String, String)?, Hash(String, Hash(Int32, String))}).new(config).process(jobs_to_process) do |job, _idx|
+            resize_one(job, widths, quality, lqip_width, lqip_quality, authored_for.call(job), job_formats[job.original_url])
           end
           results.each do |result|
             job = jobs_to_process[result.index]
             if (value = result.value) && result.success
-              width_map, lqip_data = value
+              width_map, lqip_data, format_urls = value
               new_map[job.original_url] = width_map unless width_map.empty?
               new_lqip_map[job.original_url] = lqip_data if lqip_data
+              format_urls.each { |format, urls| new_format_maps[format][job.original_url] = urls unless urls.empty? }
             else
               Logger.warn "  Image resize failed for #{job.source_path}: #{result.error}"
             end
@@ -449,14 +481,17 @@ module Hwaro
           @@resize_map_mutex.synchronize do
             @@resize_map = new_map
             @@source_map = source_map
+            @@format_maps = new_format_maps
           end
           @@lqip_map_mutex.synchronize { @@lqip_map = new_lqip_map }
-          claim_variants(ctx, jobs, new_map)
+          claim_variants(ctx, jobs, new_map, new_format_maps)
           # Count variants (widths × successful jobs), matching the pre-#389
           # meaning. Counting source images instead would silently halve/third
           # the number users see and make the "Generated N" line less useful
           # for verifying that configured widths actually produced output.
-          resized_count = jobs_to_process.sum { |j| new_map[j.original_url]?.try(&.size) || 0 }
+          resized_count = jobs_to_process.sum do |j|
+            (new_map[j.original_url]?.try(&.size) || 0) + new_format_maps.sum { |_, map| map[j.original_url]?.try(&.size) || 0 }
+          end
           Logger.success "  Generated #{resized_count} resized image(s)." if resized_count > 0
           Logger.info "  Reused #{reused_count} cached image result(s)." if reused_count > 0
           Logger.success "  Generated #{new_lqip_map.size} LQIP placeholder(s)." if new_lqip_map.size > 0
@@ -475,12 +510,39 @@ module Hwaro
         # left `widths`, after the source image was deleted, and after a
         # bigger source image changed the width set (`hero_900w.png` stayed
         # beside the new `hero_1024w.png`).
-        private def claim_variants(ctx : Core::Lifecycle::BuildContext, jobs : Array(ImageJob), map : Hash(String, Hash(Int32, String))) : Nil
+        private def claim_variants(ctx : Core::Lifecycle::BuildContext, jobs : Array(ImageJob), map : Hash(String, Hash(Int32, String)),
+                                   format_maps : Hash(String, Hash(String, Hash(Int32, String)))) : Nil
           builder = ctx.builder
           return unless builder
           jobs.each do |job|
-            map[job.original_url]?.try &.each_value do |url|
-              builder.claim_generated_output(File.join(job.dest_dir, File.basename(url)))
+            ([map] + format_maps.values).each do |variants|
+              variants[job.original_url]?.try &.each_value do |url|
+                builder.claim_generated_output(File.join(job.dest_dir, File.basename(url)))
+              end
+            end
+          end
+        end
+
+        # The extra formats each job writes, by original URL. Two sources
+        # that differ only in extension (`hero.jpg`, `hero.png`) would write
+        # the same `hero_640w.webp`: the source that sorts first keeps the
+        # names (whatever order the directory listing came in) and the other
+        # gets none, with a warning — never one overwriting the other.
+        private def formats_by_job(jobs : Array(ImageJob), formats : Array(String)) : Hash(String, Array(String))
+          stem = ->(job : ImageJob) { File.join(job.dest_dir, File.basename(job.source_path, File.extname(job.source_path))) }
+          owners = {} of String => ImageJob
+          jobs.each do |job|
+            current = owners[stem.call(job)]?
+            owners[stem.call(job)] = job if current.nil? || job.source_path < current.source_path
+          end
+          jobs.to_h do |job|
+            next {job.original_url, formats} if formats.empty?
+            owner = owners[stem.call(job)]
+            if owner == job
+              {job.original_url, formats}
+            else
+              Logger.warn "  #{job.source_path}: no #{formats.join("/")} variants, #{owner.source_path} already writes those names"
+              {job.original_url, [] of String}
             end
           end
         end
@@ -501,6 +563,7 @@ module Hwaro
           widths : Array(Int32),
           authored : Proc(String, Bool)? = nil,
           encode_settings : String? = nil,
+          variant_ext : String? = nil,
         ) : Hash(Int32, String)?
           return unless File.exists?(source_path)
           return unless Dir.exists?(dest_dir)
@@ -508,9 +571,10 @@ module Hwaro
 
           # Variants are written with a lowercased extension
           # (ImageProcessor), so `B.JPG` must look for `B_320w.jpg`.
+          # `variant_ext` checks another format's set (`.webp`) instead.
           ext = File.extname(source_path)
           basename = File.basename(source_path, ext)
-          ext = ext.downcase
+          ext = variant_ext || ext.downcase
 
           # resize_and_lqip clamps any requested width larger than the source to
           # the source's true width (writing a single `_<src_w>w` variant), so a
@@ -572,22 +636,29 @@ module Hwaro
         end
 
         # The encode settings a width variant set depends on (besides the
-        # source): the JPEG quality and the LQIP knobs.
-        def self.encode_settings(quality : Int32, lqip_width : Int32, lqip_quality : Int32) : String
-          "q#{quality}:l#{lqip_width}:#{lqip_quality}"
+        # source): the JPEG quality, the LQIP knobs and any extra formats
+        # (only spelled out when there are some, so existing stamps hold).
+        def self.encode_settings(quality : Int32, lqip_width : Int32, lqip_quality : Int32, formats : Array(String) = [] of String) : String
+          settings = "q#{quality}:l#{lqip_width}:#{lqip_quality}"
+          formats.empty? ? settings : "#{settings}:f#{formats.join(",")}"
         end
 
         # Resize a single image to all widths + generate LQIP (one decode pass)
         private def resize_one(job : ImageJob, widths : Array(Int32), quality : Int32,
                                lqip_width : Int32, lqip_quality : Int32,
-                               authored : Proc(String, Bool)?) : {Hash(Int32, String), Hash(String, String)?}
+                               authored : Proc(String, Bool)?,
+                               formats : Array(String)) : {Hash(Int32, String), Hash(String, String)?, Hash(String, Hash(Int32, String))}
           # Fingerprinted BEFORE the decode: a source rewritten mid-run then
           # mismatches on the next build and is regenerated.
-          stamp = ImageVariantStamps.fingerprint(job.source_path, ImageHooks.encode_settings(quality, lqip_width, lqip_quality))
+          stamp = ImageVariantStamps.fingerprint(job.source_path, ImageHooks.encode_settings(quality, lqip_width, lqip_quality, formats))
+          extra = formats.to_h { |format| {format, {} of Int32 => String} }
           path_map, lqip_uri, dom_color = Processors::ImageProcessor.resize_and_lqip(
-            job.source_path, job.dest_dir, widths, quality, lqip_width, lqip_quality, authored
+            job.source_path, job.dest_dir, widths, quality, lqip_width, lqip_quality, authored, extra
           )
-          path_map.each_value { |dest| ImageVariantStamps.record(dest, stamp) } if stamp
+          if stamp
+            path_map.each_value { |dest| ImageVariantStamps.record(dest, stamp) }
+            extra.each_value &.each_value { |dest| ImageVariantStamps.record(dest, stamp) }
+          end
 
           width_url_map = {} of Int32 => String
           path_map.each do |width, dest_path|
@@ -599,7 +670,7 @@ module Hwaro
                         {"lqip" => lqip_uri, "dominant_color" => dom_color}
                       end
 
-          {width_url_map, lqip_data}
+          {width_url_map, lqip_data, extra.transform_values(&.transform_values { |dest| job.url_prefix + File.basename(dest) })}
         end
 
         # --- Job collection helpers ---
@@ -809,16 +880,27 @@ module Hwaro
           ip = config.image_processing
           lqip_width = ip.lqip_enabled ? ip.lqip_width : 0
           authored = ->(name : String) { !resolve_source(url_prefix + name, config).nil? }
-          stamp = ImageVariantStamps.fingerprint(src_path, encode_settings(ip.quality, lqip_width, ip.lqip_quality))
+          stem = File.basename(src_path, File.extname(src_path))
+          formats = ip.formats.reject { |format| format_owned_elsewhere?(format, original_url, url_prefix, stem) }
+          stamp = ImageVariantStamps.fingerprint(src_path, encode_settings(ip.quality, lqip_width, ip.lqip_quality, formats))
+          extra = formats.to_h { |format| {format, {} of Int32 => String} }
           path_map, lqip_uri, dom_color = Processors::ImageProcessor.resize_and_lqip(
-            src_path, dest_dir, ip.widths, ip.quality, lqip_width, ip.lqip_quality, authored
+            src_path, dest_dir, ip.widths, ip.quality, lqip_width, ip.lqip_quality, authored, extra
           )
-          path_map.each_value { |dest| ImageVariantStamps.record(dest, stamp) } if stamp
+          if stamp
+            path_map.each_value { |dest| ImageVariantStamps.record(dest, stamp) }
+            extra.each_value &.each_value { |dest| ImageVariantStamps.record(dest, stamp) }
+          end
           return 0 if path_map.empty?
 
           width_urls = {} of Int32 => String
           path_map.each { |width, dest| width_urls[width] = url_prefix + File.basename(dest) }
-          @@resize_map_mutex.synchronize { @@resize_map[original_url] = width_urls }
+          @@resize_map_mutex.synchronize do
+            @@resize_map[original_url] = width_urls
+            extra.each do |format, map|
+              (@@format_maps[format] ||= {} of String => Hash(Int32, String))[original_url] = map.transform_values { |dest| url_prefix + File.basename(dest) }
+            end
+          end
           if lqip_uri
             @@lqip_map_mutex.synchronize { @@lqip_map[original_url] = {"lqip" => lqip_uri, "dominant_color" => dom_color} }
           end
@@ -826,6 +908,16 @@ module Hwaro
         rescue ex
           Logger.warn "  Image reprocess failed for #{src_path}: #{ex.message}"
           0
+        end
+
+        # Whether another image already publishes `format` variants under
+        # `<url_prefix><stem>_<w>w.<format>` (the owner the last full build
+        # chose, see `formats_by_job`).
+        private def self.format_owned_elsewhere?(format : String, original_url : String, url_prefix : String, stem : String) : Bool
+          name_re = /\A#{Regex.escape(url_prefix + stem)}_\d+w\.#{Regex.escape(format)}\z/
+          @@resize_map_mutex.synchronize do
+            @@format_maps[format]?.try(&.any? { |url, map| url != original_url && map.each_value.any?(&.matches?(name_re)) }) || false
+          end
         end
 
         # --- Security helpers ---

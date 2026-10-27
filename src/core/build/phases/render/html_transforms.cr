@@ -16,9 +16,17 @@ module Hwaro::Core::Build::Phases::Render
   # the same pass also stamps the original's intrinsic `width`/`height` on
   # every local image that sets neither, so the browser reserves its box
   # before the bytes arrive (no layout shift).
-  IMG_TAG_RE  = /<img\b[^>]*>/
-  IMG_SRC_RE  = /\ssrc\s*=\s*("([^"]*)"|'([^']*)')/
-  IMG_SIZE_RE = /\s(?:width|height)\s*=/i
+  #
+  # With `formats = ["webp"]`, an image that gets a srcset is also wrapped in
+  # `<picture>` with a `<source type="image/webp">` listing the WebP copies,
+  # so browsers that support WebP fetch those and the rest keep the <img>.
+  # An <img> already inside an authored <picture> is left to its sources.
+  IMG_TAG_RE       = /<img\b[^>]*>/
+  IMG_SRC_RE       = /\ssrc\s*=\s*("([^"]*)"|'([^']*)')/
+  IMG_SIZE_RE      = /\s(?:width|height)\s*=/i
+  IMG_SIZES_RE     = /\ssizes\s*=\s*("[^"]*"|'[^']*')/i
+  PICTURE_OPEN_RE  = /<picture\b/i
+  PICTURE_CLOSE_RE = /<\/picture\s*>/i
   # An actual `srcset` attribute (or a lazy-loader's `data-srcset`) — not
   # alt/title text that merely says "srcset". A `data-srcset` image is the
   # lazy-loader's to size; a real `srcset` beside it would load eagerly.
@@ -34,8 +42,16 @@ module Hwaro::Core::Build::Phases::Render
     # contended global mutex on the parallel render hot path.
     resize_map = config.image_processing.enabled ? Content::Hooks::ImageHooks.resize_map_readonly : {} of String => Hash(Int32, String)
     return html if resize_map.empty? && !dimensions
+    webp_map = Content::Hooks::ImageHooks.format_map_readonly("webp") if config.image_processing.enabled
+    pictures = webp_map && Utils::ByteScan.includes?(html, "<picture") ? picture_spans(html) : nil
+    srcset_for = ->(variants : Hash(Int32, String)) do
+      # Prefix each candidate with the subpath (base_path) so responsive
+      # images resolve on subpath deployments; the resize map stores bare
+      # root-relative paths. Mirrors the resize_image() template helper.
+      variants.to_a.sort_by { |(w, _)| w }.map { |(w, url)| "#{URI.encode_path(config.with_base_path(url))} #{w}w" }.join(", ")
+    end
 
-    html.gsub(IMG_TAG_RE) do |tag|
+    html.gsub(IMG_TAG_RE) do |tag, match|
       has_srcset = tag.matches?(IMG_SRCSET_RE)
       next tag if has_srcset && !dimensions
       m = tag.match(IMG_SRC_RE)
@@ -78,13 +94,11 @@ module Hwaro::Core::Build::Phases::Render
         Content::Hooks::ImageHooks.watch_render_source(key).try { |source| Content::Processors::TemplateEngine.record_file_read(source) }
       end
       if widths && !widths.empty? && !has_srcset
-        # Prefix each candidate with the subpath (base_path) so responsive
-        # images resolve on subpath deployments; the resize map stores bare
-        # root-relative paths. Mirrors the resize_image() template helper.
-        srcset = widths.to_a.sort_by { |(w, _)| w }.map { |(w, url)| "#{URI.encode_path(config.with_base_path(url))} #{w}w" }.join(", ")
-        additions = %( srcset="#{srcset}")
+        additions = %( srcset="#{srcset_for.call(widths)}")
         additions += %( sizes="100vw") unless tag =~ /\ssizes\s*=/
       end
+      webp = webp_map.try(&.[key]?) unless has_srcset
+      webp = nil if webp && (webp.empty? || pictures.try(&.any?(&.includes?(match.begin(0)))))
       if dimensions && !tag.matches?(IMG_SIZE_RE) && (source = Content::Hooks::ImageHooks.resolve_source(key, config))
         # The bytes decide the size, so a cached page must re-render when
         # they change.
@@ -93,8 +107,24 @@ module Hwaro::Core::Build::Phases::Render
           additions += %( width="#{size[0]}" height="#{size[1]}")
         end
       end
-      additions.empty? ? tag : tag.sub("<img", "<img#{additions}")
+      img = additions.empty? ? tag : tag.sub("<img", "<img#{additions}")
+      next img unless webp
+      sizes = tag.match(IMG_SIZES_RE).try(&.[1]) || %("100vw")
+      %(<picture><source type="image/webp" srcset="#{srcset_for.call(webp)}" sizes=#{sizes}>#{img}</picture>)
     end
+  end
+
+  # Character ranges of the authored `<picture>…</picture>` elements (an
+  # unclosed one runs to the end).
+  private def picture_spans(html : String) : Array(Range(Int32, Int32))
+    spans = [] of Range(Int32, Int32)
+    pos = 0
+    while open = html.index(PICTURE_OPEN_RE, pos)
+      close = html.index(PICTURE_CLOSE_RE, open) || html.size
+      spans << (open...close)
+      pos = close + 1
+    end
+    spans
   end
 
   private def generate_toc_html(headers : Array(Models::TocHeader)) : String
