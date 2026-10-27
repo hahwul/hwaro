@@ -410,7 +410,12 @@ module Hwaro
           # box out unscaled) write a dedicated variant at render time,
           # positioned by `anchor`; `width`/`height` are then the written
           # file's. See ImageHooks.op_variant.
-          @env.functions["resize_image"] = Crinja.function({path: "", width: 0, height: 0, op: "fit", anchor: "center"}) do
+          #
+          # `format="webp"` picks the WebP copy instead: for `fit` the
+          # pre-generated variant (`[image_processing] formats`), falling
+          # back to the source-format one when there is none; for `fill` /
+          # `crop` the variant is written as WebP.
+          @env.functions["resize_image"] = Crinja.function({path: "", width: 0, height: 0, op: "fit", anchor: "center", format: "auto"}) do
             path = arguments["path"].to_s
             # Lenient coercion: shortcode arguments are always Strings, so a
             # `width="800"` forwarded from `{% img(width="800") %}` must resize
@@ -428,6 +433,11 @@ module Hwaro
             if op != "fit" && (width <= 0 || height <= 0)
               raise Crinja::RuntimeError.new("resize_image: op=#{op.inspect} needs both width and height")
             end
+            format = arguments["format"].to_s
+            unless format == "auto" || Models::ImageProcessingConfig::VALID_FORMATS.includes?(format)
+              raise Crinja::RuntimeError.new("resize_image: unknown format #{format.inspect} (expected one of: auto, #{Models::ImageProcessingConfig::VALID_FORMATS.join(", ")})")
+            end
+            variant_format = format == "auto" ? nil : format
 
             base_url = env.resolve("base_url").to_s
 
@@ -464,7 +474,7 @@ module Hwaro
               source = Content::Hooks::ImageHooks.resolve_source(normalized)
               TemplateEngine.record_file_read(source || File.join("static", normalized))
               page_path = env.resolve("__page_path__").raw.as?(String)
-              made = source.try { |src| Content::Hooks::ImageHooks.op_variant(normalized, src, width, height, op, anchor, page_path) }
+              made = source.try { |src| Content::Hooks::ImageHooks.op_variant(normalized, src, width, height, op, anchor, page_path, variant_format) }
               return Crinja::Value.new({
                 "url"    => Crinja::Value.new(base_url.rstrip("/") + URI.encode_path(made.try(&.[0]) || normalized) + suffix),
                 "width"  => Crinja::Value.new(made.try(&.[1]) || width),
@@ -487,7 +497,8 @@ module Hwaro
 
             # Try to find a resized variant from the image hooks map
             variant = if width > 0
-                        Content::Hooks::ImageHooks.find_closest_variant(normalized, width)
+                        variant_format.try { |f| Content::Hooks::ImageHooks.find_closest_variant(normalized, width, f) } ||
+                          Content::Hooks::ImageHooks.find_closest_variant(normalized, width)
                       end
 
             final_url = if resized = variant

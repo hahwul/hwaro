@@ -456,6 +456,7 @@ Returns a resized image variant. When [image processing](/features/image-process
 | height | Int | Requested height in pixels (0 = original) |
 | op | String | `fit` (default), `fill` or `crop` — see [Crop and Fill](/features/image-processing/#crop-and-fill) |
 | anchor | String | Where `fill`/`crop` keep the image: `center` (default), `top`, `bottom`, `left`, `right`, `top_left`, `top_right`, `bottom_left`, `bottom_right` |
+| format | String | `auto` (default, the source's format) or `webp`. With `fit`, returns the [WebP variant](/features/image-processing/#webp-output) (falling back to the source-format one). With `fill`/`crop`, writes the variant as WebP |
 
 **Returns:** Object with properties:
 

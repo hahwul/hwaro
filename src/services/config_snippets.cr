@@ -911,6 +911,7 @@ module Hwaro
             # enabled = true
             # widths = [320, 640, 1024, 1280]
             # quality = 85
+            # formats = ["webp"]     # Also write WebP copies (content images get <picture>)
             #
             # [image_processing.lqip]
             # enabled = true
@@ -937,6 +938,7 @@ module Hwaro
             # enabled = true
             # widths = [320, 640, 1024, 1280]
             # quality = 85
+            # formats = ["webp"]     # Also write WebP copies (content images get <picture>)
             #
             # [image_processing.lqip]
             # enabled = true

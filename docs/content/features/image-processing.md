@@ -14,6 +14,7 @@ Hwaro can automatically generate resized image variants during build. This is us
 | JPEG (.jpg, .jpeg) | Yes | Yes |
 | PNG (.png) | Yes | Yes |
 | BMP (.bmp) | Yes | Yes |
+| WebP (.webp) | No (copied as is) | Yes, as extra variants (`formats`) |
 
 ## Configuration
 
@@ -30,7 +31,8 @@ quality = 85
 |-----|------|---------|-------------|
 | enabled | bool | false | Enable image resizing |
 | widths | array | [] | Target widths to generate (in pixels) |
-| quality | int | 85 | JPEG output quality (1-100) |
+| quality | int | 85 | JPEG output quality (1-100), also used for WebP |
+| formats | array | [] | Extra output formats beside the source's own: `["webp"]` |
 | dimensions | bool | false | Add intrinsic `width`/`height` to content images (works without `enabled`) |
 
 ### LQIP (Low-Quality Image Placeholders)
@@ -51,6 +53,36 @@ quality = 20
 | quality | int | 20 | JPEG quality for placeholder (1-100, lower = smaller) |
 
 A width of 32 and quality of 20 typically produces ~400-800 byte base64 strings per image, small enough to inline directly in HTML.
+
+### WebP Output
+
+Set `formats = ["webp"]` to also write every width variant as WebP. WebP files are typically much smaller than the JPEG or PNG they come from at the same visual quality:
+
+```toml
+[image_processing]
+enabled = true
+widths = [320, 640, 1024]
+quality = 80
+formats = ["webp"]
+```
+
+- Each variant gets a WebP copy next to it: `hero_640w.jpg` and `hero_640w.webp`.
+- WebP variants are lossy at `quality` (`100` is treated as `99`, since lossless WebP of a photo is larger than the JPEG). Transparency is kept, stored losslessly.
+- Content images that get a `srcset` are wrapped in `<picture>` with a WebP `<source>`. Browsers without WebP support keep using the `<img>`:
+
+  ```html
+  <picture>
+    <source type="image/webp" srcset="/hero_320w.webp 320w, /hero_640w.webp 640w" sizes="100vw">
+    <img srcset="/hero_320w.jpg 320w, /hero_640w.jpg 640w" sizes="100vw" src="/hero.jpg" alt="Hero">
+  </picture>
+  ```
+
+  An `<img>` already inside a `<picture>` you wrote, or one with its own `srcset`, is left alone. AMP pages keep only the `<img>`.
+- In templates, `resize_image(path=…, width=…, format="webp")` returns the WebP variant (see [Using in Templates](#using-in-templates)).
+- The encoder is built into Hwaro (pure Crystal), so no external tool or library is involved.
+- WebP files are not used as sources: a `.webp` in `static/` or a page bundle is copied as is.
+- Two sources that differ only in extension in the same directory (`hero.jpg` and `hero.png`) would write the same WebP names. The one whose path sorts first gets them, and a warning names the other one, which gets no WebP variants.
+- Encoding WebP takes longer than JPEG, so cold builds with many images take longer. Warm `--cache` builds and `hwaro serve` reuse the variants.
 
 ### Image Dimensions
 
@@ -96,6 +128,8 @@ static/hwaro.png
 ```
 
 A file you publish yourself under one of these names (for example an authored `static/hwaro_320w.png`) is never overwritten: that width is skipped and left out of the `srcset`.
+
+With `formats = ["webp"]`, every variant also gets a `{name}_{width}w.webp` copy (`public/hwaro_320w.webp`, …). The same rule applies to an authored file with one of those names.
 
 ## Using in Templates
 
@@ -166,6 +200,19 @@ When LQIP is enabled, `resize_image()` returns two additional properties: `lqip`
 
 When LQIP is disabled, `lqip` and `dominant_color` return empty strings, so templates work without changes.
 
+### WebP in Templates
+
+With `formats = ["webp"]`, pass `format="webp"` to get the WebP copy of a variant. If no WebP variant exists, you get the source-format one:
+
+```jinja
+{% set webp = resize_image(path="/images/hero.jpg", width=1024, format="webp") %}
+{% set jpg = resize_image(path="/images/hero.jpg", width=1024) %}
+<picture>
+  <source type="image/webp" srcset="{{ webp.url }}">
+  <img src="{{ jpg.url }}" width="{{ jpg.width }}" alt="Hero">
+</picture>
+```
+
 For images with transparency (PNG logos, icons), `dominant_color` is weighted by opacity, so transparent pixels do not darken it, and the `lqip` JPEG (which has no alpha channel) shows transparent areas as white.
 
 ### Crop and Fill
@@ -194,6 +241,7 @@ For images with transparency (PNG logos, icons), `dominant_color` is weighted by
 - The file name carries the size, op and anchor, e.g. `hero_400x300_fill_center.jpg`, next to the original.
 - `width`/`height` in the result are the written file's size. `lqip` and `dominant_color` are empty for these variants.
 - Only JPEG, PNG and BMP sources can be cropped. Other formats return the original URL.
+- Add `format="webp"` to write the variant as WebP instead (`hero_400x300_fill_center.webp`). This works without `formats` in the config.
 
 ## Live Demo
 

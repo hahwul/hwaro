@@ -620,8 +620,10 @@ fake-screenshot divs are slop.
 `resize_image(path=…, width=…)` — it returns `.url`, plus `.lqip` (blur-up
 placeholder) and `.dominant_color` when LQIP is enabled — and build proper
 `srcset`/`sizes` with lazy-loading. Don't ship one giant image. The built-in
-processor resizes JPEG/PNG (BMP) only; for WebP/AVIF or aggressive optimization
-run a build hook — `resize_image` passes unsupported formats through unresized.
+processor resizes JPEG/PNG (BMP) sources; `[image_processing] formats =
+["webp"]` adds WebP copies (content images get a `<picture>` WebP source, and
+`resize_image(…, format="webp")` returns them). For AVIF or other formats run a
+build hook — `resize_image` passes unsupported sources through unresized.
 
 **Rules:**
 

@@ -14,6 +14,7 @@ Hwaro는 빌드 중에 리사이즈된 이미지 변형을 자동으로 생성�
 | JPEG (.jpg, .jpeg) | 가능 | 가능 |
 | PNG (.png) | 가능 | 가능 |
 | BMP (.bmp) | 가능 | 가능 |
+| WebP (.webp) | 불가(그대로 복사) | 추가 변형으로 가능(`formats`) |
 
 ## 설정
 
@@ -30,7 +31,8 @@ quality = 85
 |-----|------|---------|-------------|
 | enabled | bool | false | 이미지 리사이즈 활성화 |
 | widths | array | [] | 생성할 대상 너비(픽셀) |
-| quality | int | 85 | JPEG 출력 품질 (1-100) |
+| quality | int | 85 | JPEG 출력 품질 (1-100), WebP에도 사용 |
+| formats | array | [] | 원본 포맷 외에 추가로 쓸 출력 포맷: `["webp"]` |
 | dimensions | bool | false | 콘텐츠 이미지에 원본 `width`/`height` 추가 (`enabled` 없이도 동작) |
 
 ### LQIP (저화질 이미지 플레이스홀더)
@@ -51,6 +53,36 @@ quality = 20
 | quality | int | 20 | 플레이스홀더 JPEG 품질 (1-100, 낮을수록 작음) |
 
 너비 32, 품질 20이면 이미지당 보통 400-800바이트 정도의 base64 문자열이 나옵니다. HTML에 바로 인라인해도 될 만큼 작습니다.
+
+### WebP 출력
+
+`formats = ["webp"]`를 설정하면 모든 너비 변형을 WebP로도 씁니다. 같은 화질이라면 WebP 파일은 보통 원본 JPEG이나 PNG보다 훨씬 작습니다:
+
+```toml
+[image_processing]
+enabled = true
+widths = [320, 640, 1024]
+quality = 80
+formats = ["webp"]
+```
+
+- 각 변형 옆에 WebP 사본이 생깁니다: `hero_640w.jpg`와 `hero_640w.webp`.
+- WebP 변형은 `quality`에 맞춘 손실 압축입니다(사진을 무손실 WebP로 쓰면 JPEG보다 커지므로 `100`은 `99`로 취급합니다). 투명도는 무손실로 보존됩니다.
+- `srcset`이 붙는 콘텐츠 이미지는 WebP `<source>`가 들어간 `<picture>`로 감쌉니다. WebP를 지원하지 않는 브라우저는 계속 `<img>`를 씁니다:
+
+  ```html
+  <picture>
+    <source type="image/webp" srcset="/hero_320w.webp 320w, /hero_640w.webp 640w" sizes="100vw">
+    <img srcset="/hero_320w.jpg 320w, /hero_640w.jpg 640w" sizes="100vw" src="/hero.jpg" alt="Hero">
+  </picture>
+  ```
+
+  직접 작성한 `<picture>` 안의 `<img>`나 자체 `srcset`이 있는 `<img>`는 건드리지 않습니다. AMP 페이지에는 `<img>`만 남습니다.
+- 템플릿에서는 `resize_image(path=…, width=…, format="webp")`가 WebP 변형을 돌려줍니다([템플릿에서 사용](#템플릿에서-사용) 참고).
+- 인코더는 Hwaro에 내장되어 있어(순수 Crystal) 외부 도구나 라이브러리가 필요 없습니다.
+- WebP 파일은 원본으로 쓰지 않습니다. `static/`이나 페이지 번들의 `.webp`는 그대로 복사됩니다.
+- 같은 디렉터리에 확장자만 다른 원본(`hero.jpg`와 `hero.png`)이 있으면 같은 WebP 이름을 쓰게 됩니다. 경로가 먼저 정렬되는 쪽이 그 이름을 갖고, 다른 쪽은 WebP 변형 없이 경고로 알려 줍니다.
+- WebP 인코딩은 JPEG보다 오래 걸리므로 이미지가 많으면 콜드 빌드가 길어집니다. warm `--cache` 빌드와 `hwaro serve`는 변형을 재사용합니다.
 
 ### 이미지 크기 속성
 
@@ -96,6 +128,8 @@ static/hwaro.png
 ```
 
 직접 게시하는 파일이 이 이름 중 하나와 같으면(예: 직접 만든 `static/hwaro_320w.png`) 덮어쓰지 않습니다. 해당 너비는 생성하지 않고 `srcset`에서도 제외합니다.
+
+`formats = ["webp"]`이면 변형마다 `{name}_{width}w.webp` 사본도 생깁니다(`public/hwaro_320w.webp`, …). 이 이름의 파일을 직접 게시해도 같은 규칙이 적용됩니다.
 
 ## 템플릿에서 사용
 
@@ -166,6 +200,19 @@ LQIP가 활성화되면 `resize_image()`가 두 속성을 추가로 반환합니
 
 LQIP가 비활성화 상태면 `lqip`와 `dominant_color`는 빈 문자열을 반환하므로 템플릿을 고치지 않아도 됩니다.
 
+### 템플릿에서 WebP 사용
+
+`formats = ["webp"]`이면 `format="webp"`를 넘겨 변형의 WebP 사본을 받을 수 있습니다. WebP 변형이 없으면 원본 포맷 변형을 받습니다:
+
+```jinja
+{% set webp = resize_image(path="/images/hero.jpg", width=1024, format="webp") %}
+{% set jpg = resize_image(path="/images/hero.jpg", width=1024) %}
+<picture>
+  <source type="image/webp" srcset="{{ webp.url }}">
+  <img src="{{ jpg.url }}" width="{{ jpg.width }}" alt="Hero">
+</picture>
+```
+
 투명도가 있는 이미지(PNG 로고, 아이콘)에서는 `dominant_color`가 불투명도로 가중 평균되므로 투명 픽셀 때문에 색이 어두워지지 않습니다. 알파 채널이 없는 `lqip` JPEG는 투명한 영역을 흰색으로 표시합니다.
 
 ### 자르기와 채우기
@@ -194,6 +241,7 @@ LQIP가 비활성화 상태면 `lqip`와 `dominant_color`는 빈 문자열을 �
 - 파일 이름에는 크기, op, anchor가 들어갑니다. 예: 원본 옆의 `hero_400x300_fill_center.jpg`.
 - 결과의 `width`/`height`는 실제로 쓴 파일의 크기입니다. 이 변형에서 `lqip`과 `dominant_color`는 빈 문자열입니다.
 - JPEG, PNG, BMP 원본만 자를 수 있습니다. 다른 포맷은 원본 URL을 반환합니다.
+- `format="webp"`를 더하면 변형을 WebP로 씁니다(`hero_400x300_fill_center.webp`). 설정에 `formats`가 없어도 동작합니다.
 
 ## 라이브 데모
 
