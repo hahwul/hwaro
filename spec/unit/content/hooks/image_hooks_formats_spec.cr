@@ -47,7 +47,14 @@ private def with_webp_site(&)
       # Variants written in the source's own mtime tick are never trusted
       # (racy-git), so a source that is "old" lets warm builds reuse them.
       File.touch("static/photo.png", Time.utc - 1.hour)
-      yield
+      begin
+        yield
+      ensure
+        # The maps are class-level: leave none of this site's variants for
+        # specs that run later in the same process.
+        Hwaro::Content::Hooks::ImageHooks.set_resize_map({} of String => Hash(Int32, String))
+        Hwaro::Content::Hooks::ImageHooks.set_format_maps({} of String => Hash(String, Hash(Int32, String)))
+      end
     end
   end
 end

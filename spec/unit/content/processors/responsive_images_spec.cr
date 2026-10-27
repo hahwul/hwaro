@@ -19,13 +19,18 @@ module Hwaro::Core::Build
   end
 end
 
+# Also starts from no WebP variants: a build earlier in the process may
+# have left some (`with_webp_map` adds them back on purpose).
 private def with_resize_map(map, &)
   prior = Hwaro::Content::Hooks::ImageHooks.resize_map
+  prior_formats = Hwaro::Content::Hooks::ImageHooks.format_maps
   Hwaro::Content::Hooks::ImageHooks.set_resize_map(map)
+  Hwaro::Content::Hooks::ImageHooks.set_format_maps({} of String => Hash(String, Hash(Int32, String)))
   begin
     yield
   ensure
     Hwaro::Content::Hooks::ImageHooks.set_resize_map(prior)
+    Hwaro::Content::Hooks::ImageHooks.set_format_maps(prior_formats)
   end
 end
 

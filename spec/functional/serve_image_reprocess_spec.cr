@@ -132,6 +132,8 @@ describe "serve image reprocessing on changed bytes (A12)" do
 
         File.read(variant).should_not eq(before)
         Hwaro::Content::Hooks::ImageHooks.find_closest_variant("/img/photo.png", 32, "webp").should eq({32, "/img/photo_32w.webp"})
+      ensure
+        Hwaro::Content::Hooks::ImageHooks.set_format_maps({} of String => Hash(String, Hash(Int32, String)))
       end
     end
   end
