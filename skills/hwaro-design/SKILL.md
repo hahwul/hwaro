@@ -150,7 +150,7 @@ motion to 8").
 
 **MOTION_INTENSITY**
 - **1–3 (Static):** `:hover` / `:active` / `:focus-visible` transitions only.
-- **4–7 (Fluid CSS):** `transition: … 0.3s cubic-bezier(0.16, 1, 0.3, 1)`,
+- **4–7 (Fluid CSS):** `transition: … 0.3s var(--ease-out)`,
   `animation-delay` cascades for load-ins, transform/opacity only.
 - **8–10 (Choreography):** scroll-driven reveals via CSS
   `animation-timeline: view()` (behind `@supports`) or an IntersectionObserver
@@ -174,20 +174,22 @@ and not just advice.
 
 ### Templates (Crinja / Jinja2-compatible) — the structure
 
-Under `templates/`. Hwaro supports two composition styles and the built-in
-scaffolds use **both**, so open the project's `templates/` and see which before
-editing: `{% extends "base.html" %}` inheritance filling `{% block content %}`
-(the `docs` scaffold works this way), and `{% include "header.html" %}` /
-`{% include "footer.html" %}` partial composition (`blog`, `book`, `simple`).
-Other files you'll meet: `page.html` / `section.html` (content layouts),
-`index.html` (home), `taxonomy*.html`, and partials like `nav.html` /
-`sidebar.html`. Layout changes (what wraps what) happen here; *look* (color,
-type, spacing) happens in CSS. Keep markup semantic and class-driven so the CSS
-can do the work.
+Under `templates/`. Hwaro supports both `{% extends "base.html" %}`
+inheritance (filling `{% block content %}`) and `{% include %}` partial
+composition. The built-in scaffolds all use **includes**: `page.html` /
+`section.html` (and `index.html`, `post.html`, `archives.html` in `blog`)
+start with `{% include "header.html" %}` and end with
+`{% include "footer.html" %}`, with partials under `partials/` (`nav.html`,
+`sidebar.html`, `search.html`, …) plus `taxonomy*.html` and `404.html`. Open
+the project's `templates/` before editing; a third-party theme may use
+inheritance instead. Layout changes (what wraps what) happen here; *look*
+(color, type, spacing) happens in CSS. Keep markup semantic and class-driven
+so the CSS can do the work.
 
 **Internal URLs must carry the base URL.** The scaffolds write every
 site-internal href/src as `{{ base_url }}{{ page.url }}`,
-`{{ base_url }}{{ lang_prefix }}/about/`, `{{ base_url }}/css/style.css` —
+`{{ base_url }}{{ lang_prefix }}/about/`, `{{ base_url }}/css/style.css`
+(`url_for(path=…)`, `| relative_url` and `asset(name=…)` are equivalent) —
 never a bare `/about/`. Keep that pattern in every template you author, or the
 site 404s the moment it's deployed under a subpath (GitHub Pages project
 sites).
@@ -197,132 +199,67 @@ sites).
 1. **Inlined `<style>`** — the `simple` scaffold ships its CSS in a `<style>`
    block inside `header.html`: zero extra requests, great for small sites; edit
    that block directly. (`blog` / `book` / `docs` instead ship an external
-   `static/css/style.css` — option 2; `bare` ships *no* CSS at all, so you bring
-   your own.)
+   `static/css/style.css`; `bare` ships *no* CSS at all, so you bring your own.)
 2. **Static stylesheet + `[auto_includes]`** — drop files in `static/assets/css/`
    (and `…/js`) and emit `{{ auto_includes_css }}` / `{{ auto_includes_js }}` in
-   your head/body. (These output raw HTML; Hwaro disables template autoescape, so
-   the scaffolds write them without `| safe` — the docs add `| safe` as a
-   harmless, portable convention you can keep.) Good when CSS grows past "one block."
+   your head/body. Good when CSS grows past "one block."
 3. **`[assets]` pipeline** — declare bundles in `config.toml`, reference with
    `{{ asset(name='main.css') }}`; you get concatenation, minification, and
    content-hash fingerprinting (cache busting) for free.
 
-> **There is a built-in SCSS compiler (opt-in via `[sass] enabled = true`),
-> but no Tailwind step and no component framework.** The built-in compiler
-> covers the practical subset — variables, nesting/`&`, partials with
-> `@use`/`@import`, mixins with `@content`, interpolation — but NOT control
-> flow (`@if`/`@each`), arithmetic, or built-in functions (`lighten()` etc.),
-> so framework-grade SCSS won't compile. Default to modern plain CSS (custom
-> properties, nesting where supported, `color-mix()`, `clamp()`); use `[sass]`
-> when the brief calls for it, or run Tailwind/PostCSS/full dart-sass via
-> **build hooks** and point Hwaro at the compiled output. Don't assume an npm
-> design system exists. When a brief names an aesthetic
-> (glass, bento, brutalist, editorial, dark tech, aurora), that's a CSS
-> language you build honestly by hand — there is no official package for any of
-> them, on any stack.
+Template output is never autoescaped, so `{{ content }}`,
+`{{ auto_includes_css }}` and friends need no `| safe` (the docs add it as a
+harmless convention; keep it if you see it).
+
+> **SCSS is built in; Tailwind and component frameworks are not.**
+> `[sass] enabled = true` compiles `.scss` with a pure-Crystal compiler that
+> tracks dart-sass closely: variables, nesting, `@use`/`@forward`/`@import`,
+> mixins, `@function`, control flow (`@if`/`@each`/`@for`/`@while`), unit
+> arithmetic, and the `math`/`color`/`list`/`map`/`string`/`selector` modules
+> (Bootstrap and Bulma compile). Not supported: the indented `.sass` syntax,
+> source maps, `@forward … with (…)`, compound units, `math.random`. Still,
+> default to modern plain CSS (custom properties, nesting, `color-mix()`,
+> `clamp()`, `light-dark()`); reach for `[sass]` when the brief or an existing
+> codebase calls for it, and run Tailwind/PostCSS via **build hooks**
+> (`[build] hooks.pre`), pointing Hwaro at the compiled output. When a brief
+> names an aesthetic (glass, bento, brutalist, editorial, dark tech, aurora),
+> that's a CSS language you build honestly by hand — there is no package for it.
 
 ### Design tokens are your single source of truth
 
-Every Hwaro scaffold themes itself through **CSS custom properties** in `:root`.
-This is the right pattern: define the system once, theme by editing tokens, and
-get dark mode + restyles almost for free. All eight scaffolds share **one**
-"Hwaro Ember" vocabulary: every color token is a `light-dark(light, dark)` pair
-resolved by `color-scheme`, so every scaffold (including `simple`) follows the
-reader's OS scheme automatically. The vocabulary is (values exact; font stacks
-abbreviated — the real ones are longer and include CJK fallbacks like
-`"Noto Serif KR"`, so don't strip those if your audience needs CJK):
+Every styled scaffold (`simple`, `blog`, `docs`, `book`) themes itself through
+one shared **"Hwaro Ember"** set of CSS custom properties in `:root`, emitted
+from `DesignTokens.root_block` (`src/services/scaffolds/design_tokens.cr` in the
+Hwaro repo). Every color token is a `light-dark(light, dark)` pair under
+`color-scheme: light dark`, so the site follows the reader's OS scheme with no
+extra CSS. **Read the exact values from the project itself** — the `:root`
+block at the top of `static/css/style.css` (or of the `<style>` in
+`header.html` for `simple`) — rather than from memory; they evolve between
+releases. The vocabulary, by role:
 
-```css
-:root {
-  color-scheme: light dark;
+| Role | Tokens |
+|---|---|
+| Accent (the single ember) | `--primary`, `--primary-strong` (hover/active), `--primary-tint`, `--selection` |
+| Signature mark | `--rule-from`, `--rule-to`, `--spark` (135° gradient of the two) |
+| Ink ramp (never pure black/white) | `--heading`, `--text`, `--text-secondary`, `--text-muted` |
+| Surfaces & edges | `--bg`, `--bg-subtle`, `--bg-raised`, `--bg-code`, `--border`, `--border-subtle`, `--edge`, `--glass`, `--glass-filter`, `--scrim` |
+| Support hues (info boxes only) | `--warn`, `--ok` |
+| Syntax (read by the `.hljs-*` rules) | `--code-comment`, `-keyword`, `-string`, `-number`, `-func`, `-type`, `-variable`, `-attr`, `-symbol` |
+| Type scale (minor third, fluid `clamp()`) | `--step--1` … `--step-5` |
+| Space (8px rhythm) | `--space-1` … `--space-8` (0.25rem → 6rem) |
+| Shape, depth, motion, measure | `--radius` (12px), `--radius-sm` (8px), `--shadow-sm`, `--shadow`, `--shadow-lg` (tinted, not black), `--ease-out` (`cubic-bezier(0.16, 1, 0.3, 1)`), `--transition` (0.15s), `--transition-slow` (0.45s), `--measure` (68ch) |
+| Faces | `--font-serif` (Charter → embedded OFL Charis SIL → … → `"Noto Serif KR"`), `--font-sans`, `--font-mono` |
 
-  /* Accent — the single ember. */
-  --primary:        light-dark(#b35454, #ec7a66);
-  --primary-strong: light-dark(#8f4040, #f39683);  /* hover/active accent */
-  --primary-tint:   color-mix(in srgb, var(--primary) 8%, transparent);
-  --selection:      color-mix(in srgb, var(--primary) 22%, transparent);
+Per-scaffold layout tokens (`--header-h`, `--sidebar-w`, `--content-max-w`,
+`--bg-sidebar`, radius overrides) are appended to the same `:root`. An
+`@supports not (color: light-dark(#000, #fff))` block pins the static light
+palette for pre-2024 browsers, so they stay readable and on-brand.
 
-  /* Ember rule — the one mark every scaffold shares. */
-  --rule-from: light-dark(#c46262, #f39683);
-  --rule-to:   light-dark(#8f4040, #cc5d4b);
-
-  /* Ink — a three-step ramp (not pure black/white). */
-  --heading:        light-dark(#241f1a, #f5f2ed);
-  --text:           light-dark(#2a241f, #dedad3);
-  --text-secondary: light-dark(#5c5248, #a7a199);
-  --text-muted:     light-dark(#6f6358, #7d776e);
-
-  /* Surfaces & edges. */
-  --bg:            light-dark(#faf7f2, #0f0f0e);
-  --bg-subtle:     light-dark(#f1eae0, #1a1917);
-  --bg-code:       light-dark(#f1eae0, #1e1c19);
-  --border:        light-dark(#e4dacd, #2b2926);
-  --border-subtle: light-dark(#efe8dd, #201e1c);
-  --edge:  color-mix(in srgb, var(--text) 8%, transparent);
-  --glass: color-mix(in srgb, var(--bg) 85%, transparent);
-  --scrim: light-dark(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.6));
-
-  /* Support hues (info boxes only — the accent stays singular). */
-  --warn: light-dark(#b07d2e, #d9a45a);
-  --ok:   light-dark(#5e8c61, #8fb491);
-
-  /* Syntax — nine slots the .hljs-* theme reads from. */
-  --code-comment:  light-dark(#a1907c, #8a8073);
-  --code-keyword:  light-dark(#b03a2e, #f0846f);
-  --code-string:   light-dark(#5f7032, #b7c06a);
-  --code-number:   light-dark(#9a6a14, #e8a83f);
-  --code-func:     light-dark(#2f6a5a, #8ec5a3);
-  --code-type:     light-dark(#b0641c, #e6914f);
-  --code-variable: light-dark(#8a4a3a, #e8b0a0);
-  --code-attr:     light-dark(#45617a, #93b5c8);
-  --code-symbol:   light-dark(#8a4368, #d79bb8);
-
-  /* Type scale — minor third (1.2), fluid via clamp(). */
-  --step--1: clamp(0.83rem, 0.81rem + 0.11vw, 0.89rem);
-  --step-0:  clamp(1rem, 0.96rem + 0.22vw, 1.125rem);
-  --step-1:  clamp(1.2rem, 1.13rem + 0.35vw, 1.4rem);
-  --step-2:  clamp(1.44rem, 1.32rem + 0.61vw, 1.78rem);
-  --step-3:  clamp(1.73rem, 1.53rem + 0.98vw, 2.28rem);
-  --step-4:  clamp(2.07rem, 1.77rem + 1.52vw, 2.92rem);
-
-  /* Space — 8px rhythm. */
-  --space-1: 0.25rem; --space-2: 0.5rem;  --space-3: 0.75rem; --space-4: 1rem;
-  --space-5: 1.5rem;  --space-6: 2.5rem;  --space-7: 4rem;    --space-8: 6rem;
-
-  /* Shape, depth, motion, measure. */
-  --measure: 68ch;
-  --radius: 10px;
-  --radius-sm: 6px;
-  --shadow-sm: 0 1px 2px light-dark(rgba(42, 36, 31, 0.05), rgba(0, 0, 0, 0.3));
-  --shadow:    0 2px 8px light-dark(rgba(42, 36, 31, 0.08), rgba(0, 0, 0, 0.4));
-  --shadow-lg: 0 16px 70px light-dark(rgba(42, 36, 31, 0.18), rgba(0, 0, 0, 0.5));
-  --transition: 0.15s ease;
-
-  /* Faces. */
-  --font-serif: "Charter", Georgia, "Noto Serif KR", serif;    /* headings (+CJK) */
-  --font-sans:  -apple-system, "Segoe UI", Roboto, sans-serif; /* body */
-  --font-mono:  ui-monospace, "SF Mono", Menlo, monospace;     /* code */
-}
-```
-
-> **Every scaffold shares this exact vocabulary.** It is emitted from one place —
-> `DesignTokens.root_block` in `src/services/scaffolds/design_tokens.cr` in the
-> Hwaro repo — so the old per-scaffold name drift is gone (`--primary-hover`,
-> `--bg-secondary`, and `--border-light` were renamed to `--primary-strong`,
-> `--bg-subtle`, and `--border-subtle`). The only per-scaffold additions are
-> layout tokens (`--header-h`, `--sidebar-w`, `--content-max-w`, `--bg-sidebar`,
-> radius overrides) injected into the same `:root`. A
-> `@supports not (color: light-dark(#000, #fff))` block pins the static light
-> palette for pre-2024 browsers, so a `*-dark` site renders light there —
-> readable and on-brand rather than broken.
-
-**Retheme by rewriting token values, not by adding parallel systems.** The type
-scale (`--step--1`…`--step-4`), spacing rhythm (`--space-1`…`--space-8`),
-`--measure`, radii, shadows, and `--transition` already exist — don't re-create
-them under new names; override their values (a different ratio, a denser rhythm)
-and build every component against them. Never hardcode a raw color in a rule:
-reach for the existing pair, or `color-mix()` off one.
+**Retheme by rewriting token values, not by adding parallel systems.** The
+scale, rhythm, radii, shadows and motion tokens already exist — don't
+re-create them under new names; override their values (a different ratio, a
+denser rhythm) and build every component against them. Never hardcode a raw
+color in a rule: reach for the existing pair, or `color-mix()` off one.
 
 ```css
 /* A custom retheme = override the light-dark() pairs in :root.
@@ -333,36 +270,31 @@ reach for the existing pair, or `color-mix()` off one.
   --bg:             light-dark(#f7f9fb, #101418);
   /* …continue through the ink ramp, surfaces, and --code-* slots… */
 }
-
-/* Manual user toggle (scaffolds do NOT ship one): flip color-scheme via a
-   data attribute + a small JS toggle that sets it. */
-:root[data-theme="dark"] { color-scheme: dark; }
-:root[data-theme="light"] { color-scheme: light; }
 ```
 
-> **Reality check: dark mode is automatic now — don't re-plumb it.**
-> - Every scaffold is light **and** dark out of the box: all color tokens are
->   `light-dark()` pairs under `color-scheme: light dark`, so the site follows
->   the OS scheme with zero extra CSS.
-> - **Forcing dark permanently** = append `:root { color-scheme: dark; }` as the
->   last rule of the sheet — that is literally all the `*-dark` scaffolds do.
->   (Delete that rule to restore automatic switching.)
-> - **A custom retheme** = override the `light-dark()` pairs in `:root` — always
->   supply **both** sides of each pair, or one scheme ships broken.
-> - **A user-facing toggle** = the `[data-theme]` pattern above plus a small JS
->   toggle; you write the toggle, the tokens do the rest.
-> - A hygiene spec (`spec/unit/services/scaffolds/scaffold_token_hygiene_spec.cr`) enforces that
->   scaffold CSS has **no hardcoded colors outside the token definitions** —
->   when you edit scaffold source CSS, keep it green by routing every color
->   through a token.
+> **Dark mode and the theme switcher already ship — don't re-plumb them.**
+> - The styled scaffolds include a **theme switcher** (`.theme-toggle` in the
+>   nav, inline script in `footer.html`) that cycles auto → light → dark, sets
+>   `data-theme` on `<html>`, and remembers the choice in `localStorage`
+>   (`hwaro-theme`). `:root[data-theme="light"|"dark"] { color-scheme: … }`
+>   at the end of the token block does the rest. `bare` has none.
+> - **A custom retheme** only touches the token pairs; the switcher keeps
+>   working because it flips `color-scheme`, not colors.
+> - **Locking one scheme** (a dark-only brand) = set `color-scheme: dark` on
+>   `:root` *and* remove the switcher markup and script; otherwise the toggle
+>   still flips the page back to light.
+> - When editing scaffold *source* in the Hwaro repo, the hygiene spec
+>   (`spec/unit/services/scaffolds/scaffold_token_hygiene_spec.cr`) fails on
+>   any hardcoded color outside the token definitions.
 
 ### Code blocks are a design surface
 
-Hwaro colors code **server-side** (Tartrazine), and the scaffolds' `.hljs-*`
-rules read entirely from the nine `--code-*` tokens — so recoloring syntax
-means editing those `light-dark()` pairs in `:root`, not touching the `.hljs-*`
-rules themselves. Tie them to your palette (e.g. keywords near your accent) for
-cohesion; both schemes come along automatically.
+The scaffolds' `.hljs-*` rules read entirely from the nine `--code-*` tokens,
+in every highlight mode (server-side Tartrazine and client highlight.js emit
+the same classes) — so recoloring syntax means editing those `light-dark()`
+pairs in `:root`, not touching the `.hljs-*` rules. Tie them to your palette
+(e.g. keywords near your accent) for cohesion; both schemes come along
+automatically.
 
 ---
 
@@ -457,7 +389,7 @@ context-aware override path.
 - **PREMIUM-CONSUMER PALETTE BAN.** For premium-consumer briefs (cookware,
   wellness, artisan goods, luxury, DTC home goods) the LLM default is warm
   cream/beige surfaces + brass/clay/oxblood accents + espresso near-black text.
-  **Note: the ember scaffold palette IS this family** (warm paper `#faf7f2`,
+  **Note: the ember scaffold palette IS this family** (warm paper background,
   rust accent, warm ink). That's fine as Hwaro's out-of-the-box identity — but
   reaching for it (or just keeping it) as *the design* for a premium-consumer
   client brief is the lazy move. Rotate to a genuinely different family:
@@ -701,10 +633,17 @@ in one small script, lazy-load it, and degrade gracefully without it.
 
 ## 7. Motion for a static site
 
-No React, no animation framework — and none needed. The toolkit, in order:
+No React, no animation framework — and none needed.
 
-1. **CSS transitions** for all interactive states (`var(--transition)`,
-   `cubic-bezier(0.16, 1, 0.3, 1)` for bigger moves).
+**Know what the scaffold already moves** before adding motion: the styled
+scaffolds ship an `@starting-style` entry fade of the main content and a sticky
+glass masthead (`backdrop-filter: var(--glass-filter)` with a solid fallback),
+and `simple` adds cross-document `@view-transition`, all guarded by
+`prefers-reduced-motion`. Tune or remove those rather than stacking a second
+load-in on top. The toolkit, in order:
+
+1. **CSS transitions** for all interactive states (`var(--transition)`;
+   `var(--transition-slow)` / `var(--ease-out)` for bigger moves).
 2. **CSS keyframes + `animation-delay` cascades** for load-in staggers
    (`animation-delay: calc(var(--i) * 60ms)` with a per-item `--i`).
 3. **CSS scroll-driven animations** (`animation-timeline: view()` /
@@ -781,7 +720,9 @@ discipline is what remains:
 - **No pure `#000000` / `#ffffff`** — the ember ink ramp and surfaces model
   this; keep custom pairs off-black/off-white too.
 - **Test both modes before finishing.** Screenshot light AND dark (Section 11).
-  Never ship a scheme you haven't seen.
+  Never ship a scheme you haven't seen. With the scaffold switcher, force a
+  scheme for a screenshot by setting `data-theme` on `<html>` (or the
+  `hwaro-theme` localStorage key) instead of changing OS settings.
 
 ---
 
@@ -992,8 +933,7 @@ debt; go greenfield only when the brand itself is changing.
 - **Retheme a scaffold (fast path).** `hwaro init my-site --scaffold blog`
   (also `simple` / `docs` / `book`; `bare` ships no CSS at all) gives you a
   complete, accessible, token-driven baseline that already adapts to light *and*
-  dark. The `*-dark` variants are the same sheet with `color-scheme: dark`
-  pinned — presets, not separate designs. Often the highest-leverage move is
+  dark and ships a theme switcher. Often the highest-leverage move is
   **rewriting the token pairs** and a few component rules to the user's brief —
   minutes to a distinctly different site. For a *custom* dark (a warm dark, not
   stock ember-dark), override the dark side of the `light-dark()` pairs —

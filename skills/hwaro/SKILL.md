@@ -37,7 +37,7 @@ Confirm you are in a Hwaro project before acting: a project root has a
 `config.toml`, usually alongside `content/` and `templates/`. Run
 `hwaro --version` (also `hwaro -v`, `hwaro -V`, or `hwaro version`) to confirm the binary is
 installed and which version you are targeting. This skill is written against
-**Hwaro 0.20.x** (current `main`). If a flag below is missing from your binary,
+**Hwaro 0.21.x** (current `main`). If a flag below is missing from your binary,
 it is newer than your install — `hwaro <command> --help` is always the
 authoritative list for the version you have.
 
@@ -78,6 +78,9 @@ contract over scraping human text.**
   regex the pretty output.
   - `build --json` prints one summary object:
     `{"status":"ok","pages_generated":…,"duration_ms":…,"cache_hits":…,"raw_files_processed":…,"pages_not_published":…}`.
+  - `doctor --json` prints
+    `{"issues":[{"id","level","category","file","message"}…],"summary":{"errors","warnings","infos","total"},"exit_code":N}`;
+    `exit_code` is what the process exits with.
   - `serve --json` prints the ready event as one line
     (`{"event":"ready","url":…,"pid":…}`); without it the line is
     `hwaro serve: ready url=… pid=…`. Wait for that line, not for a sleep.
@@ -221,7 +224,7 @@ hwaro tool list drafts --json        # all | drafts | published; --sort date|tit
 hwaro tool stats --json              # word counts, page totals, top tags
 hwaro tool convert to-yaml           # to-yaml | to-toml | to-json (front matter, in place)
 hwaro tool unused-assets --json      # unreferenced files under static/ (--delete -f removes them)
-hwaro tool agents-md --write         # (re)generate AGENTS.md (--remote = links-only; -f keeps site-specific section)
+hwaro tool agents-md --write         # (re)generate AGENTS.md (--remote = links-only; -f skips the prompt, keeps the site-specific section)
 hwaro tool import hugo /path/to/hugo-site     # also: jekyll, wordpress, notion, obsidian, hexo, astro, eleventy
 hwaro tool export jekyll                       # also: hugo (writes to export/ by default)
 ```
@@ -299,13 +302,15 @@ Templates under `templates/` are Crinja (Jinja2-compatible). The essentials:
 - **URLs:** build links with `{{ url_for(path='/about/') }}` (alias `get_url`),
   `{{ "/x.png" | relative_url }}` / `| absolute_url`, and assets with
   `{{ asset(name='main.css') }}` so `base_url`/subpaths and fingerprints
-  resolve correctly. Never hardcode the domain. Mark the current nav item with
+  resolve correctly. The built-in scaffolds write the equivalent
+  `{{ base_url }}{{ page.url }}` / `{{ base_url }}/css/style.css`; either form
+  is fine, a bare `/about/` is not. Never hardcode the domain. Mark the current nav item with
   `{% if item.url | active_path %}`.
 - The data model (`site`, `section`, `page`, `paginator`, `seo`), functions
   (`get_page`, `get_section`, `get_taxonomy`, `get_taxonomy_url`, `get_menu`,
   `load_data`, `env`, `now`, `asset_integrity`, `resize_image`), filters, and
   tests are documented under [Templates](https://hwaro.hahwul.com/templates/);
-  Markdown render hooks are `templates/hooks/render-*.html` (link, image, heading, code block, blockquote, table).
+  Markdown render hooks are `templates/hooks/render-{link,image,heading,codeblock,blockquote,table}.html`.
 
 A template error fails the build with `HWARO_E_TEMPLATE` (exit `4`); the message
 names the template and line.
