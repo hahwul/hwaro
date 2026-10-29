@@ -26,6 +26,8 @@ Spec.after_each do
   # than in each such example.
   Hwaro::CLI::Runner.json_mode = false
   Hwaro::Logger.quiet = false
+  Hwaro::Logger.color_enabled = nil
+  Hwaro::CLI::Prompt.interactive = nil
 end
 
 # Helper for creating temp directories in tests
@@ -48,10 +50,12 @@ def with_captured_log(&) : String
   previous_io = Hwaro::Logger.io
   previous_level = Hwaro::Logger.level
   previous_quiet = Hwaro::Logger.quiet?
+  previous_color = Hwaro::Logger.color_override?
   sink = IO::Memory.new
   Hwaro::Logger.io = sink
   Hwaro::Logger.level = Hwaro::Logger::Level::Info
   Hwaro::Logger.quiet = false
+  Hwaro::Logger.color_enabled = false
   begin
     yield
     sink.to_s
@@ -59,5 +63,6 @@ def with_captured_log(&) : String
     Hwaro::Logger.io = previous_io
     Hwaro::Logger.level = previous_level
     Hwaro::Logger.quiet = previous_quiet
+    Hwaro::Logger.color_enabled = previous_color
   end
 end

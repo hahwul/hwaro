@@ -774,6 +774,7 @@ describe Hwaro::Logger do
           done.send(nil)
         end
       end
+      context.wake_idle_schedulers(8)
       8.times { done.receive }
       lines = io.to_s.lines
       lines.size.should eq(16_000)

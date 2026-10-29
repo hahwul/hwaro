@@ -91,7 +91,7 @@ class Crinja::Tag::For
 
       expect Kind::IDENTIFIER, "in"
 
-      self.__no_condexpr = true
+      @__no_condexpr = true
       collection_expr = parse_expression
 
       if_expr : AST::ExpressionNode? = nil
