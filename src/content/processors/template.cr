@@ -492,7 +492,7 @@ module Hwaro
             # Serve re-renders the page too: its LQIP / dominant colour are
             # printed data (see ImageHooks.watch_render_source).
             if Content::Hooks::ImageHooks.processing_active?
-              Content::Hooks::ImageHooks.watch_render_source(normalized).try { |source| TemplateEngine.record_file_read(source) }
+              Content::Hooks::ImageHooks.watch_render_source(normalized).try { |src| TemplateEngine.record_file_read(src) }
             end
 
             # Try to find a resized variant from the image hooks map

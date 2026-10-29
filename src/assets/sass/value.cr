@@ -538,9 +538,9 @@ module Hwaro
             in Sep::Comma then ", "
             in Sep::Slash then " / "
             end
-          inner = @items.map do |item|
-            text = item.inspect_css(storage)
-            element_needs_parens?(@sep, item) ? "(#{text})" : text
+          inner = @items.map do |it|
+            text = it.inspect_css(storage)
+            element_needs_parens?(@sep, it) ? "(#{text})" : text
           end.join(joiner)
           @bracketed ? "[#{inner}]" : inner
         end

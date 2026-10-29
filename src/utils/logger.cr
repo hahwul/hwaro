@@ -156,6 +156,10 @@ module Hwaro
       @@color_enabled = value
     end
 
+    def self.color_override? : Bool?
+      @@color_enabled
+    end
+
     # Auto-detect unless explicitly set. Disabled when `NO_COLOR` env var
     # is set to any non-empty value, or when STDOUT is not a TTY.
     def self.color_enabled? : Bool

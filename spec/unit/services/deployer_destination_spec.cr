@@ -365,12 +365,17 @@ describe Hwaro::Services::Deployer do
       Dir.mktmpdir do |dir|
         src = dest_spec_site(File.join(dir, "x$(touch #{dir}/PWNED)"))
         options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["cmd"])
-        ["ls \"{source}\"", "ls '{source}/'"].each do |template|
-          err = expect_raises(Hwaro::HwaroError) do
-            Hwaro::Services::Deployer.new.run(options, dest_spec_command_config(template))
+        Hwaro::CLI::Prompt.interactive = false
+        begin
+          ["ls \"{source}\"", "ls '{source}/'"].each do |template|
+            err = expect_raises(Hwaro::HwaroError) do
+              Hwaro::Services::Deployer.new.run(options, dest_spec_command_config(template))
+            end
+            err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+            File.exists?(File.join(dir, "PWNED")).should be_false
           end
-          err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
-          File.exists?(File.join(dir, "PWNED")).should be_false
+        ensure
+          Hwaro::CLI::Prompt.interactive = nil
         end
       end
     end

@@ -1885,7 +1885,7 @@ module Hwaro
             # itself), so filter the seed, not `config`.
             defaults = Set(String).new
             collect_default_decls(sheet.children, defaults)
-            seed = config.select { |name, _| defaults.includes?(name) }
+            seed = config.select { |var_name, _| defaults.includes?(var_name) }
           elsif !config.empty?
             validate_configurable(sheet, config, url, line, column)
           end
@@ -1909,7 +1909,7 @@ module Hwaro
           @import_config = implicit ? config : nil
 
           module_env = Environment.new
-          seed.each { |name, value| module_env.variables[name] = value }
+          seed.each { |var_name, value| module_env.variables[var_name] = value }
           module_sink = [] of Css::Node
           @env = module_env
           @sink = module_sink
