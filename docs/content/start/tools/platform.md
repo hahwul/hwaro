@@ -81,7 +81,7 @@ Each config includes:
 
 [build.environment]
   # Add environment variables here
-  # HWARO_VERSION = "0.21.0"
+  # HWARO_VERSION = "0.22.0"
 
 [[redirects]]
   from = "/old-url/"
