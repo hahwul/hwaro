@@ -559,7 +559,7 @@ module Hwaro
             page.version.try { |v| Content::Versions.root_url(config, v, Content::Versions.lang_prefix(page, config)) }
           end
           before = pages.map { |page| {page.translations.dup, page.version_links.dup, page.aliases.dup, version_url.call(page)} }
-          Content::Multilingual.link_translations!(pages, config)
+          warn_translation_key_collisions(Content::Multilingual.link_translations!(pages, config))
           Content::Versions.link!(pages, config)
           moved = [] of Models::Page
           pages.each_with_index do |page, i|

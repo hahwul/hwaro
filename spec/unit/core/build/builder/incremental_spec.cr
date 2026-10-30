@@ -566,3 +566,41 @@ describe "Builder#run_incremental translation_key" do
     end
   end
 end
+
+describe "Builder#run_incremental translation_key collisions" do
+  it "warns when an edit creates a collision, once" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", <<-TOML)
+          title = "T"
+          base_url = "http://localhost"
+          default_language = "en"
+          [languages.en]
+          language_name = "English"
+          [languages.ko]
+          language_name = "Korean"
+          TOML
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{% for t in page.translations %}[{{ t.url }}]{% endfor %}")
+        File.write("content/about.md", "+++\ntitle = \"About\"\ntranslation_key = \"about\"\n+++\n")
+        File.write("content/a.ko.md", "+++\ntitle = \"A\"\ntranslation_key = \"about\"\n+++\n")
+        File.write("content/b.ko.md", "+++\ntitle = \"B\"\n+++\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        with_captured_log { builder.run_incremental(["content/a.ko.md"], options) }.should_not contain("translation_key")
+
+        File.write("content/b.ko.md", "+++\ntitle = \"B\"\ntranslation_key = \"about\"\n+++\n")
+        log = with_captured_log { builder.run_incremental(["content/b.ko.md"], options) }
+        log.scan(%(content/b.ko.md: translation_key "about" is already used by the 'ko' page content/a.ko.md)).size.should eq(1)
+
+        # An unrelated edit keeps the collision: no second warning.
+        File.write("content/about.md", "+++\ntitle = \"About!\"\ntranslation_key = \"about\"\n+++\n")
+        with_captured_log { builder.run_incremental(["content/about.md"], options) }.should_not contain("translation_key")
+      end
+    end
+  end
+end

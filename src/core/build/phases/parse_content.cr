@@ -21,9 +21,8 @@ module Hwaro::Core::Build::Phases::ParseContent
       # navigation, listings, output claims, the cache fingerprints and every
       # discovery surface then see a matched term `_index.md` as headless.
       mark_term_metadata(ctx.sections, match_term_files(ctx.pages, ctx.sections, config))
-      Content::Multilingual.link_translations!(ctx.all_pages, config).each do |c|
-        Logger.warn "content/#{c.loser.path}: translation_key #{c.key.inspect} is already used by the '#{c.code}' page content/#{c.winner.path} — this page is not linked as a translation."
-      end
+      @translation_key_collisions.clear
+      warn_translation_key_collisions(Content::Multilingual.link_translations!(ctx.all_pages, config))
       Content::Versions.link!(ctx.all_pages, config)
     end
 
@@ -47,6 +46,20 @@ module Hwaro::Core::Build::Phases::ParseContent
     end
 
     Lifecycle::HookResult::Continue
+  end
+
+  # Warn about each collision not reported since the last full build, and
+  # remember the current set: a serve relink that keeps a collision says
+  # nothing, one that introduces it (or brings it back) warns once.
+  private def warn_translation_key_collisions(collisions : Array(Content::Multilingual::KeyCollision)) : Nil
+    current = Set({String, String}).new
+    collisions.each do |c|
+      pair = {c.loser.path, c.winner.path}
+      current << pair
+      next if @translation_key_collisions.includes?(pair)
+      Logger.warn "content/#{c.loser.path}: translation_key #{c.key.inspect} is already used by the '#{c.code}' page content/#{c.winner.path} — this page is not linked as a translation."
+    end
+    @translation_key_collisions = current
   end
 
   # Render each page's `<!-- more -->` summary through the same sub-pipeline
