@@ -95,6 +95,22 @@ describe "[content] ignore in the content tools" do
     end
   end
 
+  # A slugged bundle copies its files beside its new URL; check-links knows
+  # those routes from the route index, which must not count an ignored file.
+  it "reports a link to an ignored file of a moved bundle as dead" do
+    with_ignore_project(%(title = "t"\n[content]\nignore = ["posts/b/secret.png"]\n)) do
+      FileUtils.mkdir_p("content/posts/b")
+      File.write("content/posts/b/index.md", "+++\ntitle = \"B\"\nslug = \"renamed\"\n+++\n")
+      File.write("content/posts/b/keep.png", "png")
+      File.write("content/posts/b/secret.png", "png")
+      File.write("content/linker.md", "+++\ntitle = \"L\"\n+++\n[k](/posts/renamed/keep.png) [s](/posts/renamed/secret.png)\n")
+      command = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+      dead = command.ignore_resolve_for_test(command.ignore_scan_for_test("content"), "content").map(&.link.url)
+      dead.should contain("/posts/renamed/secret.png")
+      dead.should_not contain("/posts/renamed/keep.png")
+    end
+  end
+
   it "reports links to ignored pages and files as dead, and does not scan ignored files" do
     with_ignore_project do
       command = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new

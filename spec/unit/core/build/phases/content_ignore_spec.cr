@@ -73,9 +73,14 @@ describe "[content] ignore in the build" do
       "gallery/sub/index.md" => "+++\ntitle = \"Sub\"\n+++\n",
       "gallery/sub/pic.png"  => "p",
     }
-    build_site(ignore_config(%(["gallery/sub/index.md"])), content_files: content, template_files: IGNORE_TEMPLATES) do
+    # No [content.files] here: the raw lane would publish pic.png on its own
+    # and hide whether the bundle took it.
+    config = %(title = "t"\nbase_url = "https://example.com"\n[content]\nignore = ["gallery/sub/index.md"]\n)
+    build_site(config, content_files: content, template_files: IGNORE_TEMPLATES) do |_, builder|
       File.exists?("public/gallery/sub/index.html").should be_false
       File.exists?("public/gallery/sub/pic.png").should be_true
+      gallery = builder.site.not_nil!.pages.find! { |p| p.path == "gallery/index.md" }
+      gallery.assets.should eq(["gallery/sub/pic.png"])
     end
   end
 
