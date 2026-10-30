@@ -19,8 +19,11 @@ module Hwaro::Core::Build::Phases::Render
   #
   # With `formats = ["webp"]`, an image that gets a srcset is also wrapped in
   # `<picture>` with a `<source type="image/webp">` listing the WebP copies,
-  # so browsers that support WebP fetch those and the rest keep the <img>.
-  # An <img> already inside an authored <picture> is left to its sources.
+  # so browsers that support WebP fetch those and the rest keep the <img>,
+  # unless a width the <img> offers has no WebP copy (wider than WebP's
+  # 16383px canvas): WebP browsers would never get it, so no <picture>.
+  # An <img> already inside an authored <picture> is left to its sources,
+  # like one with its own srcset.
   #
   # Quote-aware, like IMG_LAZY_REGEX: a `>` inside an attribute value
   # (`alt="Home > Docs"`) is not the end of the tag.
@@ -46,7 +49,7 @@ module Hwaro::Core::Build::Phases::Render
     resize_map = config.image_processing.enabled ? Content::Hooks::ImageHooks.resize_map_readonly : {} of String => Hash(Int32, String)
     return html if resize_map.empty? && !dimensions
     webp_map = Content::Hooks::ImageHooks.format_map_readonly("webp") if config.image_processing.enabled
-    pictures = picture_spans(html) if webp_map
+    pictures = picture_spans(html) unless resize_map.empty?
     srcset_for = ->(variants : Hash(Int32, String)) do
       # Prefix each candidate with the subpath (base_path) so responsive
       # images resolve on subpath deployments; the resize map stores bare
@@ -55,7 +58,7 @@ module Hwaro::Core::Build::Phases::Render
     end
 
     html.gsub(IMG_TAG_RE) do |tag, match|
-      has_srcset = tag.matches?(IMG_SRCSET_RE)
+      has_srcset = tag.matches?(IMG_SRCSET_RE) || !!pictures.try(&.any?(&.includes?(match.begin(0))))
       next tag if has_srcset && !dimensions
       m = tag.match(IMG_SRC_RE)
       next tag unless m
@@ -101,7 +104,7 @@ module Hwaro::Core::Build::Phases::Render
         additions += %( sizes="100vw") unless tag =~ /\ssizes\s*=/
       end
       webp = webp_map.try(&.[key]?) unless has_srcset
-      webp = nil if webp && (webp.empty? || pictures.try(&.any?(&.includes?(match.begin(0)))))
+      webp = nil if webp && (webp.empty? || webp.keys.max < (widths.try(&.keys.max?) || 0))
       if dimensions && !tag.matches?(IMG_SIZE_RE) && (source = Content::Hooks::ImageHooks.resolve_source(key, config))
         # The bytes decide the size, so a cached page must re-render when
         # they change.

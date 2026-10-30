@@ -109,6 +109,16 @@ describe "Responsive content images" do
       end
     end
 
+    it "adds no <picture> when the widest width has no WebP copy" do
+      with_resize_map({"/posts/foo/photo.png" => {400 => "/posts/foo/photo_400w.png", 17_000 => "/posts/foo/photo_17000w.png"}}) do
+        with_webp_map({"/posts/foo/photo.png" => {400 => "/posts/foo/photo_400w.webp"}}) do
+          out = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(%(<img src="photo.png">), bundle_page, enabled_config)
+          out.should_not contain("<picture")
+          out.should contain("photo_17000w.png 17000w")
+        end
+      end
+    end
+
     it "wraps an image that follows a closed authored <picture>" do
       with_resize_map(SAMPLE_MAP) do
         with_webp_map(WEBP_MAP) do
@@ -183,6 +193,13 @@ describe "Responsive content images" do
       out = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(
         %(<img src="https://cdn.example.com/posto.png">), bundle_page, enabled_config)
       out.should_not contain("srcset")
+    end
+  end
+
+  it "leaves an <img> inside an authored <picture> without a srcset" do
+    with_resize_map(SAMPLE_MAP) do
+      html = %(<picture><source srcset="/custom.webp" type="image/webp"><img src="photo.png" alt="Custom"></picture>)
+      Hwaro::Core::Build::Builder.new.test_apply_responsive_images(html, bundle_page, enabled_config).should eq(html)
     end
   end
 

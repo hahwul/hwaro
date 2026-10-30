@@ -77,7 +77,7 @@ formats = ["webp"]
   </picture>
   ```
 
-  직접 작성한 `<picture>` 안의 `<img>`나 자체 `srcset`이 있는 `<img>`는 건드리지 않습니다. AMP 페이지에는 `<img>`만 남습니다.
+  직접 작성한 `<picture>` 안의 `<img>`나 자체 `srcset`이 있는 `<img>`는 `formats` 설정과 상관없이 건드리지 않습니다. 가장 넓은 변형에 WebP 사본이 없는 이미지(WebP는 가로·세로 최대 16383px이라 그보다 큰 변형은 WebP로 쓰지 않습니다)는 `srcset`만 붙고 `<picture>`로 감싸지 않습니다. 감싸면 브라우저가 WebP `<source>`를 골라 더 넓은 크기를 끝내 받지 못하기 때문입니다. AMP 페이지에는 `<img>`만 남습니다.
 - 템플릿에서는 `resize_image(path=…, width=…, format="webp")`가 WebP 변형을 돌려줍니다([템플릿에서 사용](#템플릿에서-사용) 참고).
 - 인코더는 Hwaro에 내장되어 있어(순수 Crystal) 외부 도구나 라이브러리가 필요 없습니다.
 - WebP 파일은 원본으로 쓰지 않습니다. `static/`이나 페이지 번들의 `.webp`는 그대로 복사됩니다.
