@@ -538,6 +538,15 @@ describe Hwaro::Core::Build::Privacy do
     end
   end
 
+  it "reads a tag whose quoted attribute value contains '>'" do
+    with_cdn do |cdn, _hits, _server|
+      with_privacy(privacy_config) do |privacy, _dir|
+        html = %(<link title="a > b" rel="preconnect" href="#{cdn}"><img title="a > b" src="#{cdn}/img/pic.png">)
+        rewrite(privacy, html).should match(/\A<img title="a > b" src="\/assets\/external\/[0-9a-f]{12}-pic\.png">\z/)
+      end
+    end
+  end
+
   it "does not publish a response whose Content-Type contradicts the URL's extension" do
     with_cdn do |cdn, _hits, _server|
       with_privacy(privacy_config) do |privacy, dir|

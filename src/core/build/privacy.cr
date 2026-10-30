@@ -173,8 +173,9 @@ module Hwaro
           include JSON::Serializable
         end
 
-        HTML_RE = /<!--[\s\S]*?-->|<(script|style|textarea)\b([^>]*)>([\s\S]*?)<\/\1\s*>|<(link|img|source|video|audio)\b([^>]*)>/i
-        LINK_RE = /<link\b[^>]*>/i
+        # Tag attributes are quote-aware: `alt="a > b"` does not end the tag.
+        HTML_RE = /<!--[\s\S]*?-->|<(script|style|textarea)\b(#{Utils::TextUtils::HTML_TAG_ATTRS})>([\s\S]*?)<\/\1\s*>|<(link|img|source|video|audio)\b(#{Utils::TextUtils::HTML_TAG_ATTRS})>/i
+        LINK_RE = /<link\b#{Utils::TextUtils::HTML_TAG_ATTRS}>/i
         ATTR_RE = /\s([a-zA-Z_:][-\w:.]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'<>`]+)))?/
         SRI_RE  = /\s(?:integrity|crossorigin)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'<>`]+))?/i
         CSS_RE  = /\/\*[\s\S]*?\*\/|((?:-webkit-)?image-set\((?:[^()]|\([^()]*\))*\))|url\(\s*(?:"([^"]*)"|'([^']*)'|([^)"'\s]*))\s*\)|@import\s*(?:"([^"]*)"|'([^']*)')/i
