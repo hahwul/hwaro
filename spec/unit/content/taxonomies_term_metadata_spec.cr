@@ -119,12 +119,14 @@ describe "taxonomy term _index.md metadata" do
           "posts/p1.md"            => post("P1", ["go"]),
           "tags/nonterm/_index.md" => "+++\ntitle = \"Not a term section\"\n+++\nSection body\n",
           "tags/nonterm/child.md"  => post("Child", [] of String),
-          "tags/moved/_index.md"   => "+++\ntitle = \"Moved\"\npath = \"/elsewhere/\"\n+++\n",
+          # `go` IS a term, but `path` publishes this section elsewhere.
+          "tags/go/_index.md" => "+++\ntitle = \"Moved\"\npath = \"/elsewhere/\"\n+++\n",
         },
         template_files: TEMPLATES) do |dir|
         File.read(File.join(dir, "public/tags/nonterm/index.html")).should eq("SECTION=Not a term section|<p>Section body</p>\n")
         File.exists?(File.join(dir, "public/tags/nonterm/child/index.html")).should be_true
-        File.exists?(File.join(dir, "public/elsewhere/index.html")).should be_true
+        File.read(File.join(dir, "public/elsewhere/index.html")).should start_with("SECTION=Moved|")
+        File.read(File.join(dir, "public/tags/go/index.html")).should start_with("T=Tags: go|")
         File.read(File.join(dir, "public/sitemap.xml")).should contain("https://ex.com/tags/nonterm/</loc>")
         File.read(File.join(dir, "public/llms.txt")).should contain("Not a term section")
       end

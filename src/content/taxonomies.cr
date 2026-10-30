@@ -262,39 +262,38 @@ module Hwaro
       # `shadowed_by` is the file that won the same page (nil for the winner).
       record TermFile, url : String, shadowed_by : String?
 
-      # The candidate files (`term_metadata_path?`) whose directory name is the
-      # URL slug (NFC) of a term page this build writes in the file's
-      # language: `content/tags/rust-lang/_index.md` for `/tags/rust-lang/`,
-      # `content/tags/c-2/_index.md` for a disambiguated `/tags/c-2/`. Keyed by
+      # The candidate files (`term_metadata_path?`) that would publish at the
+      # URL (NFC) of a term page this build writes: the directory is the
+      # term's slug in the file's language — `content/tags/rust-lang/_index.md`
+      # for `/tags/rust-lang/`, `content/tags/c-2/_index.md` for a
+      # disambiguated `/tags/c-2/`, `_index.ko.md` for `/ko/tags/<slug>/` —
+      # and no `path` or `[permalinks]` rule moved it elsewhere. Keyed by
       # section path. A matched file describes that term page instead of
       # publishing a page of its own (Builder#mark_term_metadata); every other
       # candidate stays an ordinary section, exactly as before. When several
-      # files match one page (`_index.md` beside `_index.markdown`, or an
-      # `_index.ko.md` on a single-language site), `_index.md` wins, else the
-      # first path; the others are reported and not published.
+      # files match one page (`_index.md` beside `_index.markdown`),
+      # `_index.md` wins, else the first path; the others are reported and
+      # not published.
       def self.match_term_metadata(pages : Array(Models::Page), sections : Array(Models::Section), config : Models::Config) : Hash(String, TermFile)
         result = {} of String => TermFile
         candidates = sections.select { |s| term_metadata_path?(s.path, config) }
         return result if candidates.empty?
 
-        urls = {} of {String, String, String} => String
+        urls = Set(String).new
         # Output-collision verdicts (`output_suppressed`) come from the render
         # phase, after this runs on a cold build; ignoring them keeps a serve
         # pass, which still holds the last pass's verdicts, matching the same.
         term_spaces(config, pages, term_index(pages, config), honor_suppressed: false).each do |space|
-          code = space.language || config.default_language
           space.index_terms.each do |term|
-            slug = space.slug_map[term]
-            urls[{space.taxonomy.name, code, slug}] = "#{space.lang_prefix}/#{space.taxonomy.name}/#{slug}/"
+            urls << "#{space.lang_prefix}/#{space.taxonomy.name}/#{space.slug_map[term]}/"
           end
         end
 
         winners = {} of String => String
         # A plain `_index.md` first, then path order.
         candidates.sort_by { |s| {File.basename(s.path) == "_index.md" ? 0 : 1, s.path} }.each do |section|
-          parts = Path[section.path].parts
-          dir = parts[1].ascii_only? ? parts[1] : parts[1].unicode_normalize(:nfc)
-          next unless url = urls[{parts[0], section.language || config.default_language, dir}]?
+          url = section.url.ascii_only? ? section.url : section.url.unicode_normalize(:nfc)
+          next unless urls.includes?(url)
           winner = winners[url]?
           winners[url] = section.path unless winner
           result[section.path] = TermFile.new(url, winner)
