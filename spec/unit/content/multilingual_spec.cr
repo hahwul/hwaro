@@ -221,6 +221,19 @@ describe "Hwaro::Content::Multilingual translation_key" do
     end
   end
 
+  it "prefers a linkable page over a headless or redirecting one in a collision" do
+    en = keyed_page("about.md", "/about/", "about")
+    headless = keyed_page("a.ko.md", "/ko/a/", "about", "ko")
+    headless.render = false
+    redirect = keyed_page("b.ko.md", "/ko/b/", "about", "ko")
+    redirect.redirect_to = "/elsewhere/"
+    real = keyed_page("c.ko.md", "/ko/c/", "about", "ko")
+    collisions = Hwaro::Content::Multilingual.link_translations!([en, headless, redirect, real], key_config)
+    collisions.map { |c| {c.winner.path, c.loser.path} }.should eq([{"c.ko.md", "a.ko.md"}, {"c.ko.md", "b.ko.md"}])
+    en.translations.map(&.url).should eq(["/about/", "/ko/c/"])
+    real.translations.map(&.url).should eq(["/about/", "/ko/c/"])
+  end
+
   it "does nothing on a single-language site" do
     page = keyed_page("about.md", "/about/", "about")
     Hwaro::Content::Multilingual.link_translations!([page], Hwaro::Models::Config.new).should be_empty

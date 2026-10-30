@@ -111,8 +111,8 @@ hwaro doctor --json
   (`translation-missing`)
 - 기본 언어 원본이 없는 번역 (`translation-orphan`)
 - 같은 언어의 두 페이지가 같은 `translation_key`를 씀
-  (`translation-key-collision`, warning): 빌드는 경로가 먼저 정렬되는 페이지만
-  연결합니다
+  (`translation-key-collision`, warning): 빌드는 한 페이지만 연결합니다(출력되는 페이지가
+  헤드리스나 `redirect_to` 페이지보다 먼저, 그다음은 경로 순)
 
 페이지는 빌드가 `page.translations`를 만들 때와 똑같이 짝지어집니다 (`translation_key`가
 있으면 그 키로, 없으면 언어 접미사를 뺀 기본 이름이 같으면 한 묶음이므로 `about.md`, `about.en.md`,
@@ -277,7 +277,7 @@ ignore = [
 | `content-ignore-hides-sections` | structure | `[content] ignore` 패턴이 섹션의 `_index.md`를 숨기는데 그 섹션의 페이지는 여전히 빌드됨 |
 | `translation-missing` | i18n | 설정된 언어에 대응 페이지가 없는 페이지나 섹션 |
 | `translation-orphan` | i18n | 기본 언어 원본이 없는 번역 |
-| `translation-key-collision` | i18n | 같은 언어의 두 페이지가 같은 `translation_key`를 씀. 경로가 먼저인 페이지만 연결됨 |
+| `translation-key-collision` | i18n | 같은 언어의 두 페이지가 같은 `translation_key`를 씀. 한 페이지만 연결됨(출력되는 페이지 우선, 그다음 경로 순) |
 
 어떤 규칙 ID와도 맞지 않는 항목은 "효과 없음" 경고로 알려주므로, 오타가 조용히
 넘어가지 않습니다.

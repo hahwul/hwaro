@@ -70,8 +70,10 @@ module Hwaro
       # sharing a key stay apart) or, without one, its file name minus the
       # language suffix (`about.md` ↔ `about.ko.md`). The two never mix: a
       # keyed page does not join the file-name group of an unkeyed one.
-      # Inside a keyed group the first path (byte order) of each language
-      # wins; the others are returned so callers can report them.
+      # Inside a keyed group each language keeps one page — a linkable one
+      # (rendered, not a redirect stub) before any other, then the first
+      # path in byte order; the others are returned so callers can report
+      # them.
       def link_translations!(pages : Array(Models::Page), config : Models::Config) : Array(KeyCollision)
         collisions = [] of KeyCollision
         return collisions unless multilingual?(config)
@@ -101,7 +103,10 @@ module Hwaro
 
           by_code = {} of String => Models::Page
           if keyed
-            group_pages.sort_by!(&.path).each do |p|
+            # A linkable page (written, not a redirect stub) beats one the
+            # links below would skip anyway, so a headless duplicate never
+            # leaves its language unlinked; then the first path wins.
+            group_pages.sort_by! { |p| {p.render && !p.has_redirect? ? 0 : 1, p.path} }.each do |p|
               code = language_code(p, config)
               if winner = by_code[code]?
                 collisions << KeyCollision.new(key, code, winner, p)

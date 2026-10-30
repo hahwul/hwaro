@@ -115,8 +115,8 @@ hwaro doctor --json
   counterpart in another configured language (`translation-missing`)
 - A translation with no default-language original (`translation-orphan`)
 - Two pages of one language sharing a `translation_key`
-  (`translation-key-collision`, warning): the build links only the one whose
-  path sorts first
+  (`translation-key-collision`, warning): the build links only one, a written page
+  before a headless or `redirect_to` one, then the first path
 
 Pages are paired exactly as the build pairs `page.translations` (their
 `translation_key`, else the same base name without the language suffix, so
@@ -283,7 +283,7 @@ Rows marked ✗ are error level and **cannot** be ignored.
 | `content-ignore-hides-sections` | structure | A `[content] ignore` pattern hides a section's `_index.md` while the section's pages still build |
 | `translation-missing` | i18n | Page or section has no counterpart in a configured language |
 | `translation-orphan` | i18n | Translation has no default-language original |
-| `translation-key-collision` | i18n | Two pages of one language share a `translation_key`; only the first by path is linked |
+| `translation-key-collision` | i18n | Two pages of one language share a `translation_key`; only one is linked (a written page first, then path order) |
 
 An entry that matches no rule id is reported as having no effect, so a typo
 in this list never passes silently.
