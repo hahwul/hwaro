@@ -19,6 +19,14 @@ module Hwaro
       def watch_spec_apply(changeset : ChangeSet, options : Config::Options::BuildOptions)
         apply_changeset(changeset, options)
       end
+
+      # How often the watcher asked whether a path is ignored.
+      class_property watch_spec_ignore_probes = 0
+
+      private def content_ignored?(path : String) : Bool
+        Server.watch_spec_ignore_probes += 1
+        previous_def
+      end
     end
   end
 end
@@ -113,6 +121,31 @@ describe "serve: [content] ignore" do
         before = server.watch_spec_scan
         File.write("content/p.md", "+++\ntitle = \"P\"\n+++\ntwo, longer\n")
         server.watch_spec_detect(before, server.watch_spec_scan).modified_content.should eq(["content/p.md"])
+      end
+    end
+  end
+
+  # The watcher diffs every poll; an unchanged path must cost only the stamp
+  # compare, never a pattern match.
+  it "does not match unchanged paths against the ignore list" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "t"\nbase_url = "https://example.com"\n[content]\nignore = ["_templates"]\n))
+        FileUtils.mkdir_p("content/_templates")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("content/p.md", "+++\ntitle = \"P\"\n+++\n")
+        File.write("content/_templates/n.md", "# n\n")
+
+        server = Hwaro::Services::Server.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        server.watch_spec_builder.run(options).should be_true
+
+        snapshot = server.watch_spec_scan
+        Hwaro::Services::Server.watch_spec_ignore_probes = 0
+        server.watch_spec_detect(snapshot, snapshot.dup).empty?.should be_true
+        Hwaro::Services::Server.watch_spec_ignore_probes.should eq(0)
       end
     end
   end

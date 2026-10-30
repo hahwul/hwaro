@@ -129,9 +129,10 @@ module Hwaro
 
         # --- Files that exist in both snapshots but with different stamps ---
         new_mtimes.each do |path, new_stamp|
+          old_stamp = old_mtimes[path]?
+          next if old_stamp == new_stamp # unchanged (cheapest test first)
           next if hidden.call(path)
-          if old_stamp = old_mtimes[path]?
-            next if old_stamp == new_stamp # unchanged
+          if old_stamp
 
             if watched_config_file?(path)
               # A config stamp that moved only because OUR OWN last build
@@ -189,7 +190,8 @@ module Hwaro
       # A `content/` path the last build's `[content] ignore` hides. The build
       # never discovers it, so editing, adding or removing it is no change —
       # unless a page reads it by name (`include_md`, `include_code`, a
-      # transclusion, a literal `load_data()`): a partials folder is a fine
+      # literal `load_data()`; a transclusion never can, since it resolves
+      # pages and an ignored file is none): a partials folder is a fine
       # thing to ignore, and its edits must still re-render the pages that
       # include it. The snapshots keep stamping every path, so editing the
       # patterns (a config change: full rebuild) never reads as a burst of
