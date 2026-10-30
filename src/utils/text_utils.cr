@@ -782,9 +782,12 @@ module Hwaro
       end
 
       # The attribute run of an opening tag: anything but `>`, except that a
-      # quoted value may contain `>` (`alt="Home > Docs"`). Possessive, so a
-      # long data: URI value is one cheap step, not one per character.
-      HTML_TAG_ATTRS = %q((?:[^>"']++|"[^"]*"|'[^']*')*)
+      # quoted value may contain `>` (`alt="Home > Docs"`). Possessive all the
+      # way out, so neither a long data: URI value nor a long run of
+      # attributes costs a PCRE JIT stack frame per step. A user follows it
+      # with the tag's `>` (or `\/?>`), which it only reaches at its own end,
+      # so giving nothing back changes no match.
+      HTML_TAG_ATTRS = %q((?:[^>"']++|"[^"]*+"|'[^']*+')*+)
 
       # Raw-text HTML elements whose *content* is code, not display text.
       # `<style>`/`<script>` bodies must be dropped along with their tags;

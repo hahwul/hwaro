@@ -507,6 +507,11 @@ describe Hwaro::Utils::TextUtils do
         Hwaro::Utils::TextUtils.strip_html(%(<a title='a > b' href="x">link</a>)).should eq("link")
       end
 
+      it "drops a <script> with tens of thousands of quoted attributes without exhausting the regex stack" do
+        html = %(<script #{%(a="" ) * 30_000}>var x = 1;</script>Tail)
+        Hwaro::Utils::TextUtils.strip_html(html).should eq("Tail")
+      end
+
       it "keeps a < that does not start a tag as text" do
         Hwaro::Utils::TextUtils.strip_html("1 < 2 and x<3").should eq("1 < 2 and x<3")
       end

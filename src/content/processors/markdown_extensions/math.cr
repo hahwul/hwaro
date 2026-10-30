@@ -25,7 +25,7 @@ module Hwaro
         # flat element (generated spans never contain tags); the attribute
         # scan is quote-aware so a `>` inside a quoted value doesn't end
         # the opening tag early.
-        HTML_CODE_SPAN_RE = /<code(?:\s(?:[^>"']|"[^"]*"|'[^']*')*)?>[^<]*<\/code>/
+        HTML_CODE_SPAN_RE = /<code(?:\s#{Utils::TextUtils::HTML_TAG_ATTRS})?>[^<]*<\/code>/
 
         # Placeholder emitted by transform_outside_code_spans for a stashed
         # code span; the capture is the span's index.

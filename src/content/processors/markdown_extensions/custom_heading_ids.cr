@@ -75,7 +75,7 @@ module Hwaro
         # Quote-aware attrs (a `>` inside a quoted value must not end the
         # tag); the id checks guard with `(?<![\w-])` so `data-id=` never
         # counts as the element's id.
-        HEADING_TAG_FOR_HID_RE = /<(h[1-6])((?:[^>"']|"[^"]*"|'[^']*')*)>(.*?)<\/\1>/m
+        HEADING_TAG_FOR_HID_RE = /<(h[1-6])(#{Utils::TextUtils::HTML_TAG_ATTRS})>(.*?)<\/\1>/m
         HID_MARKER_RE          = /<!--HID:([\w][\w:-]*)-->/
         EXISTING_ID_RE         = /(?<![\w-])id\s*=\s*"[^"]*"/i
         ANY_ID_ATTR_PRESENT_RE = /(?<![\w-])id\s*=/i
