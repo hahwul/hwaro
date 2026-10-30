@@ -77,7 +77,7 @@ formats = ["webp"]
   </picture>
   ```
 
-  An `<img>` already inside a `<picture>` you wrote, or one with its own `srcset`, is left alone, with or without `formats`. An image whose widest variant has no WebP copy (a WebP image is at most 16383px wide or tall, so wider variants are never written as WebP) gets its `srcset` but no `<picture>`, because browsers would pick the WebP `<source>` and never load the wider sizes. AMP pages keep only the `<img>`.
+  An `<img>` already inside a `<picture>` you wrote still gets its `srcset`, but no WebP `<source>` and no second `<picture>`. An `<img>` with its own `srcset` is left alone. An image whose widest variant has no WebP copy (a WebP image is at most 16383px wide or tall, so wider variants are never written as WebP) gets its `srcset` but no `<picture>`, because browsers would pick the WebP `<source>` and never load the wider sizes. AMP pages keep only the `<img>`.
 - In templates, `resize_image(path=…, width=…, format="webp")` returns the WebP variant (see [Using in Templates](#using-in-templates)).
 - The encoder is built into Hwaro (pure Crystal), so no external tool or library is involved.
 - WebP files are not used as sources: a `.webp` in `static/` or a page bundle is copied as is.

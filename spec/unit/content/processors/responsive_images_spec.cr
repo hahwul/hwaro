@@ -196,10 +196,14 @@ describe "Responsive content images" do
     end
   end
 
-  it "leaves an <img> inside an authored <picture> without a srcset" do
+  it "gives an <img> inside an authored <picture> its srcset but no WebP wrap" do
     with_resize_map(SAMPLE_MAP) do
-      html = %(<picture><source srcset="/custom.webp" type="image/webp"><img src="photo.png" alt="Custom"></picture>)
-      Hwaro::Core::Build::Builder.new.test_apply_responsive_images(html, bundle_page, enabled_config).should eq(html)
+      with_webp_map(WEBP_MAP) do
+        html = %(<picture><source media="(min-width: 800px)" srcset="/wide.png"><img src="photo.png" alt="Art"></picture>)
+        Hwaro::Core::Build::Builder.new.test_apply_responsive_images(html, bundle_page, enabled_config).should eq(
+          %(<picture><source media="(min-width: 800px)" srcset="/wide.png">) +
+          %(<img srcset="/posts/foo/photo_400w.png 400w, /posts/foo/photo_800w.png 800w" sizes="100vw" src="photo.png" alt="Art"></picture>))
+      end
     end
   end
 
