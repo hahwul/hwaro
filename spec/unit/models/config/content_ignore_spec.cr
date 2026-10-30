@@ -32,6 +32,24 @@ describe "[content] ignore" do
       config.not_nil!.content_files.ignore.should be_empty
     end
 
+    it "warns about each non-string entry and keeps the string ones" do
+      config = nil
+      log = with_captured_log { config = load_config(%([content]\nignore = ["README.md", 3, true]\n)) }
+      log.should contain("[content] ignore entry 3")
+      log.should contain("[content] ignore entry true")
+      config.not_nil!.content_files.ignore.should eq(["README.md"])
+    end
+
+    # The natural first guess puts the key under [content.files], where it
+    # used to hide nothing in silence.
+    it "warns that [content.files] ignore has no effect" do
+      config = nil
+      log = with_captured_log { config = load_config(%([content.files]\nignore = ["README.md"]\n)) }
+      log.should contain("[content.files] ignore has no effect")
+      config.not_nil!.content_files.ignore.should be_empty
+      with_captured_log { load_config(%([content.files]\nallow_extensions = ["pdf"]\n)) }.should_not contain("ignore")
+    end
+
     it "loads without a [content.files] table, and beside one" do
       config = load_config(%([content]\nignore = ["x.md"]\n[content.files]\nallow_extensions = ["png"]\n))
       config.content_files.ignore.should eq(["x.md"])

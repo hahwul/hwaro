@@ -343,10 +343,22 @@ module Hwaro
     class Config
       private def self.load_content_files(config : Config)
         return unless content_section = config.raw["content"]?.try(&.as_h?)
-        if patterns = string_list?(content_section["ignore"]?, "[content] ignore")
+        ignore_any = content_section["ignore"]?
+        if patterns = string_list?(ignore_any, "[content] ignore")
+          # string_list? drops a non-string entry in silence; a pattern that
+          # vanished is a file that still publishes, so name it.
+          ignore_any.try(&.as_a?).try &.each do |entry|
+            Logger.warn "Ignoring [content] ignore entry #{entry.raw.inspect}: patterns must be strings." if entry.as_s?.nil?
+          end
           config.content_files.ignore = ContentFilesConfig.normalize_ignore(patterns)
         end
         return unless s = content_section["files"]?.try(&.as_h?)
+
+        # The natural first guess, but the key lives on [content]: under
+        # [content.files] it would hide nothing.
+        if s.has_key?("ignore")
+          Logger.warn "[content.files] ignore has no effect: the key belongs on [content] (write `ignore = [...]` under [content])."
+        end
 
         allow_any = s["allow_extensions"]? || s["extensions"]?
         disallow_any = s["disallow_extensions"]?
