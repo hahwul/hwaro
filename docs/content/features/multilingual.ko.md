@@ -150,7 +150,10 @@ Hwaro는 다국어 페이지의 캐노니컬 링크 태그를 생성합니다:
 <link rel="alternate" hreflang="en" href="https://example.com/about/">
 <link rel="alternate" hreflang="ko" href="https://example.com/ko/about/">
 <link rel="alternate" hreflang="ja" href="https://example.com/ja/about/">
+<link rel="alternate" hreflang="x-default" href="https://example.com/about/">
 ```
+
+마지막 `x-default` 태그는 기본 언어 버전을 가리킵니다. 검색엔진은 방문자의 언어가 어느 대체 언어와도 맞지 않을 때 이 페이지를 보여줍니다. 기본 언어 버전이 없는 페이지에는 붙지 않습니다. `sitemap.xml`에도 `x-default`를 포함해 같은 대체 링크가 들어갑니다.
 
 ### SEO 태그 결합
 

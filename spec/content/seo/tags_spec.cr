@@ -157,5 +157,63 @@ describe Hwaro::Content::Seo::Tags do
 
       tags.should eq expected_tags.sort.join("\n")
     end
+
+    describe "x-default" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      config.default_language = "en"
+      config.languages["ko"] = Hwaro::Models::LanguageConfig.new("ko")
+
+      links = ->(current : String) {
+        [
+          Hwaro::Models::TranslationLink.new(code: "en", url: "/about/", title: "About", is_current: current == "en", is_default: true),
+          Hwaro::Models::TranslationLink.new(code: "ko", url: "/ko/about/", title: "소개", is_current: current == "ko"),
+        ]
+      }
+
+      it "points at the default-language version from the default page" do
+        page = Hwaro::Models::Page.new("about.md")
+        page.language = "en"
+        page.url = "/about/"
+        page.translations = links.call("en")
+
+        Hwaro::Content::Seo::Tags.hreflang_tags(page, config).should eq([
+          %(<link rel="alternate" hreflang="en" href="https://example.com/about/">),
+          %(<link rel="alternate" hreflang="ko" href="https://example.com/ko/about/">),
+          %(<link rel="alternate" hreflang="x-default" href="https://example.com/about/">),
+        ].join("\n"))
+      end
+
+      it "points at the default-language version from a translation" do
+        page = Hwaro::Models::Page.new("about.ko.md")
+        page.language = "ko"
+        page.url = "/ko/about/"
+        page.translations = links.call("ko")
+
+        Hwaro::Content::Seo::Tags.hreflang_tags(page, config).should eq([
+          %(<link rel="alternate" hreflang="ko" href="https://example.com/ko/about/">),
+          %(<link rel="alternate" hreflang="en" href="https://example.com/about/">),
+          %(<link rel="alternate" hreflang="x-default" href="https://example.com/about/">),
+        ].join("\n"))
+      end
+
+      it "is omitted when no default-language version exists" do
+        config3 = Hwaro::Models::Config.new
+        config3.base_url = "https://example.com"
+        config3.default_language = "en"
+        config3.languages["ko"] = Hwaro::Models::LanguageConfig.new("ko")
+        config3.languages["ja"] = Hwaro::Models::LanguageConfig.new("ja")
+
+        page = Hwaro::Models::Page.new("about.ko.md")
+        page.language = "ko"
+        page.url = "/ko/about/"
+        page.translations = [
+          Hwaro::Models::TranslationLink.new(code: "ko", url: "/ko/about/", title: "소개", is_current: true),
+          Hwaro::Models::TranslationLink.new(code: "ja", url: "/ja/about/", title: "概要"),
+        ]
+
+        Hwaro::Content::Seo::Tags.hreflang_tags(page, config3).should_not contain("x-default")
+      end
+    end
   end
 end

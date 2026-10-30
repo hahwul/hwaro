@@ -118,16 +118,21 @@ module Hwaro
 
               # Hreflang alternates — emit one per translation (including
               # the current page itself; Google's spec asks for a self-
-              # referencing entry).
+              # referencing entry), then `x-default` for the
+              # default-language version, matching `hreflang_tags`.
+              default_href = nil
               page.translations.each do |t|
                 next unless written_urls.includes?(t.url)
                 t_path = t.url.starts_with?('/') ? t.url : "/#{t.url}"
                 t_full = base.empty? ? t_path : base + t_path
+                href = Utils::TextUtils.escape_xml(Utils::TextUtils.encode_url_path(t_full))
+                default_href = href if t.is_default
                 str << "    <xhtml:link rel=\"alternate\" hreflang=\""
                 str << Utils::TextUtils.escape_xml(t.code)
-                str << "\" href=\""
-                str << Utils::TextUtils.escape_xml(Utils::TextUtils.encode_url_path(t_full))
-                str << "\" />\n"
+                str << "\" href=\"" << href << "\" />\n"
+              end
+              if default_href
+                str << "    <xhtml:link rel=\"alternate\" hreflang=\"x-default\" href=\"" << default_href << "\" />\n"
               end
 
               # Add lastmod if available

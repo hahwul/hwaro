@@ -150,7 +150,10 @@ Output:
 <link rel="alternate" hreflang="en" href="https://example.com/about/">
 <link rel="alternate" hreflang="ko" href="https://example.com/ko/about/">
 <link rel="alternate" hreflang="ja" href="https://example.com/ja/about/">
+<link rel="alternate" hreflang="x-default" href="https://example.com/about/">
 ```
+
+The last tag, `x-default`, points at the default-language version: it is the fallback search engines show visitors whose language matches none of the alternates. It is left out when the page has no default-language version. `sitemap.xml` lists the same alternates, `x-default` included.
 
 ### Combined SEO Tags
 
