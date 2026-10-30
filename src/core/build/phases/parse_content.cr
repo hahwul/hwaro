@@ -861,13 +861,24 @@ module Hwaro::Core::Build::Phases::ParseContent
 
   # Content::Taxonomies.match_term_metadata over the pages that will publish:
   # a page that loses its URL to another (a dry run of the render phase's
-  # claims, which run later) puts no term page up. Candidate files claim
-  # nothing in that dry run — the ones that match are headless.
+  # claims, which run later) puts no term page up. A matched file is
+  # headless and claims nothing; an unmatched one publishes and claims its
+  # URL — and may beat the only page carrying some other term — so the
+  # claims and the match are iterated until they agree.
   protected def match_term_files(pages : Array(Models::Page), sections : Array(Models::Section), config : Models::Config) : Hash(String, Content::Taxonomies::TermFile)
-    return {} of String => Content::Taxonomies::TermFile unless sections.any? { |s| Content::Taxonomies.term_metadata_path?(s.path, config) }
-    writers = (pages + sections.reject { |s| Content::Taxonomies.term_metadata_path?(s.path, config) }).as(Array(Models::Page))
-    losers = output_losers(writers)
-    Content::Taxonomies.match_term_metadata(losers.empty? ? pages : pages.reject { |p| losers.includes?(p.path) }, sections, config)
+    matches = {} of String => Content::Taxonomies::TermFile
+    candidates, others = sections.partition { |s| Content::Taxonomies.term_metadata_path?(s.path, config) }
+    return matches if candidates.empty?
+    # ponytail: fixed-point loop, capped; a site needs chained collisions
+    # between term files and pages to take more than two rounds.
+    4.times do
+      writers = (pages + others + candidates.reject { |s| matches.has_key?(s.path) }).as(Array(Models::Page))
+      losers = output_losers(writers)
+      found = Content::Taxonomies.match_term_metadata(losers.empty? ? pages : pages.reject { |p| losers.includes?(p.path) }, sections, config)
+      break if found == matches
+      matches = found
+    end
+    matches
   end
 
   # Make each `content/<taxonomy>/<slug>/_index.md` that matched a generated
@@ -1255,7 +1266,8 @@ module Hwaro::Core::Build::Phases::ParseContent
   # Merge ancestor cascades (root → leaf) for `page` and apply the values the
   # page did not set itself. Also stamps `page.cascade_fingerprint` so the
   # build cache invalidates descendants when a parent cascade changes.
-  protected def apply_cascade_to(page : Models::Page, cascade_map : Hash(Tuple(String, String), Hash(String, Models::ExtraValue)))
+  # Public for doctor, which resolves cascaded taxonomy terms the same way.
+  def apply_cascade_to(page : Models::Page, cascade_map : Hash(Tuple(String, String), Hash(String, Models::ExtraValue)))
     merged = merged_cascade_for(page, cascade_map)
     page.cascade_fingerprint = merged.empty? ? "" : cascade_fingerprint(merged)
     return if merged.empty?

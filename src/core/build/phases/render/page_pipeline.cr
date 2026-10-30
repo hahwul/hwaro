@@ -275,13 +275,19 @@ module Hwaro::Core::Build::Phases::Render
   # claimed as taxonomy outputs so a removed alias is pruned like a removed
   # term page. An alias another page or alias owns lost its claim in
   # compute_output_url_winners (which warned); one naming a taxonomy index
-  # or term page this pass writes (`taxonomy_urls`) is refused here.
+  # or term page this pass writes (`taxonomy_urls`), or a pager page of one,
+  # is refused here.
+  private TAXONOMY_PAGER_SUFFIX = /page\/[1-9]\d*\/\z/
+
   def write_term_aliases(page : Models::Section, site : Models::Site, output_dir : String, verbose : Bool, taxonomy_urls : Set(String)) : Nil
     return if page.aliases.empty?
     refused = Set(String).new
     page.aliases.each do |a|
       norm = Utils::PathUtils.normalize_alias_url(a)
-      next if norm == page.url || !taxonomy_urls.includes?(norm) || !refused.add?(norm)
+      # A taxonomy URL itself or one of its pager pages (`<url>page/N/`;
+      # generated taxonomy pages keep the default paginate_path).
+      pager_base = norm.sub(TAXONOMY_PAGER_SUFFIX, "")
+      next if norm == page.url || !(taxonomy_urls.includes?(norm) || taxonomy_urls.includes?(pager_base)) || !refused.add?(norm)
       Logger.warn "Duplicate alias output path '#{norm}' — alias on '#{page.path}' collides with the generated taxonomy page '#{norm}' and is not written"
     end
     clear_page_derived_outputs(page.path)

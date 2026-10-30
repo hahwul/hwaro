@@ -1307,7 +1307,8 @@ module Hwaro
                   end
           # Term bodies change only with content semantics: a template set the
           # selective path can't scope (shortcode/hook edits land here), or a
-          # forced re-parse of the term file itself. A layout edit leaves them
+          # forced page (run_incremental_then_rerender: the re-parsed term file,
+          # or one linking to a page the edit moved). A layout edit leaves them
           # — and their link checks — alone. Every case that renders one also
           # regenerates the taxonomy pages below.
           render_term_bodies(affected_templates.nil? ? site.sections : forced.compact_map(&.as?(Models::Section)), site, templates, highlight, global_vars, options.parallel)

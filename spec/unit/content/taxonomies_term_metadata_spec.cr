@@ -310,6 +310,7 @@ describe "taxonomy term _index.md metadata" do
       File.read(term).should start_with("T=Tags: rust|D=|X=|B=|")
     end
   end
+
   it "keeps a term file's aliases off other term pages and other claims" do
     log = with_captured_log do
       build_site(CONFIG,
@@ -405,7 +406,9 @@ describe "taxonomy term _index.md metadata" do
       dest = File.join(dir, "public/tags/rust/index.html")
       File.read(dest).should contain("HI1")
 
-      written = File.info(dest).modification_time
+      # Backdated, so a rewrite shows even on a 1-second-mtime filesystem.
+      written = Time.utc(2001, 1, 1)
+      File.touch(dest, written)
       File.write("templates/post.html", "EDITED {{ page.title }}")
       log = with_captured_log { builder.run_rerender(options).should be_true }
       File.read(File.join(dir, "public/posts/p1/index.html")).should eq("EDITED P1")
@@ -454,6 +457,65 @@ describe "taxonomy term _index.md metadata" do
       File.write("content/tags/solo/_index.md", "+++\ntitle = \"Solo 2\"\naliases = [\"/shared/\"]\n+++\n")
       log = with_captured_log { builder.run_incremental(["content/tags/solo/_index.md"], options).should be_true }
       log.scan("alias on 'tags/solo/_index.md' collides with 'tags/other/_index.md'").size.should eq(1)
+    end
+  end
+  # tags/zzz/_index.md matches no term, so it publishes — and beats z.md for
+  # /tags/zzz/. z.md was rust's only page: no rust term page, so
+  # tags/rust/_index.md must stay the ordinary section it was.
+  it "keeps a file publishing when an unmatched term-directory section takes its term's only page" do
+    log = with_captured_log do
+      build_site(CONFIG,
+        content_files: {
+          "tags/zzz/_index.md"  => "+++\ntitle = \"Zzz\"\n+++\n",
+          "z.md"                => "+++\ntitle = \"Z\"\npath = \"tags/zzz\"\ntags = [\"rust\"]\n+++\n",
+          "tags/rust/_index.md" => "+++\ntitle = \"Rust section\"\n+++\n",
+        },
+        template_files: TEMPLATES) do |dir|
+        File.read(File.join(dir, "public/tags/zzz/index.html")).should start_with("SECTION=Zzz|")
+        File.read(File.join(dir, "public/tags/rust/index.html")).should start_with("SECTION=Rust section|")
+      end
+    end
+    log.should contain("Duplicate output path '/tags/zzz/' — 'z.md' collides with 'tags/zzz/_index.md'")
+  end
+
+  it "refuses a term-file alias onto a term's pager page" do
+    log = with_captured_log do
+      build_site(CONFIG.sub(%(feed = true), %(feed = true\npaginate_by = 1)),
+        content_files: {
+          "posts/p1.md"       => post("P1", ["go", "zz"]),
+          "posts/p2.md"       => post("P2", ["go"]),
+          "tags/zz/_index.md" => "+++\ntitle = \"Zz\"\naliases = [\"/tags/go/page/2/\"]\n+++\n",
+        },
+        template_files: TEMPLATES) do |dir|
+        File.read(File.join(dir, "public/tags/go/page/2/index.html")).should start_with("T=Tags: go|")
+      end
+    end
+    log.should contain("alias on 'tags/zz/_index.md' collides with the generated taxonomy page '/tags/go/page/2/'")
+  end
+
+  it "re-renders a term body linking to a page a serve edit moves" do
+    build_site(CONFIG,
+      content_files: {
+        "posts/p1.md"         => post("P1", ["rust"]),
+        "posts/p2.md"         => post("P2", ["go"]),
+        "tags/rust/_index.md" => "+++\ntitle = \"Rust\"\n+++\n[p2](@/posts/p2.md)\n",
+      },
+      template_files: TEMPLATES) do |dir, builder|
+      options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)
+      options.serve_mode = true
+      options.preserve_output = true
+      dest = File.join(dir, "public/tags/rust/index.html")
+      File.read(dest).should contain(%(href="/posts/p2/"))
+
+      File.write("content/posts/p2.md", "+++\ntitle = \"P2\"\ndate = 2024-01-01\nslug = \"moved\"\ntags = [\"go\"]\n+++\n")
+      builder.run_incremental(["content/posts/p2.md"], options).should be_true
+      File.read(dest).should contain(%(href="/posts/moved/"))
+
+      # The same through a combined content + template pass.
+      File.write("templates/section.html", "SECTION2={{ page.title }}|{{ content }}")
+      File.write("content/posts/p2.md", "+++\ntitle = \"P2\"\ndate = 2024-01-01\nslug = \"again\"\ntags = [\"go\"]\n+++\n")
+      builder.run_incremental_then_rerender(["content/posts/p2.md"], options).should be_true
+      File.read(dest).should contain(%(href="/posts/again/"))
     end
   end
 end
