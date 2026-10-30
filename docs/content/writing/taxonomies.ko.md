@@ -99,6 +99,37 @@ tech = ["crystal", "security"]
 
 다국어 사이트에서는 기본 언어가 아닌 각 언어가 자기 접두사 아래에 항목 페이지(`/ko/tags/crystal/`)를 따로 만들고, 그 언어의 페이지만 나열합니다. 언어별로 만들 택소노미는 `[languages.<code>] taxonomies`로 고르며, 생략하면 모든 `[[taxonomies]]` 이름이 쓰입니다. 자세한 내용은 [다국어](/ko/features/multilingual/)를 참고하세요.
 
+## 콘텐츠로 항목 페이지 꾸미기
+
+항목 페이지에도 제목, 설명, 본문을 직접 쓸 수 있습니다. `content/<taxonomy>/<slug>/`에 `_index.md`를 두면 되며, `<slug>`는 항목 페이지 URL의 마지막 부분입니다.
+
+```markdown
++++
+title = "Crystal"
+description = "Crystal 언어에 관한 글"
+image = "/images/crystal.png"
+
+[extra]
+icon = "gem"
++++
+
+Crystal은 Ruby와 닮은 문법의 컴파일 언어입니다.
+```
+
+`content/tags/crystal/_index.md`는 `/tags/crystal/`을 꾸밉니다. 디렉터리 이름은 항목의 표기가 아니라 URL 슬러그입니다. `Rust Lang` 항목은 `/tags/rust-lang/`에 생성되므로 파일은 `content/tags/rust-lang/_index.md`입니다. 두 항목의 슬러그가 겹치면(`C#`과 `C++`는 둘 다 `c`) 두 번째 항목의 페이지는 `/tags/c-2/`가 되고, 파일도 `content/tags/c-2/_index.md`입니다.
+
+항목 페이지에서는 이렇게 쓰입니다.
+
+- `page.title`, `page.description`, `page.image`, `page.extra`가 파일의 값을 따릅니다. `title`이 없으면 생성된 "Tags: crystal"이 그대로 쓰입니다. `<title>`, og/twitter 태그, 항목 RSS 피드 제목도 같은 값을 씁니다.
+- `term_content`에는 파일 본문을 렌더링한 HTML이 들어갑니다(Markdown, 숏코드, `@/` 링크를 다른 페이지와 똑같이 처리합니다). `content`는 지금처럼 생성된 페이지 목록이라 기존 템플릿은 그대로 동작하며, 본문을 보여 줄 자리에 `{{ term_content }}`를 넣으면 됩니다.
+- [`get_taxonomy()`](#get-taxonomy-함수)의 항목에 파일의 `title`과 `description`이 붙습니다. `get_taxonomy()`는 사이트 전체를 보는 함수라 기본 언어 파일만 반영합니다. 파일이 없는 항목에는 `title` 키가 없으니 `{{ term.title or term.name }}`처럼 씁니다.
+
+다국어 사이트에서는 언어마다 자기 파일을 읽습니다. `content/tags/crystal/_index.ko.md`는 `/ko/tags/crystal/`을 꾸밉니다.
+
+이 파일은 별도 페이지로 게시되지 않습니다. 사이트맵, 피드, 검색 색인, llms.txt, 섹션 목록에 들어가지 않으므로 항목 URL은 한 번만 나옵니다. 어떤 항목 페이지와도 맞지 않는 파일(그 언어에서 해당 항목을 단 게시 페이지가 없거나, 디렉터리 이름이 항목 슬러그가 아닌 경우)도 게시되지 않으며, 빌드가 경고를 출력합니다.
+
+한 단계 위의 `content/<taxonomy>/_index.md`는 다르게 동작합니다. 생성된 항목 목록이 전과 같이 `/tags/`에서 이 파일을 대체하고, 빌드는 대체 경고를 그대로 출력합니다. 택소노미를 메뉴에 넣을 때 쓰는 파일입니다.
+
 ## 템플릿
 
 두 템플릿 모두 완성된 목록을 `{{ content }}`로 받습니다. `taxonomy.html`에는 항목 목록이, `taxonomy_term.html`에는 페이지 목록이 들어갑니다. 커스텀 마크업이 필요하면 `content` 대신 [`get_taxonomy()`](#get-taxonomy-함수)를 사용합니다.
@@ -166,6 +197,7 @@ tech = ["crystal", "security"]
 | taxonomy_name | String | 택소노미 이름("tags") |
 | taxonomy_term | String | 현재 항목 이름(인덱스 페이지에서는 빈 문자열) |
 | content | String | 미리 렌더링된 목록 HTML(항목 또는 페이지) |
+| term_content | String | 항목 `_index.md` 본문을 렌더링한 HTML(항목 페이지 전용, 파일이 없으면 빈 문자열). [콘텐츠로 항목 페이지 꾸미기](#콘텐츠로-항목-페이지-꾸미기) 참고 |
 
 ### 항목 객체
 
@@ -175,6 +207,8 @@ tech = ["crystal", "security"]
 | slug | String | URL에 안전한 이름 |
 | pages | Array<Page> | 이 항목이 붙은 페이지 |
 | count | Int | 페이지 수 |
+| title | String | 항목 `_index.md`의 제목(파일이 있을 때만) |
+| description | String | 항목 `_index.md`의 설명(파일이 있을 때만) |
 
 ## get_taxonomy() 함수
 
