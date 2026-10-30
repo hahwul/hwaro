@@ -82,7 +82,7 @@ formats = ["webp"]
 - The encoder is built into Hwaro (pure Crystal), so no external tool or library is involved.
 - WebP files are not used as sources: a `.webp` in `static/` or a page bundle is copied as is.
 - Two sources that differ only in extension in the same directory (`hero.jpg` and `hero.png`) would write the same WebP names. The one whose path sorts first gets them, and a warning names the other one, which gets no WebP variants.
-- Encoding WebP takes longer than JPEG, so cold builds with many images take longer. Warm `--cache` builds and `hwaro serve` reuse a variant while its source file and the encode settings (`quality`, the LQIP keys) are unchanged; the record is kept in `.hwaro/image_variants.log`.
+- Encoding WebP takes longer than JPEG, so cold builds with many images take longer. Warm `--cache` builds and `hwaro serve` reuse a variant while its source file and the encode settings (`quality`, the LQIP keys) are unchanged; the record is kept in `.hwaro/image_variants.log`. A Hwaro release that changes the encoder's output re-encodes every variant once on the next build.
 
 ### Image Dimensions
 

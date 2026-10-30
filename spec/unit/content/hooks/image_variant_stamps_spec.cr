@@ -12,12 +12,12 @@ end
 describe Hwaro::Content::Hooks::ImageVariantStamps do
   stamps = Hwaro::Content::Hooks::ImageVariantStamps
 
-  it "fingerprints the exact mtime, size and settings of a source" do
+  it "fingerprints the exact mtime, size and settings of a source, and the encoder revision" do
     Dir.mktmpdir do |dir|
       path = File.join(dir, "a.png")
       File.write(path, "abc")
       File.touch(path, Time.utc(2020, 1, 1))
-      stamps.fingerprint(path, "q85").should eq("1577836800000:3:q85")
+      stamps.fingerprint(path, "q85").should eq("1577836800000:3:q85:r#{Hwaro::Content::Hooks::ImageVariantStamps::ENCODER_REVISION}")
       stamps.fingerprint(File.join(dir, "missing.png"), "q85").should be_nil
     end
   end
