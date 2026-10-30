@@ -789,6 +789,11 @@ module Hwaro
       # so giving nothing back changes no match.
       HTML_TAG_ATTRS = %q((?:[^>"']++|"[^"]*+"|'[^']*+')*+)
 
+      # Like HTML_TAG_ATTRS, but a quote opens a value only right after `=`,
+      # as in HTML: a stray quote (`alt=Bob's`, `alt="55" TV"`) is plain text,
+      # so the tag still ends at its `>` exactly as a `[^>]*` scan did.
+      HTML_TAG_ATTRS_QUOTED_VALUES = %q((?:[^>=]++|=\s*+"[^"]*+"|=\s*+'[^']*+'|=)*+)
+
       # Raw-text HTML elements whose *content* is code, not display text.
       # `<style>`/`<script>` bodies must be dropped along with their tags;
       # otherwise the CSS/JS source survives tag-stripping and pollutes

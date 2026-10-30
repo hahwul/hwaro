@@ -547,6 +547,15 @@ describe Hwaro::Core::Build::Privacy do
     end
   end
 
+  it "keeps a stray apostrophe in an unquoted value from hiding the tag or the next one" do
+    with_cdn do |cdn, _hits, _server|
+      with_privacy(privacy_config) do |privacy, _dir|
+        html = %(<img src=#{cdn}/img/pic.png alt=Bob's><script src="#{cdn}/js/app.js"></script><img alt=Mom's src="#{cdn}/img/pic.png"><p>it's</p>)
+        rewrite(privacy, html).should match(/\A<img src="\/assets\/external\/[0-9a-f]{12}-pic\.png" alt=Bob's><script src="\/assets\/external\/[0-9a-f]{12}-app\.js"><\/script><img alt=Mom's src="\/assets\/external\/[0-9a-f]{12}-pic\.png"><p>it's<\/p>\z/)
+      end
+    end
+  end
+
   it "does not publish a response whose Content-Type contradicts the URL's extension" do
     with_cdn do |cdn, _hits, _server|
       with_privacy(privacy_config) do |privacy, dir|

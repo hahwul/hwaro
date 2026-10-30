@@ -166,6 +166,12 @@ describe "search split_by_heading" do
     sections.map { |s| {s[:id], s[:heading], s[:body]} }.should eq([{"sec", "Sec", "<p>x</p>"}])
   end
 
+  it "keeps a stray apostrophe in an unquoted value from merging sections" do
+    html = %(<h2 id="a" title=Bob's>A</h2><p>it's</p><h2 id="b">B</h2><p>y</p>)
+    sections = Hwaro::Content::Search.heading_sections(html)
+    sections.map { |s| {s[:id], s[:heading], s[:body]} }.should eq([{"a", "A", "<p>it's</p>"}, {"b", "B", "<p>y</p>"}])
+  end
+
   it "ignores headings inside HTML comments" do
     html = %(<!-- <h2 id="ghost">Ghost</h2> --><h2 id="real">Real</h2><p>x</p><!--\n<h3 id="g2">G</h3>\n-->)
     Hwaro::Content::Search.heading_sections(html).map { |s| s[:id] }.should eq(["real"])

@@ -336,7 +336,7 @@ module Hwaro
       end
 
       # Quote-aware: `title="a > b"` does not end the tag before its alt.
-      HTML_IMG_RE = /<img(\s#{Utils::TextUtils::HTML_TAG_ATTRS})?\/?>/i
+      HTML_IMG_RE = /<img(\s#{Utils::TextUtils::HTML_TAG_ATTRS_QUOTED_VALUES})?\/?>/i
 
       # One HTML attribute: its name, then an optional `=value` (quoted or
       # not). Consuming each value whole is what keeps `title="x alt=y"`
