@@ -423,6 +423,36 @@ describe Hwaro::Content::Seo::Amp do
       tag.should_not contain(%(="true"))
     end
 
+    it "reads <link>, <video> and <iframe> tags whose quoted values contain '>'" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+
+      html = %(<html><head><link rel="stylesheet" href="/wide.css" media="(width >= 600px)"></head><body>) +
+             %(<video title="a > b" src="/v.mp4"></video><iframe title="Map > Seoul" src="https://example.com/e"></iframe></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should_not contain("wide.css")
+      result.should_not contain("600px")
+      result.should contain(%(<amp-video title="a > b" src="/v.mp4" layout="responsive"></amp-video>))
+      result.should contain(%(<amp-iframe title="Map > Seoul" src="https://example.com/e" layout="responsive"))
+    end
+
+    it "keeps stray apostrophes in unquoted values from merging <link>, <iframe> and <video> tags" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+
+      html = %(<html><head><link rel="stylesheet" href="/s.css" title=Bob's><meta name="x" content="it's"></head><body>) +
+             %(<iframe src="https://example.com/e" title=Bob's></iframe><p>It's</p>) +
+             %(<video src="/v.mp4" title=Mom's controls></video></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should_not contain("/s.css")
+      result.should contain(%(<meta name="x" content="it's">))
+      result.should contain(%(<amp-iframe src="https://example.com/e" title=Bob's layout="responsive"))
+      result.should contain(%(</amp-iframe><p>It's</p><amp-video src="/v.mp4" title=Mom's controls layout="responsive"></amp-video>))
+      result.should contain("amp-video-0.1.js")
+    end
+
     it "converts iframe to amp-iframe" do
       page = Hwaro::Models::Page.new("test.md")
       page.url = "/test/"

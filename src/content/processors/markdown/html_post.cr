@@ -11,8 +11,11 @@ module Hwaro
         # Attribute scans here and below are quote-aware (a `>` inside a
         # quoted value, e.g. title="a > b", is legal HTML5 and must not end
         # the tag) and the `id` key uses a `(?<![\w-])` guard so `data-id=`
-        # never counts as the element's id.
-        ANCHOR_LINK_REGEX = /<(h[1-6])((?:[^>"']|"[^"]*"|'[^']*')*?(?<![\w-])id="([^"]+)"(?:[^>"']|"[^"]*"|'[^']*')*)>(.*?)<\/\1>/m
+        # never counts as the element's id. Possessive, so a long unquoted
+        # value (an inline `data-x=…`) does not exhaust the PCRE JIT stack:
+        # the prefix stops only at an `i` that starts a non-empty `id="…"`,
+        # the first one the lazy `(?:…)*?id="…"` scan would have taken.
+        ANCHOR_LINK_REGEX = /<(h[1-6])((?:[^>"'i]++|(?<![\w-])i(?!d="[^"]++")|(?<=[\w-])i|"[^"]*+"|'[^']*+')*+(?<![\w-])id="([^"]+)"#{Utils::TextUtils::HTML_TAG_ATTRS})>(.*?)<\/\1>/m
 
         # Regex for post_process_html — lightweight replacements for XML.parse_html
         # Matches <h1>…</h1> through <h6>…</h6>, capturing tag name, level digit, attributes, and inner HTML
@@ -24,7 +27,7 @@ module Hwaro
         # heading's id and leaving the real one with none, which also broke
         # the render-hooks convergence invariant (HookedRenderer#heading gets
         # this right).
-        HEADING_TAG_REGEX = /<(h([1-6]))(\s(?:[^>"']|"[^"]*"|'[^']*')*)?>(.*?)<\/h\2>/mi
+        HEADING_TAG_REGEX = /<(h([1-6]))(\s#{Utils::TextUtils::HTML_TAG_ATTRS})?>(.*?)<\/h\2>/mi
         # Matches <img ...> tags that do NOT already have a loading= attribute
         # (the lookahead is quote-aware too, so a loading= sitting after a
         # quoted `>` is still seen, and `data-loading=` doesn't count).

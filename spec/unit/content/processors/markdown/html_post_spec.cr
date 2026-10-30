@@ -64,6 +64,23 @@ describe Hwaro::Content::Processors::Markdown do
     end
   end
 
+  describe "long unquoted attribute values" do
+    it "insert an anchor into a heading whose attributes hold a 100k-character value" do
+      content = %(<h2 data-x=#{"A" * 100_000} id="long">Long</h2>\n\n<h2 id="next" title="a>b">Next</h2>\n)
+      html, toc = Hwaro::Content::Processors::Markdown.new.render_with_anchors(content, safe: false, anchor_style: "after")
+      toc.map(&.id).should eq(["long", "next"])
+      html.should contain(%(<a class="anchor" href="#long"))
+      html.should contain(%(<a class="anchor" href="#next"))
+    end
+
+    it "id a heading whose attributes hold a 100k-character value" do
+      content = %(<h2 data-x=#{"A" * 100_000}>Long</h2>\n\n## Next\n)
+      html, toc = Hwaro::Processor::Markdown.render(content, safe: false)
+      toc.map(&.id).should eq(["long", "next"])
+      html.should contain(%( id="long">Long</h2>))
+    end
+  end
+
   describe "lazy loading and external links" do
     it "lazy-load an <img> with a 100k-character unquoted src" do
       content = "<img src=data:image/gif;base64,#{"A" * 100_000}>\n\n<img loading=eager src=b.png>\n\n<img data-loading=x src=c.png />\n"

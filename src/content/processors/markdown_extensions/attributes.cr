@@ -36,8 +36,9 @@ module Hwaro
         # element's marker (e.g. a heading whose non-conformant hook emitted
         # non-`<hN>` markup, leaving its HATTR marker unconsumed by the heading
         # pass). Hook wrappers (`</figure>`, `</span>`, `</a>`, `</picture>`, …)
-        # are deliberately NOT excluded, so they still bind normally.
-        IMG_HATTR_RE = /(<img\b(?:[^>"']|"[^"]*"|'[^']*')*?)(\s*\/?>)((?:(?!<img\b|<!--HATTR:|<\/(?:p|li|t[dh]|d[dt]|h[1-6])\b).)*?)<!--HATTR:([0-9a-f]+)-->/m
+        # are deliberately NOT excluded, so they still bind normally. The tag
+        # scan is IMG_LAZY_REGEX's possessive form of `(?:…)*?(\s*\/?>)`.
+        IMG_HATTR_RE = /(<img\b(?:[^>"'\s\/]++|\s++(?!\/?>)|\/(?!>)|"[^"]*+"|'[^']*+')*+)(\s*\/?>)((?:(?!<img\b|<!--HATTR:|<\/(?:p|li|t[dh]|d[dt]|h[1-6])\b).)*?)<!--HATTR:([0-9a-f]+)-->/m
 
         def postprocess_attributes(html : String) : String
           return html unless Utils::ByteScan.includes?(html, "<!--HATTR:")

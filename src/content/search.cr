@@ -30,8 +30,9 @@ module Hwaro
       alias Entry = Hash(String, String | Array(String))
 
       # An h2/h3 element of the rendered page, and the `id` attribute in its
-      # attribute list. `split_by_heading` cuts the page body at these.
-      SPLIT_HEADING_RE = /<h([23])\b([^>]*)>(.*?)<\/h\1\s*>/im
+      # attribute list (quote-aware: `title="a > b"` does not end the tag).
+      # `split_by_heading` cuts the page body at these.
+      SPLIT_HEADING_RE = /<h([23])\b(#{Utils::TextUtils::HTML_TAG_ATTRS_QUOTED_VALUES})>(.*?)<\/h\1\s*>/im
       HEADING_ID_ATTR  = /\sid\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+))/i
       HTML_COMMENT     = /<!--.*?-->/m
 

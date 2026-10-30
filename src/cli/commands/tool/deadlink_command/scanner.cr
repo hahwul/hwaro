@@ -205,11 +205,11 @@ module Hwaro
           # directly in Markdown. `<source>` matters because `<picture>` and
           # `<video>` blocks are the common hand-written HTML in docs content.
           # The value may be unquoted (`href=/x/`), which stops at whitespace
-          # or `>`.
+          # or `>`; a quoted value may contain `>` (`title="a > b"`).
           # Matched in two passes — tag, then each attribute inside it — because
           # a single regex consumes the whole tag and so only ever reports the
           # FIRST link attribute: `<img srcset="…" src="…">` lost its `src`.
-          HTML_TAG_RE  = /<(a|img|source)\b([^>]*)>/i
+          HTML_TAG_RE  = /<(a|img|source)\b(#{Utils::TextUtils::HTML_TAG_ATTRS_QUOTED_VALUES})>/i
           HTML_ATTR_RE = /\b(href|src|srcset)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i
 
           # One `srcset` entry is `url [descriptor]`, comma-separated.

@@ -20,7 +20,7 @@ module Hwaro
         # every absolute http(s) href, including ones pointing at the site's
         # own domain (documented; matches Zola). Code blocks are immune:
         # markd entity-escapes `<a` inside them.
-        EXTERNAL_ANCHOR_RE = /<a\s((?:[^>"']|"[^"]*"|'[^']*')*)>/i
+        EXTERNAL_ANCHOR_RE = /<a\s(#{Utils::TextUtils::HTML_TAG_ATTRS})>/i
         EXTERNAL_HREF_RE   = /(?<![\w-])href\s*=\s*(?:"https?:\/\/|'https?:\/\/)/i
         EXISTING_TARGET_RE = /(?<![\w-])target\s*=/i
         EXISTING_REL_RE    = /(?<![\w-])rel\s*=\s*(["'])(.*?)\1/i
