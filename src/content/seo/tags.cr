@@ -54,18 +54,30 @@ module Hwaro
             current_url = Utils::TextUtils.encode_url_path(current_url)
             lang_code = page.language || config.default_language
             str << %(<link rel="alternate" hreflang="#{HTML.escape(lang_code)}" href="#{HTML.escape(current_url)}">)
+            default_url = nil
 
             # Add translations (already ordered by ordered_language_codes via link_translations!)
             page.translations.each do |t|
-              next if t.is_current
+              if t.is_current
+                default_url = current_url if t.is_default
+                next
+              end
               abs_url = if Processors::InternalLinkResolver.has_own_origin?(t.url)
                           t.url
                         else
                           "#{base}#{Utils::PathUtils.root_relative(t.url)}"
                         end
               abs_url = Utils::TextUtils.encode_url_path(abs_url)
+              default_url = abs_url if t.is_default
               str << '\n'
               str << %(<link rel="alternate" hreflang="#{HTML.escape(t.code)}" href="#{HTML.escape(abs_url)}">)
+            end
+
+            # The default-language version is the fallback for visitors
+            # whose language matches none of the alternates.
+            if default_url
+              str << '\n'
+              str << %(<link rel="alternate" hreflang="x-default" href="#{HTML.escape(default_url)}">)
             end
           end
         end

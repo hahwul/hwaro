@@ -46,6 +46,24 @@ describe "hreflang on paginated listings" do
       File.read("public/posts/page/2/index.html").should_not contain("hreflang")
     end
   end
+
+  it "names the default-language page as x-default on every translation, head and sitemap alike" do
+    build_site(
+      "title = \"T\"\nbase_url = \"https://ex.com\"\ndefault_language = \"en\"\n\n[sitemap]\nenabled = true\n\n[languages.en]\nlanguage_name = \"English\"\n\n[languages.ko]\nlanguage_name = \"한국어\"\n",
+      content_files: {
+        "about.md"    => "+++\ntitle = \"About\"\n+++\n",
+        "about.ko.md" => "+++\ntitle = \"소개\"\n+++\n",
+        "solo.md"     => "+++\ntitle = \"Solo\"\n+++\n",
+      },
+      template_files: {"page.html" => "{{ hreflang_tags }}"},
+    ) do
+      x_default = %(<link rel="alternate" hreflang="x-default" href="https://ex.com/about/">)
+      File.read("public/about/index.html").should contain(x_default)
+      File.read("public/ko/about/index.html").should contain(x_default)
+      File.read("public/solo/index.html").should_not contain("hreflang")
+      File.read("public/sitemap.xml").scan(%(hreflang="x-default" href="https://ex.com/about/")).size.should eq(2)
+    end
+  end
 end
 
 describe "resize_image with a page-bundle image" do

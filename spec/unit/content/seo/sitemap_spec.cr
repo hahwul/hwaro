@@ -379,6 +379,63 @@ describe Hwaro::Content::Seo::Sitemap do
       end
     end
 
+    it "adds an x-default alternate for the default-language version" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.sitemap.enabled = true
+        config.base_url = "https://example.com"
+        site = Hwaro::Models::Site.new(config)
+
+        links = ->(current : String) {
+          [
+            Hwaro::Models::TranslationLink.new(code: "en", url: "/about/", title: "About", is_current: current == "en", is_default: true),
+            Hwaro::Models::TranslationLink.new(code: "ko", url: "/ko/about/", title: "소개", is_current: current == "ko"),
+          ]
+        }
+        en_page = Hwaro::Models::Page.new("about.md")
+        en_page.url = "/about/"
+        en_page.render = true
+        en_page.translations = links.call("en")
+        ko_page = Hwaro::Models::Page.new("about.ko.md")
+        ko_page.url = "/ko/about/"
+        ko_page.language = "ko"
+        ko_page.render = true
+        ko_page.translations = links.call("ko")
+
+        Hwaro::Content::Seo::Sitemap.generate([en_page, ko_page], site, dir)
+
+        content = File.read(File.join(dir, "sitemap.xml"))
+        x_default = %(<xhtml:link rel="alternate" hreflang="x-default" href="https://example.com/about/" />)
+        content.scan(x_default).size.should eq(2)
+        content.should contain(%(hreflang="ko" href="https://example.com/ko/about/" />\n    #{x_default}))
+      end
+    end
+
+    it "omits x-default when the default-language version is not written" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.sitemap.enabled = true
+        config.base_url = "https://example.com"
+        site = Hwaro::Models::Site.new(config)
+
+        ko_page = Hwaro::Models::Page.new("about.ko.md")
+        ko_page.url = "/ko/about/"
+        ko_page.language = "ko"
+        ko_page.render = true
+        ko_page.translations = [
+          Hwaro::Models::TranslationLink.new(code: "en", url: "/about/", title: "About", is_default: true),
+          Hwaro::Models::TranslationLink.new(code: "ko", url: "/ko/about/", title: "소개", is_current: true),
+        ]
+        en_page = Hwaro::Models::Page.new("about.md")
+        en_page.url = "/about/"
+        en_page.render = false
+
+        Hwaro::Content::Seo::Sitemap.generate([en_page, ko_page], site, dir)
+
+        File.read(File.join(dir, "sitemap.xml")).should_not contain("x-default")
+      end
+    end
+
     it "excludes redirect_to translations from hreflang alternates" do
       # A translation that is a `redirect_to` stub declares its target as
       # canonical, so it is not a valid hreflang alternate either.
