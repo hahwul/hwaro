@@ -10,7 +10,7 @@ private def guard_grammar(name : String, rule : String) : String
 end
 
 private def with_guard_grammar(xml : String, &)
-  names, filenames, template, _ = Tartrazine.hwaro_parse_custom_lexer(xml)
+  names, filenames, template, _, _ = Tartrazine.hwaro_parse_custom_lexer(xml)
   Tartrazine.hwaro_register_custom_lexers([{names, filenames, template}])
   Hwaro::Content::Processors::ServerHighlighter.reset_memos
   yield
@@ -86,6 +86,23 @@ describe "Tartrazine loop guards (ext/tartrazine_loop_guard)" do
         html.should be_nil
       end
       log.should contain("nested deeper than 32 levels")
+    end
+  end
+
+  it "stops an <include> cycle with a warning instead of overflowing the stack" do
+    {
+      "selfinc" => %(<state name="root"><rule><include state="root"/></rule></state>),
+      "twoinc"  => %(<state name="root"><rule pattern="a"><token type="Text"/></rule><rule><include state="b"/></rule></state><state name="b"><rule><include state="root"/></rule></state>),
+      "combinc" => %(<state name="root"><rule pattern="x"><token type="Keyword"/><combined state="x" state="y"/></rule></state><state name="x"><rule><include state="x"/></rule></state><state name="y"><rule pattern="q"><token type="Text"/></rule></state>),
+    }.each do |name, states|
+      with_guard_grammar(%(<lexer><config><name>#{name}</name></config><rules>#{states}</rules></lexer>)) do
+        log = with_captured_log do
+          finished, html = highlight_within("ab\nxq", name)
+          finished.should be_true
+          html.should be_nil
+        end
+        log.should contain("<include> nested deeper than 64 levels")
+      end
     end
   end
 

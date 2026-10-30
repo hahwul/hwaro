@@ -140,13 +140,18 @@ those is the quickest start.
   on and its fences fall back to plain output. A `<push>`, `<include>` or
   `<combined>` naming a state the file does not define is a warning too,
   but the grammar still loads (a few bundled grammars have one): only a
-  code block that reaches that rule falls back to plain. `hwaro doctor`
-  reports the same problems, name clashes included
+  code block that reaches that rule falls back to plain. The same goes
+  for a cycle of `<include>`s, a rule without a `pattern` that emits a
+  `<token>`, a negative `<pop depth>`, and a `<using lexer>` naming no
+  bundled or custom lexer. A `<filename>` that is not a valid glob (an
+  unclosed `[`, `{}` nested more than 10 deep) is ignored with a warning.
+  `hwaro doctor` reports the same problems, name clashes included
   (`highlight-lexer-invalid`).
 - **Runaway rules:** a rule that matches the empty string without
-  changing state, or a `<usingself>`/`<using>` that keeps delegating to
-  itself (more than 32 levels deep), would never finish; the code block
-  falls back to plain output with a warning instead. A regex that
+  changing state, a `<usingself>`/`<using>` that keeps delegating to
+  itself (more than 32 levels deep), or `<include>`s that loop back
+  (more than 64 levels deep) would never finish; the code block falls
+  back to plain output with a warning instead. A regex that
   backtracks catastrophically is just slow, as it would be in a bundled
   grammar.
 - **`include_code`:** a file matching one of a grammar's `<filename>`

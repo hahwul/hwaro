@@ -36,7 +36,8 @@ module Hwaro
 
         # Parse every grammar in `dir`. Returns the grammars to register, a
         # `{path, message}` problem for each file that did not load (or lost
-        # a name to an earlier file, or references an undefined state), and
+        # a name to an earlier file, or has a defect that only bites
+        # mid-tokenization, see Tartrazine.hwaro_parse_custom_lexer), and
         # a digest of the loaded files' bytes ("" when none loaded). Each
         # file is read once, and a read failure is a problem like a parse
         # failure — build and doctor both report exactly this list.
@@ -50,11 +51,13 @@ module Hwaro
             problems << {dir, "not loaded — #{ex.message || ex.class.name}"}
             [] of String
           end
+          usings = [] of {String, Array(String)}
           paths.each do |path|
             xml = File.read(path)
-            names, filenames, template, warnings = Tartrazine.hwaro_parse_custom_lexer(xml)
+            names, filenames, template, warnings, lexers = Tartrazine.hwaro_parse_custom_lexer(xml)
             grammars << Grammar.new(path, names, filenames, template)
             warnings.each { |warning| problems << {path, warning} }
+            usings << {path, lexers} unless lexers.empty?
             md5.update(path)
             md5.update("\0")
             md5.update(xml)
@@ -63,6 +66,12 @@ module Hwaro
             problems << {path, "not loaded — #{ex.message || ex.class.name}"}
           end
           grammars = drop_duplicate_names(grammars, problems)
+          custom = grammars.flat_map(&.names).to_set
+          usings.each do |path, lexers|
+            lexers.each do |lexer|
+              problems << {path, %(<using lexer="#{lexer}"> names no bundled or custom lexer; code blocks that reach it fall back to plain)} unless Tartrazine.hwaro_lexer_known?(lexer, custom)
+            end
+          end
           {grammars, problems, grammars.empty? ? "" : md5.final.hexstring}
         end
 

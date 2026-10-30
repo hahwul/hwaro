@@ -50,6 +50,12 @@ ensure
   Hwaro::Content::Processors::CustomLexers.apply(Hwaro::Models::Config.new)
 end
 
+module Tartrazine
+  def self.test_glob_error(glob : String) : String?
+    hwaro_glob_error(glob)
+  end
+end
+
 private def server_highlight(code : String, lang : String) : String?
   Hwaro::Content::Processors::ServerHighlighter.highlight(code, lang)
 end
@@ -184,6 +190,83 @@ describe Hwaro::Content::Processors::CustomLexers do
       Hwaro::Content::Processors::Includes.language_for("app.cr").should eq("crystal")
     end
     Hwaro::Content::Processors::Includes.language_for("ops/site.mdsl").should eq("")
+  end
+
+  # File.match? raises on a malformed glob only once a path reaches the bad
+  # spot, so a bad <filename> used to crash include_code mid-build.
+  it "drops a <filename> glob File.match? would refuse, with a warning" do
+    grammar = CUSTOM_GRAMMAR.sub("</config>", "<filename>[unterminated</filename><filename>*.mdsl</filename></config>")
+    with_lexers({"mydsl.xml" => grammar}) do
+      log = with_captured_log { Hwaro::Content::Processors::CustomLexers.apply(lexers_config) }
+      log.should contain(%(lexers/mydsl.xml: <filename> "[unterminated" is not a valid glob (unterminated character set); ignored))
+      Hwaro::Content::Processors::Includes.language_for("unterminated.toml").should eq("toml")
+      Hwaro::Content::Processors::Includes.language_for("site.mdsl").should eq("mydsl")
+    end
+    deep = "{" * 11 + "x" + "}" * 11
+    with_lexers({"mydsl.xml" => CUSTOM_GRAMMAR.sub("</config>", "<filename>#{deep}</filename></config>")}) do
+      log = with_captured_log { Hwaro::Content::Processors::CustomLexers.apply(lexers_config) }
+      log.should contain(%(<filename> "#{deep}" is not a valid glob (brace nesting deeper than 10 levels); ignored))
+      Hwaro::Content::Processors::Includes.language_for("x").should eq("")
+    end
+  end
+
+  # The backstop for a shape the up-front check does not know.
+  it "treats a glob File.match? refuses as no match at lookup" do
+    _, _, template, _, _ = Tartrazine.hwaro_parse_custom_lexer(CUSTOM_GRAMMAR)
+    Tartrazine.hwaro_register_custom_lexers([{["mydsl"], ["[unterminated", "*.mdsl"], template}])
+    Tartrazine.hwaro_custom_language_for("unterminated.toml").should be_nil
+    Tartrazine.hwaro_custom_language_for("site.mdsl").should eq("mydsl")
+  ensure
+    Tartrazine.hwaro_register_custom_lexers([] of {Array(String), Array(String), Tartrazine::LexerTemplate})
+  end
+
+  it "never accepts a glob File.match? raises on" do
+    glob_chars = %q(a[]^\-*b{},{{)
+    rng = Random.new(42)
+    paths = ["", "a", "b", "ab-c", "]]", "^a", "\\a", "zzzzzzzz", "aaaaaaaaaaaa"]
+    5000.times do
+      glob = String.build { |io| rng.rand(1..28).times { io << glob_chars.char_at(rng.rand(glob_chars.size)) } }
+      raises = paths.any? do |path|
+        File.match?(glob, path)
+        false
+      rescue File::BadPatternError
+        true
+      end
+      # Paths can miss the bad spot, so only an accepted glob is checked
+      # against every probe.
+      (Tartrazine.test_glob_error(glob).nil? && raises).should be_false
+    end
+    Tartrazine.test_glob_error("[]").should eq("unterminated character set")
+    Tartrazine.test_glob_error("[]]").should be_nil
+    Tartrazine.test_glob_error("a\\").should eq("trailing escape")
+    Tartrazine.test_glob_error("{a,{b,{c,{d,{e,{f,{g,{h,{i,{j,{k}}}}}}}}}}}").should eq("brace nesting deeper than 10 levels")
+    Tartrazine.test_glob_error("{" * 10 + "a" + "}" * 10).should be_nil
+    Tartrazine.test_glob_error("[{{{{{{{{{{{]").should be_nil
+    Tartrazine.test_glob_error("\\{" * 11).should be_nil
+  end
+
+  it "warns about grammar defects that would only surface mid-tokenization" do
+    rules = ->(name : String, body : String) { %(<lexer><config><name>#{name}</name></config><rules><state name="root">#{body}</state></rules></lexer>) }
+    files = {
+      "self_inc.xml" => rules.call("selfinc", %(<rule><include state="root"/></rule>)),
+      # An include after a rule that always matches is never reached.
+      "dead_inc.xml" => rules.call("deadinc", %(<rule pattern="a"><token type="Text"/></rule><rule><pop depth="1"/></rule><rule><include state="root"/></rule>)),
+      "two_inc.xml"  => %(<lexer><config><name>twoinc</name></config><rules><state name="root"><rule pattern="a"><token type="Text"/></rule><rule><include state="b"/></rule></state><state name="b"><rule><include state="root"/></rule></state></rules></lexer>),
+      "no_pat.xml"   => rules.call("nopat", %(<rule><token type="Keyword"/></rule><rule><push state="root"/></rule>)),
+      "neg_pop.xml"  => rules.call("negpop", %(<rule pattern="a"><pop depth="-2"/></rule>)),
+      "using.xml"    => rules.call("usingx", %(<rule pattern="(a)(b)(c)(d)(e)(f)"><bygroups><using lexer="nonexistent"/><using lexer="Python"/><using lexer="nopat"/><using lexer="nosuch+html"/><using lexer="nopat+html"/><using lexer="html+python+nopat"/></bygroups></rule>)),
+    }
+    with_lexers(files) do
+      _, problems, _ = Hwaro::Content::Processors::CustomLexers.scan("lexers")
+      problems.should eq([
+        {"lexers/neg_pop.xml", %(has <pop depth="-2">; code blocks that reach it fall back to plain)},
+        {"lexers/no_pat.xml", "has a <rule> without a pattern that emits a <token>; code blocks that reach it fall back to plain"},
+        {"lexers/self_inc.xml", "has an <include> cycle (root -> root); code blocks that reach it fall back to plain"},
+        {"lexers/two_inc.xml", "has an <include> cycle (root -> b -> root); code blocks that reach it fall back to plain"},
+        {"lexers/using.xml", %(<using lexer="nonexistent"> names no bundled or custom lexer; code blocks that reach it fall back to plain)},
+        {"lexers/using.xml", %(<using lexer="nosuch+html"> names no bundled or custom lexer; code blocks that reach it fall back to plain)},
+      ])
+    end
   end
 
   it "warns when the directory is missing" do
