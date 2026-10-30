@@ -77,14 +77,16 @@ describe "registration order" do
   it "keeps the Crinja filter, test and function sets" do
     env = Hwaro::Content::Processors::TemplateEngine.new.env
     env.filters.keys.sort!.should eq(%w[
-      abs absolute_url active_path append attr batch capitalize ceil center
-      compact date default dictsort escape filesizeformat first flatten float
-      floor forceescape format group_by groupby indent inspect int join
-      jsonify last length list lower map markdownify pluralize pprint prepend
-      random reject rejectattr relative_url replace reverse round safe select
-      selectattr slice slugify sort sort_by split string strip_html striptags
-      sum t title tojson trim truncate truncate_words unique upper urlencode
-      urlize where wordcount wordwrap xml_escape xmlattr
+      abs absolute_url active_path append attr base64_decode base64_encode
+      batch capitalize ceil center compact date default dictsort escape
+      filesizeformat first flatten float floor forceescape format group_by
+      groupby indent inspect int join jsonify last length list lower map
+      markdownify md5 pluralize pprint prepend random
+      regex_replace reject rejectattr relative_url replace reverse round safe
+      select selectattr sha1 sha256 sha384 sha512 slice slugify sort sort_by
+      split string strip_html striptags sum t title tojson trim truncate
+      truncate_words unique upper urlencode urlize where wordcount wordwrap
+      xml_escape xmlattr
     ])
     env.tests.keys.sort!.should eq(%w[
       != < <= == > >= callable containing defined divisibleby empty endswith
