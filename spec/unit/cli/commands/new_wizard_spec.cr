@@ -88,3 +88,23 @@ describe Hwaro::CLI::Commands::NewWizard do
     options.path.should be_nil
   end
 end
+
+class Hwaro::CLI::Commands::NewWizard
+  def detect_sections_for_test : Array(String)
+    detect_sections
+  end
+end
+
+# The section hint must not offer a folder `[content] ignore` hides: a page
+# created there never builds.
+describe "NewWizard section hint with [content] ignore" do
+  it "leaves ignored folders out" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "t"\n[content]\nignore = ["_templates", "drafts/"]\n))
+        %w[posts _templates drafts notes].each { |name| FileUtils.mkdir_p("content/#{name}") }
+        Hwaro::CLI::Commands::NewWizard.new.detect_sections_for_test.should eq(["notes", "posts"])
+      end
+    end
+  end
+end
