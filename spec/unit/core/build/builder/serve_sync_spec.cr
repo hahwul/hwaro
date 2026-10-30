@@ -83,3 +83,27 @@ describe "Builder#copy_changed_content_files and bundle assets" do
     end
   end
 end
+
+describe "Builder serve passes and the date filter's locale warning" do
+  it "warns about an unknown date locale again on each incremental serve pass" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.date | date(format='%B', locale='xx') }}")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        2.times do |pass|
+          File.write("content/a.md", "+++\ntitle = \"A#{pass}\"\ndate = \"2024-03-05\"\n+++\n")
+          log = with_captured_log { builder.run_incremental(["content/a.md"], options) }
+          log.should contain(%(unknown locale "xx"))
+          File.read("public/a/index.html").should eq("March")
+        end
+      end
+    end
+  end
+end

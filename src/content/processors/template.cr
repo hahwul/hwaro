@@ -116,7 +116,7 @@ module Hwaro
 
         private def register_now_function
           # now() function - returns current time
-          @env.functions["now"] = Crinja.function({format: nil}) do
+          @env.functions["now"] = Crinja.function({format: nil, locale: nil}) do
             format = arguments["format"]
             time = Time.local
             # The page is only as fresh as this format's text: a `--cache`
@@ -130,7 +130,7 @@ module Hwaro
               # (`now(format="%")`) makes Crystal's `Time#to_s` raise a bare
               # `IndexError`, which is not a `Crinja::Error` and so kills the
               # build with `Index out of bounds` and no template file:line.
-              Crinja::Value.new(Filters::DateFilters.format_time(time, format.to_s))
+              Crinja::Value.new(Filters::DateFilters.format_time(time, format.to_s, Filters::DateFilters.locale_arg(arguments["locale"])))
             end
           end
         end

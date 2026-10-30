@@ -866,6 +866,7 @@ module Hwaro
           # one filesystem timestamp tick does not move; a build must read
           # the data files as they are now, not as a previous build saw them.
           Content::Processors::TemplateEngine.clear_load_data_cache
+          Content::Processors::Filters::DateFilters.clear_locale_warnings
           # Same for the SRI digests (keyed on mtime + size, so this is
           # belt-and-braces) and the record `hooks.post` is checked against.
           Utils::SriCache.clear

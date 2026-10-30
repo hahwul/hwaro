@@ -134,7 +134,7 @@ Both sides are normalized to one trailing slash before comparing, so `/posts` an
 | default | Fallback for an undefined, none, or empty value (see [Default Values](#default-values)) | {{ value \| default(value="N/A") }} |
 | jsonify | JSON encode | {{ data \| jsonify }} |
 | tojson | JSON encode; `indent` pretty-prints with that many spaces (0–16) | {{ data \| tojson(indent=2) }} |
-| date | Format date (default format `%Y-%m-%d`) | {{ page.date \| date("%Y-%m-%d") }} |
+| date | Format date (default format `%Y-%m-%d`); `locale` translates month and weekday names (see [Date Formatting](#date-formatting)) | {{ page.date \| date(format="%B %-d", locale="ko") }} |
 
 ## Examples
 
@@ -169,6 +169,23 @@ Format codes:
 - `%d` — Day (01-31)
 - `%B` — Month name (January)
 - `%b` — Month abbr (Jan)
+- `%A` / `%a` — Weekday name / abbr (Tuesday / Tue)
+- `%P` / `%p` — AM/PM / am/pm
+
+Pass `locale` to translate the names. A template shared by several languages passes `locale=page.language`:
+
+```jinja
+{{ page.date | date(format="%B %-d일 (%a)", locale="ko") }}   {# 3월 5일 (화) #}
+{{ page.date | date(format="%A %-d %B %Y", locale=page.language) }}
+```
+
+`locale` translates `%B`, `%b` (and `%h`), `%A`, `%a`, `%P`, `%p`, and the `%^` uppercase forms. Every other code, including the composite `%c` and `%r`, prints exactly as it does without a locale. Outside English, `%p` and `%P` print the same locale form (`오후`, `CH`, `p.m.`); only English has a lowercase `am`/`pm`.
+
+`page.date` reaches templates as a date-only string (`2024-03-05`), so `%p`/`%P` on it always print the morning form. Use a value with a time of day (a datetime from front matter `extra` or data, or `now()`) when you need AM/PM.
+
+Built-in locales: `ko`, `ja`, `zh` (Simplified), `zh_TW` (Traditional; also used for `zh_Hant`, `zh_HK`, `zh_MO`), `de`, `fr`, `es`, `it`, `pt` (Brazilian, so `pt_BR` uses it), `ru`, `nl`, `pl`, `tr`, `vi`, `id`, and English. `ko`, `ko_KR`, `ko-KR` and `KO-kr` are the same locale, and a region without its own table falls back to its language (`fr_CA` uses `fr`).
+
+Names follow CLDR's in-date ("format") forms, so Russian and Polish months are genitive (`5 марта`, `5 marca`): right next to a day number, not as a standalone month heading. An unknown locale logs one warning per build (and per `serve` rebuild) and prints English names. Without `locale`, or with an empty or blank one, output is unchanged. `now(format=..., locale=...)` takes the same argument.
 
 ### URL Handling
 
