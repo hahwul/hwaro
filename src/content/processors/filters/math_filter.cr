@@ -1,4 +1,3 @@
-require "big"
 require "crinja"
 
 module Hwaro
@@ -7,33 +6,76 @@ module Hwaro
       module Filters
         module MathFilters
           # ASCII digits only: `\d` also matches Arabic-Indic or fullwidth
-          # digits under UCP, which BigDecimal then refuses.
+          # digits under UCP.
           PLAIN_NUMBER_RE = /\A[+-]?[0-9]+(?:\.[0-9]+)?\z/
 
-          # The exact decimal value of a number, or of a string holding a
-          # plain decimal (`"1234.5"`); nil for anything else, including
-          # NaN/Infinity and booleans.
-          def self.to_decimal(value : Crinja::Value) : BigDecimal?
+          # An exact decimal as digit strings: sign, integer digits (no
+          # leading zeros) and fraction digits. Kept as text, not BigDecimal,
+          # so hwaro does not link libgmp for one filter.
+          alias Decimal = {Bool, String, String}
+
+          # The exact decimal of a number, or of a string holding a plain
+          # decimal (`"1234.5"`); nil for anything else, including
+          # NaN/Infinity and booleans. A float gives its shortest round-trip
+          # digits (`0.1 + 0.2` is `0.30000000000000004`, `1e-7` is
+          # `0.0000001`).
+          def self.to_decimal(value : Crinja::Value) : Decimal?
             case raw = value.raw
-            when Int   then BigDecimal.new(raw)
-            when Float then shortest(raw) if raw.finite?
+            when Int   then split_decimal(raw.to_s)
+            when Float then float_decimal(raw) if raw.finite?
             when String, Crinja::SafeString
               text = raw.to_s.strip
-              BigDecimal.new(text) if text.matches?(PLAIN_NUMBER_RE)
+              split_decimal(text) if text.matches?(PLAIN_NUMBER_RE)
             end
           end
 
-          # A float's shortest round-trip digits. BigDecimal parses
-          # `Float#to_s`, whose `1.0e-7` / `1234.0` carry a padding zero
-          # that is not a digit of the number.
-          def self.shortest(float : Float) : BigDecimal
-            number = BigDecimal.new(float)
-            value, scale = number.value, number.scale
-            while scale > 0 && value % 10 == 0
-              value //= 10
-              scale -= 1
+          # Splits `[+-]digits[.digits]`; the fraction keeps its digits as
+          # written.
+          private def self.split_decimal(text : String) : Decimal
+            negative = text.starts_with?('-')
+            text = text.lchop('-').lchop('+')
+            integer, _, fraction = text.partition('.')
+            {negative, integer.lstrip('0').presence || "0", fraction}
+          end
+
+          # `Float#to_s` is the shortest round-trip form, possibly in
+          # exponent notation (`1.5e-7`, `1.0e+20`); shift its digits into
+          # plain notation and drop the padding zero of `1234.0` / `1.0e-7`.
+          private def self.float_decimal(float : Float) : Decimal
+            mantissa, _, exponent = float.abs.to_s.partition('e')
+            point = mantissa.index!('.') + (exponent.empty? ? 0 : exponent.to_i)
+            digits = mantissa.delete('.')
+            integer, fraction = if point <= 0
+                                  {"0", "0" * -point + digits}
+                                elsif point >= digits.size
+                                  {digits + "0" * (point - digits.size), ""}
+                                else
+                                  {digits[0, point], digits[point..]}
+                                end
+            {float < 0, integer.lstrip('0').presence || "0", fraction.rstrip('0')}
+          end
+
+          # `decimal` rounded half away from zero to `places` fraction
+          # digits (padded with zeros when it has fewer).
+          def self.round_decimal(decimal : Decimal, places : Int32) : Decimal
+            negative, integer, fraction = decimal
+            return {negative, integer, fraction.ljust(places, '0')} if fraction.size <= places
+            digits = (integer + fraction[0, places]).chars
+            if fraction[places] >= '5'
+              i = digits.size - 1
+              while i >= 0 && digits[i] == '9'
+                digits[i] = '0'
+                i -= 1
+              end
+              if i >= 0
+                digits[i] = digits[i].succ
+              else
+                digits.unshift('1')
+              end
             end
-            BigDecimal.new(value, scale)
+            joined = digits.join
+            integer = joined[0, joined.size - places].lstrip('0').presence || "0"
+            {negative, integer, joined[joined.size - places, places]}
           end
 
           # `decimals=` as a place count clamped to 0..20: an integer, or an
@@ -50,15 +92,13 @@ module Hwaro
           # `number` with its integer digits grouped in threes, rounded
           # half away from zero to `decimals` places (nil keeps the
           # number's own decimals).
-          def self.num_format(number : BigDecimal, decimals : Int32?, separator : String, decimal_point : String) : String
-            number = number.round(decimals, mode: :ties_away) if decimals
-            scale = number.scale.to_i
-            digits = number.value.abs.to_s.rjust(scale + 1, '0')
-            integer = digits[0, digits.size - scale]
-            fraction = digits[digits.size - scale, scale]
-            fraction = fraction.ljust(decimals, '0') if decimals
+          def self.num_format(number : Decimal, decimals : Int32?, separator : String, decimal_point : String) : String
+            number = round_decimal(number, decimals) if decimals
+            negative, integer, fraction = number
+            # No `-0`: a value that is (or rounds to) zero has no sign.
+            negative &&= integer != "0" || fraction.each_char.any? { |char| char != '0' }
             String.build do |io|
-              io << '-' if number.value < 0
+              io << '-' if negative
               integer.each_char_with_index do |char, i|
                 io << separator if i > 0 && (integer.size - i) % 3 == 0
                 io << char
