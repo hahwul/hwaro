@@ -1051,10 +1051,23 @@ describe Hwaro::Services::Doctor do
       it "does not ask for an _index.md in a taxonomy directory holding term files" do
         issues = run_doctor(base_config + %(\n[[taxonomies]]\nname = "tags"\n),
           {"tags/rust/_index.md" => "+++\ntitle = \"Rust\"\n+++\n", "tags/go/_index.md" => "+++\ntitle = \"Go\"\n+++\n",
+           "post.md" => "+++\ntitle = \"P\"\ntags = [\"rust\", \"go\"]\n+++\n",
            "guides/a/b.md" => "+++\ntitle = \"B\"\n+++\n"})
         missing = issues.select { |i| i.id == "structure-missing-index" }.map(&.message)
         missing.any?(&.includes?("tags/")).should be_false
         missing.any?(&.includes?("guides/")).should be_true
+      end
+
+      # Only files a term page takes are exempt: an ordinary section under a
+      # taxonomy directory still is one.
+      it "still asks for an _index.md when a taxonomy directory holds ordinary sections" do
+        issues = run_doctor(base_config + %(\n[[taxonomies]]\nname = "tags"\n\n[[taxonomies]]\nname = "authors"\n),
+          {"tags/rust/_index.md" => "+++\ntitle = \"Rust\"\n+++\n", "tags/notes/_index.md" => "+++\ntitle = \"Notes\"\n+++\n",
+           "authors/a/b.md" => "+++\ntitle = \"B\"\n+++\n",
+           "post.md" => "+++\ntitle = \"P\"\ntags = [\"rust\"]\n+++\n"})
+        missing = issues.select { |i| i.id == "structure-missing-index" }.map(&.message)
+        missing.any?(&.includes?("tags/")).should be_true
+        missing.any?(&.includes?("authors/")).should be_true
       end
 
       it "reports info when section dir missing _index.md" do
