@@ -1,6 +1,7 @@
 require "../../../spec_helper"
 require "../../../support/build_helper"
 require "../../../../src/content/processors/syntax_highlighter"
+require "../../../../src/content/processors/includes"
 
 private CUSTOM_GRAMMAR = <<-'XML'
   <lexer>
@@ -91,24 +92,53 @@ describe Hwaro::Content::Processors::CustomLexers do
       "c_no_name.xml" => %(<lexer><config></config><rules><state name="root"></state></rules></lexer>),
       "d_no_root.xml" => %(<lexer><config><name>Z</name></config><rules><state name="other"></state></rules></lexer>),
       "e_bad_act.xml" => %(<lexer><config><name>W</name></config><rules><state name="root"><rule pattern="x"><bogus/></rule></state></rules></lexer>),
-      "mydsl.xml"     => CUSTOM_GRAMMAR,
-      "not-a-grammar" => "ignored: no .xml extension",
+      # States the stock loader only trips over mid-tokenization.
+      "f_bad_push.xml" => %(<lexer><config><name>V</name></config><rules><state name="root"><rule pattern="x"><push state="nope"/></rule></state></rules></lexer>),
+      "g_bad_incl.xml" => %(<lexer><config><name>U</name></config><rules><state name="root"><rule><include state="missing"/></rule></state></rules></lexer>),
+      "h_bad_comb.xml" => %(<lexer><config><name>T</name></config><rules><state name="root"><rule pattern="x"><combined state="root" state="gone"/></rule></state></rules></lexer>),
+      "mydsl.xml"      => CUSTOM_GRAMMAR,
+      "not-a-grammar"  => "ignored: no .xml extension",
     }
     with_lexers(files) do
       log = with_captured_log { Hwaro::Content::Processors::CustomLexers.apply(lexers_config) }
-      log.should contain("lexers/a_bad_xml.xml: invalid XML (line 3)")
+      log.should contain("lexers/a_bad_xml.xml: not loaded — invalid XML (line 3)")
       log.should contain("lexers/b_bad_re.xml:")
       log.should contain("compiling regex")
-      log.should contain("lexers/c_no_name.xml: missing <config><name>")
-      log.should contain(%(lexers/d_no_root.xml: missing <state name="root">))
+      log.should contain("lexers/c_no_name.xml: not loaded — missing <config><name>")
+      log.should contain(%(lexers/d_no_root.xml: not loaded — missing <state name="root">))
       log.should contain("lexers/e_bad_act.xml:")
+      log.should contain(%(lexers/f_bad_push.xml: not loaded — <push> names undefined state "nope"))
+      log.should contain(%(lexers/g_bad_incl.xml: not loaded — <include> names undefined state "missing"))
+      log.should contain(%(lexers/h_bad_comb.xml: not loaded — <combined> names undefined state "gone"))
       log.should_not contain("not-a-grammar")
       server_highlight("let", "mydsl").should eq(%(<span class="hljs-keyword">let</span>))
       server_highlight("x", "z").should be_nil
 
-      grammars, errors = Hwaro::Content::Processors::CustomLexers.scan("lexers")
+      grammars, problems, _ = Hwaro::Content::Processors::CustomLexers.scan("lexers")
       grammars.map(&.path).should eq(["lexers/mydsl.xml"])
-      errors.map(&.[0]).should eq(%w[a_bad_xml b_bad_re c_no_name d_no_root e_bad_act].map { |n| "lexers/#{n}.xml" })
+      problems.map(&.[0]).should eq(%w[a_bad_xml b_bad_re c_no_name d_no_root e_bad_act f_bad_push g_bad_incl h_bad_comb].map { |n| "lexers/#{n}.xml" })
+    end
+  end
+
+  # A bundled grammar is the natural starting point, so the loader's own
+  # checks (XML, <name>, root state) must accept them all — Chroma's
+  # repeated `state` attributes included. The rejections left are grammars
+  # the stock loader cannot build either (regexes PCRE2 refuses, actions
+  # Tartrazine lacks), plus three that push a state they never define and
+  # so break as soon as that rule matches.
+  it "accepts the bundled grammars except the ones that are broken anyway" do
+    paths = Tartrazine::LexerFiles.files.map(&.path).select(&.ends_with?(".xml"))
+    paths.size.should be > 200
+    rejected = {} of String => String
+    paths.each do |path|
+      Tartrazine.hwaro_parse_custom_lexer(Tartrazine::LexerFiles.get(path).gets_to_end)
+    rescue ex
+      rejected[path] = ex.message.to_s
+    end
+    rejected.values.select { |m| m.includes?("invalid XML") || m.starts_with?("missing <") || m.includes?("<lexer>") }.should be_empty
+    rejected.select { |_, m| m.includes?("names undefined state") }.keys.sort!.should eq(["/psl.xml", "/sourcepawn.xml", "/yang.xml"])
+    rejected.values.reject(&.includes?("names undefined state")).each do |message|
+      (message.includes?("compiling regex") || message.includes?("Unknown enum Tartrazine::ActionType")).should be_true
     end
   end
 
@@ -121,6 +151,31 @@ describe Hwaro::Content::Processors::CustomLexers do
       # The second file still answers to the name nobody else claimed.
       server_highlight("let", "other").should eq("let")
     end
+  end
+
+  it "warns about an unreadable grammar instead of aborting the build" do
+    with_lexers({"a_locked.xml" => CUSTOM_GRAMMAR.sub("MyDSL", "Locked").sub("<alias>mydsl</alias>", "").sub("<alias>MDSL</alias>", ""), "mydsl.xml" => CUSTOM_GRAMMAR}) do
+      File.chmod("lexers/a_locked.xml", 0o000)
+      begin
+        pending!("a 0o000 file is still readable (root)") if File::Info.readable?("lexers/a_locked.xml")
+        log = with_captured_log { Hwaro::Content::Processors::CustomLexers.apply(lexers_config).should_not be_empty }
+        log.should contain("lexers/a_locked.xml: not loaded")
+        server_highlight("let", "mydsl").should eq(%(<span class="hljs-keyword">let</span>))
+      ensure
+        File.chmod("lexers/a_locked.xml", 0o644)
+      end
+    end
+  end
+
+  it "lets include_code detect a custom grammar from its <filename> globs" do
+    grammar = CUSTOM_GRAMMAR.sub("</config>", "<filename>*.mdsl</filename><filename>Deployfile</filename></config>")
+    with_lexers({"mydsl.xml" => grammar}) do
+      Hwaro::Content::Processors::CustomLexers.apply(lexers_config)
+      Hwaro::Content::Processors::Includes.language_for("ops/site.MDSL").should eq("mydsl")
+      Hwaro::Content::Processors::Includes.language_for("Deployfile").should eq("mydsl")
+      Hwaro::Content::Processors::Includes.language_for("app.cr").should eq("crystal")
+    end
+    Hwaro::Content::Processors::Includes.language_for("ops/site.mdsl").should eq("")
   end
 
   it "warns when the directory is missing" do

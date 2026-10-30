@@ -23,6 +23,34 @@ describe "doctor: [highlight] lexers_dir" do
     end
   end
 
+  it "reads an absolute lexers_dir as is" do
+    Dir.mktmpdir do |dir|
+      Dir.mktmpdir do |grammars|
+        File.write(File.join(grammars, "bad.xml"), "<nope")
+        issues = lexer_doctor_issues(dir, %(lexers_dir = #{grammars.inspect}))
+        issues.any? { |i| i.id == "config-dir-missing" }.should be_false
+        issues.select { |i| i.id == "highlight-lexer-invalid" }.map(&.file).should eq([File.join(grammars, "bad.xml")])
+      end
+    end
+  end
+
+  it "reports undefined state references and duplicate names like the build" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "lexers"))
+      ok = %(<lexer><config><name>Ok</name></config><rules><state name="root"><rule pattern="."><token type="Text"/></rule></state></rules></lexer>)
+      File.write(File.join(dir, "lexers", "a.xml"), ok)
+      File.write(File.join(dir, "lexers", "b.xml"), ok)
+      File.write(File.join(dir, "lexers", "c.xml"),
+        %(<lexer><config><name>C</name></config><rules><state name="root"><rule pattern="x"><push state="nope"/></rule></state></rules></lexer>))
+
+      messages = lexer_doctor_issues(dir, %(lexers_dir = "lexers")).select { |i| i.id == "highlight-lexer-invalid" }.map(&.message)
+      messages.should eq([
+        %(syntax grammar not loaded — <push> names undefined state "nope"),
+        "syntax grammar 'ok' is already defined by #{File.join(dir, "lexers", "a.xml")}; keeping #{File.join(dir, "lexers", "a.xml")}",
+      ])
+    end
+  end
+
   it "reports a missing directory" do
     Dir.mktmpdir do |dir|
       issue = lexer_doctor_issues(dir, %(lexers_dir = "lexers")).find { |i| i.id == "config-dir-missing" }

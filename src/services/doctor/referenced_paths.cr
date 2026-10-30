@@ -260,16 +260,16 @@ module Hwaro
       # reads the grammars, so there is nothing to check.
       private def check_lexers(issues : Array(Issue), config : Models::Config)
         return unless (dir = config.highlight.lexers_dir) && config.highlight.enabled && config.highlight.server?
-        path = Path[File.dirname(@config_path), dir].normalize.to_s
+        path = Utils::PathUtils.absolute?(dir) ? dir : Path[File.dirname(@config_path), dir].normalize.to_s
         unless Dir.exists?(path)
           issues << Issue.new(id: "config-dir-missing", level: :warning, category: "config", file: @config_path,
             message: "[highlight] lexers_dir: #{dir} — directory not found")
           return
         end
-        _, errors = Content::Processors::CustomLexers.scan(path)
-        errors.each do |file, message|
+        _, problems, _ = Content::Processors::CustomLexers.scan(path)
+        problems.each do |file, message|
           issues << Issue.new(id: "highlight-lexer-invalid", level: :warning, category: "config", file: file,
-            message: "syntax grammar not loaded: #{message}")
+            message: "syntax grammar #{message}")
         end
       end
 

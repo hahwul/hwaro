@@ -22,7 +22,7 @@ module Hwaro
         extend self
 
         # One parsed grammar file.
-        record Grammar, path : String, names : Array(String), template : Tartrazine::LexerTemplate
+        record Grammar, path : String, names : Array(String), filenames : Array(String), template : Tartrazine::LexerTemplate
 
         # Content digest of the grammars the current build registered; ""
         # when none. Folded into the build-cache config hash and the body
@@ -34,18 +34,35 @@ module Hwaro
           Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "*.xml")).select { |path| File.file?(path) }.sort!
         end
 
-        # Parse every grammar in `dir`: the ones that loaded, and a
-        # `{path, message}` pair for each that did not.
-        def scan(dir : String) : {Array(Grammar), Array({String, String})}
+        # Parse every grammar in `dir`. Returns the grammars to register, a
+        # `{path, message}` problem for each file that did not load (or lost
+        # a name to an earlier file), and a digest of the loaded files'
+        # bytes ("" when none loaded). Each file is read once, and a read
+        # failure is a problem like a parse failure — build and doctor both
+        # report exactly this list.
+        def scan(dir : String) : {Array(Grammar), Array({String, String}), String}
           grammars = [] of Grammar
-          errors = [] of {String, String}
-          files(dir).each do |path|
-            names, template = Tartrazine.hwaro_parse_custom_lexer(File.read(path))
-            grammars << Grammar.new(path, names, template)
+          problems = [] of {String, String}
+          md5 = Digest::MD5.new
+          paths = begin
+            files(dir)
           rescue ex
-            errors << {path, ex.message || ex.class.name}
+            problems << {dir, "not loaded — #{ex.message || ex.class.name}"}
+            [] of String
           end
-          {grammars, errors}
+          paths.each do |path|
+            xml = File.read(path)
+            names, filenames, template = Tartrazine.hwaro_parse_custom_lexer(xml)
+            grammars << Grammar.new(path, names, filenames, template)
+            md5.update(path)
+            md5.update("\0")
+            md5.update(xml)
+            md5.update("\0")
+          rescue ex
+            problems << {path, "not loaded — #{ex.message || ex.class.name}"}
+          end
+          grammars = drop_duplicate_names(grammars, problems)
+          {grammars, problems, grammars.empty? ? "" : md5.final.hexstring}
         end
 
         # Register this build's grammars (replacing the previous build's —
@@ -63,14 +80,12 @@ module Hwaro
             elsif !Dir.exists?(dir)
               Logger.warn "[highlight] lexers_dir: #{dir} — directory not found; no custom grammars loaded."
             else
-              grammars, errors = scan(dir)
-              errors.each { |path, message| Logger.warn "Skipping syntax grammar #{path}: #{message}" }
-              grammars = drop_duplicate_names(grammars)
-              new_digest = digest_of(files(dir)) unless grammars.empty?
+              grammars, problems, new_digest = scan(dir)
+              problems.each { |path, message| Logger.warn "Syntax grammar #{path}: #{message}" }
             end
           end
 
-          Tartrazine.hwaro_register_custom_lexers(grammars.map { |grammar| {grammar.names, grammar.template} })
+          Tartrazine.hwaro_register_custom_lexers(grammars.map { |grammar| {grammar.names, grammar.filenames, grammar.template} })
           # Highlighted output memoized under the previous grammar set (or a
           # language remembered as having no lexer) is stale now.
           ServerHighlighter.reset_memos if new_digest != @@digest
@@ -82,13 +97,15 @@ module Hwaro
         end
 
         # The first file (in sorted order) to claim a name keeps it; a later
-        # claim is reported, and a file left with no names is not loaded.
-        private def drop_duplicate_names(grammars : Array(Grammar)) : Array(Grammar)
+        # claim is a problem, and a file left with no names is not loaded.
+        # A dropped file's bytes stay in the digest: harmless, it only
+        # means editing it also invalidates the cache.
+        private def drop_duplicate_names(grammars : Array(Grammar), problems : Array({String, String})) : Array(Grammar)
           owners = {} of String => String
           grammars.compact_map do |grammar|
             names = grammar.names.select do |name|
               if owner = owners[name]?
-                Logger.warn "Syntax grammar #{grammar.path}: '#{name}' is already defined by #{owner}; keeping #{owner}."
+                problems << {grammar.path, "'#{name}' is already defined by #{owner}; keeping #{owner}"}
                 false
               else
                 owners[name] = grammar.path
@@ -97,17 +114,6 @@ module Hwaro
             end
             names.empty? ? nil : grammar.copy_with(names: names)
           end
-        end
-
-        private def digest_of(paths : Array(String)) : String
-          md5 = Digest::MD5.new
-          paths.each do |path|
-            md5.update(path)
-            md5.update("\0")
-            md5.update(File.read(path))
-            md5.update("\0")
-          end
-          md5.final.hexstring
         end
       end
     end
