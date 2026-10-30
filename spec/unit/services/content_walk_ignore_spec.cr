@@ -294,7 +294,7 @@ describe "[content] ignore in the content tools" do
       found = Hwaro::Services::Doctor.new(content_dir: "content", config_path: "config.toml").run
         .select(&.id.==("content-ignore-hides-sections"))
       by_pattern = found.to_h { |issue| {issue.message[/pattern "([^"]+)"/, 1], issue} }
-      by_pattern.keys.sort.should eq(["_*", "blog/_*", "notes/_index.md"])
+      by_pattern.keys.sort!.should eq(["_*", "blog/_*", "notes/_index.md"])
       by_pattern["_*"].level.should eq(:warning)
       by_pattern["_*"].message.should contain(%("_*/"))
       by_pattern["_*"].message.should contain("content/_index.md")
