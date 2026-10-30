@@ -121,6 +121,7 @@ module Hwaro::Core::Build::Phases::Render
 
     # Page object with all properties
     page_obj = {
+      "path"         => Crinja::Value.new(page.path),
       "title"        => Crinja::Value.new(page.title),
       "description"  => Crinja::Value.new(page.description || ""),
       "url"          => Crinja::Value.new(effective_url),
