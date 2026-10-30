@@ -186,4 +186,43 @@ describe "[content] ignore in the content tools" do
       flagged.should contain("content-schema-violation")
     end
   end
+
+  # Doctor's referenced-path and version checks must not accept a file or
+  # folder the build never reads.
+  it "makes doctor report config paths that point into ignored content" do
+    config = <<-TOML
+      title = "My Site"
+      base_url = "https://example.com"
+      [content]
+      ignore = ["raw.json", "docs/old/", "gone.md"]
+      [og]
+      default_image = "/raw.json"
+      [pwa]
+      enabled = true
+      offline_page = "/gone/"
+      [[versions.list]]
+      name = "old"
+      path = "docs/old"
+      TOML
+    with_ignore_project(config) do
+      File.write("content/raw.json", "{}")
+      File.write("content/gone.md", "+++\ntitle = \"Gone\"\n+++\n")
+      FileUtils.mkdir_p("content/docs/old")
+      File.write("content/docs/old/_index.md", "+++\ntitle = \"Old\"\n+++\n")
+      messages = Hwaro::Services::Doctor.new(content_dir: "content", config_path: "config.toml").run.map(&.message)
+      messages.any?(&.includes?("default_image")).should be_true
+      messages.any? { |m| m.includes?("version \"old\"") && m.includes?("[content] ignore") }.should be_true
+    end
+  end
+
+  # `_*` reads as "underscore folders" but also hides every `_index.md`.
+  it "warns about an ignore pattern that hides section index files" do
+    config = %(title = "t"\nbase_url = "https://example.com"\n[content]\nignore = ["_*", "**/_*/", "README.md"]\n)
+    with_ignore_project(config) do
+      issues = Hwaro::Services::Doctor.new(content_dir: "content", config_path: "config.toml").run
+      warned = issues.select { |i| i.id == "content-ignore-hides-sections" }.map(&.message)
+      warned.size.should eq(1)
+      warned.first.should contain(%("_*"))
+    end
+  end
 end

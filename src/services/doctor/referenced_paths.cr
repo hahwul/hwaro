@@ -78,7 +78,10 @@ module Hwaro
       # publishes it — `ReadContent`'s rule. Anything else under `content/`
       # never reaches the site at that path.
       private def published_content_file?(config : Models::Config, url_path : String) : Bool
-        return false unless File.file?(File.join(@content_dir, url_path))
+        source = File.join(@content_dir, url_path)
+        return false unless File.file?(source)
+        # `[content] ignore` hides it from the build, raw `.json`/`.xml` too.
+        return false if @content_ignore.ignored?(source)
         ext = File.extname(url_path).downcase
         return true if ext == ".json" || ext == ".xml"
         config.content_files.enabled? && config.content_files.publish?(url_path)
@@ -304,7 +307,10 @@ module Hwaro
                                  File.join(slug, "_index.markdown"),
                                ]
                              end
-        return true if content_candidates.any? { |c| File.exists?(File.join(@content_dir, c)) }
+        return true if content_candidates.any? do |candidate|
+                         source = File.join(@content_dir, candidate)
+                         File.exists?(source) && !@content_ignore.ignored?(source)
+                       end
 
         # A prior build's output (`[build] output_dir`, "public" by default):
         # a pretty route lands

@@ -127,7 +127,7 @@ module Hwaro
           CheckSpec.new("front matter schema ([[content.schema]])",
             ["content-schema-violation"], blocked_by: CONFIG_BLOCKING_IDS),
           CheckSpec.new("section index files (_index.md)",
-            ["structure-missing-index"], blocked_by: CONFIG_BLOCKING_IDS),
+            ["structure-missing-index", "content-ignore-hides-sections"], blocked_by: CONFIG_BLOCKING_IDS),
           CheckSpec.new("translations (pages in every language)",
             ["translation-missing", "translation-orphan"], blocked_by: CONFIG_BLOCKING_IDS),
         ],

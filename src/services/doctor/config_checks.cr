@@ -166,9 +166,16 @@ module Hwaro
         # entry links to a 404 root).
         config.versions.list.each do |version|
           dir = File.join(@content_dir, version.path)
-          next if Dir.exists?(dir)
-          issues << Issue.new(id: "version-path-missing", level: :warning, category: "config", file: @config_path,
-            message: "version \"#{version.name}\" points at content path \"#{version.path}\" which does not exist (#{dir})")
+          if !Dir.exists?(dir)
+            issues << Issue.new(id: "version-path-missing", level: :warning, category: "config", file: @config_path,
+              message: "version \"#{version.name}\" points at content path \"#{version.path}\" which does not exist (#{dir})")
+          elsif @content_ignore.ignored?(File.join(dir, "hwaro-probe"))
+            # The build never reads an ignored folder (probed through a child
+            # so folders-only patterns count): the version publishes
+            # nothing, exactly as if the path were missing.
+            issues << Issue.new(id: "version-path-missing", level: :warning, category: "config", file: @config_path,
+              message: "version \"#{version.name}\" points at content path \"#{version.path}\", which [content] ignore hides — the version publishes no pages")
+          end
         end
       end
 
