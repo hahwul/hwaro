@@ -121,6 +121,8 @@ module Hwaro::Core::Build::Phases::Initialize
       Content::Processors::SyntaxHighlighter.server_mode = config.highlight.server?
       Content::Processors::SyntaxHighlighter.default_line_numbers = config.highlight.line_numbers
       Content::Processors::SyntaxHighlighter.default_copy = config.highlight.copy
+      # `[highlight] lexers_dir` grammars, registered before anything renders.
+      lexers_digest = Content::Processors::CustomLexers.apply(config)
       # Same pattern for the markdown options template filters consult
       # (markdownify honors the site's safe/smart_punctuation settings).
       Processor::Markdown.filter_markdown_config = config.markdown
@@ -153,6 +155,8 @@ module Hwaro::Core::Build::Phases::Initialize
         # `site.data` values and diverges from `--full` (see I-cache-data).
         config_hash = Cache.compute_config_hash(config, ctx.options.env)
         config_hash = "#{config_hash}-#{compute_data_hash}-#{Cache.compute_options_hash(ctx.options)}"
+        # A grammar edit re-highlights every page; no grammars, no change.
+        config_hash = "#{config_hash}-lexers:#{lexers_digest}" unless lexers_digest.empty?
         build_cache.set_global_checksums(@global_templates_hash, config_hash,
           invalidate_on_template_change: !@per_page_template_hash,
           output_dir: output_dir)

@@ -1085,6 +1085,14 @@ describe Hwaro::Models::Config do
       config.highlight.line_numbers.should be_false
       config.highlight.mode.should eq("server")
       config.highlight.copy.should be_false
+      config.highlight.lexers_dir.should be_nil
+    end
+
+    it "loads [highlight] lexers_dir and treats a blank or mistyped value as unset" do
+      load_config(%([highlight]\nlexers_dir = " lexers "\n)).highlight.lexers_dir.should eq("lexers")
+      load_config(%([highlight]\nlexers_dir = ""\n)).highlight.lexers_dir.should be_nil
+      log = with_captured_log { load_config(%([highlight]\nlexers_dir = 3\n)).highlight.lexers_dir.should be_nil }
+      log.should contain("Ignoring non-string config value lexers_dir = 3")
     end
 
     it "can update highlight settings" do
