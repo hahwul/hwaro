@@ -419,7 +419,7 @@ Get current datetime:
 
 | Name | Type | Description |
 |------|------|-------------|
-| format | String? | Date format string (optional; default `%Y-%m-%d %H:%M:%S`) |
+| format | String? | Date format string (optional; default `%Y-%m-%d %H:%M:%S`, also used for `none` or an undefined variable) |
 | locale | String? | Translates month, weekday and AM/PM names, as in the [`date` filter](/templates/filters/#date-formatting) (optional) |
 
 **Returns:** String

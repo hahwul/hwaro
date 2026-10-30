@@ -419,7 +419,7 @@ base_url이 포함된 URL을 생성합니다.
 
 | 이름 | 타입 | 설명 |
 |------|------|-------------|
-| format | String? | 날짜 포맷 문자열(선택, 기본값 `%Y-%m-%d %H:%M:%S`) |
+| format | String? | 날짜 포맷 문자열(선택, 기본값 `%Y-%m-%d %H:%M:%S`, `none`이나 정의되지 않은 변수일 때도 기본값) |
 | locale | String? | 월·요일·오전/오후 이름을 번역([`date` 필터](/ko/templates/filters/#날짜-포맷)와 같음, 선택) |
 
 **반환값:** String
