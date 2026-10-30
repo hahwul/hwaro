@@ -64,6 +64,28 @@ describe "[content] ignore" do
       rules.ignored?("readme.md").should be_false
     end
 
+    # gitignore/globset spell a negated class `[!…]`; File.match? reads that
+    # as "`!` or …", so `[!a]*` used to hide `a.md` and keep `b.md`.
+    it "reads [!…] as a negated class, like [^…]" do
+      config = load_config(%([content]\nignore = ["notes/[!_]*.md", "[^x]y.md"]\n))
+      config.content_files.ignore.should eq(["notes/[^_]*.md", "[^x]y.md"])
+      config.content_files.ignored?("notes/a.md").should be_true
+      config.content_files.ignored?("notes/_tpl.md").should be_false
+      config.content_files.ignored?("ay.md").should be_true
+      config.content_files.ignored?("xy.md").should be_false
+    end
+
+    it "matches a pattern of any depth only where its segments line up" do
+      deep = Hwaro::Models::ContentFilesConfig.new
+      deep.ignore = ["a/*/c", "x?z", "{p,q/r}"]
+      deep.ignored?("a/b/c/d.md").should be_true
+      deep.ignored?("a/b/d.md").should be_false
+      deep.ignored?("xyz/n.md").should be_true
+      deep.ignored?("q/r/s.md").should be_true
+      deep.ignored?("p").should be_true
+      deep.ignored?("q/s.md").should be_false
+    end
+
     it "never matches a path outside the content root" do
       wide = Hwaro::Models::ContentFilesConfig.new
       wide.ignore = ["**"]

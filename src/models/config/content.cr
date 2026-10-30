@@ -76,13 +76,52 @@ module Hwaro
       # every non-page consumer of content/ already asks `publish?` /
       # `denied?`, so they honour it without extra plumbing; the page lanes
       # ask `ignored?` directly.
-      property ignore : Array(String)
+      getter ignore : Array(String)
+
+      # How one `ignore` pattern is tested (see `ignore=`). Most patterns are
+      # a plain name (`README.md`, `_templates`) or a plain folder plus `/**`,
+      # which a string compare answers; a glob without `**`, braces or a
+      # `[…]` class (which may match a `/`) matches only a path of exactly its
+      # own depth, so one prefix is tested instead of every ancestor.
+      enum IgnoreKind
+        Literal
+        Tree
+        Depth
+        Anywhere
+      end
+
+      record IgnoreRule, kind : IgnoreKind, pattern : String, span : Int32
+
+      @ignore_rules : Array(IgnoreRule)
 
       def initialize
         @allow_extensions = [] of String
         @disallow_extensions = [] of String
         @disallow_paths = [] of String
         @ignore = [] of String
+        @ignore_rules = [] of IgnoreRule
+      end
+
+      def ignore=(patterns : Array(String))
+        @ignore = patterns
+        @ignore_rules = patterns.map { |pattern| ContentFilesConfig.compile_ignore(Utils::PathUtils.nfc(pattern)) }
+      end
+
+      protected def self.compile_ignore(pattern : String) : IgnoreRule
+        head = pattern.ends_with?("/**") ? pattern[0, pattern.size - 3] : nil
+        if glob_literal?(pattern)
+          IgnoreRule.new(IgnoreKind::Literal, pattern, 0)
+        elsif head && !head.empty? && glob_literal?(head)
+          IgnoreRule.new(IgnoreKind::Tree, "#{head}/", 0)
+        elsif pattern.includes?("**") || pattern.includes?('{') || pattern.includes?('[')
+          IgnoreRule.new(IgnoreKind::Anywhere, pattern, 0)
+        else
+          IgnoreRule.new(IgnoreKind::Depth, pattern, pattern.count('/') + 1)
+        end
+      end
+
+      private def self.glob_literal?(pattern : String) : Bool
+        pattern.each_char.none?(&.in?('*', '?', '[', ']', '{', '}'))
       end
 
       def enabled? : Bool
@@ -116,15 +155,42 @@ module Hwaro
       end
 
       private def ignored_normalized?(path : String) : Bool
-        return false if @ignore.empty? || path.empty? || path == ".." || path.starts_with?("../")
+        return false if @ignore_rules.empty? || path.empty? || path == ".." || path.starts_with?("../")
+        path = Utils::PathUtils.nfc(path)
+        depth = path.count('/') + 1
+        @ignore_rules.any? do |rule|
+          case rule.kind
+          in .literal?
+            path == rule.pattern || (path.starts_with?(rule.pattern) && path.byte_at?(rule.pattern.bytesize) == '/'.ord)
+          in .tree?
+            path.starts_with?(rule.pattern)
+          in .depth?
+            rule.span <= depth && File.match?(rule.pattern, rule.span == depth ? path : leading_segments(path, rule.span))
+          in .anywhere?
+            any_prefix_matches?(rule.pattern, path)
+          end
+        rescue File::BadPatternError
+          # A malformed glob matches nothing, so a config typo can't crash
+          # a build; the other patterns still apply.
+          false
+        end
+      end
+
+      private def any_prefix_matches?(pattern : String, path : String) : Bool
         from = 0
         loop do
           slash = path.index('/', from)
-          prefix = slash ? path[0, slash] : path
-          return true if @ignore.any? { |pattern| Utils::PathUtils.glob_match?(pattern, prefix) }
+          return true if File.match?(pattern, slash ? path[0, slash] : path)
           return false unless slash
           from = slash + 1
         end
+      end
+
+      # The first `count` segments of `path` (which has more than that).
+      private def leading_segments(path : String, count : Int32) : String
+        slash = -1
+        count.times { slash = path.index('/', slash + 1) || return path }
+        path[0, slash]
       end
 
       private def denied_normalized?(normalized_path : String) : Bool
@@ -149,10 +215,12 @@ module Hwaro
       end
 
       # `[content] ignore` patterns: normalized like `disallow_paths`, with a
-      # trailing `/` dropped (`_templates/` names the directory itself).
+      # trailing `/` dropped (`_templates/` names the directory itself) and
+      # the gitignore/globset negated class `[!…]` spelled `[^…]`, the form
+      # `File.match?` reads (it takes `[!a]` as "`!` or `a`").
       def self.normalize_ignore(values : Array(String)) : Array(String)
         values.compact_map do |pattern|
-          normalized = normalize_path(pattern).rstrip('/')
+          normalized = normalize_path(pattern).rstrip('/').gsub("[!", "[^")
           normalized.empty? ? nil : normalized
         end
       end
