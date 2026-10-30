@@ -283,8 +283,9 @@ module Hwaro
       # publishing a page of its own (Builder#mark_term_metadata); every other
       # candidate stays an ordinary section, exactly as before. When several
       # files match one page (`_index.md` beside `_index.markdown`, or
-      # `_index.ko.md` beside `_index.ko.markdown`), the `.md` one wins, else
-      # the first path; the others are reported and not published.
+      # `_index.ko.md` beside `_index.ko.markdown`), a plain `_index.md` wins,
+      # then a `.md` one, else the first path; the others are reported and
+      # not published.
       def self.match_term_metadata(pages : Array(Models::Page), sections : Array(Models::Section), config : Models::Config) : Hash(String, TermFile)
         result = {} of String => TermFile
         candidates = sections.select { |s| term_metadata_path?(s.path, config) }
@@ -301,8 +302,9 @@ module Hwaro
         end
 
         winners = {} of String => String
-        # `.md` first (in every language), then path order.
-        candidates.sort_by { |s| {s.path.ends_with?(".md") ? 0 : 1, s.path} }.each do |section|
+        # A plain `_index.md`, then any other `.md` (`_index.ko.md` over
+        # `_index.ko.markdown`), then path order.
+        candidates.sort_by { |s| {File.basename(s.path) == "_index.md" ? 0 : (s.path.ends_with?(".md") ? 1 : 2), s.path} }.each do |section|
           url = section.url.ascii_only? ? section.url : section.url.unicode_normalize(:nfc)
           next unless urls.includes?(url)
           winner = winners[url]?

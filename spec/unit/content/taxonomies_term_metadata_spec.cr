@@ -493,6 +493,21 @@ describe "taxonomy term _index.md metadata" do
     log.should contain("content/tags/rust/_index.ko.markdown is ignored: content/tags/rust/_index.ko.md already describes the term page /ko/tags/rust/")
   end
 
+  it "prefers a plain _index.md over _index.<default>.md for a default-language term page" do
+    log = with_captured_log do
+      build_site(MULTILINGUAL_CONFIG,
+        content_files: {
+          "a.md"                   => post("A", ["rust"]),
+          "tags/rust/_index.md"    => "+++\ntitle = \"PLAIN\"\n+++\n",
+          "tags/rust/_index.en.md" => "+++\ntitle = \"EN\"\n+++\n",
+        },
+        template_files: TEMPLATES) do |dir|
+        File.read(File.join(dir, "public/tags/rust/index.html")).should start_with("T=PLAIN|")
+      end
+    end
+    log.should contain("content/tags/rust/_index.en.md is ignored: content/tags/rust/_index.md already describes the term page /tags/rust/")
+  end
+
   # Page 1 of a term lives at the term URL; nothing is written at page/1/,
   # so an alias there (a common SEO redirect) is free.
   it "writes a term-file alias at the term's page/1/" do
