@@ -40,8 +40,32 @@ describe "DateFilters locale" do
   }.each do |locale, month, month_abbr, day, day_abbr, pm|
     it "localizes every name directive for #{locale}" do
       localized("%B|%b|%h|%A|%a|%P|%p", locale).should eq(
-        [month, month_abbr, month_abbr, day, day_abbr, pm, pm.downcase].join('|'))
+        [month, month_abbr, month_abbr, day, day_abbr, pm, pm].join('|'))
     end
+  end
+
+  it "prints the CLDR AM/PM form for %p as well as %P (vi, tr have no lowercase form)" do
+    localized("%p %P", "vi").should eq("CH CH")
+    localized("%p %P", "tr", SUN_AM).should eq("ÖÖ ÖÖ")
+  end
+
+  it "never lets an incomplete prefix before a name read the name as a directive" do
+    {"%-", "%_", "%^", "%:", "%::", "%3", "%6", "%9"}.each do |prefix|
+      %w[a A b h B p P].each do |directive|
+        format = "#{prefix}%#{directive}"
+        # English: the prefix prints literally, then the name.
+        TUE_PM.to_s(format).should eq(prefix + TUE_PM.to_s("%#{directive}"))
+        {"fr", "nl", "de", "ko"}.each do |locale|
+          {TUE_PM, SUN_AM, Time.utc(2024, 5, 5), Time.utc(2024, 4, 1)}.each do |time|
+            localized(format, locale, time).should eq(prefix + localized("%#{directive}", locale, time))
+          end
+        end
+      end
+    end
+    localized("%_%a", "fr").should eq("%_mar.")
+    localized("%-%a", "fr", SUN_AM).should eq("%-dim.")
+    localized("%-%b", "nl", Time.utc(2024, 5, 5)).should eq("%-mei")
+    localized("%^%B", "de", Time.utc(2024, 4, 1)).should eq("%^April")
   end
 
   it "uses the Sunday/December/morning ends of each table" do
@@ -55,6 +79,12 @@ describe "DateFilters locale" do
   it "upcases the %^ forms in the locale" do
     localized("%^B %^b %^A %^a", "de").should eq("MÄRZ MÄRZ DIENSTAG DI.")
     localized("%^B", "ko").should eq("3월")
+  end
+
+  it "upcases Turkish with the dotted capital İ" do
+    localized("%^B", "tr", Time.utc(2024, 4, 1)).should eq("NİSAN")
+    localized("%^B %^a", "tr", Time.utc(2024, 10, 1)).should eq("EKİM SAL")
+    localized("%^A", "tr-TR", Time.utc(2024, 10, 2)).should eq("ÇARŞAMBA")
   end
 
   it "leaves every other directive to Time::Format" do
@@ -121,18 +151,47 @@ describe "DateFilters locale" do
     log.scan(/unknown locale "yy-ZZ"/).size.should eq(1)
   end
 
-  it "warns once across parallel render fibers" do
-    log = with_captured_log do
+  it "warns once per locale across parallel worker threads" do
+    locales = (0...300).map { |i| "q#{i}" }
+    sink = IO::Memory.new
+    with_captured_log do
+      # A bare IO::Memory drops lines under concurrent writers; production
+      # stderr goes through GuardedIO, so the capture does too.
+      Hwaro::Logger.io = Hwaro::Logger::GuardedIO.new(sink)
+      context = Fiber::ExecutionContext::Parallel.new("date-locale-spec", 8)
       done = Channel(Nil).new
-      8.times do
-        spawn do
-          10.times { localized("%B", "qq") }
+      8.times do |t|
+        context.spawn do
+          # Each worker walks the list from a different offset so threads
+          # collide on the same fresh locale.
+          locales.size.times { |i| DateFilters.format_time(TUE_PM, "%B", locales[(i + t) % locales.size]) }
           done.send(nil)
         end
       end
-      8.times { done.receive }
+      context.wake_idle_schedulers(8)
+      # Unguarded, concurrent `Set#add?` corrupts the hash and a worker spins
+      # forever (seen when the Mutex was removed); fail instead of hanging.
+      8.times do
+        select
+        when done.receive
+        when timeout(30.seconds)
+          fail "date-locale workers hung: the warn-once set was corrupted by concurrent access"
+        end
+      end
     end
-    log.scan(/unknown locale "qq"/).size.should eq(1)
+    log = sink.to_s
+    locales.each { |loc| log.scan(/unknown locale "#{loc}"/).size.should eq(1) }
+  end
+
+  it "treats a whitespace-only locale as no locale, without a warning" do
+    log = with_captured_log { localized("%B", "  ").should eq("March") }
+    log.should_not contain("unknown locale")
+  end
+
+  it "accepts a safe-string locale" do
+    vars = {"d" => Crinja::Value.new(TUE_PM)}
+    render_crinja("{{ d | date(format='%A', locale=('ko' | safe)) }}", vars).should eq("화요일")
+    render_crinja("{{ now(format='%P', locale=('ja' | safe)) }}").should match(/\A午[前後]\z/)
   end
 
   it "warns again after the per-build reset" do

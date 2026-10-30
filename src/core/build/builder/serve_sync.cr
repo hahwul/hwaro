@@ -600,6 +600,9 @@ module Hwaro
           # A serve pass is a new build for `asset_integrity()` and the SRI
           # tags: re-hash, and re-map the copied sources.
           Utils::SriCache.clear
+          # ...and for the date filter's unknown-locale warning, which a
+          # still-wrong `locale=` must repeat on every rebuild.
+          Content::Processors::Filters::DateFilters.clear_locale_warnings
           @context.try { |ctx| publish_asset_sources(ctx) }
           forget_created_dirs
           # The tree now holds the previous build's files, served live.

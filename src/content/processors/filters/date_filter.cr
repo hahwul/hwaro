@@ -8,22 +8,18 @@ module Hwaro
           # Month, weekday and AM/PM names for one locale: CLDR "format"
           # context, wide and abbreviated. Weekdays run Monday first, matching
           # `Time::DayOfWeek#value` (Monday = 1 … Sunday = 7).
-          struct LocaleNames
-            getter months : Array(String)
-            getter months_abbr : Array(String)
-            getter days : Array(String)
-            getter days_abbr : Array(String)
-            getter am : String
-            getter pm : String
-            # `%p` is the lowercase form (Crystal prints `am`/`pm` for it).
-            getter am_lower : String
-            getter pm_lower : String
-
-            def initialize(@months, @months_abbr, @days, @days_abbr, @am, @pm)
-              @am_lower = am.downcase
-              @pm_lower = pm.downcase
-            end
-          end
+          # `%p` and `%P` both print `am`/`pm` as written: only English has a
+          # lowercase variant (Crystal's `am`/`pm`), and lowercasing a CLDR
+          # form makes a non-word in vi (`ch`) or tr (`ös`). `upcase` is the
+          # case rule `%^` applies (Turkish needs `i` → `İ`).
+          record LocaleNames,
+            months : Array(String),
+            months_abbr : Array(String),
+            days : Array(String),
+            days_abbr : Array(String),
+            am : String,
+            pm : String,
+            upcase : Unicode::CaseOptions = Unicode::CaseOptions::None
 
           # `Time#to_s(format)` raises a bare Crystal `IndexError` on a
           # malformed format string (a trailing `%`, e.g. `date("%")`) — not a
@@ -37,7 +33,9 @@ module Hwaro
           # English locale, is Crystal's own output byte for byte.
           def self.format_time(time : Time, format : String, locale : String = "") : String
             names = locale.empty? ? nil : locale_names(locale)
-            time.to_s(names ? localize_format(format, time, names) : format)
+            marked = names ? mark_names(format) : nil
+            return time.to_s(format) unless names && marked
+            fill_names(time.to_s(marked), time, names)
           rescue ex : IndexError | ArgumentError
             raise Crinja::TypeError.new("invalid date format #{format.inspect}: #{ex.message}")
           end
@@ -45,7 +43,10 @@ module Hwaro
           # The `locale=` argument as a string; none/undefined (an unset
           # `page.language`) or a non-string means "no locale".
           def self.locale_arg(value : Crinja::Value) : String
-            (raw = value.raw).is_a?(String) ? raw : ""
+            case raw = value.raw
+            when String, Crinja::SafeString then raw.to_s
+            else                                 ""
+            end
           end
 
           # The name table for `locale`, or nil for Crystal's English names.
@@ -57,6 +58,7 @@ module Hwaro
             LOCALES[locale]?.try { |names| return names }
             return if locale == "en"
             key = locale.strip.downcase.tr("-", "_")
+            return if key.empty? # `locale=" "` is no locale, not an unknown one
             loop do
               return if key == "en"
               LOCALES[key]?.try { |names| return names }
@@ -75,22 +77,32 @@ module Hwaro
             Logger.warn "date: unknown locale #{locale.inspect}; month and weekday names render in English." if first
           end
 
-          # Called at the start of every build (Builder#run), so a locale that
-          # is still wrong warns again on the next `serve` rebuild.
+          # Called at the start of every build (Builder#run) and serve pass
+          # (Builder#begin_serve_pass), so a locale that is still wrong warns
+          # again on the next rebuild.
           def self.clear_locale_warnings : Nil
             @@warned_mutex.synchronize { @@warned_locales.clear }
           end
 
-          # Rewrites `format` with the localized names spliced in as literal
-          # text, leaving every other directive for `Time#to_s` exactly as
-          # written. A `%` pair that is not a name directive (`%%`, `%-d`,
-          # `%_m`, `%3N`, `%::z`, …) is copied verbatim, two chars at a time,
-          # which tokenizes the same way `Time::Format` does.
-          def self.localize_format(format : String, time : Time, names : LocaleNames) : String
-            String.build(format.bytesize + 16) do |io|
+          # Name directives become one marker char each (a Unicode
+          # noncharacter, U+FDD0 + kind), `Time#to_s` formats the rest, and
+          # `fill_names` swaps the markers for names afterwards. Splicing the
+          # names into the format instead let a dangling prefix (`%-`, `%_`,
+          # `%^`, `%:`, `%3`) re-read a name's first letter as a directive:
+          # `%_%a` in French printed " 3ar." for "%_mar.". A marker is never a
+          # directive, so it prints literally wherever it lands.
+          #
+          # A `%` pair that is not a name directive (`%%`, `%-d`, `%_m`, `%3N`,
+          # …) is copied verbatim, which tokenizes the way `Time::Format` does.
+          # Returns nil when there is nothing to localize, or when the format
+          # itself holds a marker char (never in real text), to stay English.
+          def self.mark_names(format : String) : String?
+            found = false
+            marked = String.build(format.bytesize + 4) do |io|
               reader = Char::Reader.new(format)
               while reader.has_next?
                 char = reader.current_char
+                return if MARKER_RANGE.includes?(char.ord)
                 reader.next_char
                 unless char == '%' && reader.has_next?
                   io << char # a trailing `%` stays and raises in `Time#to_s`
@@ -100,23 +112,40 @@ module Hwaro
                 upcase = directive == '^' && reader.peek_next_char.in?('a', 'A', 'b', 'h', 'B')
                 directive = reader.next_char if upcase
                 reader.next_char
-                if name = localized_name(directive, time, names)
-                  io << (upcase ? name.upcase : name)
+                if kind = NAME_KINDS.index(directive == 'h' ? 'b' : directive)
+                  found = true
+                  io << (MARKER_BASE + kind + (upcase ? UPCASE_OFFSET : 0)).chr
                 else
                   io << '%' << directive
                 end
               end
             end
+            marked if found
           end
 
-          private def self.localized_name(directive : Char, time : Time, names : LocaleNames) : String?
-            case directive
-            when 'a'      then names.days_abbr[time.day_of_week.value - 1]
-            when 'A'      then names.days[time.day_of_week.value - 1]
-            when 'b', 'h' then names.months_abbr[time.month - 1]
-            when 'B'      then names.months[time.month - 1]
-            when 'p'      then time.hour < 12 ? names.am_lower : names.pm_lower
-            when 'P'      then time.hour < 12 ? names.am : names.pm
+          NAME_KINDS    = {'a', 'A', 'b', 'B', 'p', 'P'}
+          MARKER_BASE   = 0xFDD0
+          UPCASE_OFFSET = NAME_KINDS.size
+          MARKER_RANGE  = MARKER_BASE...(MARKER_BASE + 2 * NAME_KINDS.size)
+
+          private def self.fill_names(text : String, time : Time, names : LocaleNames) : String
+            String.build(text.bytesize + 32) do |io|
+              text.each_char do |char|
+                ord = char.ord
+                unless MARKER_RANGE.includes?(ord)
+                  io << char
+                  next
+                end
+                kind = (ord - MARKER_BASE) % UPCASE_OFFSET
+                name = case NAME_KINDS[kind]
+                       when 'a' then names.days_abbr[time.day_of_week.value - 1]
+                       when 'A' then names.days[time.day_of_week.value - 1]
+                       when 'b' then names.months_abbr[time.month - 1]
+                       when 'B' then names.months[time.month - 1]
+                       else          time.hour < 12 ? names.am : names.pm
+                       end
+                io << (ord - MARKER_BASE >= UPCASE_OFFSET ? name.upcase(names.upcase) : name)
+              end
             end
           end
 
@@ -174,6 +203,8 @@ module Hwaro
           # "5 marca"). `pt` is Brazilian Portuguese, as in CLDR, so `pt_BR`
           # resolves to it; Traditional Chinese (`zh_TW`) also serves `zh_Hant`,
           # `zh_HK` and `zh_MO`. English is Crystal's own names, not a table.
+          # AM/PM is the abbreviated CLDR form, except Korean, which uses the
+          # wide 오전/오후 on purpose (ICU's Korean patterns print it too).
           ZH_HANT = LocaleNames.new(
             months: %w[1月 2月 3月 4月 5月 6月 7月 8月 9月 10月 11月 12月],
             months_abbr: %w[1月 2月 3月 4月 5月 6月 7月 8月 9月 10月 11月 12月],
@@ -257,7 +288,7 @@ module Hwaro
               months_abbr: %w[Oca Şub Mar Nis May Haz Tem Ağu Eyl Eki Kas Ara],
               days: %w[Pazartesi Salı Çarşamba Perşembe Cuma Cumartesi Pazar],
               days_abbr: %w[Pzt Sal Çar Per Cum Cmt Paz],
-              am: "ÖÖ", pm: "ÖS"),
+              am: "ÖÖ", pm: "ÖS", upcase: Unicode::CaseOptions::Turkic),
             "vi" => LocaleNames.new(
               months: ["tháng 1", "tháng 2", "tháng 3", "tháng 4", "tháng 5", "tháng 6",
                        "tháng 7", "tháng 8", "tháng 9", "tháng 10", "tháng 11", "tháng 12"],
