@@ -251,7 +251,7 @@ ignore = [
 | `deployment-target-undefined` | config | deployment.target에 대응하는 `[[deployment.targets]]` 없음 |
 | `related-taxonomy-undefined` | config | `[related]`가 정의되지 않은 택소노미를 참조 |
 | `menu-parent-undefined` | config | 메뉴 항목의 `parent`가 같은 메뉴의 identifier와 맞지 않음 |
-| `version-path-missing` | config | `[[versions.list]]` 경로가 `content/` 아래에 없음 |
+| `version-path-missing` | config | `[[versions.list]]` 경로가 `content/` 아래에 없거나 `[content] ignore`로 제외됨 |
 | `config-path-missing` | config | 참조한 파일이 존재하지 않음 |
 | `config-dir-missing` | config | 참조한 디렉터리가 존재하지 않음 |
 | `build-output-unusable` | config | `[build] output_dir`로 라우트를 검증할 수 없음 (없거나 `hwaro serve` 출력) |
@@ -271,6 +271,7 @@ ignore = [
 | `content-template-missing` | content | 프론트 매터의 `template` / `page_template` / `[cascade] template`이 없는 템플릿을 가리킴 |
 | `content-schema-violation` | content | 프론트 매터가 `[[content.schema]]`를 위반 ✗ |
 | `structure-missing-index` | structure | `_index.md`가 없는 섹션 |
+| `content-ignore-hides-sections` | structure | `[content] ignore` 패턴이 섹션의 `_index.md`를 숨기는데 그 섹션의 페이지는 여전히 빌드됨 |
 | `translation-missing` | i18n | 설정된 언어에 대응 페이지가 없는 페이지나 섹션 |
 | `translation-orphan` | i18n | 기본 언어 원본이 없는 번역 |
 

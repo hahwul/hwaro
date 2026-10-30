@@ -70,11 +70,61 @@ module Hwaro
       property allow_extensions : Array(String)
       property disallow_extensions : Array(String)
       property disallow_paths : Array(String)
+      # `[content] ignore` — content-relative globs Hwaro never sees: no
+      # page, section, bundle asset or published file comes from a match.
+      # Read from `[content]`, not `[content.files]`, but held here because
+      # every non-page consumer of content/ already asks `publish?` /
+      # `denied?`, so they honour it without extra plumbing; the page lanes
+      # ask `ignored?` directly.
+      getter ignore : Array(String)
+
+      # How one `ignore` pattern is tested (see `ignore=`). Most patterns are
+      # a plain name (`README.md`, `_templates`) or a plain folder plus `/**`,
+      # which a string compare answers; a glob without `**`, braces or a
+      # `[…]` class (which may match a `/`) matches only a path of exactly its
+      # own depth, so one prefix is tested instead of every ancestor.
+      #
+      # A pattern written with a trailing `/` (gitignore's folder form)
+      # matches folders only: `_*/` hides `_templates/` but not `_index.md`.
+      enum IgnoreKind
+        Literal  = 0
+        Tree     = 1
+        Depth    = 2
+        Anywhere = 3
+      end
+
+      record IgnoreRule, kind : IgnoreKind, pattern : String, span : Int32, folders_only : Bool
 
       def initialize
         @allow_extensions = [] of String
         @disallow_extensions = [] of String
         @disallow_paths = [] of String
+        @ignore = [] of String
+        @ignore_rules = [] of IgnoreRule
+      end
+
+      def ignore=(patterns : Array(String))
+        @ignore = patterns
+        @ignore_rules = patterns.map { |pattern| ContentFilesConfig.compile_ignore(Utils::PathUtils.nfc(pattern)) }
+      end
+
+      protected def self.compile_ignore(pattern : String) : IgnoreRule
+        folders = pattern.ends_with?('/')
+        pattern = pattern.rstrip('/')
+        head = pattern.ends_with?("/**") ? pattern[0, pattern.size - 3] : nil
+        if glob_literal?(pattern)
+          IgnoreRule.new(IgnoreKind::Literal, pattern, 0, folders)
+        elsif !folders && head && !head.empty? && glob_literal?(head)
+          IgnoreRule.new(IgnoreKind::Tree, "#{head}/", 0, folders)
+        elsif pattern.includes?("**") || pattern.includes?('{') || pattern.includes?('[')
+          IgnoreRule.new(IgnoreKind::Anywhere, pattern, 0, folders)
+        else
+          IgnoreRule.new(IgnoreKind::Depth, pattern, pattern.count('/') + 1, folders)
+        end
+      end
+
+      private def self.glob_literal?(pattern : String) : Bool
+        pattern.each_char.none?(&.in?('*', '?', '[', ']', '{', '}'))
       end
 
       def enabled? : Bool
@@ -87,6 +137,7 @@ module Hwaro
         return false if ext.empty?
         return false if ext == ".md"
         return false unless @allow_extensions.includes?(ext)
+        return false if ignored?(relative_path)
         !denied_normalized?(normalized_path)
       end
 
@@ -95,7 +146,63 @@ module Hwaro
       # `.json`/`.xml` files publish without an allow-list entry, but the deny
       # rules still apply to them.
       def denied?(relative_path : String) : Bool
-        denied_normalized?(ContentFilesConfig.normalize_path(relative_path))
+        ignored?(relative_path) || denied_normalized?(ContentFilesConfig.normalize_path(relative_path))
+      end
+
+      # True when `[content] ignore` hides `relative_path` (content-relative).
+      # A pattern matching any ancestor directory hides the whole subtree, so
+      # `_templates` alone covers `_templates/note.md`, like `_templates/**`.
+      # Case-sensitive, like `disallow_paths`.
+      #
+      # `relative_path` is only tidied (backslashes to `/`, a leading `./` dropped),
+      # never stripped of a leading `content/` the way patterns are: that
+      # segment of a real `content/content/x.md` is a folder of its own.
+      def ignored?(relative_path : String) : Bool
+        return false if @ignore.empty?
+        ignored_normalized?(relative_path.gsub('\\', '/').lchop("./"))
+      end
+
+      private def ignored_normalized?(path : String) : Bool
+        return false if @ignore_rules.empty? || path.empty? || path == ".." || path.starts_with?("../")
+        path = Utils::PathUtils.nfc(path)
+        depth = path.count('/') + 1
+        @ignore_rules.any? do |rule|
+          # A folders-only rule never tests the path's own last segment.
+          limit = rule.folders_only ? depth - 1 : depth
+          case rule.kind
+          in .literal?
+            (path == rule.pattern && !rule.folders_only) || (path.starts_with?(rule.pattern) && path.byte_at?(rule.pattern.bytesize) == '/'.ord)
+          in .tree?
+            path.starts_with?(rule.pattern)
+          in .depth?
+            rule.span <= limit && File.match?(rule.pattern, rule.span == depth ? path : leading_segments(path, rule.span))
+          in .anywhere?
+            any_prefix_matches?(rule.pattern, path, limit)
+          end
+        rescue File::BadPatternError
+          # A malformed glob matches nothing, so a config typo can't crash
+          # a build; the other patterns still apply.
+          false
+        end
+      end
+
+      # Whether `pattern` matches one of the first `limit` prefixes of `path`.
+      private def any_prefix_matches?(pattern : String, path : String, limit : Int32) : Bool
+        from = 0
+        limit.times do
+          slash = path.index('/', from)
+          return true if File.match?(pattern, slash ? path[0, slash] : path)
+          return false unless slash
+          from = slash + 1
+        end
+        false
+      end
+
+      # The first `count` segments of `path` (which has more than that).
+      private def leading_segments(path : String, count : Int32) : String
+        slash = -1
+        count.times { slash = path.index('/', slash + 1) || return path }
+        path[0, slash]
       end
 
       private def denied_normalized?(normalized_path : String) : Bool
@@ -118,8 +225,23 @@ module Hwaro
         end
       end
 
+      # `[content] ignore` patterns: normalized like `disallow_paths`, with
+      # trailing slashes folded to one (the folders-only form, see
+      # IgnoreKind) and the gitignore/globset negated class `[!…]` spelled
+      # `[^…]`, the form `File.match?` reads (it takes `[!a]` as "`!` or `a`").
+      def self.normalize_ignore(values : Array(String)) : Array(String)
+        values.compact_map do |pattern|
+          normalized = normalize_path(pattern)
+          folders = normalized.ends_with?('/')
+          normalized = normalized.rstrip('/').gsub("[!", "[^")
+          next if normalized.empty?
+          folders ? "#{normalized}/" : normalized
+        end
+      end
+
       def self.normalize_path(path : String) : String
         path = path.strip.gsub('\\', '/')
+        path = path.lchop("./")
         path = path.lchop("/")
         path = path.lchop("content/")
         path
@@ -223,7 +345,22 @@ module Hwaro
     class Config
       private def self.load_content_files(config : Config)
         return unless content_section = config.raw["content"]?.try(&.as_h?)
+        ignore_any = content_section["ignore"]?
+        if patterns = string_list?(ignore_any, "[content] ignore")
+          # string_list? drops a non-string entry in silence; a pattern that
+          # vanished is a file that still publishes, so name it.
+          ignore_any.try(&.as_a?).try &.each do |entry|
+            Logger.warn "Ignoring [content] ignore entry #{entry.raw.inspect}: patterns must be strings." if entry.as_s?.nil?
+          end
+          config.content_files.ignore = ContentFilesConfig.normalize_ignore(patterns)
+        end
         return unless s = content_section["files"]?.try(&.as_h?)
+
+        # The natural first guess, but the key lives on [content]: under
+        # [content.files] it would hide nothing.
+        if s.has_key?("ignore")
+          Logger.warn "[content.files] ignore has no effect: the key belongs on [content] (write `ignore = [...]` under [content])."
+        end
 
         allow_any = s["allow_extensions"]? || s["extensions"]?
         disallow_any = s["disallow_extensions"]?

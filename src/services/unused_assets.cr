@@ -222,10 +222,14 @@ module Hwaro
 
         # Co-located assets in content directory
         if Dir.exists?(@content_dir)
+          # A file `[content] ignore` hides is not the site's asset: never
+          # reported, never deleted.
+          ignore = ContentWalk.ignore_rules(@content_dir)
           Dir.glob(File.join(Utils::PathUtils.glob_escape(@content_dir), "**", "*")) do |path|
             ext = File.extname(path).downcase
             next if CONTENT_EXTENSIONS.includes?(ext)
             next unless ASSET_EXTENSIONS.includes?(ext)
+            next if ignore.ignored?(path)
             assets << path if ContentWalk.readable_file?(path)
           end
         end
@@ -240,7 +244,9 @@ module Hwaro
         scan_files = [] of String
 
         if Dir.exists?(@content_dir)
-          scan_files.concat(ContentWalk.find_content_files(@content_dir))
+          # Ignored Markdown too: a page can `include_md` an ignored partial,
+          # and an asset only that partial names is still published.
+          scan_files.concat(ContentWalk.find_content_files(@content_dir, ContentWalk::Ignore.none))
         end
 
         if Dir.exists?(@templates_dir)

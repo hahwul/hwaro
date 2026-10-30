@@ -18,6 +18,8 @@ module Hwaro
 
       @output_dir : String? = nil
       @draft_paths = Set(String).new
+      # `[content] ignore`: an ignored page publishes no alias.
+      @ignore = ContentWalk::Ignore.none
 
       def initialize(@config : Models::Config)
       end
@@ -368,7 +370,8 @@ module Hwaro
 
         # Own flag or one cascaded from a section (ContentLister is the
         # publish-state source of truth).
-        @draft_paths = ContentLister.new(content_dir).draft_paths
+        @ignore = ContentWalk::Ignore.new(@config.content_files, content_dir, content_dir)
+        @draft_paths = ContentLister.new(content_dir, ignore: @ignore).draft_paths
         scan_content_for_aliases(content_dir, redirects)
         redirects
       end
@@ -388,6 +391,8 @@ module Hwaro
         end
         children.each do |entry|
           path = File.join(dir, entry)
+          # `[content] ignore` hides it from the build: no page, no alias.
+          next if @ignore.ignored?(path)
           # `follow_symlinks: false` keeps a symlinked directory (including a
           # cycle like `ln -s . content/loop`) from being recursed into —
           # following one used to recurse until ELOOP aborted the whole

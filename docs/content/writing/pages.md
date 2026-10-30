@@ -40,6 +40,8 @@ Your content in **Markdown**.
 
 For JSON, the first balanced `{...}` at the very start of the file is the front matter, and no fence is needed. The file must begin with `{` (no leading whitespace).
 
+Every `.md` and `.markdown` file under `content/` becomes a page, front matter or not. To keep a file out of the site (a `README.md`, note templates), list it in [`[content] ignore`](/start/config/#ignoring-content-files).
+
 ## Front Matter
 
 ### Required

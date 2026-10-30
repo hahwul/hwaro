@@ -25,6 +25,8 @@ module Hwaro
           issues << Issue.new(id: "config-parse-error", level: :error, category: "config", file: @config_path, message: "Failed to parse config: #{ex.message}")
           return
         end
+        # Every content check skips what this (env-aware) config ignores.
+        @content_ignore = ContentWalk.ignore_rules(@content_dir, config, @config_path)
 
         check_base_url(issues, config)
         check_title(issues, config)
@@ -164,9 +166,16 @@ module Hwaro
         # entry links to a 404 root).
         config.versions.list.each do |version|
           dir = File.join(@content_dir, version.path)
-          next if Dir.exists?(dir)
-          issues << Issue.new(id: "version-path-missing", level: :warning, category: "config", file: @config_path,
-            message: "version \"#{version.name}\" points at content path \"#{version.path}\" which does not exist (#{dir})")
+          if !Dir.exists?(dir)
+            issues << Issue.new(id: "version-path-missing", level: :warning, category: "config", file: @config_path,
+              message: "version \"#{version.name}\" points at content path \"#{version.path}\" which does not exist (#{dir})")
+          elsif @content_ignore.ignored?(File.join(dir, "hwaro-probe"))
+            # The build never reads an ignored folder (probed through a child
+            # so folders-only patterns count): the version publishes
+            # nothing, exactly as if the path were missing.
+            issues << Issue.new(id: "version-path-missing", level: :warning, category: "config", file: @config_path,
+              message: "version \"#{version.name}\" points at content path \"#{version.path}\", which [content] ignore hides — the version publishes no pages")
+          end
         end
       end
 
@@ -293,6 +302,7 @@ module Hwaro
         ids = Set(String).new
         Dir.glob(File.join(Utils::PathUtils.glob_escape(@content_dir), "**", "_index.*")) do |path|
           next unless ContentWalk.markdown?(path)
+          next if @content_ignore.ignored?(path)
           dir = Path[File.dirname(path)].relative_to(@content_dir).to_posix.to_s
           dir = "" if dir == "."
           Content::Menus.top_level_dir(dir, config.versions.for_path(dir)).try { |id| ids << id }

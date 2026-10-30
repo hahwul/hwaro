@@ -101,6 +101,8 @@ disallow_paths = ["drafts/**", "**/_*", "private/**"]
 
 경로는 `content/` 디렉터리 기준 상대 경로로 매칭됩니다. 거부 규칙(`disallow_extensions`, `disallow_paths`)은 `allow_extensions` 설정 여부와 관계없이 페이지 번들 안의 파일에도 적용됩니다.
 
+`disallow_paths`는 마크다운이 아닌 파일에만 적용됩니다. 마크다운까지 포함해 경로를 사이트에서 완전히 빼려면(`README.md`, `_templates/` 폴더 등) [`[content] ignore`](/ko/start/config/#콘텐츠-파일-제외)를 사용하세요. 같은 패턴을 쓰며, 제외된 파일은 페이지도, 번들 에셋도, 발행 파일도 되지 않습니다.
+
 ## 콘텐츠 파일 참조
 
 ### 마크다운에서

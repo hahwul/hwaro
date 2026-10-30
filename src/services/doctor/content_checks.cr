@@ -38,7 +38,58 @@ module Hwaro
         # `docs/_index.md` collides with the latest version's root, and
         # without it the build writes a redirect stub there.
         version_parents = config.versions.list.map(&.parent_dir).reject(&.empty?).to_set
+        check_broad_ignore_patterns(issues, config)
         walk_section_dirs(@content_dir, issues, index_names(config), version_parents)
+      end
+
+      # A pattern that hides a section's `_index.*` while pages of that
+      # section still build: the section page and its listing are gone. Each
+      # pattern is tested against the real index files.
+      #
+      # `["_*"]` (or `**/_*`, `blog/_*`) usually means "underscore folders",
+      # but without a trailing `/` it matches files too: the advice is the
+      # folders-only form. A pattern naming index files itself
+      # (`notes/_index.md`, `**/_index*`) is deliberate, so it gets an info
+      # line saying which index it hides instead.
+      private def check_broad_ignore_patterns(issues : Array(Issue), config : Models::Config) : Nil
+        patterns = config.content_files.ignore
+        return if patterns.empty?
+
+        indexes = [] of String
+        built_dirs = Set(String).new
+        ContentWalk.find_content_files(@content_dir, ContentWalk::Ignore.none).each do |file|
+          if File.basename(file).starts_with?("_index.")
+            indexes << file
+          elsif !@content_ignore.ignored?(file)
+            # Every folder above a page that builds holds that page.
+            dir = File.dirname(file)
+            loop do
+              break unless built_dirs.add?(dir)
+              parent = File.dirname(dir)
+              break if parent == dir
+              dir = parent
+            end
+          end
+        end
+        return if indexes.empty?
+
+        patterns.each do |pattern|
+          probe = Models::ContentFilesConfig.new
+          probe.ignore = [pattern]
+          rules = @content_ignore.with_rules(probe)
+          hidden = indexes.select { |index| rules.ignored?(index) && built_dirs.includes?(File.dirname(index)) }
+          next if hidden.empty?
+
+          named = hidden.first(3).join(", ") + (hidden.size > 3 ? ", …" : "")
+          last = pattern.rstrip('/').split('/').last
+          if last.includes?("_index") || last.each_char.none?(&.in?('*', '?', '[', '{'))
+            issues << Issue.new(id: "content-ignore-hides-sections", level: :info, category: "structure", file: @config_path,
+              message: "[content] ignore pattern \"#{pattern}\" hides the section index #{named}; its pages still build, without a section page")
+          else
+            issues << Issue.new(id: "content-ignore-hides-sections", level: :warning, category: "structure", file: @config_path,
+              message: "[content] ignore pattern \"#{pattern}\" also hides section index files whose pages still build (#{named}); end it with / to match folders only (\"#{pattern.rstrip('/')}/\")")
+          end
+        end
       end
 
       # The base names that count as an index page for this site: always
@@ -68,6 +119,7 @@ module Hwaro
         Dir.each_child(root) do |entry|
           next if entry.starts_with?(".") || entry.starts_with?("_")
           child = File.join(root, entry)
+          next if content_ignored?(child)
           # A symlinked directory can close a cycle (`ln -s .. content/x/y`),
           # and this walk follows it: `File.directory?` resolves the link, so
           # the recursion only stops when the kernel gives up at MAXSYMLINKS
@@ -113,8 +165,14 @@ module Hwaro
       # case-insensitively, like `ReadContent`: a `*.{md,markdown}` glob
       # missed `Post.MD`, which the build publishes.
       private def dir_contains_markdown?(dir : String) : Bool
-        Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "**", "*")) { |path| return true if ContentWalk.markdown?(path) }
+        Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "**", "*")) { |path| return true if ContentWalk.markdown?(path) && !content_ignored?(path) }
         false
+      end
+
+      # Hidden by the site's `[content] ignore`: never a page, so never a
+      # finding either.
+      private def content_ignored?(path : String) : Bool
+        @content_ignore.ignored?(path)
       end
 
       # Returns true if the directory contains markdown files anywhere
@@ -124,11 +182,12 @@ module Hwaro
       # bundles rather than true sections.
       private def dir_has_markdown_in_subdirs?(dir : String, index_names : Set(String)) : Bool
         # Any markdown deeper than direct children of this dir?
-        Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "*", "*")) { |path| return true if ContentWalk.markdown?(path) }
+        Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "*", "*")) { |path| return true if ContentWalk.markdown?(path) && !content_ignored?(path) }
 
         # Any direct markdown file that is *not* an index page?
         Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "*")) do |path|
           next unless ContentWalk.markdown?(path)
+          next if content_ignored?(path)
           return true unless index_names.includes?(markdown_stem(File.basename(path)))
         end
 
@@ -138,16 +197,21 @@ module Hwaro
       # True when `dir` holds a section index (`_index.md`, or a declared
       # per-language spelling such as `_index.ko.md`).
       private def section_index?(dir : String, index_names : Set(String)) : Bool
-        return true if File.exists?(File.join(dir, "_index.md")) ||
-                       File.exists?(File.join(dir, "_index.markdown"))
+        return true if visible_file?(File.join(dir, "_index.md")) ||
+                       visible_file?(File.join(dir, "_index.markdown"))
         # Only a multilingual site has more spellings to look for, and only
         # then is the extra glob per directory worth paying for.
         return false if index_names.size <= 2
 
         Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "_index.*.{md,markdown}")) do |path|
+          next if content_ignored?(path)
           return true if index_names.includes?(markdown_stem(File.basename(path)))
         end
         false
+      end
+
+      private def visible_file?(path : String) : Bool
+        File.exists?(path) && !content_ignored?(path)
       end
 
       # `index.ko.md` -> "index.ko". Only the markdown extension is
@@ -192,7 +256,7 @@ module Hwaro
         # glob skipped `Post.MD`, so doctor reported a clean site the build
         # then failed on), and lstat-first so a symlink cycle
         # (`ln -s loop.md content/loop.md`) can't raise ELOOP out of the run.
-        files = ContentWalk.find_content_files(@content_dir)
+        files = ContentWalk.find_content_files(@content_dir, @content_ignore)
         return if files.empty?
 
         menus = MenuScope.new(config)
@@ -206,7 +270,7 @@ module Hwaro
 
       # `[[content.schema]]` violations, one error per violation.
       private def check_content_schema(issues : Array(Issue), config : Models::Config)
-        Doctor.content_schema_results(@content_dir, config).each do |_, result|
+        Doctor.content_schema_results(@content_dir, config, @content_ignore).each do |_, result|
           issues.concat(result.violations.map { |v| Doctor.schema_issue(v) })
         end
       end
@@ -222,7 +286,7 @@ module Hwaro
       # pages), with section cascades resolved by the build's own
       # `build_cascade_map` / `merged_cascade_for`. {file, result} per
       # checked page, in path order. Shared by doctor and `tool validate`.
-      def self.content_schema_results(content_dir : String, config : Models::Config) : Array({String, Content::FrontMatterSchema::Result})
+      def self.content_schema_results(content_dir : String, config : Models::Config, ignore : ContentWalk::Ignore = ContentWalk.ignore_rules(content_dir)) : Array({String, Content::FrontMatterSchema::Result})
         results = [] of {String, Content::FrontMatterSchema::Result}
         return results if config.content_schema.empty? || !Dir.exists?(content_dir)
 
@@ -234,7 +298,7 @@ module Hwaro
           menus = MenuScope.new(config)
           sections = [] of Models::Section
           pages = [] of {Models::Page, String, String, Hash(String, Models::ExtraValue), Bool}
-          ContentLister.new(content_dir, GeneratedContent.infos(content_dir)).list_all.each do |info|
+          ContentLister.new(content_dir, GeneratedContent.infos(content_dir, ignore.rules), ignore).list_all.each do |info|
             generated = !info.generated_from.nil?
             relative = generated ? info.path : Path[info.path].relative_to(content_dir).to_s
             file = generated ? File.join(content_dir, info.path) : info.path
@@ -309,7 +373,7 @@ module Hwaro
         # build (`products/blue.ko.md` ↔ generated `products/blue.md`), so they
         # count as originals; they have no file to report as untranslated.
         generated = {} of String => String
-        entries = ContentLister.new(@content_dir, GeneratedContent.infos(@content_dir)).list_all.select(&.published?).sort_by!(&.path).map do |info|
+        entries = ContentLister.new(@content_dir, GeneratedContent.infos(@content_dir, @content_ignore.rules), @content_ignore).list_all.select(&.published?).sort_by!(&.path).map do |info|
           relative = info.generated_from ? info.path : Path[info.path].relative_to(@content_dir).to_s
           file = info.generated_from ? File.join(@content_dir, info.path) : info.path
           info.generated_source.try { |source| generated[file] = source }

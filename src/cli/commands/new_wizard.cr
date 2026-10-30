@@ -1,5 +1,6 @@
 require "../prompt"
 require "../../config/options/new_options"
+require "../../services/content_lister"
 require "../../services/creator"
 require "../../utils/logger"
 
@@ -117,7 +118,12 @@ module Hwaro
           return [] of String unless Dir.exists?(CONTENT_DIR)
           # Skip dot-dirs (.obsidian, .git worktrees, …) — they are ignored by
           # the build, so suggesting them as sections would be misleading.
-          Dir.children(CONTENT_DIR).select { |c| !c.starts_with?('.') && Dir.exists?(File.join(CONTENT_DIR, c)) }.sort!
+          # Folders `[content] ignore` hides (probed through a child, so a
+          # folders-only pattern counts) are no sections either.
+          ignore = Services::ContentWalk.ignore_rules(CONTENT_DIR)
+          Dir.children(CONTENT_DIR).select do |c|
+            !c.starts_with?('.') && Dir.exists?(File.join(CONTENT_DIR, c)) && !ignore.ignored?(File.join(CONTENT_DIR, c, "hwaro-probe"))
+          end.sort!
         rescue
           [] of String
         end

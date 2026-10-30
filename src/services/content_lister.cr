@@ -6,6 +6,7 @@
 require "json"
 require "yaml"
 require "toml"
+require "../models/config"
 require "../utils/date_utils"
 require "../utils/frontmatter_scanner"
 require "../utils/logger"
@@ -53,7 +54,10 @@ module Hwaro
       # for files the build itself skips. `tool list`, `tool stats`,
       # `tool validate` and `tool convert` all walk through here, so they
       # stay consistent with each other.
-      def find_content_files(content_dir : String) : Array(String)
+      #
+      # Files `[content] ignore` hides are left out, so no tool lists,
+      # validates, converts or link-checks what the build never reads.
+      def find_content_files(content_dir : String, ignore : Ignore = ignore_rules(content_dir)) : Array(String)
         files = [] of String
 
         # Match ReadContent's case-insensitive extension check. Lowercase-only
@@ -62,10 +66,112 @@ module Hwaro
         # silently disagreed with the build.
         Dir.glob(File.join(Utils::PathUtils.glob_escape(content_dir), "**", "*")) do |file|
           next unless markdown?(file)
+          next if ignore.ignored?(file)
           files << file if readable_file?(file)
         end
 
         files.sort
+      end
+
+      # `[content] ignore` rules bound to the content root they are written
+      # against (`content/` beside the config that holds them), answering for
+      # paths under one walked directory. A walk of a subdirectory
+      # (`-c content/blog`) still matches `blog/b.md`, and a directory outside
+      # that root is matched by none of its rules.
+      #
+      # Paths spelled under the walked directory (what its glob yields) take
+      # a string prefix instead of `expand_path`, which costs a getcwd per
+      # call — on a walk of thousands of files that was most of the time.
+      struct Ignore
+        getter rules : Models::ContentFilesConfig
+
+        def self.none : Ignore
+          new(Models::ContentFilesConfig.new, ".", ".")
+        end
+
+        def initialize(@rules : Models::ContentFilesConfig, root : String, @dir : String)
+          @root = File.expand_path(root)
+          @dir_prefix = @dir.ends_with?('/') ? @dir : "#{@dir}/"
+          base = Path[File.expand_path(@dir)].relative_to(@root).to_posix.to_s
+          @base = if base == "."
+                    ""
+                  elsif base != ".." && !base.starts_with?("../")
+                    "#{base}/"
+                  end
+        end
+
+        def empty? : Bool
+          @rules.ignore.empty?
+        end
+
+        # The same root and walked directory, other rules.
+        def with_rules(rules : Models::ContentFilesConfig) : Ignore
+          Ignore.new(rules, @root, @dir)
+        end
+
+        # True when `path` (as the tools spell it) is hidden.
+        def ignored?(path : String) : Bool
+          return false if empty?
+          if path.starts_with?(@dir_prefix)
+            rest = path[@dir_prefix.size..]
+            if plain?(rest)
+              base = @base || return false
+              return @rules.ignored?(base + rest)
+            end
+          end
+          relative = Path[File.expand_path(path)].relative_to(@root).to_posix.to_s
+          @rules.ignored?(relative)
+        end
+
+        # No `.`/`..` segment for the prefix shortcut to get wrong.
+        private def plain?(rest : String) : Bool
+          !(rest.starts_with?('.') || rest.includes?("/.") || rest.includes?("//"))
+        end
+      end
+
+      # Where the project config of `content_dir` lives: `config.toml`
+      # beside it, else the working directory's (ContentLister's language
+      # lookup). Nil when there is none.
+      def project_config_path(content_dir : String) : String?
+        parent = File.dirname(content_dir.rstrip(File::SEPARATOR))
+        {File.join(parent, "config.toml"), "config.toml"}.find { |candidate| File.exists?(candidate) }
+      end
+
+      # The project config a content-walking tool reads (see
+      # `project_config_path`). Loaded quietly — the build owns config
+      # diagnostics, here they would only repeat. Nil when there is none or
+      # it won't load.
+      def project_config(content_dir : String) : Models::Config?
+        path = project_config_path(content_dir) || return
+        load_quietly(path)
+      end
+
+      private def load_quietly(path : String) : Models::Config?
+        previous = Logger.level
+        Logger.level = Logger::Level::Error
+        begin
+          Models::Config.load(path)
+        ensure
+          Logger.level = previous
+        end
+      rescue Exception
+        nil
+      end
+
+      # The `[content] ignore` rules of `content_dir`'s project (see
+      # `project_config_path`) for a walk of `content_dir`; none when there
+      # is no loadable config.
+      # ponytail: base config only — like every other tool without --env,
+      # an overlay's ignore list is not read; doctor passes its own.
+      def ignore_rules(content_dir : String) : Ignore
+        path = project_config_path(content_dir) || return Ignore.none
+        config = load_quietly(path) || return Ignore.none
+        ignore_rules(content_dir, config, path)
+      end
+
+      # The rules of an already loaded `config` (read from `config_path`).
+      def ignore_rules(content_dir : String, config : Models::Config, config_path : String) : Ignore
+        Ignore.new(config.content_files, File.join(File.dirname(config_path), "content"), content_dir)
       end
 
       # True when `path` carries a Markdown page extension, compared
@@ -225,7 +331,10 @@ module Hwaro
       # command computes these; see ListCommand#generated_content_infos.
       @generated : Array(ContentInfo)
 
-      def initialize(@content_dir : String = "content", @generated : Array(ContentInfo) = [] of ContentInfo)
+      # `[content] ignore` rules for the walk; the project's when nil.
+      @ignore : ContentWalk::Ignore?
+
+      def initialize(@content_dir : String = "content", @generated : Array(ContentInfo) = [] of ContentInfo, @ignore : ContentWalk::Ignore? = nil)
       end
 
       # List all content files
@@ -404,7 +513,7 @@ module Hwaro
       end
 
       private def find_content_files : Array(String)
-        ContentWalk.find_content_files(@content_dir)
+        ContentWalk.find_content_files(@content_dir, @ignore || ContentWalk.ignore_rules(@content_dir))
       end
 
       private def parse_content_info(

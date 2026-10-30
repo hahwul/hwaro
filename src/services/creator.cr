@@ -532,6 +532,9 @@ module Hwaro
           )
         end
         Logger.outcome("created", full_path)
+        if config && config.content_files.ignored?(full_path.lchop("#{CONTENT_DIR}/"))
+          Logger.warn "#{full_path} matches [content] ignore: the build will not read or publish it."
+        end
         full_path
       end
 

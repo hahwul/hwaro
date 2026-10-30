@@ -49,7 +49,7 @@ path = "docs/v1"
 - `latest = true`는 정확히 하나여야 합니다. 표시된 항목이 없으면 **첫 번째** 항목이 최신이 되고, 둘 이상이면 오류입니다.
 - `search`, `feeds`, `taxonomies`는 `"latest"` 또는 `"all"`만 허용합니다.
 
-`hwaro doctor`는 존재하지 않는 콘텐츠 디렉터리를 가리키는 버전이 있으면 `version-path-missing` 경고를 냅니다.
+`hwaro doctor`는 존재하지 않거나 [`[content] ignore`](/ko/start/config/#콘텐츠-파일-제외)로 제외된 콘텐츠 디렉터리를 가리키는 버전이 있으면 `version-path-missing` 경고를 냅니다.
 
 ## 콘텐츠 구조
 
@@ -226,7 +226,7 @@ const hits = results.filter((r) => !r.version || r.version === current);
 
 - `[versions]`는 설정 해시에, 버전 소속은 페이지 집합 지문에 포함됩니다. 따라서 파일을 버전 디렉터리 간에 옮기거나, 대응 페이지를 추가하거나(다른 버전의 `version_links`에서 `exists`가 바뀜), 스위치를 바꾸면 `hwaro build --cache`가 바뀐 것을 다시 빌드합니다.
 - `hwaro serve`는 버전 사이트도 다른 사이트처럼 빌드하며, 버전 디렉터리 안의 편집은 증분으로 반영됩니다.
-- `hwaro doctor`는 디렉터리가 없는 `[[versions.list]]` 항목에 `version-path-missing`을 보고합니다.
+- `hwaro doctor`는 디렉터리가 없거나 제외된 `[[versions.list]]` 항목에 `version-path-missing`을 보고합니다.
 
 ## 포함되지 않은 것
 

@@ -95,6 +95,9 @@ module Hwaro
       # `--env` / HWARO_ENV: the config.<env>.toml overlay `check_config`
       # merges, so doctor validates what `build --env X` will load.
       @env : String?
+      # The loaded config's `[content] ignore` rules (set by `run`): the
+      # content checks skip what the build never reads.
+      @content_ignore = ContentWalk::Ignore.none
 
       def initialize(@content_dir : String = "content", @config_path : String = "config.toml", @templates_dir : String = "templates", @static_dir : String = "static", @env : String? = nil)
       end

@@ -115,12 +115,24 @@ module Hwaro
         removed_files = [] of String
         config_changed = false
         config_files = [] of String
+        # Explicit read sources, listed once per diff and only when an ignored
+        # path shows up (see content_ignored?).
+        read_sources = [] of Set(String)
+        hidden = ->(path : String) do
+          if content_ignored?(path)
+            sources = read_sources.first? || explicit_read_sources.tap { |found| read_sources << found }
+            !sources.includes?(path)
+          else
+            false
+          end
+        end
 
         # --- Files that exist in both snapshots but with different stamps ---
         new_mtimes.each do |path, new_stamp|
-          if old_stamp = old_mtimes[path]?
-            next if old_stamp == new_stamp # unchanged
-
+          old_stamp = old_mtimes[path]?
+          next if old_stamp == new_stamp # unchanged (cheapest test first)
+          next if hidden.call(path)
+          if old_stamp
             if watched_config_file?(path)
               # A config stamp that moved only because OUR OWN last build
               # rewrote it byte-identically is the #760 config loop:
@@ -155,7 +167,7 @@ module Hwaro
 
         # --- Files that existed before but are now gone ---
         old_mtimes.each_key do |path|
-          next if new_mtimes.has_key?(path)
+          next if new_mtimes.has_key?(path) || hidden.call(path)
           # An include source outside the roots leaves the snapshot when no
           # page includes it any more; a deleted one keeps a MISSING_STAMP.
           removed_files << path if watched_root_path?(path) || watched_config_file?(path)
@@ -172,6 +184,27 @@ module Hwaro
           config_changed: config_changed,
           config_files: config_files,
         )
+      end
+
+      # A `content/` path the last build's `[content] ignore` hides. The build
+      # never discovers it, so editing, adding or removing it is no change —
+      # unless a page reads it by name (`include_md`, `include_code`, a
+      # literal `load_data()`; a transclusion never can, since it resolves
+      # pages and an ignored file is none): a partials folder is a fine
+      # thing to ignore, and its edits must still re-render the pages that
+      # include it. The snapshots keep stamping every path, so editing the
+      # patterns (a config change: full rebuild) never reads as a burst of
+      # adds or removals.
+      private def content_ignored?(path : String) : Bool
+        return false unless path.starts_with?("content/")
+        !!@builder.config.try(&.content_files.ignored?(path.lchop("content/")))
+      end
+
+      # Project-relative files the last build read by name.
+      private def explicit_read_sources : Set(String)
+        sources = @builder.load_data_sources
+        @builder.include_sources.each { |path| sources << Path.posix(path).normalize.to_s }
+        sources
       end
 
       # Put a modified path into the right bucket.
@@ -201,7 +234,12 @@ module Hwaro
         static : Array(String),
         data : Array(String),
       )
-        if path.starts_with?("content/")
+        if content_ignored?(path)
+          # Only a file a page reads by name gets here (see content_ignored?).
+          # It is no page, so like an include source outside the roots it
+          # takes the data bucket's full rebuild.
+          data << path
+        elsif path.starts_with?("content/")
           if markdown_source?(path)
             content << path
           else
