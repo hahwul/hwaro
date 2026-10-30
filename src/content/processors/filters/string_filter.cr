@@ -85,6 +85,48 @@ module Hwaro
             end
           end
 
+          # Every match of `regex` in `text` (valid UTF-8) replaced by `rep`,
+          # with Rust's / Go's match iteration: an empty match that starts
+          # where the previous match ended is skipped (`"aab"` with `a*`
+          # gives `-b-`, where `String#gsub` gives `--b-`).
+          def self.replace_all(text : String, regex : Regex, rep : String) : String
+            size = text.bytesize
+            copied = 0
+            last_end = -1
+            offset = 0
+            # The first search validates the subject; `text` cannot change,
+            # so later ones skip the check (as `String#gsub` does).
+            options = Regex::MatchOptions::None
+            String.build(size) do |io|
+              while match = regex.match_at_byte_index(text, offset, options: options)
+                options = Regex::MatchOptions::NO_UTF_CHECK
+                start, stop = match.byte_begin(0), match.byte_end(0)
+                unless start == stop && start == last_end
+                  io.write(text.unsafe_byte_slice(copied, start - copied))
+                  io << expand_replacement(rep, match)
+                  copied = last_end = stop
+                end
+                break if stop >= size && start == stop
+                # An empty match advances one character, not one byte.
+                offset = start == stop ? stop + char_bytesize(text.byte_at(stop)) : stop
+              end
+              io.write(text.unsafe_byte_slice(copied, size - copied))
+            end
+          end
+
+          # Length of the UTF-8 sequence led by `byte`.
+          private def self.char_bytesize(byte : UInt8) : Int32
+            if byte < 0x80
+              1
+            elsif byte < 0xE0
+              2
+            elsif byte < 0xF0
+              3
+            else
+              4
+            end
+          end
+
           def self.register(env : Crinja)
             # `regex_replace(pattern=, rep=)` — Zola's filter (Hugo's
             # `replaceRE`): every match of the PCRE2 `pattern` is replaced
@@ -103,7 +145,7 @@ module Hwaro
                 raise Crinja::RuntimeError.new("regex_replace: invalid pattern #{pattern.inspect}: #{ex.message}")
               end
               begin
-                text.gsub(regex) { |_, match| StringFilters.expand_replacement(rep, match) }
+                StringFilters.replace_all(text, regex, rep)
               rescue ex : Regex::Error
                 raise Crinja::RuntimeError.new("regex_replace: #{ex.message} for pattern #{pattern.inspect}")
               end

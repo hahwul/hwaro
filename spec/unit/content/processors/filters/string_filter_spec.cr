@@ -1,6 +1,12 @@
 require "../../../../spec_helper"
 require "../../../../../src/content/processors/template"
 
+module Hwaro::Content::Processors::Filters::StringFilters
+  def self.regex_cache_size : Int32
+    @@regex_mutex.synchronize { @@regex_cache.size }
+  end
+end
+
 private def expect_template_error(source : String, message : String, vars = {} of String => Crinja::Value)
   ex = expect_raises(Crinja::Error) { render_crinja(source, vars) }
   ex.message.not_nil!.should contain(message)
@@ -54,23 +60,45 @@ describe Hwaro::Content::Processors::Filters::StringFilters do
       render_crinja(%({{ s | regex_replace(pattern="b", rep="c") }}), vars).should eq("a�c")
     end
 
-    it "shares one compiled regex across parallel render fibers" do
-      patterns = (0...300).map { |i| "x#{i}" }
+    it "skips an empty match that touches the previous match, like Rust and Go" do
+      render_crinja(%({{ "aab" | regex_replace(pattern="a*", rep="-") }})).should eq("-b-")
+      render_crinja(%({{ "xx" | regex_replace(pattern="x*", rep="-") }})).should eq("-")
+      render_crinja(%({{ "abc" | regex_replace(pattern="", rep="-") }})).should eq("-a-b-c-")
+      # Empty matches advance by a character, not a byte.
+      render_crinja(%({{ "한é" | regex_replace(pattern="x*", rep="|") }})).should eq("|한|é|")
+      render_crinja(%({{ "b한b" | regex_replace(pattern="b*", rep="-") }})).should eq("-한-")
+    end
+  end
+
+  describe ".regex" do
+    it "returns the cached regex until it is evicted, then compiles it afresh" do
+      filters = Hwaro::Content::Processors::Filters::StringFilters
+      first = filters.regex("evict-me")
+      filters.regex("evict-me").should be(first)
+      Hwaro::Content::Processors::Filters::StringFilters::REGEX_CACHE_SIZE.times { |i| filters.regex("evict-filler-#{i}") }
+      filters.regex_cache_size.should eq(Hwaro::Content::Processors::Filters::StringFilters::REGEX_CACHE_SIZE)
+      again = filters.regex("evict-me")
+      again.should_not be(first)
+      again.should eq(first)
+    end
+
+    it "stays consistent and bounded under parallel workers" do
+      filters = Hwaro::Content::Processors::Filters::StringFilters
       results = Channel(Bool).new
-      ctx = Fiber::ExecutionContext::Parallel.new("regex-cache-spec", 4)
+      ctx = Fiber::ExecutionContext::Parallel.new("regex-cache-spec", 8)
       8.times do |worker|
         ctx.spawn do
           ok = true
-          200.times do |n|
-            pattern = patterns[(worker * 37 + n) % patterns.size]
-            ok &&= render_crinja(%({{ "a#{pattern}b" | regex_replace(pattern="#{pattern}", rep="-") }})) == "a-b"
+          # Overlapping pattern sets well past the bound: constant eviction.
+          400.times do |n|
+            pattern = "par-#{(worker * 97 + n) % 1000}"
+            ok &&= filters.regex(pattern).source == pattern
           end
           results.send(ok)
         end
       end
       8.times { results.receive.should be_true }
-      Hwaro::Content::Processors::Filters::StringFilters.regex("x1").should be(
-        Hwaro::Content::Processors::Filters::StringFilters.regex("x1"))
+      filters.regex_cache_size.should be <= Hwaro::Content::Processors::Filters::StringFilters::REGEX_CACHE_SIZE
     end
   end
 
