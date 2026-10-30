@@ -9,6 +9,20 @@ require "../../../src/utils/html_minifier"
 # Regression coverage for latent bugs fixed during the source-code audit.
 # Each block names the class of defect it guards against.
 
+# Expanded while typing a method body, i.e. after every `require` of the
+# program has been processed, so a big-number require anywhere counts.
+private def big_numbers_loaded? : Bool
+  {{ @top_level.has_constant?("BigInt") || @top_level.has_constant?("BigDecimal") }}
+end
+
+describe "libgmp dependency" do
+  it "does not load Crystal's big numbers, which link libgmp into every package" do
+    # `require "big"` (num_format once used BigDecimal) made the nix, AUR,
+    # snap, chocolatey, docker and macOS builds need libgmp.
+    big_numbers_loaded?.should be_false
+  end
+end
+
 describe "bugfix regressions" do
   describe "InlineMarkdown.safe_url? (XSS)" do
     it "blocks control-character-obfuscated script schemes" do

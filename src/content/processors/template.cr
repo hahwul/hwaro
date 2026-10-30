@@ -91,23 +91,12 @@ module Hwaro
             !value_empty?(target.raw)
           end
 
-          regex_cache = {} of String => Regex
-          regex_mutex = Mutex.new
-          max_regex_cache_size = 256
-
           # Test if a string matches a regex
           # Usage: {% if asset is matching("[.](jpg|png)$") %}
           @env.tests["matching"] = Crinja.test do
             regex_str = arguments.varargs.first?.try(&.to_s) || ""
             begin
-              regex = regex_mutex.synchronize do
-                # Evict oldest entry when cache is full
-                if regex_cache.size >= max_regex_cache_size && !regex_cache.has_key?(regex_str)
-                  regex_cache.delete(regex_cache.first_key)
-                end
-                regex_cache[regex_str] ||= Regex.new(regex_str)
-              end
-              target.to_s.matches?(regex)
+              target.to_s.matches?(Filters::StringFilters.regex(regex_str))
             rescue ArgumentError
               false
             end

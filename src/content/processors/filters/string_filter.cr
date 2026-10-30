@@ -1,4 +1,6 @@
+require "base64"
 require "crinja"
+require "openssl"
 require "../../../utils/crinja_utils"
 
 module Hwaro
@@ -6,7 +8,177 @@ module Hwaro
     module Processors
       module Filters
         module StringFilters
+          # Hash filters and the OpenSSL digest each one computes.
+          DIGESTS = {"md5" => "MD5", "sha1" => "SHA1", "sha256" => "SHA256", "sha384" => "SHA384", "sha512" => "SHA512"}
+
+          REGEX_CACHE_SIZE = 256
+          @@regex_cache = {} of String => Regex
+          @@regex_mutex = Mutex.new
+
+          # `pattern` compiled once per process, shared by every render
+          # worker (a compiled Regex is read-only; PCRE2 match data is
+          # per-thread). Bounded: the oldest pattern is evicted first.
+          # Raises ArgumentError for an invalid pattern.
+          def self.regex(pattern : String) : Regex
+            @@regex_mutex.synchronize do
+              @@regex_cache[pattern]? || begin
+                @@regex_cache.delete(@@regex_cache.first_key) if @@regex_cache.size >= REGEX_CACHE_SIZE
+                @@regex_cache[pattern] = Regex.new(pattern)
+              end
+            end
+          end
+
+          # Expands a Zola (Rust regex) replacement string for one match:
+          # `$1` / `${1}` by index, `$name` / `${name}` by name, `$$` for a
+          # literal `$`. As in Rust, `$name` takes the longest run of
+          # `[0-9A-Za-z_]` (`$1a` names group "1a"), an unknown or unmatched
+          # group expands to nothing, a `$` not followed by a name stays
+          # literal, and backslashes have no special meaning.
+          def self.expand_replacement(rep : String, match : Regex::MatchData) : String
+            return rep unless rep.includes?('$')
+            String.build do |io|
+              i = 0
+              size = rep.bytesize
+              while i < size
+                byte = rep.byte_at(i)
+                unless byte === '$' && i + 1 < size
+                  io.write_byte(byte)
+                  i += 1
+                  next
+                end
+                following = rep.byte_at(i + 1)
+                if following === '$'
+                  io << '$'
+                  i += 2
+                elsif following === '{'
+                  close = rep.byte_index('}', i + 2)
+                  if close && close > i + 2
+                    io << capture(match, rep.byte_slice(i + 2, close - i - 2))
+                    i = close + 1
+                  else
+                    io << '$'
+                    i += 1
+                  end
+                else
+                  stop = i + 1
+                  while stop < size && ((b = rep.byte_at(stop)).unsafe_chr.ascii_alphanumeric? || b === '_')
+                    stop += 1
+                  end
+                  if stop == i + 1
+                    io << '$'
+                    i += 1
+                  else
+                    io << capture(match, rep.byte_slice(i + 1, stop - i - 1))
+                    i = stop
+                  end
+                end
+              end
+            end
+          end
+
+          private def self.capture(match : Regex::MatchData, name : String) : String
+            if name.each_char.all?(&.ascii_number?)
+              index = name.to_i?
+              (index && index < match.size ? match[index]? : nil) || ""
+            else
+              match[name]? || ""
+            end
+          end
+
+          # Every match of `regex` in `text` (valid UTF-8) replaced by `rep`,
+          # with Rust's / Go's match iteration: an empty match that starts
+          # where the previous match ended is skipped (`"aab"` with `a*`
+          # gives `-b-`, where `String#gsub` gives `--b-`).
+          def self.replace_all(text : String, regex : Regex, rep : String) : String
+            size = text.bytesize
+            copied = 0
+            last_end = -1
+            offset = 0
+            # The first search validates the subject; `text` cannot change,
+            # so later ones skip the check (as `String#gsub` does).
+            options = Regex::MatchOptions::None
+            String.build(size) do |io|
+              while match = regex.match_at_byte_index(text, offset, options: options)
+                options = Regex::MatchOptions::NO_UTF_CHECK
+                start, stop = match.byte_begin(0), match.byte_end(0)
+                unless start == stop && start == last_end
+                  io.write(text.unsafe_byte_slice(copied, start - copied))
+                  io << expand_replacement(rep, match)
+                  copied = last_end = stop
+                end
+                break if stop >= size && start == stop
+                # An empty match advances one character, not one byte.
+                offset = start == stop ? stop + char_bytesize(text.byte_at(stop)) : stop
+              end
+              io.write(text.unsafe_byte_slice(copied, size - copied))
+            end
+          end
+
+          # Length of the UTF-8 sequence led by `byte`.
+          private def self.char_bytesize(byte : UInt8) : Int32
+            if byte < 0x80
+              1
+            elsif byte < 0xE0
+              2
+            elsif byte < 0xF0
+              3
+            else
+              4
+            end
+          end
+
           def self.register(env : Crinja)
+            # `regex_replace(pattern=, rep=)` — Zola's filter (Hugo's
+            # `replaceRE`): every match of the PCRE2 `pattern` is replaced
+            # by `rep`, expanded as in `expand_replacement`.
+            env.filters["regex_replace"] = Crinja.filter({pattern: nil, rep: ""}) do
+              pattern = arguments["pattern"]
+              raise Crinja::RuntimeError.new("regex_replace requires a pattern") if pattern.none? || pattern.undefined?
+              pattern = pattern.to_s
+              rep = arguments["rep"].to_s
+              text = target.to_s
+              # PCRE2 refuses to match invalid UTF-8 (ArgumentError).
+              text = text.scrub unless text.valid_encoding?
+              regex = begin
+                StringFilters.regex(pattern)
+              rescue ex : ArgumentError
+                raise Crinja::RuntimeError.new("regex_replace: invalid pattern #{pattern.inspect}: #{ex.message}")
+              end
+              begin
+                StringFilters.replace_all(text, regex, rep)
+              rescue ex : Regex::Error
+                raise Crinja::RuntimeError.new("regex_replace: #{ex.message} for pattern #{pattern.inspect}")
+              end
+            end
+
+            env.filters["base64_encode"] = Crinja.filter do
+              Base64.strict_encode(target.to_s)
+            end
+
+            # Accepts the standard and URL-safe alphabets, with or without
+            # padding. The decoded bytes must be UTF-8 text: a template
+            # string cannot carry arbitrary binary.
+            env.filters["base64_decode"] = Crinja.filter do
+              decoded = begin
+                Base64.decode_string(target.to_s)
+              rescue ex : Base64::Error
+                raise Crinja::RuntimeError.new("base64_decode: invalid base64 input: #{ex.message}")
+              end
+              raise Crinja::RuntimeError.new("base64_decode: decoded bytes are not valid UTF-8") unless decoded.valid_encoding?
+              decoded
+            end
+
+            # `md5`, `sha1`, `sha256`, `sha384`, `sha512` — lowercase hex of
+            # the digest of the string's UTF-8 bytes; `base64=true` returns
+            # the digest in base64 instead (an SRI value is
+            # `"sha384-" ~ (text | sha384(base64=true))`).
+            DIGESTS.each do |name, algorithm|
+              env.filters[name] = Crinja.filter({base64: false}) do
+                digest = OpenSSL::Digest.new(algorithm).update(target.to_s).final
+                arguments["base64"].truthy? ? Base64.strict_encode(digest) : digest.hexstring
+              end
+            end
+
             # Truncate words filter
             env.filters["truncate_words"] = Crinja.filter({length: 50, end: "..."}) do
               # Strip first: a leading-whitespace input would otherwise split into
