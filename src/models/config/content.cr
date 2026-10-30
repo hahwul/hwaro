@@ -87,15 +87,13 @@ module Hwaro
       # A pattern written with a trailing `/` (gitignore's folder form)
       # matches folders only: `_*/` hides `_templates/` but not `_index.md`.
       enum IgnoreKind
-        Literal
-        Tree
-        Depth
-        Anywhere
+        Literal  = 0
+        Tree     = 1
+        Depth    = 2
+        Anywhere = 3
       end
 
       record IgnoreRule, kind : IgnoreKind, pattern : String, span : Int32, folders_only : Bool
-
-      @ignore_rules : Array(IgnoreRule)
 
       def initialize
         @allow_extensions = [] of String
