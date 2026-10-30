@@ -1,13 +1,14 @@
 require "big"
 require "crinja"
-require "../../../utils/crinja_utils"
 
 module Hwaro
   module Content
     module Processors
       module Filters
         module MathFilters
-          PLAIN_NUMBER_RE = /\A[+-]?\d+(?:\.\d+)?\z/
+          # ASCII digits only: `\d` also matches Arabic-Indic or fullwidth
+          # digits under UCP, which BigDecimal then refuses.
+          PLAIN_NUMBER_RE = /\A[+-]?[0-9]+(?:\.[0-9]+)?\z/
 
           # The exact decimal value of a number, or of a string holding a
           # plain decimal (`"1234.5"`); nil for anything else, including
@@ -15,10 +16,34 @@ module Hwaro
           def self.to_decimal(value : Crinja::Value) : BigDecimal?
             case raw = value.raw
             when Int   then BigDecimal.new(raw)
-            when Float then BigDecimal.new(raw) if raw.finite?
+            when Float then shortest(raw) if raw.finite?
             when String, Crinja::SafeString
               text = raw.to_s.strip
               BigDecimal.new(text) if text.matches?(PLAIN_NUMBER_RE)
+            end
+          end
+
+          # A float's shortest round-trip digits. BigDecimal parses
+          # `Float#to_s`, whose `1.0e-7` / `1234.0` carry a padding zero
+          # that is not a digit of the number.
+          def self.shortest(float : Float) : BigDecimal
+            number = BigDecimal.new(float)
+            value, scale = number.value, number.scale
+            while scale > 0 && value % 10 == 0
+              value //= 10
+              scale -= 1
+            end
+            BigDecimal.new(value, scale)
+          end
+
+          # `decimals=` as a place count clamped to 0..20: an integer, or an
+          # integral float or string. Anything else means "not given".
+          def self.decimal_places(value : Crinja::Value) : Int32?
+            case raw = value.raw
+            when Int   then raw.clamp(0, 20).to_i32
+            when Float then raw.clamp(0.0, 20.0).to_i32 if raw.finite? && raw == raw.trunc
+            when String, Crinja::SafeString
+              raw.to_s.strip.to_i64?.try(&.clamp(0, 20).to_i32)
             end
           end
 
@@ -51,8 +76,7 @@ module Hwaro
             # `ceil` / `floor`.
             env.filters["num_format"] = Crinja.filter({decimals: nil, separator: ",", decimal_point: "."}) do
               if number = MathFilters.to_decimal(target)
-                decimals = arguments["decimals"]
-                decimals = decimals.none? || decimals.undefined? ? nil : Utils::CrinjaUtils.to_count(decimals, max: 20)
+                decimals = MathFilters.decimal_places(arguments["decimals"])
                 MathFilters.num_format(number, decimals, arguments["separator"].to_s, arguments["decimal_point"].to_s)
               else
                 target

@@ -19,6 +19,13 @@ describe Hwaro::Content::Processors::Filters::MathFilters do
       render_crinja("{{ x | num_format }}", {"x" => Crinja::Value.new(1e20)}).should eq("100,000,000,000,000,000,000")
     end
 
+    it "prints a float's shortest form in plain notation" do
+      # Float#to_s writes these as "1.0e-7" / "2.0e-6"; the ".0" is not a digit.
+      {1e-7 => "0.0000001", 2e-6 => "0.000002", 1234.0 => "1,234", 1.5e-7 => "0.00000015"}.each do |value, expected|
+        render_crinja("{{ x | num_format }}", {"x" => Crinja::Value.new(value)}).should eq(expected)
+      end
+    end
+
     it "rounds half away from zero, without a negative zero" do
       render_crinja("{{ 1.005 | num_format(decimals=2) }}").should eq("1.01")
       render_crinja("{{ 2.5 | num_format(decimals=0) }}").should eq("3")
@@ -41,6 +48,8 @@ describe Hwaro::Content::Processors::Filters::MathFilters do
     it "returns anything that is not a number unchanged" do
       render_crinja(%({{ "abc" | num_format }})).should eq("abc")
       render_crinja(%({{ "1e3" | num_format }})).should eq("1e3")
+      # Non-ASCII digits (`\d` matches them under UCP) are text, not numbers.
+      render_crinja(%({{ "١٢٣٤" | num_format }}|{{ "１２３４" | num_format }})).should eq("١٢٣٤|１２３４")
       render_crinja(%(<{{ nope | num_format }}>)).should eq("<>")
       render_crinja(%({{ true | num_format }})).should eq("true")
       vars = {"x" => Crinja::Value.new(Float64::NAN), "y" => Crinja::Value.new(Float64::INFINITY)}
@@ -50,6 +59,12 @@ describe Hwaro::Content::Processors::Filters::MathFilters do
     it "clamps decimals= into 0..20" do
       render_crinja("{{ 1.5 | num_format(decimals=-3) }}").should eq("2")
       render_crinja("{{ 1 | num_format(decimals=99) }}").should eq("1." + "0" * 20)
+    end
+
+    it "accepts an integral decimals= string or float and ignores any other value" do
+      render_crinja(%({{ 1.5 | num_format(decimals="2") }}|{{ 1.5 | num_format(decimals=2.0) }})).should eq("1.50|1.50")
+      render_crinja(%({{ 1.25 | num_format(decimals="x") }}|{{ 1.25 | num_format(decimals=1.5) }}|{{ 1.25 | num_format(decimals=true) }}))
+        .should eq("1.25|1.25|1.25")
     end
   end
 end
