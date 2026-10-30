@@ -107,6 +107,11 @@ For a taxonomy named `tags` with term `crystal`:
 
 With `paginate_by` set, term pages paginate at `/tags/crystal/page/2/`, `/tags/crystal/page/3/`, … (page 1 stays at `/tags/crystal/`). The pager object is described in [Data Model › Paginator](/templates/data-model/#paginator).
 
+On a multilingual site, each non-default language writes its own term pages
+under its prefix (`/ko/tags/crystal/`), listing only that language's pages.
+`[languages.<code>] taxonomies` picks which taxonomies a language generates
+(every `[[taxonomies]]` name when omitted); see [Multilingual](/features/multilingual/).
+
 ## Templates
 
 Both templates receive a ready-made listing as `{{ content }}`: the term list in `taxonomy.html`, the page list in `taxonomy_term.html`. For custom markup, use [`get_taxonomy()`](#get-taxonomy-function) instead of `content`.

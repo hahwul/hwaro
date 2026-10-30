@@ -40,7 +40,7 @@ cache_strategy = "cache-first"
 | background_color | string | "#ffffff" | Splash screen background color |
 | display | string | "standalone" | Display mode: `fullscreen`, `standalone`, `minimal-ui` or `browser` (an unknown value falls back to `standalone`) |
 | start_url | string | "/" | URL when the app launches |
-| icons | array | [] | Icon file paths |
+| icons | array | [] | Icon file paths. A leading `static/` is dropped, so `static/icon-192.png` is published as `/icon-192.png` |
 | offline_page | string | — | Fallback page when offline |
 | precache_urls | array | [] | URLs to cache during service worker install |
 | cache_strategy | string | `"cache-first"` | Asset fetch strategy: `cache-first`, `network-first`, or `stale-while-revalidate` |

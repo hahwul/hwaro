@@ -161,7 +161,7 @@ Hwaro automatically aggregates all authors defined in the `authors` front matter
 
 #### Defining Authors
 
-You can enrich author data by creating a `data/authors.yml` (or `.json`, `.toml`) file. Keys must match the author IDs used in the page front matter.
+You can enrich author data by creating a `data/authors.yml` (or `.json`, `.toml`) file. Keys must match the author IDs used in the page front matter. IDs are trimmed and lowercased, and data keys are matched the same way, so `authors = ["John-Doe"]` finds a `john-doe:` or `John-Doe:` entry (an exact lowercase key wins over a differently cased one).
 
 **content/my-post.md**
 
@@ -183,10 +183,10 @@ john-doe:
 
 #### Usage in Templates
 
-The `site.authors` object contains all authors found on the site. Each author object has:
-- `key`: The author ID (e.g., "john-doe")
-- `name`: The author name (from data or ID fallback)
-- `pages`: List of pages by this author (sorted by date)
+The `site.authors` object contains every author referenced by a listed page, keyed by the lowercased ID. Drafts, headless (`render = false`) and generated pages are skipped, the same pages the `/authors/` taxonomy leaves out, and a `data/authors.yml` entry no page references is not added. Each author object has:
+- `key`: The author ID, lowercased (e.g., "john-doe")
+- `name`: The author name (from data, else the ID as first written)
+- `pages`: List of pages by this author, newest first. Each entry carries `title`, `url`, `date`, `description`, `image`, `summary`, `summary_truncated`, `tags`, `reading_time`, `word_count` and `language`
 - Any custom fields from `data/authors.yml`
 
 ```jinja
@@ -244,15 +244,28 @@ For the current section URL in `section.html`, use `page.url`.
 | section_description | section.description |
 | section_list | Pre-rendered HTML list of pages |
 
-### From Front Matter
+### Section Objects in Lists
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| sort_by | String? | "date" | Sort by: date (newest first), published (newest first, ignoring `updated`), weight (lowest first), title (A→Z) |
-| reverse | Bool? | false | Flip the natural sort order — see [Writing › Sections › Sort direction](/writing/sections/#sort-direction) |
-| paginate | Int? | — | Pages per page |
-| transparent | Bool | false | Pass pages to parent |
-| generate_feeds | Bool | false | Generate RSS feed |
+The section objects in `section.subsections`, `site.sections` and `get_section()` results carry a different, larger set of fields than the current page's `section` (they have no `list`, `page_template`, `paginate_path` or `redirect_to`):
+
+| Property | Type | Description |
+|----------|------|-------------|
+| title, description, url | String | As on the section page |
+| path | String | Source path (`blog/_index.md`) |
+| name | String | Section name (`blog`, `docs/guides`; empty for the root) |
+| top_level | Bool | No `/` in `name` |
+| date | String | Section date (YYYY-MM-DD, empty when unset) |
+| draft, is_index, transparent | Bool | From front matter |
+| language | String | Effective language code |
+| weight | Int | Section weight |
+| sort_by | String | `sort_by` from front matter (empty when unset, which sorts by date) |
+| reverse | Bool | `reverse` from front matter |
+| paginate | Int | Pages per pager (`0` when unset) |
+| pagination_enabled | Bool? | `pagination_enabled` from front matter (`none` when unset) |
+| pages, pages_count | Array<Page>, Int | The section's listed pages, in its sort order |
+| assets | Array<String> | Colocated files |
+| subsections | Array<Section> | Child sections, same shape (empty on the root section's own entry) |
+| version | Object? | Only on versioned sites |
 
 ### Iterating Pages
 
@@ -331,7 +344,7 @@ Rendered HTML content is available as the top-level `content` variable.
 | page.draft | Bool | Is draft |
 | page.weight | Int | Sort weight |
 | page.image | String? | Featured image path |
-| page.authors | Array<String> | Author names |
+| page.authors | Array<String> | Author IDs as written in front matter (see [Site Authors](#site-authors)) |
 | page.tags | Array<String> | Tags from front matter |
 | page.taxonomies | Object | This page's taxonomy terms (`page.taxonomies.tags`, `page.taxonomies.<name>`) |
 | page.extra | Object | Custom front matter fields |
@@ -345,6 +358,7 @@ Rendered HTML content is available as the top-level `content` variable.
 | page.summary | String? | Summary HTML: the chunk before `<!-- more -->`, else `page.description`, else an automatic excerpt of the rendered body (`[content] summary_length`, one escaped `<p>`). Use with `\| safe` to embed (e.g. `{{ page.summary \| safe }}`); for `<meta name="description">` use `page.description` directly. |
 | page.summary_truncated | Bool | `true` only when `page.summary` is an automatic excerpt that was cut short (useful for a "Read more" link). |
 | page.assets | Array<String> | Static files in page bundle |
+| page.path | String | Source path relative to `content/` (`blog/my-post.md`) |
 | page.series | String | Series name from front matter (empty if none) |
 | page.series_index | Int | 1-based position within the series (requires `[series]` enabled) |
 | page.series_pages | Array<Page> | All pages in the same series, sorted by `series_weight` |
@@ -418,6 +432,8 @@ Navigation follows the flat reading order across the entire site, similar to mdB
 | .url | String | Page URL |
 | .description | String? | Page description |
 | .date | String? | Page date |
+
+Both are full page objects, the same shape as the entries of `section.pages`, so `page.lower.summary` or `page.lower.extra` work too.
 
 ```jinja
 <nav class="post-nav">
@@ -496,7 +512,7 @@ The global `versions` list (`{% for v in versions %}`, `versions.latest`, `versi
   {% if t.is_current %}
   <span>{{ t.code | upper }}</span>
   {% else %}
-  <a href="{{ t.url }}">{{ t.code | upper }}</a>
+  <a href="{{ base_url }}{{ t.url }}">{{ t.code | upper }}</a>
   {% endif %}
 {% endfor %}
 </nav>
@@ -541,7 +557,7 @@ unknown key that lands in `page.extra.outputs`, and it overrides the
 
 ---
 
-### Time Variables
+## Time Variables
 
 | Variable | Type | Description |
 |----------|------|-------------|
@@ -555,7 +571,7 @@ unknown key that lands in `page.extra.outputs`, and it overrides the
 
 ---
 
-### SEO Variables
+## SEO Variables
 
 **Pre-rendered HTML** (backward compatible):
 
@@ -591,6 +607,7 @@ unknown key that lands in `page.extra.outputs`, and it overrides the
 | seo.twitter_creator | String | Twitter creator handle |
 | seo.fb_app_id | String | Facebook App ID |
 | seo.hreflang | Array | Same as `page.translations` |
+| seo.noindex | Bool | Only on versioned sites: `true` for a page of an older version, unless `[versions] noindex_old = false` |
 
 Page title, description, URL, and image are available as `page.title`, `page.description`, `page.url`, `page.image`. The `seo` object provides computed values specific to SEO (resolved URLs, config values).
 
@@ -615,7 +632,7 @@ Page title, description, URL, and image are available as `page.title`, `page.des
 
 ---
 
-### Asset Variables
+## Asset Variables
 
 Pre-rendered `<link>` and `<script>` tags for convenience. These are generated from your `config.toml` settings.
 
@@ -646,7 +663,7 @@ Pre-rendered `<link>` and `<script>` tags for convenience. These are generated f
 
 ---
 
-### Table of Contents
+## Table of Contents
 
 Only available when `toc = true` in front matter.
 
@@ -699,7 +716,7 @@ Only available when `toc = true` in front matter.
 
 ---
 
-### Paginator
+## Paginator
 
 Available in section and taxonomy term templates when pagination is enabled (`paginate` in [section front matter](/writing/sections/#front-matter), `paginate_by` for taxonomies). Page 1 lives at the section URL; later pages at `{url}/{paginate_path}/{n}/`.
 
@@ -730,7 +747,7 @@ A `pagination_obj` variant exposes the same data as `previous_url`, `next_url`, 
 
 ---
 
-### Taxonomy Variables
+## Taxonomy Variables
 
 Available in taxonomy templates:
 
@@ -759,7 +776,7 @@ For custom listings, use `get_taxonomy()`. See [Taxonomies](/writing/taxonomies/
 | Property | Type | Description |
 |----------|------|--------------|
 | name | String | Display label |
-| url | String | Bare root-relative path, or untouched external URL — comparable to `page.url` |
+| url | String | Bare root-relative path, or untouched external URL — comparable to `page.url`. Empty for an entry written without `url` (a group heading), so render it unlinked |
 | href | String | `url` with the site's `base_path` applied (internal) or unchanged (external) — use this in `<a href>` |
 | identifier | String | Unique key within the menu |
 | weight | Int | Sort order |

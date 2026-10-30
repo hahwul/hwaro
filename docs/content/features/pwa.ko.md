@@ -40,7 +40,7 @@ cache_strategy = "cache-first"
 | background_color | string | "#ffffff" | 스플래시 화면 배경색 |
 | display | string | "standalone" | 표시 모드: `fullscreen`, `standalone`, `minimal-ui`, `browser` 중 하나 (알 수 없는 값은 `standalone`으로 대체) |
 | start_url | string | "/" | 앱 실행 시 열리는 URL |
-| icons | array | [] | 아이콘 파일 경로 |
+| icons | array | [] | 아이콘 파일 경로. 앞의 `static/`은 제거되므로 `static/icon-192.png`는 `/icon-192.png`로 게시됩니다 |
 | offline_page | string | — | 오프라인일 때 보여줄 폴백 페이지 |
 | precache_urls | array | [] | 서비스 워커 설치 시 미리 캐시할 URL |
 | cache_strategy | string | `"cache-first"` | 에셋 요청 전략: `cache-first`, `network-first`, `stale-while-revalidate` |

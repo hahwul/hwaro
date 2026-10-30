@@ -191,3 +191,24 @@ describe "seo.twitter_card" do
     end
   end
 end
+
+describe "page.path" do
+  # The page being rendered carries the same source path as its entry in a
+  # listing; templates must not see it empty only on the page itself.
+  it "is set on the current page as on its listing entry" do
+    build_site(
+      "title = \"T\"\nbase_url = \"http://localhost\"\n",
+      content_files: {
+        "blog/_index.md" => "+++\ntitle = \"Blog\"\n+++\n",
+        "blog/post.md"   => "+++\ntitle = \"Post\"\n+++\n",
+      },
+      template_files: {
+        "page.html"    => "[{{ page.path }}]",
+        "section.html" => "{% for p in section.pages %}[{{ p.path }}]{% endfor %}",
+      },
+    ) do
+      File.read("public/blog/post/index.html").should eq("[blog/post.md]")
+      File.read("public/blog/index.html").should eq("[blog/post.md]")
+    end
+  end
+end

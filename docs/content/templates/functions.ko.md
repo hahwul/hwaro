@@ -85,6 +85,8 @@ toc = true
 | assets | Array<String> |
 | subsections | Array<Section> |
 
+이 객체에는 `top_level`, `date`, `draft`, `is_index`, `language`, `weight`, `transparent`, `sort_by`, `reverse`, `paginate`, `pagination_enabled`도 있습니다. [데이터 모델 › 목록 속 섹션 객체](/ko/templates/data-model/#목록-속-섹션-객체)를 참고하세요.
+
 **예시:**
 
 ```jinja
@@ -205,7 +207,7 @@ toc = true
 | 속성 | 타입 | 설명 |
 |----------|------|--------------|
 | name | String | 표시 레이블 |
-| url | String | 아무것도 붙지 않은 루트 상대 경로, 또는 손대지 않은 외부 URL |
+| url | String | 아무것도 붙지 않은 루트 상대 경로, 또는 손대지 않은 외부 URL. `url` 없는 엔트리(그룹 제목)는 빈 문자열 |
 | href | String | 내부 링크면 `url`에 `base_path`를 적용한 값, 외부면 그대로 — `<a href>`에는 이 값을 사용 |
 | identifier | String | 메뉴 안에서 고유한 키 |
 | weight | Int | 정렬 순서 |

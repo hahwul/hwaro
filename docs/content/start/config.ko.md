@@ -338,7 +338,7 @@ Cache-Control = "no-store"
 | `[auto_includes]` | [자동 인클루드](/ko/features/auto-includes/) | CSS/JS 파일 자동 인클루드 |
 | `[assets]` | [에셋 파이프라인](/ko/features/asset-pipeline/) | CSS/JS 압축(minify) & 핑거프린팅, 하위 리소스 무결성(`sri`) |
 | `[sass]` | [Sass/SCSS](/ko/features/sass/) | 내장 SCSS 컴파일 (순수 Crystal) |
-| `[image_processing]` | [이미지 처리](/ko/features/image-processing/) | 이미지 리사이즈 & LQIP |
+| `[image_processing]` | [이미지 처리](/ko/features/image-processing/) | 이미지 리사이즈, WebP 사본(`formats = ["webp"]`) & LQIP |
 | `[image_processing.lqip]` | [이미지 처리](/ko/features/image-processing/#lqip-저화질-이미지-플레이스홀더) | Base64 블러업 플레이스홀더 |
 | `[content.files]` | [콘텐츠 파일](/ko/features/content-files/) | 마크다운이 아닌 파일 게시 |
 | `[content.new]` | [아키타입](/ko/writing/archetypes/) | `hwaro new`의 기본 프론트 매터와 번들 방식 |

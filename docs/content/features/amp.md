@@ -38,17 +38,22 @@ The AMP converter automatically applies these transformations:
 | `<html>` | `<html amp>` |
 | `<img>` | `<amp-img layout="responsive">` when it has `width` and `height`; otherwise `<amp-img layout="fill">` inside `<div class="amp-img-container">` |
 | `<video>` | `<amp-video layout="responsive">` |
-| `<iframe>` | `<amp-iframe layout="responsive">` |
-| `<script>` (inline) | Removed |
+| `<iframe>` | `<amp-iframe layout="responsive">` (`layout="fixed-height"` when it has only a `height`), with a default `sandbox` when it has none |
+| `<picture>` | Only its `<img>` is kept (the `<source>` elements are dropped), then converted as above |
+| `<script>` | Removed, except JSON-LD (`type="application/ld+json"`) and scripts loaded from `cdn.ampproject.org` |
+| `<link rel="stylesheet">` | Removed, except font providers AMP allows (Google Fonts, Bunny Fonts, Typekit, Font Awesome, …) |
+| `<style>` blocks | Merged into the single `<style amp-custom>`, without `!important` and at-rules AMP disallows (`@import`, `@layer`, …) |
 | `style="..."` attributes | Removed |
-| `onclick` handlers | Removed |
-| `loading="lazy"` attributes | Removed (AMP elements do their own lazy loading and reject the attribute) |
+| `on*` event handlers (`onclick`, …) | Removed |
+| `loading`, `decoding`, `fetchpriority` attributes | Removed (AMP elements do their own lazy loading and reject these attributes) |
 | Relative `src` / `href` (`cover.png`, `../other/`) | Resolved against the original page's URL, because the AMP copy lives one directory deeper |
 
 Additionally injected:
 - AMP boilerplate CSS
-- AMP runtime script (`cdn.ampproject.org/v0.js`)
+- AMP runtime script (`cdn.ampproject.org/v0.js`), plus the `amp-iframe` / `amp-video` extension scripts when the page uses them
 - `<link rel="canonical">` pointing to the original page
+
+If the theme already ships `<style amp-boilerplate>`, the boilerplate, runtime and `<style>` merge are skipped; Hwaro still adds any missing extension scripts and the `<link rel="canonical">`. Drafts, `redirect_to` pages and pages with `render = false` get no AMP version. With [CSP](/features/csp/) enabled, the AMP copy carries no CSP `<meta>` tag.
 
 ## Output Structure
 

@@ -25,7 +25,7 @@ identifier = "about"
 | 키 | 타입 | 기본값 | 설명 |
 |-----|------|---------|-------------|
 | name | string | — | **필수.** 표시 라벨. `name`이 없는 엔트리는 경고와 함께 건너뜀 |
-| url | string | "" | 루트 상대 경로(`/posts/`) 또는 절대 `http(s)://`/`//` URL |
+| url | string | "" | 루트 상대 경로(`/posts/`), 또는 자체 스킴(`https://`, `mailto:` 등)이나 `//`로 시작하는 URL. 하위 항목만 묶는 헤더라면 생략하세요. 이 항목은 빈 `url`/`href`를 유지하고 `active_path`와 일치하지 않습니다 |
 | weight | int | 0 | 메뉴 내 정렬 순서(오름차순), 이후 `name`, `identifier` 순 |
 | identifier | string | `name` | 다른 엔트리가 `parent`로 참조하는 고유 키 |
 | parent | string | 없음 | 이 엔트리를 하위로 넣을 다른 엔트리의 `identifier` |
@@ -186,7 +186,7 @@ url = "/ko/posts/"
 | href | String | `base_path`가 적용된 `url`(내부) 또는 그대로(외부) — `<a href>`에는 이 값 사용 |
 | identifier | String | 메뉴 내 고유 키 |
 | weight | Int | 정렬 순서 |
-| external | Bool | `http://`, `https://`, `//` URL이면 `true` |
+| external | Bool | 자체 스킴(`https://`, `mailto:` 등)이나 `//`로 시작하는 URL이면 `true` |
 | children | Array\<Entry\> | 중첩 엔트리([계층 구조](#계층-구조) 참고) |
 | page | Page? | 엔트리가 프론트 매터에서 왔고 `Page`로 해석될 때 등록한 페이지/섹션의 데이터(설정 전용 엔트리와 `Section`의 `_index.md`에서 등록한 엔트리는 nil) |
 

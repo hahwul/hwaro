@@ -14,4 +14,9 @@ hwaro tool ci github-actions
 hwaro tool platform github-pages
 ```
 
+`tool ci github-actions` still writes the same workflow as `tool platform github-pages`
+(`.github/workflows/deploy.yml`) and accepts the same `-o, --output PATH`,
+`--stdout` and `-f, --force` flags, after printing a deprecation warning on
+stderr.
+
 See [platform](/start/tools/platform/) for full documentation.

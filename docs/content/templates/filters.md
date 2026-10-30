@@ -9,6 +9,8 @@ Filters transform values in templates. Apply with the pipe `|` operator.
 
 Hwaro ships its own filters on top of the standard Crinja (Jinja2) built-ins (`upper`, `lower`, `join`, `map`, `select`, `batch`, and friends), so both kinds work anywhere below.
 
+Besides the built-ins in the tables below, these Jinja2 filters are available: `abs`, `attr`, `batch`, `center`, `dictsort`, `escape` (`e`), `filesizeformat`, `float`, `format`, `groupby`, `indent`, `int`, `list`, `map`, `random`, `reject`, `rejectattr`, `round`, `select`, `selectattr`, `slice`, `string`, `striptags`, `sum`, `title`, `truncate`, `urlencode`, `urlize`, `wordcount`, `wordwrap` and `xmlattr`. `min` and `max` are not.
+
 ## Syntax
 
 ```jinja
@@ -103,7 +105,7 @@ The `t` filter looks up translation keys from TOML files in the `i18n/` director
 <a href="{{ item.href }}"{% if item.url | active_path(ancestor=true) %} class="open"{% endif %}>{{ item.name }}</a>
 ```
 
-Both sides are normalized to one trailing slash before comparing, so `/posts` and `/posts/` are equal. The root path (`/`) only ever matches exactly, even with `ancestor=true`. An external `item.url` (`http://`, `https://`, `//`) never matches.
+Both sides are normalized to one trailing slash before comparing, so `/posts` and `/posts/` are equal. The root path (`/`) only ever matches exactly, even with `ancestor=true`. An external `item.url` (`http://`, `https://`, `//`) never matches, and neither does the empty `url` of an entry written without one (a group heading).
 
 ## Data Filters
 

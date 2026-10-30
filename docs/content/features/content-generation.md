@@ -56,6 +56,8 @@ Every value spec (`slug`, `title`, `body`, `date`, `description`, and each `taxo
 | `description` | no | Field or template for the page description. |
 | `taxonomies` | no | Table of `taxonomy = "spec"`. A field holding an array contributes every element as a term; a scalar contributes one; `null`/`""` contributes none. |
 
+A key not in this table is ignored with a warning naming the rule. A missing required key, a value of the wrong type, or both `body` and `body_template` in one rule is a config error (`HWARO_E_CONFIG`).
+
 ## The Whole Record in Templates
 
 Templates see the full source record as `page.extra.item`, so there is no need to map every field through the rule:
@@ -88,7 +90,7 @@ If a record disappears from the data, its page is gone from the next build's pag
 Every failure names the rule, the record (1-based, in data order) and what to fix:
 
 ```
-Error [HWARO_E_CONTENT]: [[content.generate]] "products.items": record #37: missing field 'skuu' (available: categories, name, price, released, sku).
+Error [HWARO_E_CONTENT]: [[content.generate]] "products.items": record #37: slug: missing field 'skuu' (available: categories, description_md, name, price, released, sku).
 ```
 
 A rule whose `source` is missing or not an array fails the build too. A typo must never silently generate zero pages.

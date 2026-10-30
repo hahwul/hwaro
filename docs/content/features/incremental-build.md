@@ -29,6 +29,13 @@ hwaro build --cache
 
 On the first run, Hwaro builds every page and saves checksums to `.hwaro_cache.json`. On subsequent builds, only changed files are re-processed.
 
+To make caching the default for `hwaro build`, set it in `config.toml`:
+
+```toml
+[build]
+cache = true
+```
+
 ### Force a full rebuild
 
 ```bash
@@ -43,10 +50,10 @@ The `--full` flag clears the cache and rebuilds every page from scratch. The new
 
 Each cached entry tracks:
 
-- **File modification time (mtime)** — fast first check
+- **File modification time (mtime) and size** — fast first check
 - **Content checksum (MD5)** — verifies actual change when mtime differs, catching false positives from file touches
 
-When mtime hasn't changed, the file is considered unchanged without reading its content. When mtime differs, Hwaro computes and compares the content hash to confirm the change is real.
+When mtime and size haven't changed, the file is considered unchanged without reading its content. When either differs, Hwaro computes and compares the content hash to confirm the change is real. A page whose output file (or one of its alias stubs or pagination pages) is missing from the output directory is re-rendered as well.
 
 ### Dependency invalidation
 
@@ -59,6 +66,10 @@ Beyond per-file checksums, Hwaro tracks what each page actually depends on:
   template chain renders that partial.
 - **Cascade fingerprint** — the merged section `[cascade]` values applied to
   the page, so editing a parent `_index.md` cascade rebuilds its descendants.
+- **Bundle assets** — the set of files colocated with a page bundle, so adding
+  or removing one re-renders the page (`page.assets` changes).
+- **Git history** — with [`[git]`](/features/git-info/) enabled, the file's
+  latest commit, so a new commit re-renders the page.
 - **Other pages it renders** — the prev/next neighbours, series list, related
   posts, translations and breadcrumb ancestors the page's templates read, its
   parent section's title, description, assets and sort order

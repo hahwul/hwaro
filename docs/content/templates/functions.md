@@ -85,6 +85,8 @@ a specific language variant.
 | assets | Array<String> |
 | subsections | Array<Section> |
 
+The object also carries `top_level`, `date`, `draft`, `is_index`, `language`, `weight`, `transparent`, `sort_by`, `reverse`, `paginate` and `pagination_enabled`. See [Data Model › Section Objects in Lists](/templates/data-model/#section-objects-in-lists).
+
 **Examples:**
 
 ```jinja
@@ -205,7 +207,7 @@ Access a named menu's resolved entry tree ([Menus](/features/menus/)):
 | Property | Type | Description |
 |----------|------|--------------|
 | name | String | Display label |
-| url | String | Bare root-relative path, or untouched external URL |
+| url | String | Bare root-relative path, or untouched external URL. Empty for an entry without `url` (a group heading) |
 | href | String | `url` with `base_path` applied (internal) or unchanged (external) — use this in `<a href>` |
 | identifier | String | Unique key within the menu |
 | weight | Int | Sort order |

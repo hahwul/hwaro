@@ -174,16 +174,18 @@ Hwaro는 [Highlight.js](https://highlightjs.org/) 테마를 사용합니다. 유
 ```html
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
 ```
 
 `use_cdn = false`이면 로컬 경로에서 로드합니다.
 
 ```html
-<link rel="stylesheet" href="/assets/css/highlight/github-dark.min.css">
-<script src="/assets/js/highlight.min.js"></script>
+<link rel="stylesheet" href="/assets/css/highlight/github-dark.min.css?v=<hash>">
+<script src="/assets/js/highlight.min.js?v=<hash>"></script>
+<script>hljs.highlightAll();</script>
 ```
 
-`use_cdn = false`를 쓸 때는 로컬 파일을 직접 준비해야 합니다. 기본값인 서버 모드에서는 테마 스타일시트만 참조됩니다. 위의 `<script>` 태그는 `mode = "client"`일 때만 나타납니다.
+`use_cdn = false`를 쓸 때는 로컬 파일을 직접 준비해야 합니다. `?v=` 접미사는 [캐시 버스팅](/ko/features/cache-busting/)이 붙입니다. 기본값인 서버 모드에서는 테마 스타일시트만 참조됩니다. 위의 `<script>` 태그는 `mode = "client"`일 때만 나타납니다.
 
 ## 템플릿 연동
 

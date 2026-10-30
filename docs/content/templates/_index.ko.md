@@ -35,9 +35,11 @@ HTML 외에도 페이지/섹션은 `[outputs]` 설정으로 활성화한 형제 
 | content/index.md | index.html 또는 page.html |
 | content/about.md | page.html |
 | content/blog/_index.md | section.html |
-| content/blog/post.md | page.html |
-| 택소노미 인덱스 | taxonomy.html |
-| 택소노미 항목 | taxonomy_term.html |
+| content/blog/post.md | 섹션의 `page_template`, 없으면 page.html |
+| 택소노미 인덱스 | taxonomy.html, 없으면 page.html |
+| 택소노미 항목 | taxonomy_term.html, 없으면 taxonomy.html, 그것도 없으면 page.html |
+
+페이지나 섹션 프론트 매터의 `template` 키는 이 선택을 덮어씁니다. 지정한 템플릿이 없으면 빌드가 경고를 남기고 위의 기본값으로 돌아갑니다.
 
 ## 간단한 예시
 

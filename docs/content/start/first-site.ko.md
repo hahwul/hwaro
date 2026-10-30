@@ -68,6 +68,7 @@ my-site/
 ├── templates/       # Jinja2 templates
 ├── static/          # Static files (CSS, JS, images)
 ├── archetypes/      # Front matter templates for hwaro new
+├── AGENTS.md        # AI 코딩 에이전트용 안내 (--skip-agents-md로 생략)
 ├── data/            # 선택: site.data로 노출되는 JSON/YAML/TOML (CSV는 load_data()로)
 └── public/          # Generated output
 ```

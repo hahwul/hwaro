@@ -97,6 +97,8 @@ tech = ["crystal", "security"]
 
 `paginate_by`를 설정하면 항목 페이지가 `/tags/crystal/page/2/`, `/tags/crystal/page/3/`, … 로 페이지네이션됩니다(1페이지는 `/tags/crystal/`에 그대로 있습니다). 페이저 객체는 [데이터 모델 › Paginator](/ko/templates/data-model/#paginator)에 설명되어 있습니다.
 
+다국어 사이트에서는 기본 언어가 아닌 각 언어가 자기 접두사 아래에 항목 페이지(`/ko/tags/crystal/`)를 따로 만들고, 그 언어의 페이지만 나열합니다. 언어별로 만들 택소노미는 `[languages.<code>] taxonomies`로 고르며, 생략하면 모든 `[[taxonomies]]` 이름이 쓰입니다. 자세한 내용은 [다국어](/ko/features/multilingual/)를 참고하세요.
+
 ## 템플릿
 
 두 템플릿 모두 완성된 목록을 `{{ content }}`로 받습니다. `taxonomy.html`에는 항목 목록이, `taxonomy_term.html`에는 페이지 목록이 들어갑니다. 커스텀 마크업이 필요하면 `content` 대신 [`get_taxonomy()`](#get-taxonomy-함수)를 사용합니다.

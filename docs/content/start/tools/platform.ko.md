@@ -59,8 +59,14 @@ hwaro tool platform vercel --stdout
 - **출력 디렉터리**: 설정한 `[build] output_dir` (기본값 `public/`). 값을
   바꾸면 생성되는 모든 설정 파일에 그대로 반영되므로, 호스팅 서비스가
   `hwaro build`가 실제로 쓰는 디렉터리를 배포합니다. `gitlab-ci`는 기본값이
-  아닐 때 `pages` 잡에 `publish:`도 함께 추가합니다.
-- **리다이렉트**: 프론트 매터에 정의한 페이지 [`aliases`](/ko/writing/pages/)에서 만든 301 리다이렉트 (예: `aliases: ["/old-url/"]`)
+  아닐 때 `pages` 잡에 `publish:`도 함께 추가합니다. 예외는 `github-pages`
+  워크플로입니다. `hahwul/hwaro` 액션은 자체 `output_dir` 입력값(기본값
+  `public`)으로 `-o`를 지정해 빌드하고 그 디렉터리를 배포하므로, 이 경우에는
+  입력값을 설정하세요([액션 입력값](/ko/deploy/github-pages/#액션-입력값) 참고).
+
+`netlify`와 `vercel`에는 다음도 포함됩니다.
+
+- **리다이렉트**: 프론트 매터에 정의한 페이지 [`aliases`](/ko/writing/pages/)에서 만든 301 리다이렉트 (예: `aliases: ["/old-url/"]`). `cloudflare`는 같은 리다이렉트를 `static/_redirects`에 옮겨 적을 수 있도록 주석으로 나열합니다
 - **캐시 헤더**: `[assets]` 출력 디렉터리에 1년짜리 `immutable` 규칙. 그 안의 모든 파일 이름이 내용 해시를 포함할 때만 생성됩니다. 즉 에셋 파이프라인이 `fingerprint = true`와 하나 이상의 `[[assets.bundles]]`로 활성화되어 있고, 같은 URL로 해시 없이 복사되는 `static/<output_dir>/` 디렉터리가 없어야 합니다
 
 ### Netlify 출력

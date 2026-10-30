@@ -38,17 +38,22 @@ AMP 변환기는 다음 변환을 자동으로 적용합니다:
 | `<html>` | `<html amp>` |
 | `<img>` | `width`와 `height`가 있으면 `<amp-img layout="responsive">`, 없으면 `<div class="amp-img-container">` 안의 `<amp-img layout="fill">` |
 | `<video>` | `<amp-video layout="responsive">` |
-| `<iframe>` | `<amp-iframe layout="responsive">` |
-| `<script>` (인라인) | 제거 |
+| `<iframe>` | `<amp-iframe layout="responsive">` (`height`만 있으면 `layout="fixed-height"`). `sandbox`가 없으면 기본값을 추가 |
+| `<picture>` | `<img>`만 남기고(`<source>` 요소는 제거) 위와 같이 변환 |
+| `<script>` | 제거. 단 JSON-LD(`type="application/ld+json"`)와 `cdn.ampproject.org`에서 불러오는 스크립트는 유지 |
+| `<link rel="stylesheet">` | 제거. 단 AMP가 허용하는 폰트 제공자(Google Fonts, Bunny Fonts, Typekit, Font Awesome 등)는 유지 |
+| `<style>` 블록 | 하나의 `<style amp-custom>`으로 합침. `!important`와 AMP가 허용하지 않는 at-rule(`@import`, `@layer` 등)은 제거 |
 | `style="..."` 속성 | 제거 |
-| `onclick` 핸들러 | 제거 |
-| `loading="lazy"` 속성 | 제거 (AMP 요소는 자체 지연 로딩을 하며 이 속성을 허용하지 않음) |
+| `on*` 이벤트 핸들러 (`onclick` 등) | 제거 |
+| `loading`, `decoding`, `fetchpriority` 속성 | 제거 (AMP 요소는 자체 지연 로딩을 하며 이 속성들을 허용하지 않음) |
 | 상대 경로 `src` / `href` (`cover.png`, `../other/`) | AMP 사본이 한 단계 더 깊은 디렉터리에 있으므로 원본 페이지 URL 기준으로 변환 |
 
 추가로 다음이 주입됩니다:
 - AMP 보일러플레이트 CSS
-- AMP 런타임 스크립트 (`cdn.ampproject.org/v0.js`)
+- AMP 런타임 스크립트 (`cdn.ampproject.org/v0.js`). 페이지에서 쓰면 `amp-iframe` / `amp-video` 확장 스크립트도 함께
 - 원본 페이지를 가리키는 `<link rel="canonical">`
+
+테마가 이미 `<style amp-boilerplate>`를 포함하고 있으면 보일러플레이트, 런타임, `<style>` 병합은 건너뛰지만, 빠진 확장 스크립트와 `<link rel="canonical">`은 여전히 추가합니다. 초안, `redirect_to` 페이지, `render = false` 페이지는 AMP 버전을 만들지 않습니다. [CSP](/ko/features/csp/)를 켜면 AMP 사본에는 CSP `<meta>` 태그가 붙지 않습니다.
 
 ## 출력 구조
 

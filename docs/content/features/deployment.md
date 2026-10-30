@@ -34,10 +34,10 @@ url = "gs://my-bucket"
 | `gs://` | `gsutil -m rsync` | Google Cloud SDK |
 | `az://` | `az storage blob sync` | Azure CLI |
 
-You can always override with a custom `command` field for full control.
+A target can also be a local directory given as `path = "/var/www/mysite"` (same as `file://`). You can always override with a custom `command` field for full control.
 
 ```bash
-hwaro deploy              # Deploy to default target
+hwaro deploy              # Deploy to [deployment] target, or the first target
 hwaro deploy --target s3  # Deploy to specific target
 hwaro deploy --dry-run    # Preview changes
 ```

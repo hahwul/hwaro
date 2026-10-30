@@ -44,7 +44,7 @@ Basic organization info from site config. Uses `og.default_image` as logo if set
 
 ## Page-Specific Schemas
 
-Set `schema_type` in front matter to auto-detect and include additional types:
+Set `schema_type` in front matter to auto-detect and include additional types. The value is case-insensitive: `FAQ` or `FAQPage` for an FAQ page, `HowTo` or `how-to` for a how-to.
 
 ### FAQPage
 

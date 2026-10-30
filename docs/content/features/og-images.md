@@ -41,7 +41,7 @@ logo = "static/logo.png"
 | overlay_opacity | float | `0.45` | How much `background` color covers the photo (0.0 = full photo, 1.0 = hidden) |
 | text_panel | float | `0.0` | 0.0–0.6. Soft panel behind the text for legibility on busy backgrounds |
 | pattern_opacity | float | `0.35` | Peak alpha of the pattern styles (`dots`, `grid`, …). Each pattern fades internally from this peak |
-| pattern_scale | float | `1.0` | Scale multiplier for the pattern styles (min 0.1) |
+| pattern_scale | float | `1.0` | Scale multiplier for the pattern styles (clamped to 0.1–10.0) |
 | accent_bars | bool | `false` | Classic thin top/bottom accent bars on the pattern styles |
 | lazy_generate | bool | `false` | Skip bulk generation during `hwaro serve`; images render on first request. Recommended for large sites. No effect on `hwaro build` |
 

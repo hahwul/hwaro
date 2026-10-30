@@ -340,7 +340,7 @@ Each feature has its own documentation with full configuration details. Below is
 | `[auto_includes]` | [Auto Includes](/features/auto-includes/) | Auto-include CSS/JS files |
 | `[assets]` | [Asset Pipeline](/features/asset-pipeline/) | CSS/JS minification & fingerprinting, Subresource Integrity (`sri`) |
 | `[sass]` | [Sass/SCSS](/features/sass/) | Built-in SCSS compilation (pure Crystal) |
-| `[image_processing]` | [Image Processing](/features/image-processing/) | Image resizing & LQIP |
+| `[image_processing]` | [Image Processing](/features/image-processing/) | Image resizing, WebP copies (`formats = ["webp"]`) & LQIP |
 | `[image_processing.lqip]` | [Image Processing](/features/image-processing/#lqip-low-quality-image-placeholders) | Base64 blur-up placeholders |
 | `[content.files]` | [Content Files](/features/content-files/) | Publish non-Markdown files |
 | `[content.new]` | [Archetypes](/writing/archetypes/) | Default front matter and bundle style for `hwaro new` |

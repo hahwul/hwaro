@@ -42,7 +42,7 @@ hooks.pre = [
 ]
 ```
 
-If a pre-build hook **fails** (exits with a non-zero status), the build process is **aborted**. This prevents building with missing dependencies or broken assets.
+If a pre-build hook **fails** (exits with a non-zero status), the build process is **aborted**: the remaining hooks are skipped and `hwaro build` exits with `HWARO_E_CONFIG` (exit code 3). This prevents building with missing dependencies or broken assets.
 
 ### Post-Build Hooks
 
@@ -63,7 +63,7 @@ hooks.post = [
 ]
 ```
 
-If a post-build hook **fails**, a warning is shown but the build is **not** considered failed. The generated site remains intact.
+If a post-build hook **fails**, a warning is shown but the build is **not** considered failed (the exit code stays 0), and the remaining post-build hooks are skipped. The generated site remains intact.
 
 ## Execution Order
 

@@ -38,7 +38,7 @@ hwaro build --memory-limit 512M
 hwaro build --memory-limit 2G
 ```
 
-`G`(기가바이트), `M`(메가바이트), `K`(킬로바이트) 접미사를 사용할 수 있습니다. 배치 크기는 페이지당 약 50KB로 잡는 휴리스틱으로 계산합니다.
+`G`(기가바이트), `M`(메가바이트), `K`(킬로바이트) 접미사를 붙이거나 바이트 수를 그대로 쓸 수 있습니다. 배치 크기는 페이지당 약 50KB로 잡는 휴리스틱으로 계산합니다.
 
 ### 환경 변수
 
@@ -115,12 +115,11 @@ hwaro build --stream --verbose
 ```
 
 ```
-Building site...
   Streaming mode enabled (batch size: 500)
   ...
-  Streaming batch 1 (500 pages)
-  Streaming batch 2 (500 pages)
-  Streaming batch 3 (234 pages)
+[DEBUG]   Streaming batch 1 (500 pages)
+[DEBUG]   Streaming batch 2 (500 pages)
+[DEBUG]   Streaming batch 3 (234 pages)
   ...
 ```
 

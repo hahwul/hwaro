@@ -72,7 +72,7 @@ Add your content...
 hwaro new notes/my-article.md -t "My Article" -a posts
 ```
 
-출력 경로와 무관하게 `archetypes/posts.md`를 사용합니다.
+출력 경로와 무관하게 `archetypes/posts.md`를 사용합니다. 프로젝트에서 쓸 수 있는 이름은 `hwaro new --list-archetypes`로 확인합니다.
 
 ### 2. 경로 기반 매칭
 
@@ -109,6 +109,8 @@ bundle = false                        # true: foo.md 대신 foo/index.md 스캐�
 ```
 
 내장 필드(`title`, `date`, `draft`, `tags`)와 겹치는 항목은 빈 값으로 중복 생성되지 않도록 무시됩니다. 빌드가 숫자·불리언·리스트·테이블로 읽는 키는 `""` 대신 키가 없을 때 가정하는 값으로 채워지므로(`weight = 0`, `toc = false`, `in_sitemap = true`, `aliases = []`, `extra = {}`) 새 페이지가 타입 경고 없이 빌드됩니다. 중립적인 값이 없는 키(`path`, `redirect_to`, `paginate`, `paginate_by`, `pagination_enabled`, `reverse`, `insert_anchor_links`)는 생략됩니다.
+
+`front_matter_format`과 `default_fields`는 이 내장 템플릿에만 적용됩니다. 아키타입이 매칭되면 그 프론트 매터가 그대로 쓰이고, `hwaro new`는 두 설정이 적용되지 않았다고 경고합니다. `hwaro init`의 모든 스캐폴드는 `archetypes/default.md`를 함께 만들므로, 이 설정을 쓰려면 그 파일(또는 매칭되는 아키타입)을 지우세요. `bundle`은 어느 쪽이든 적용됩니다.
 
 ### 리프 번들(디렉터리) 레이아웃
 

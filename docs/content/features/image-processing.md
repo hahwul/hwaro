@@ -32,7 +32,7 @@ quality = 85
 | enabled | bool | false | Enable image resizing |
 | widths | array | [] | Target widths to generate (in pixels) |
 | quality | int | 85 | JPEG output quality (1-100), also used for WebP |
-| formats | array | [] | Extra output formats beside the source's own: `["webp"]` |
+| formats | array | [] | Extra output formats beside the source's own: `["webp"]`. Any other value is a config error |
 | dimensions | bool | false | Add intrinsic `width`/`height` to content images (works without `enabled`) |
 
 ### LQIP (Low-Quality Image Placeholders)
@@ -82,7 +82,7 @@ formats = ["webp"]
 - The encoder is built into Hwaro (pure Crystal), so no external tool or library is involved.
 - WebP files are not used as sources: a `.webp` in `static/` or a page bundle is copied as is.
 - Two sources that differ only in extension in the same directory (`hero.jpg` and `hero.png`) would write the same WebP names. The one whose path sorts first gets them, and a warning names the other one, which gets no WebP variants.
-- Encoding WebP takes longer than JPEG, so cold builds with many images take longer. Warm `--cache` builds and `hwaro serve` reuse the variants.
+- Encoding WebP takes longer than JPEG, so cold builds with many images take longer. Warm `--cache` builds and `hwaro serve` reuse a variant while its source file and the encode settings (`quality`, the LQIP keys) are unchanged; the record is kept in `.hwaro/image_variants.log`.
 
 ### Image Dimensions
 
@@ -247,7 +247,7 @@ For images with transparency (PNG logos, icons), `dominant_color` is weighted by
 
 ### Resize Demo
 
-This docs site has image processing enabled with `widths = [128, 256, 512]` and LQIP enabled. The images below are automatically generated resized variants of `static/hwaro.png`:
+This docs site has image processing enabled with `widths = [128, 256, 512, 640]` and LQIP enabled. The images below are automatically generated resized variants of `static/hwaro.png`:
 
 **Original** (`hwaro.png`):
 

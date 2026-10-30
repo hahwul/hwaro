@@ -28,6 +28,8 @@ HWARO_ENV=staging hwaro build
 # CLI flag takes precedence over HWARO_ENV
 ```
 
+`build`, `serve`, `deploy` and `doctor` accept `--env`. If `config.<env>.toml` does not exist, Hwaro warns (a typo in `--env` or a file that was never committed) and continues with `config.toml` alone.
+
 ## File Structure
 
 ```

@@ -38,7 +38,7 @@ hwaro build --memory-limit 512M
 hwaro build --memory-limit 2G
 ```
 
-Accepts `G` (gigabytes), `M` (megabytes), and `K` (kilobytes) suffixes. The batch size is calculated using a heuristic of ~50KB per page.
+Accepts `G` (gigabytes), `M` (megabytes), and `K` (kilobytes) suffixes, or a plain byte count. The batch size is calculated using a heuristic of ~50KB per page.
 
 ### Environment variable
 
@@ -115,12 +115,11 @@ hwaro build --stream --verbose
 ```
 
 ```
-Building site...
   Streaming mode enabled (batch size: 500)
   ...
-  Streaming batch 1 (500 pages)
-  Streaming batch 2 (500 pages)
-  Streaming batch 3 (234 pages)
+[DEBUG]   Streaming batch 1 (500 pages)
+[DEBUG]   Streaming batch 2 (500 pages)
+[DEBUG]   Streaming batch 3 (234 pages)
   ...
 ```
 

@@ -20,7 +20,7 @@ disallow_paths = ["drafts/**", "**/_*"]
 
 | 키 | 타입 | 기본값 | 설명 |
 |-----|------|---------|-------------|
-| allow_extensions | array | [] | 게시할 파일 확장자 |
+| allow_extensions | array | [] | 게시할 파일 확장자. 이 목록이 비어 있지 않으면 게시가 켜집니다 (`extensions`도 별칭으로 사용 가능) |
 | disallow_extensions | array | [] | 제외할 파일 확장자 |
 | disallow_paths | array | [] | 제외할 경로의 글롭(glob) 패턴 |
 
@@ -70,7 +70,7 @@ content/
 allow_extensions = ["jpg", "jpeg", "png", "gif", "svg", "webp"]
 ```
 
-확장자는 정규화되므로 `"jpg"`와 `".jpg"` 둘 다 쓸 수 있습니다.
+확장자는 정규화되므로 `"jpg"`와 `".jpg"` 둘 다 쓸 수 있으며, 대소문자를 구분하지 않습니다(`photo.JPG`는 `"jpg"`에 일치). `.md` 파일은 이 방식으로 복사되지 않습니다.
 
 ### 차단 목록
 

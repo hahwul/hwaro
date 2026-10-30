@@ -17,6 +17,13 @@ Print values with double braces:
 {{ content }}
 ```
 
+Attribute, index and call access also work after a parenthesized expression, so you can read a field straight off a filter or function result:
+
+```jinja
+{{ (section.pages | first).title }}
+{{ (get_section(path="blog").pages | map(attribute="title") | list)[0] }}
+```
+
 ## Comments
 
 ```jinja
@@ -155,6 +162,29 @@ Include partial templates:
 <main>{{ content | safe }}</main>
 {% include "partials/footer.html" %}
 ```
+
+## Macros
+
+Define reusable snippets with `{% macro %}`, usually in a partial, and import them where you need them:
+
+`templates/partials/macros.html`:
+
+```jinja
+{% macro card(p, show_date=true) %}
+<a href="{{ p.url }}">{{ p.title }}</a>
+{% if show_date and p.date %}<time>{{ p.date }}</time>{% endif %}
+{% endmacro %}
+```
+
+```jinja
+{% import "partials/macros.html" as m %}
+{% for p in section.pages %}{{ m.card(p) }}{% endfor %}
+
+{% from "partials/macros.html" import card %}
+{{ card(page, show_date=false) }}
+```
+
+The same file can be imported more than once in one render, for example by a base layout and by the child template that extends it, or under two names. Only a real cycle (`a.html` imports `b.html`, which imports `a.html`) is an error.
 
 ## Setting Variables
 
