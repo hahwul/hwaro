@@ -20,9 +20,9 @@ describe "[content] ignore" do
       load_config(%([content]\nignore = "README.md"\n)).content_files.ignore.should eq(["README.md"])
     end
 
-    it "normalizes a leading /, ./ or content/, a trailing / and backslashes" do
-      config = load_config(%([content]\nignore = ["/README.md", "./drafts/**", "content/notes", "_templates/", 'a\\b.md', ""]\n))
-      config.content_files.ignore.should eq(["README.md", "drafts/**", "notes", "_templates", "a/b.md"])
+    it "normalizes a leading /, ./ or content/, repeated trailing / and backslashes" do
+      config = load_config(%([content]\nignore = ["/README.md", "./drafts/**", "content/notes", "_templates//", 'a\\b.md', "", "/"]\n))
+      config.content_files.ignore.should eq(["README.md", "drafts/**", "notes", "_templates/", "a/b.md"])
     end
 
     it "warns and keeps the default for a value of the wrong type" do
@@ -73,6 +73,21 @@ describe "[content] ignore" do
       config.content_files.ignored?("notes/_tpl.md").should be_false
       config.content_files.ignored?("ay.md").should be_true
       config.content_files.ignored?("xy.md").should be_false
+    end
+
+    # gitignore's folder form: `_*` hides `_index.md` too, `_*/` does not.
+    it "matches folders only for a pattern written with a trailing /" do
+      folders = Hwaro::Models::ContentFilesConfig.new
+      folders.ignore = ["_*/", "**/_*/", "drafts/"]
+      folders.ignored?("_templates/note.md").should be_true
+      folders.ignored?("blog/_partials/x.md").should be_true
+      folders.ignored?("drafts/a.md").should be_true
+      folders.ignored?("_index.md").should be_false
+      folders.ignored?("blog/_index.md").should be_false
+      folders.ignored?("drafts").should be_false
+      files = Hwaro::Models::ContentFilesConfig.new
+      files.ignore = ["_*"]
+      files.ignored?("_index.md").should be_true
     end
 
     it "matches a pattern of any depth only where its segments line up" do

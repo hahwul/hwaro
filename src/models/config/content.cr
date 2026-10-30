@@ -83,6 +83,9 @@ module Hwaro
       # which a string compare answers; a glob without `**`, braces or a
       # `[…]` class (which may match a `/`) matches only a path of exactly its
       # own depth, so one prefix is tested instead of every ancestor.
+      #
+      # A pattern written with a trailing `/` (gitignore's folder form)
+      # matches folders only: `_*/` hides `_templates/` but not `_index.md`.
       enum IgnoreKind
         Literal
         Tree
@@ -90,7 +93,7 @@ module Hwaro
         Anywhere
       end
 
-      record IgnoreRule, kind : IgnoreKind, pattern : String, span : Int32
+      record IgnoreRule, kind : IgnoreKind, pattern : String, span : Int32, folders_only : Bool
 
       @ignore_rules : Array(IgnoreRule)
 
@@ -108,15 +111,17 @@ module Hwaro
       end
 
       protected def self.compile_ignore(pattern : String) : IgnoreRule
+        folders = pattern.ends_with?('/')
+        pattern = pattern.rstrip('/')
         head = pattern.ends_with?("/**") ? pattern[0, pattern.size - 3] : nil
         if glob_literal?(pattern)
-          IgnoreRule.new(IgnoreKind::Literal, pattern, 0)
-        elsif head && !head.empty? && glob_literal?(head)
-          IgnoreRule.new(IgnoreKind::Tree, "#{head}/", 0)
+          IgnoreRule.new(IgnoreKind::Literal, pattern, 0, folders)
+        elsif !folders && head && !head.empty? && glob_literal?(head)
+          IgnoreRule.new(IgnoreKind::Tree, "#{head}/", 0, folders)
         elsif pattern.includes?("**") || pattern.includes?('{') || pattern.includes?('[')
-          IgnoreRule.new(IgnoreKind::Anywhere, pattern, 0)
+          IgnoreRule.new(IgnoreKind::Anywhere, pattern, 0, folders)
         else
-          IgnoreRule.new(IgnoreKind::Depth, pattern, pattern.count('/') + 1)
+          IgnoreRule.new(IgnoreKind::Depth, pattern, pattern.count('/') + 1, folders)
         end
       end
 
@@ -159,15 +164,17 @@ module Hwaro
         path = Utils::PathUtils.nfc(path)
         depth = path.count('/') + 1
         @ignore_rules.any? do |rule|
+          # A folders-only rule never tests the path's own last segment.
+          limit = rule.folders_only ? depth - 1 : depth
           case rule.kind
           in .literal?
-            path == rule.pattern || (path.starts_with?(rule.pattern) && path.byte_at?(rule.pattern.bytesize) == '/'.ord)
+            (path == rule.pattern && !rule.folders_only) || (path.starts_with?(rule.pattern) && path.byte_at?(rule.pattern.bytesize) == '/'.ord)
           in .tree?
             path.starts_with?(rule.pattern)
           in .depth?
-            rule.span <= depth && File.match?(rule.pattern, rule.span == depth ? path : leading_segments(path, rule.span))
+            rule.span <= limit && File.match?(rule.pattern, rule.span == depth ? path : leading_segments(path, rule.span))
           in .anywhere?
-            any_prefix_matches?(rule.pattern, path)
+            any_prefix_matches?(rule.pattern, path, limit)
           end
         rescue File::BadPatternError
           # A malformed glob matches nothing, so a config typo can't crash
@@ -176,14 +183,16 @@ module Hwaro
         end
       end
 
-      private def any_prefix_matches?(pattern : String, path : String) : Bool
+      # Whether `pattern` matches one of the first `limit` prefixes of `path`.
+      private def any_prefix_matches?(pattern : String, path : String, limit : Int32) : Bool
         from = 0
-        loop do
+        limit.times do
           slash = path.index('/', from)
           return true if File.match?(pattern, slash ? path[0, slash] : path)
           return false unless slash
           from = slash + 1
         end
+        false
       end
 
       # The first `count` segments of `path` (which has more than that).
@@ -214,14 +223,17 @@ module Hwaro
         end
       end
 
-      # `[content] ignore` patterns: normalized like `disallow_paths`, with a
-      # trailing `/` dropped (`_templates/` names the directory itself) and
-      # the gitignore/globset negated class `[!…]` spelled `[^…]`, the form
-      # `File.match?` reads (it takes `[!a]` as "`!` or `a`").
+      # `[content] ignore` patterns: normalized like `disallow_paths`, with
+      # trailing slashes folded to one (the folders-only form, see
+      # IgnoreKind) and the gitignore/globset negated class `[!…]` spelled
+      # `[^…]`, the form `File.match?` reads (it takes `[!a]` as "`!` or `a`").
       def self.normalize_ignore(values : Array(String)) : Array(String)
         values.compact_map do |pattern|
-          normalized = normalize_path(pattern).rstrip('/').gsub("[!", "[^")
-          normalized.empty? ? nil : normalized
+          normalized = normalize_path(pattern)
+          folders = normalized.ends_with?('/')
+          normalized = normalized.rstrip('/').gsub("[!", "[^")
+          next if normalized.empty?
+          folders ? "#{normalized}/" : normalized
         end
       end
 
