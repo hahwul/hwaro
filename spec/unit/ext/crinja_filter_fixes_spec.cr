@@ -101,6 +101,11 @@ describe "Crinja built-in filter fixes" do
         .render({"posts" => posts}).should eq("b|A")
     end
 
+    it "iterates a mapping's keys, as Jinja2 does" do
+      render_filter("{{ {'a': 1, 'z': 0, 'M': 5} | max }}|{{ {'a': 1, 'z': 0, 'M': 5} | min }}|{{ {} | max is undefined }}")
+        .should eq("z|a|true")
+    end
+
     it "gives undefined for an empty or undefined sequence" do
       render_filter("<{{ [] | max }}{{ [] | min }}{{ nope | max }}>|{{ ([] | max) is undefined }}").should eq("<>|true")
     end

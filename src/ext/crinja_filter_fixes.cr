@@ -132,15 +132,18 @@ end
 # `min` / `max` (Jinja2 built-ins Crinja lacks): the first smallest / largest
 # item, compared like `sort` (strings case-insensitively unless
 # `case_sensitive=true`), by an `attribute=` path (dotted, as in `sort`) when
-# given. An empty or undefined sequence gives undefined; items that cannot be
-# compared raise a template error.
+# given; a mapping compares its keys. An empty or undefined sequence gives
+# undefined; items that cannot be compared raise a template error.
 module Crinja::Filter
   def self.__extreme(target : Value, arguments : Arguments, sign : Int32) : Value
     return Value.new(Undefined.new) if target.undefined?
     attribute = arguments["attribute"]
     case_sensitive = arguments["case_sensitive"].truthy?
     best = nil
-    target.to_a.each do |item|
+    raw = target.raw
+    # A mapping iterates its keys, as in Python.
+    items = raw.is_a?(Hash) ? raw.keys : target.to_a
+    items.each do |item|
       key = attribute.none? ? item : __attr_path(attribute, item)
       best = {key, item} if best.nil? || __compare(key, best[0], case_sensitive) * sign > 0
     end
