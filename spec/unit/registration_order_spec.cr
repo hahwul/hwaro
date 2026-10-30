@@ -81,7 +81,7 @@ describe "registration order" do
       batch capitalize ceil center compact date default dictsort escape
       filesizeformat first flatten float floor forceescape format group_by
       groupby indent inspect int join jsonify last length list lower map
-      markdownify md5 pluralize pprint prepend random
+      markdownify md5 num_format pluralize pprint prepend random
       regex_replace reject rejectattr relative_url replace reverse round safe
       select selectattr sha1 sha256 sha384 sha512 slice slugify sort sort_by
       split string strip_html striptags sum t title tojson trim truncate
