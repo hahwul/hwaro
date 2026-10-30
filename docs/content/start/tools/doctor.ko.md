@@ -106,8 +106,10 @@ hwaro doctor --json
 - `_index.md`가 없는 섹션 디렉터리(`content/tags/` 같은 택소노미 디렉터리는
   빌드가 `/tags/`를 직접 만들므로 제외)
 - 맞는 항목 페이지가 없는 `content/tags/<dir>/_index.md`. 대개 `<dir>`을
-  항목의 URL 슬러그가 아니라 철자 그대로 쓴 경우입니다
-  (`taxonomy-term-file-unmatched`)
+  항목의 URL 슬러그가 아니라 철자 그대로 썼거나, 그 항목을 초안, 무시된
+  페이지, 다른 언어 페이지만 달고 있는 경우입니다
+  (`taxonomy-term-file-unmatched`. `path`나 `[permalinks]`로 다른 곳에 옮긴
+  섹션은 제외)
 
 **번역 보고** (언어가 둘 이상인 사이트):
 
@@ -280,7 +282,7 @@ ignore = [
 | `content-schema-violation` | content | 프론트 매터가 `[[content.schema]]`를 위반 ✗ |
 | `structure-missing-index` | structure | `_index.md`가 없는 섹션 |
 | `content-ignore-hides-sections` | structure | `[content] ignore` 패턴이 섹션의 `_index.md`를 숨기는데 그 섹션의 페이지는 여전히 빌드됨 |
-| `taxonomy-term-file-unmatched` | structure | `content/<taxonomy>/<dir>/_index.md`에 맞는 항목 페이지가 없어(대개 `<dir>`이 항목의 URL 슬러그가 아님) 일반 섹션으로 게시됨 |
+| `taxonomy-term-file-unmatched` | structure | `content/<taxonomy>/<dir>/_index.md`에 맞는 항목 페이지가 없어(`<dir>`이 항목의 URL 슬러그가 아니거나, 그 언어의 게시 페이지 중 그 항목을 단 것이 없음) 일반 섹션으로 게시됨 |
 | `translation-missing` | i18n | 설정된 언어에 대응 페이지가 없는 페이지나 섹션 |
 | `translation-orphan` | i18n | 기본 언어 원본이 없는 번역 |
 | `translation-key-collision` | i18n | 같은 언어의 두 페이지가 같은 `translation_key`를 씀. 한 페이지만 연결됨(출력되는 페이지 우선, 그다음 경로 순) |

@@ -1059,13 +1059,14 @@ describe Hwaro::Services::Doctor do
       end
 
       # `[content] ignore`: an ignored post puts no term page up, so its
-      # term's file is an ordinary section, which doctor notes.
+      # term's file is an ordinary section, which doctor notes. The term
+      # exists (on the ignored post), so the advice is not to rename.
       it "reads term files over the ignore-aware page set" do
         config = base_config + %(\n[[taxonomies]]\nname = "tags"\n\n[content]\nignore = ["hidden.md"]\n)
         files = {"tags/go/_index.md" => "+++\ntitle = \"Go\"\n+++\n",
                  "hidden.md"         => "+++\ntitle = \"H\"\ntags = [\"go\"]\n+++\n"}
         run_doctor(config, files).select { |i| i.id == "taxonomy-term-file-unmatched" }.map(&.message).should eq(
-          ["Matches no term page of taxonomy tags, so it publishes as an ordinary section; name its directory after the term's URL slug (/tags/<slug>/) to describe that term page"])
+          ["No term page /tags/go/ is generated: no published page in this file's language carries that term, so it publishes as an ordinary section"])
       end
 
       it "counts cascaded terms when deciding a file describes a term page" do
@@ -1083,12 +1084,23 @@ describe Hwaro::Services::Doctor do
         issues = run_doctor(base_config + %(\n[[taxonomies]]\nname = "tags"\n\n[[taxonomies]]\nname = "authors"\n),
           {"tags/rust/_index.md" => "+++\ntitle = \"Rust\"\n+++\n", "tags/rustlang/_index.md" => "+++\ntitle = \"Typo\"\n+++\n",
            "tags/moved/_index.md" => "+++\ntitle = \"Moved\"\npath = \"elsewhere\"\n+++\n",
+           "tags/wip/_index.md" => "+++\ntitle = \"WIP\"\n+++\n", "draft.md" => "+++\ntitle = \"D\"\ndraft = true\ntags = [\"wip\"]\n+++\n",
            "tags/rust/notes.md" => "+++\ntitle = \"N\"\n+++\n",
            "authors/a/b.md" => "+++\ntitle = \"B\"\n+++\n",
            "post.md" => "+++\ntitle = \"P\"\ntags = [\"rust\"]\n+++\n"})
         missing = issues.select { |i| i.id == "structure-missing-index" }.map(&.message)
         missing.any? { |m| m.ends_with?(": tags/") || m.ends_with?(": authors/") }.should be_false
-        issues.select { |i| i.id == "taxonomy-term-file-unmatched" }.map { |i| Path[i.file.to_s].parts.last(3).join("/") }.should eq(["tags/rustlang/_index.md"])
+        notes = issues.select { |i| i.id == "taxonomy-term-file-unmatched" }.to_h { |i| {Path[i.file.to_s].parts.last(3).join("/"), i.message} }
+        notes.keys.sort!.should eq(["tags/rustlang/_index.md", "tags/wip/_index.md"])
+        notes["tags/rustlang/_index.md"].should eq("Matches no term page of taxonomy tags: no page carries a term with the URL slug \"rustlang\", so it publishes as an ordinary section; name its directory after the term's URL slug (/tags/<slug>/) to describe that term page")
+        notes["tags/wip/_index.md"].should eq("No term page /tags/wip/ is generated: no published page in this file's language carries that term, so it publishes as an ordinary section")
+      end
+
+      it "leaves a term-directory section a [permalinks] rule moves alone" do
+        issues = run_doctor(base_config + %(\n[permalinks]\n"tags" = "/topics/"\n\n[[taxonomies]]\nname = "tags"\n),
+          {"tags/rustlang/_index.md" => "+++\ntitle = \"Moved\"\n+++\n",
+           "post.md"                 => "+++\ntitle = \"P\"\ntags = [\"rust\"]\n+++\n"})
+        issues.any? { |i| i.id == "taxonomy-term-file-unmatched" }.should be_false
       end
 
       it "reports info when section dir missing _index.md" do
