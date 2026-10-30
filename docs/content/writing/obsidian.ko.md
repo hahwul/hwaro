@@ -17,7 +17,7 @@ backlinks = true   # page.backlinks
 
 볼트를 한 번만 일반 마크다운으로 변환하려면 [`hwaro tool import obsidian`](/ko/start/tools/import/)을 사용하세요.
 
-볼트에는 노트가 아닌 파일도 있습니다. `_templates/` 폴더, `README.md`, Excalidraw 그림 같은 것들입니다. 이런 파일을 [`[content] ignore`](/ko/start/config/#콘텐츠-파일-제외)에 적으면 Hwaro가 읽지 않으므로 발행되지 않고, `[[링크]]`나 `![[임베드]]`도 그 파일로 해석되지 않습니다. `.obsidian/` 같은 점(.)으로 시작하는 폴더는 처음부터 읽지 않습니다.
+볼트에는 노트가 아닌 파일도 있습니다. `_templates/` 폴더, `README.md`, Excalidraw 그림 같은 것들입니다. 이런 파일을 [`[content] ignore`](/ko/start/config/#콘텐츠-파일-제외)에 적으면 콘텐츠 탐색에서 빠집니다. 발행되지 않고, `[[링크]]`나 `![[임베드]]`도 그 파일로 해석되지 않습니다. 다만 `include_md`나 `load_data()`에 경로를 직접 지정하면 제외된 파일도 읽으므로, 템플릿 폴더에 노트가 포함할 조각을 둘 수 있습니다. `.obsidian/` 같은 점(.)으로 시작하는 폴더는 처음부터 읽지 않습니다.
 
 ```toml
 [content]

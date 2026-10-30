@@ -17,7 +17,7 @@ backlinks = true   # page.backlinks
 
 To convert a vault into plain Markdown once instead, use [`hwaro tool import obsidian`](/start/tools/import/).
 
-A vault also holds files that are not notes: a `_templates/` folder, a `README.md`, Excalidraw drawings. List them in [`[content] ignore`](/start/config/#ignoring-content-files) and Hwaro never reads them, so they are not published and no `[[link]]` or `![[embed]]` resolves to them. Dot folders such as `.obsidian/` are never read in the first place.
+A vault also holds files that are not notes: a `_templates/` folder, a `README.md`, Excalidraw drawings. List them in [`[content] ignore`](/start/config/#ignoring-content-files) and content discovery skips them. They are not published, and no `[[link]]` or `![[embed]]` resolves to them. An explicit `include_md` or `load_data()` path still reads an ignored file, so a template folder can hold snippets that notes include. Dot folders such as `.obsidian/` are never read in the first place.
 
 ```toml
 [content]
