@@ -73,7 +73,9 @@ module Hwaro
 
         case command
         when "-v", "-V", "--version"
-          Logger.info "#{Hwaro::VERSION}"
+          # The version is the command's output, not a status line, so
+          # `--quiet` must not swallow it (Logger.info would).
+          Logger.io.puts Hwaro::VERSION
         when "-h", "--help"
           Runner.print_help
         else
@@ -226,7 +228,7 @@ module Hwaro
 
         # Register version command
         CommandRegistry.register(CommandInfo.new(name: "version", description: "Show version")) do |_|
-          Logger.info "#{Hwaro::VERSION}"
+          Logger.io.puts Hwaro::VERSION
         end
 
         # Register help command. `hwaro help <command>` delegates to the

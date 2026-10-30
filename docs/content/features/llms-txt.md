@@ -94,7 +94,7 @@ The `llms-full.txt` file is structured as follows:
 5. **Page entries** — Each page separated by `---`, containing:
    - `Title` — Page title
    - `URL` — Absolute URL to the page
-   - `Source` — Source file path relative to project root
+   - `Source` — Source file path relative to project root. A page made by [`[[content.generate]]`](/features/content-generation/) has no file, so it names the data it came from instead, such as `data.products.items`
    - `Language` — Language code (only for multilingual sites)
    - Raw content of the page
 

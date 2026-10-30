@@ -227,7 +227,13 @@ module Hwaro
               url = page.url
               absolute_url = Utils::TextUtils.encode_url_path(base_url.empty? ? url : "#{base_url}#{url}")
               str << "URL: " << absolute_url << "\n"
-              str << "Source: content/" << page.path << "\n"
+              # A `[[content.generate]]` page has no file under content/;
+              # name the data it was generated from instead.
+              if synthesis = page.synthesis
+                str << "Source: " << synthesis.origin << "\n"
+              else
+                str << "Source: content/" << page.path << "\n"
+              end
 
               if config.multilingual?
                 lang = page.language || config.default_language

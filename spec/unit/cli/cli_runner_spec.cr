@@ -282,6 +282,32 @@ describe Hwaro::CLI::Runner do
         end
       end
     end
+
+    it "still prints the version under --quiet" do
+      [["-q", "--version"], ["version", "-q"], ["--quiet", "-v"]].each do |argv|
+        previous_io = Hwaro::Logger.io
+        previous_level = Hwaro::Logger.level
+        previous_quiet = Hwaro::Logger.quiet?
+        sink = IO::Memory.new
+        Hwaro::Logger.io = sink
+        Hwaro::Logger.level = Hwaro::Logger::Level::Info
+
+        old_argv = ARGV.dup
+        ARGV.clear
+        ARGV.concat(argv)
+
+        begin
+          Hwaro::CLI::Runner.new.run
+          sink.to_s.should eq("#{Hwaro::VERSION}\n")
+        ensure
+          ARGV.clear
+          ARGV.concat(old_argv)
+          Hwaro::Logger.io = previous_io
+          Hwaro::Logger.level = previous_level
+          Hwaro::Logger.quiet = previous_quiet
+        end
+      end
+    end
   end
 end
 
