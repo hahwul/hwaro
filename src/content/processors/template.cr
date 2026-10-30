@@ -118,8 +118,12 @@ module Hwaro
           # now() function - returns current time
           @env.functions["now"] = Crinja.function({format: nil, locale: nil}) do
             format = arguments["format"]
-            # An undefined variable is no format, like `none`.
-            format = format.none? || format.undefined? ? CLOCK_DEFAULT_FORMAT : format.to_s
+            # An undefined variable is no format, like `none`. The default
+            # format prints no names, so its locale is never looked up (an
+            # unknown one does not warn).
+            default = format.none? || format.undefined?
+            format = default ? CLOCK_DEFAULT_FORMAT : format.to_s
+            locale = default ? "" : Filters::DateFilters.locale_arg(arguments["locale"])
             # The page is only as fresh as this format's text: a `--cache`
             # build re-renders it once the formatted clock moves.
             TemplateEngine.record_clock_read(format)
@@ -127,7 +131,7 @@ module Hwaro
             # (`now(format="%")`) makes Crystal's `Time#to_s` raise a bare
             # `IndexError`, which is not a `Crinja::Error` and so kills the
             # build with `Index out of bounds` and no template file:line.
-            Crinja::Value.new(Filters::DateFilters.format_time(Time.local, format, Filters::DateFilters.locale_arg(arguments["locale"])))
+            Crinja::Value.new(Filters::DateFilters.format_time(Time.local, format, locale))
           end
         end
 
