@@ -85,7 +85,7 @@ toc = true
 | assets | Array<String> |
 | subsections | Array<Section> |
 
-이 객체에는 `top_level`, `date`, `draft`, `is_index`, `language`, `weight`, `transparent`, `sort_by`, `reverse`, `paginate`, `pagination_enabled`도 있습니다. [데이터 모델 › 목록 속 섹션 객체](/ko/templates/data-model/#목록-속-섹션-객체)를 참고하세요.
+이 객체에는 `top_level`, `date`, `draft`, `is_index`, `language`, `weight`, `transparent`, `sort_by`, `reverse`, `paginate`, `pagination_enabled`와 (지정했다면) `translation_key`도 있습니다. [데이터 모델 › 목록 속 섹션 객체](/ko/templates/data-model/#목록-속-섹션-객체)를 참고하세요.
 
 **예시:**
 

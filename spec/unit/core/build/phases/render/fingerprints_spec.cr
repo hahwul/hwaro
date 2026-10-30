@@ -454,6 +454,10 @@ class Hwaro::Core::Build::Builder
     compute_menu_set_fingerprint(site)
   end
 
+  def test_section_set_fingerprint(sections : Array(Hwaro::Models::Section)) : String
+    compute_section_set_fingerprint(sections)
+  end
+
   def test_page_relations_hash(page, templates, site, link_targets) : String
     page_relations_hash(page, templates, site, link_targets)
   end
@@ -483,6 +487,20 @@ describe "relations hash get_page lookup" do
     # Still the page the slash-stripped URL names: retitling it moves the hash.
     site.pages.last.title = "Renamed"
     builder.test_page_relations_hash(site.pages.first, templates, site, {} of String => Hwaro::Models::Page).should_not eq(hashes.first)
+  end
+end
+
+# `site.sections` / `get_section()` expose a section's `translation_key`.
+describe "section-set fingerprint: translation_key" do
+  it "moves with a section's key and keeps its digest without one" do
+    builder = Hwaro::Core::Build::Builder.new
+    section = Hwaro::Models::Section.new("posts/_index.md")
+    unkeyed = builder.test_section_set_fingerprint([section])
+    section.translation_key = "blog"
+    keyed = builder.test_section_set_fingerprint([section])
+    keyed.should_not eq(unkeyed)
+    section.translation_key = "news"
+    builder.test_section_set_fingerprint([section]).should_not eq(keyed)
   end
 end
 

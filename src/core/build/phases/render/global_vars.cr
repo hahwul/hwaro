@@ -117,6 +117,7 @@ module Hwaro::Core::Build::Phases::Render
         "subsections"        => Crinja::Value.new([] of Crinja::Value),
       } of String => Crinja::Value
       hash["version"] = Content::Versions.page_version_value(s, config) if config.versions.enabled?
+      s.translation_key.try { |key| hash["translation_key"] = Crinja::Value.new(key) }
       section_val = Crinja::Value.new(hash)
       section_data_by_path[s.path] = {pages: section_pages, hash: hash}
       all_sections_array << section_val

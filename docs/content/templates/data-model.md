@@ -266,6 +266,7 @@ The section objects in `section.subsections`, `site.sections` and `get_section()
 | assets | Array<String> | Colocated files |
 | subsections | Array<Section> | Child sections, same shape (empty on the root section's own entry) |
 | version | Object? | Only on versioned sites |
+| translation_key | String? | `translation_key` from front matter (undefined when unset) |
 
 ### Iterating Pages
 

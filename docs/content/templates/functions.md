@@ -85,7 +85,7 @@ a specific language variant.
 | assets | Array<String> |
 | subsections | Array<Section> |
 
-The object also carries `top_level`, `date`, `draft`, `is_index`, `language`, `weight`, `transparent`, `sort_by`, `reverse`, `paginate` and `pagination_enabled`. See [Data Model › Section Objects in Lists](/templates/data-model/#section-objects-in-lists).
+The object also carries `top_level`, `date`, `draft`, `is_index`, `language`, `weight`, `transparent`, `sort_by`, `reverse`, `paginate`, `pagination_enabled` and, when set, `translation_key`. See [Data Model › Section Objects in Lists](/templates/data-model/#section-objects-in-lists).
 
 **Examples:**
 

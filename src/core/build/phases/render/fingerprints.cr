@@ -563,9 +563,9 @@ module Hwaro::Core::Build::Phases::Render
 
   # Fingerprint the section set — the metadata nav/menus and section-set
   # consumers render: identity fields plus `render`, `redirect_to`, `date`,
-  # `sort_by`, `reverse`,
-  # `transparent`, `paginate` and the section's bundle assets, all of which
-  # the `site.sections`/`get_section()` Crinja hash exposes.
+  # `sort_by`, `reverse`, `transparent`, `paginate`, `translation_key` and
+  # the section's bundle assets, all of which the
+  # `site.sections`/`get_section()` Crinja hash exposes.
   # No `fields` parameter: that hash exposes no `extra` key at all, so a
   # section's `[extra]` is unreachable from any section-set listing.
   # Fingerprinting it could only ever cause spurious invalidation, never
@@ -600,6 +600,8 @@ module Hwaro::Core::Build::Phases::Render
       fp_value(digest, s.paginate.try(&.to_s) || "-")
       fp_list(digest, s.assets.sort)
       fp_menus(digest, s.menus)
+      # Folded only when set, so sites without keys keep their digest.
+      s.translation_key.try { |key| fp_value(digest, "k:#{key}") }
     end
     digest.final.hexstring
   end
