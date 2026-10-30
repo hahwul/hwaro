@@ -61,3 +61,21 @@ describe "Render global vars: Unicode-normalized lookups" do
     end
   end
 end
+
+describe "Render global vars: section translation_key" do
+  it "exposes a section's translation_key in get_section() and site.sections" do
+    build_site(
+      "title = \"T\"\nbase_url = \"http://localhost\"\n",
+      content_files: {
+        "index.md"        => "+++\ntitle = \"Home\"\ntemplate = \"probe\"\n+++\n",
+        "posts/_index.md" => "+++\ntitle = \"Posts\"\ntranslation_key = \"blog\"\n+++\n",
+        "docs/_index.md"  => "+++\ntitle = \"Docs\"\n+++\n",
+      },
+      template_files: {
+        "probe.html" => "[{{ get_section(path='posts').translation_key }}]{% for s in site.sections | sort(attribute='path') %}[{{ s.name }}={{ s.translation_key is defined }}]{% endfor %}",
+      },
+    ) do
+      File.read("public/index.html").should eq("[blog][docs=false][posts=true]")
+    end
+  end
+end

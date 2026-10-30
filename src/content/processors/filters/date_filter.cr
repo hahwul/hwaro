@@ -50,15 +50,17 @@ module Hwaro
           end
 
           # The name table for `locale`, or nil for Crystal's English names.
-          # Case-insensitive, `-` or `_` separated, and falls back one
-          # subtag at a time (`zh-Hant-TW` → `zh_hant` → `zh`). An unknown
-          # locale warns once per build and renders English.
+          # Case-insensitive, `-` or `_` separated, ignores a POSIX
+          # `.codeset` / `@modifier` (`ko_KR.UTF-8`, `ko@euro`), and falls
+          # back one subtag at a time (`zh-Hant-TW` → `zh_hant` → `zh`). An
+          # unknown locale warns once per build and renders English.
           def self.locale_names(locale : String) : LocaleNames?
             # Fast path: the canonical keys `page.language` usually holds.
             LOCALES[locale]?.try { |names| return names }
             return if locale == "en"
             key = locale.strip.downcase.tr("-", "_")
             return if key.empty? # `locale=" "` is no locale, not an unknown one
+            key = key[0, key.index(/[.@]/) || key.size]
             loop do
               return if key == "en"
               LOCALES[key]?.try { |names| return names }
@@ -164,7 +166,12 @@ module Hwaro
           # "2024-01-15xxx" instead of passing it through unchanged.
           def self.parse_string(value : String) : Time?
             return try_parse(value, "%Y-%m-%d") if value.size <= 10
-            zoned, local = value[10] == 'T' ? {T_ZONED, T_LOCAL} : {SPACE_ZONED, SPACE_LOCAL}
+            if value[10].in?('T', 't')
+              value = value.upcase # RFC 3339 allows a lowercase `t` and `z`
+              zoned, local = T_ZONED, T_LOCAL
+            else
+              zoned, local = SPACE_ZONED, SPACE_LOCAL
+            end
             # Longer than the zone-less minute form ("2024-01-15T10:30").
             if value.size > 16
               zoned.each { |fmt| try_parse(value, fmt).try { |time| return time } }
@@ -189,9 +196,9 @@ module Hwaro
               case value
               when Time
                 DateFilters.format_time(value, format, locale)
-              when String
-                parsed = DateFilters.parse_string(value)
-                parsed ? DateFilters.format_time(parsed, format, locale) : value
+              when String, Crinja::SafeString
+                parsed = DateFilters.parse_string(value.to_s)
+                parsed ? DateFilters.format_time(parsed, format, locale) : value.to_s
               else
                 value.to_s
               end

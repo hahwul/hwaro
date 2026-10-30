@@ -106,6 +106,14 @@ describe "Crinja built-in filter fixes" do
         .should eq("z|a|true")
     end
 
+    it "treats an undefined attribute like none, as sort does" do
+      render_filter("{{ [3, 1, 2] | min(attribute=missing) }}|{{ [3, 1, 2] | max(attribute=missing) }}").should eq("1|3")
+    end
+
+    it "gives the same answer for a mixed string/number list in either order" do
+      render_filter("{{ [1, 'a'] | max }}{{ ['a', 1] | max }}|{{ [1, 'a'] | min }}{{ ['a', 1] | min }}").should eq("aa|11")
+    end
+
     it "gives undefined for an empty or undefined sequence" do
       render_filter("<{{ [] | max }}{{ [] | min }}{{ nope | max }}>|{{ ([] | max) is undefined }}").should eq("<>|true")
     end

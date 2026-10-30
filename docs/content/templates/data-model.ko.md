@@ -266,6 +266,7 @@ john-doe:
 | assets | Array<String> | 함께 둔 파일 |
 | subsections | Array<Section> | 같은 형태의 하위 섹션(루트 섹션 자신의 항목에서는 빈 배열) |
 | version | Object? | 버전 문서 사이트에서만 |
+| translation_key | String? | 프론트 매터의 `translation_key`(없으면 정의되지 않음) |
 
 ### 페이지 순회
 

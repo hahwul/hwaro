@@ -85,7 +85,7 @@ a specific language variant.
 | assets | Array<String> |
 | subsections | Array<Section> |
 
-The object also carries `top_level`, `date`, `draft`, `is_index`, `language`, `weight`, `transparent`, `sort_by`, `reverse`, `paginate` and `pagination_enabled`. See [Data Model › Section Objects in Lists](/templates/data-model/#section-objects-in-lists).
+The object also carries `top_level`, `date`, `draft`, `is_index`, `language`, `weight`, `transparent`, `sort_by`, `reverse`, `paginate`, `pagination_enabled` and, when set, `translation_key`. See [Data Model › Section Objects in Lists](/templates/data-model/#section-objects-in-lists).
 
 **Examples:**
 
@@ -419,7 +419,7 @@ Get current datetime:
 
 | Name | Type | Description |
 |------|------|-------------|
-| format | String? | Date format string (optional; default `%Y-%m-%d %H:%M:%S`) |
+| format | String? | Date format string (optional; default `%Y-%m-%d %H:%M:%S`, also used for `none` or an undefined variable) |
 | locale | String? | Translates month, weekday and AM/PM names, as in the [`date` filter](/templates/filters/#date-formatting) (optional) |
 
 **Returns:** String

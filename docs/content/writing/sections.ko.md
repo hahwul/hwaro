@@ -49,6 +49,7 @@ Welcome to my blog.
 | redirect_to | string | — | 섹션을 렌더링하는 대신 이 URL(또는 `@/blog/post.md` 같은 `@/` 콘텐츠 경로)로 가는 HTML 리다이렉트 페이지 생성 |
 | draft | bool | false | 프로덕션에서 제외 |
 | weight | int | 0 | 섹션 정렬 순서 |
+| translation_key | string | — | 디렉터리 이름이 다른 섹션 번역을 연결. [번역 키](/ko/features/multilingual/#번역-키) 참고 |
 | cascade | table | — | 하위 항목이 상속하는 기본값 ([캐스케이드](#캐스케이드) 참고) |
 
 ## 캐스케이드

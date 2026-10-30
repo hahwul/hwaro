@@ -108,6 +108,13 @@ describe "DateFilters locale" do
     localized("%a", "zh-Hans-CN").should eq("周二")
   end
 
+  it "ignores a POSIX codeset or modifier" do
+    log = with_captured_log do
+      %w[ko.UTF-8 ko@euro ko_KR.UTF-8 ko_KR.UTF-8@x].each { |loc| localized("%A", loc).should eq("화요일") }
+    end
+    log.should_not contain("unknown locale")
+  end
+
   it "keeps Crystal's English output for English locales, with no warning" do
     log = with_captured_log do
       %w[en en_US en-GB].each { |loc| localized("%B %a %p", loc).should eq(TUE_PM.to_s("%B %a %p")) }
@@ -204,6 +211,14 @@ describe "DateFilters locale" do
 
   it "still reports a malformed format by its original text" do
     expect_raises(Crinja::Error, %(invalid date format "%B %")) { localized("%B %", "ko") }
+  end
+
+  it "formats a safe string and a lowercase RFC 3339 t/z" do
+    render_crinja(%({{ ("2024-03-05" | safe) | date("%B %d, %Y") }})).should eq("March 05, 2024")
+    render_crinja(%({{ "2024-03-05t14:07:09z" | date("%B %d %H:%M %z") }})).should eq("March 05 14:07 +0000")
+    render_crinja(%({{ "2024-03-05t14:07" | date("%H:%M") }})).should eq("14:07")
+    # An unparseable one comes back as a plain string (escaped), as before.
+    render_crinja(%({% autoescape true %}{{ ("<b>" | safe) | date }}{% endautoescape %})).should eq("&lt;b&gt;")
   end
 
   it "passes the locale through now(format=...)" do

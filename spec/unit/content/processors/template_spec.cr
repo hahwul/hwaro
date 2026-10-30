@@ -309,6 +309,16 @@ describe Hwaro::Content::Processors::TemplateEngine do
       result.should eq(Time.local.year.to_s)
     end
 
+    it "treats an undefined now() format like none" do
+      Hwaro::Content::Processors::TemplateEngine.take_render_reads
+      render_crinja("{{ now(format=missing) }}").should match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+      Hwaro::Content::Processors::TemplateEngine.take_render_reads.should eq(Set{"clock:%Y-%m-%d %H:%M:%S"})
+    end
+
+    it "does not look up the locale of a now() without a format" do
+      with_captured_log { render_crinja("{{ now(locale='xx-now') }}") }.should_not contain("unknown locale")
+    end
+
     it "processes env function with set variable" do
       ENV["HWARO_TPL_TEST"] = "analytics-123"
       vars = {} of String => Crinja::Value
