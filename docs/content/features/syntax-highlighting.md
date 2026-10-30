@@ -134,14 +134,25 @@ those is the quickest start.
   grammar can also replace a bundled one (an `<alias>ini</alias>` takes
   over ```` ```ini ```` fences). When two of your files claim the same
   name, the first file in sorted order keeps it.
-- **Errors:** a missing directory, malformed XML, a regex that does not
-  compile, or a file without `<name>` or a `root` state is a warning
-  naming the file; the build goes on and those fences fall back to plain
-  output. `hwaro doctor` reports the same problems
-  (`highlight-lexer-invalid`).
+- **Errors:** a missing directory, an unreadable file, malformed XML, a
+  regex that does not compile, a file without `<name>` or a `root` state,
+  or a `<push>`/`<include>`/`<combined>` naming a state the file does not
+  define is a warning naming the file; that file is skipped, the build
+  goes on and its fences fall back to plain output. `hwaro doctor` reports
+  the same problems, name clashes included (`highlight-lexer-invalid`).
+- **Runaway rules:** a rule that matches the empty string without
+  changing state, or a `<usingself>`/`<using>` that keeps delegating to
+  itself (more than 32 levels deep), would never finish; the code block
+  falls back to plain output with a warning instead. A regex that
+  backtracks catastrophically is just slow, as it would be in a bundled
+  grammar.
+- **`include_code`:** a file matching one of a grammar's `<filename>`
+  globs (`<filename>*.dpl</filename>`) is highlighted with it, ahead of
+  the bundled lexers.
 - **Rebuilds:** editing, adding or removing a grammar re-highlights every
   page, under `hwaro build --cache` and in `hwaro serve`, which watches
-  the directory.
+  the directory (only a `lexers_dir` inside the project: an absolute path
+  or one starting with `../` is read by every build but not watched).
 - **Client mode:** Highlight.js cannot read these grammars, so
   `lexers_dir` is ignored (with a warning) when `mode = "client"`.
 

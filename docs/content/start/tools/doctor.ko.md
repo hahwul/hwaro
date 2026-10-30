@@ -261,7 +261,7 @@ ignore = [
 | `build-output-stale` | config | 소스보다 오래된 빌드 출력으로 라우트를 통과시킴 |
 | `sass-dir-not-scanned` | config | 빌드가 스캔하지 않는 루트 `sass/` 디렉터리에 SCSS 파일이 있음 |
 | `sass-disabled-with-sources` | config | `[sass]`가 꺼진 상태에서 `static/` 아래에 SCSS 엔트리 파일이 있음 |
-| `highlight-lexer-invalid` | config | `[highlight] lexers_dir`의 문법 파일을 읽을 수 없음 (잘못된 XML·정규식, `<name>` 누락) |
+| `highlight-lexer-invalid` | config | `[highlight] lexers_dir`의 문법 파일을 불러오지 못함 (읽기 실패, 잘못된 XML·정규식, `<name>` 누락, 없는 상태 참조) 또는 앞선 파일과 이름이 겹침 |
 | `missing-config-*` | config_missing | 설정 섹션 누락 (예: `missing-config-pwa`) |
 | `template-dir-missing` | template | 템플릿 디렉터리를 찾을 수 없음 ✗ |
 | `template-required-missing` | template | `page.html`(또는 `default.html`) 누락 ✗ |
