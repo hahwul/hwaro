@@ -39,21 +39,22 @@ module Hwaro
         # without it the build writes a redirect stub there.
         version_parents = config.versions.list.map(&.parent_dir).reject(&.empty?).to_set
         check_broad_ignore_patterns(issues, config)
-        # Nor is `content/tags/` holding only files that describe term pages
-        # (term_metadata_files): the build generates `/tags/` itself.
-        term_files = term_metadata_files(config)
-        unless term_files.empty?
-          config.taxonomies.each do |taxonomy|
-            dir = File.join(@content_dir, taxonomy.name)
-            next unless Dir.exists?(dir)
-            markdown = [] of String
-            Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "**", "*")) do |path|
-              markdown << Path[path].relative_to(@content_dir).to_s if ContentWalk.markdown?(path) && !content_ignored?(path)
-            end
-            version_parents << taxonomy.name if !markdown.empty? && markdown.all? { |f| term_files.includes?(f) }
-          end
-        end
+        # Nor is a taxonomy directory (`content/tags/`): the build generates
+        # `/tags/` itself and replaces an authored `tags/_index.md`, warning.
+        config.taxonomies.each { |taxonomy| version_parents << taxonomy.name }
         walk_section_dirs(@content_dir, issues, index_names(config), version_parents)
+
+        # A `tags/<dir>/_index.md` no term page takes (usually `<dir>` spelled
+        # as the term rather than its URL slug) quietly publishes as a section.
+        term_metadata(config).strays.each do |stray|
+          taxonomy = Path[stray.path].parts[0]
+          message = if stray.known_term
+                      "No term page #{stray.url} is generated: no published page in this file's language carries that term, so it publishes as an ordinary section"
+                    else
+                      "Matches no term page of taxonomy #{taxonomy}: no page carries a term with the URL slug \"#{Path[stray.url].basename}\", so it publishes as an ordinary section; name its directory after the term's URL slug (/#{taxonomy}/<slug>/) to describe that term page"
+                    end
+          issues << Issue.new(id: "taxonomy-term-file-unmatched", level: :info, category: "structure", file: stray.file, message: message)
+        end
       end
 
       # Content-relative paths of the `_index` files a default build reads as
@@ -62,26 +63,33 @@ module Hwaro
       # without a candidate (`term_metadata_path?`), which skips the parse.
       # Terms a section `[cascade]` hands down count, as in the build; output
       # collisions don't — doctor approximates, the build decides. Computed
-      # once per run (two checks read it).
-      private def term_metadata_files(config : Models::Config) : Set(String)
-        @term_metadata_files ||= compute_term_metadata_files(config)
+      # once per run (two checks read it). The candidates no term page takes
+      # are `strays`, minus those a `path` or `[permalinks]` rule moves away
+      # from `<lang>/<taxonomy>/<dir>/` on purpose.
+      private def term_metadata(config : Models::Config) : TermMetadata
+        @term_metadata ||= compute_term_metadata(config)
       end
 
-      private def compute_term_metadata_files(config : Models::Config) : Set(String)
-        return Set(String).new if config.taxonomies.empty? || !Dir.exists?(@content_dir)
-        infos = ContentLister.new(@content_dir, GeneratedContent.infos(@content_dir, @content_ignore.rules), @content_ignore).list_all.select(&.published?)
+      private def compute_term_metadata(config : Models::Config) : TermMetadata
+        none = TermMetadata.new(Set(String).new, [] of StrayTermFile)
+        return none if config.taxonomies.empty? || !Dir.exists?(@content_dir)
+        listed = ContentLister.new(@content_dir, GeneratedContent.infos(@content_dir, @content_ignore.rules), @content_ignore).list_all
+        infos = listed.select(&.published?)
         relative = ->(info : ContentInfo) { info.generated_from ? info.path : Path[info.path].relative_to(@content_dir).to_s }
-        return Set(String).new unless infos.any? { |info| Content::Taxonomies.term_metadata_path?(relative.call(info), config) }
+        return none unless infos.any? { |info| Content::Taxonomies.term_metadata_path?(relative.call(info), config) }
 
         default = config.default_language
         menus = MenuScope.new(config)
         pages = [] of Models::Page
         sections = [] of Models::Section
+        drafts = [] of Models::Page # read for their terms only (`known_term`)
+        candidates = [] of {Models::Section, String}
         previous = Logger.level
         Logger.level = Logger::Level::Error # the build reports front-matter warnings
         begin
-          infos.each do |info|
+          listed.each do |info|
             path = relative.call(info)
+            next if !info.published? && File.basename(path).starts_with?("_index.")
             file = info.generated_from ? File.join(@content_dir, info.path) : info.path
             data = begin
               Processor::Markdown.parse(info.generated_source || File.read(file), file)
@@ -97,6 +105,7 @@ module Hwaro
                 language: language, date: data[:date], title: data[:title], version: config.versions.for_path(path))[0]
               section.cascade = data[:cascade]
               sections << section
+              candidates << {section, file} if data[:custom_path].nil? && Content::Taxonomies.term_metadata_path?(path, config)
             else
               page = Models::Page.new(path)
               page.language = language
@@ -106,16 +115,55 @@ module Hwaro
               page.authors = data[:authors]
               page.front_matter_keys = data[:front_matter_keys]
               page.version = config.versions.for_path(path)
-              pages << page
+              (info.published? ? pages : drafts) << page
             end
           end
           builder = Core::Build::Builder.new
           cascade_map = builder.build_cascade_map(sections)
-          pages.each { |page| builder.apply_cascade_to(page, cascade_map) } unless cascade_map.empty?
+          (pages + drafts).each { |page| builder.apply_cascade_to(page, cascade_map) } unless cascade_map.empty?
         ensure
           Logger.level = previous
         end
-        Content::Taxonomies.match_term_metadata(pages, sections, config).keys.to_set
+        files = Content::Taxonomies.match_term_metadata(pages, sections, config).keys.to_set
+        unmatched = candidates.compact_map do |section, file|
+          next if files.includes?(section.path)
+          taxonomy = Path[section.path].parts[0]
+          prefix = "#{section.language.try { |code| "/#{code}" }}/#{taxonomy}/"
+          slug = section.url.lchop(prefix).rchop("/")
+          # Moved by a `[permalinks]` rule: not meant to be a term page.
+          next if !section.url.starts_with?(prefix) || slug.empty? || slug.includes?('/')
+          {section, file, taxonomy, slug}
+        end
+        return TermMetadata.new(files, [] of StrayTermFile) if unmatched.empty?
+
+        # Every term slug some page carries, in any language, drafts and
+        # `[content] ignore`d pages included.
+        slugs = Set({String, String}).new
+        add_slugs = ->(page : Models::Page) do
+          config.taxonomies.each { |t| page.taxonomy_values(t.name).each { |term| slugs << {t.name, Utils::TextUtils.safe_slugify(term)} } }
+        end
+        (pages + drafts).each { |page| add_slugs.call(page) }
+        unless @content_ignore.empty?
+          Logger.level = Logger::Level::Error
+          begin
+            ContentWalk.find_content_files(@content_dir, ContentWalk::Ignore.none).each do |file|
+              next unless @content_ignore.ignored?(file)
+              data = begin
+                Processor::Markdown.parse(File.read(file), file)
+              rescue Hwaro::HwaroError | File::Error
+                next
+              end
+              page = Models::Page.new(file)
+              page.tags = data[:tags]
+              page.taxonomies = data[:taxonomies]
+              page.authors = data[:authors]
+              add_slugs.call(page)
+            end
+          ensure
+            Logger.level = previous
+          end
+        end
+        TermMetadata.new(files, unmatched.map { |section, file, taxonomy, slug| StrayTermFile.new(section.path, file, section.url, slugs.includes?({taxonomy, slug})) })
       end
 
       # A pattern that hides a section's `_index.*` while pages of that
@@ -464,7 +512,7 @@ module Hwaro
         # A file that describes a term page is headless in the build, which
         # is what link_translations! pairs on: a matched `_index.md` is then
         # nobody's original, and each language's term page exists anyway.
-        term_files = term_metadata_files(config)
+        term_files = term_metadata(config).files
         entries.each { |page, _| page.render = false if term_files.includes?(page.path) } unless term_files.empty?
         files = entries.to_h { |page, file| {page.path, file} }
         losers = Set(String).new

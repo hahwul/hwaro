@@ -478,6 +478,87 @@ describe "taxonomy term _index.md metadata" do
     log.should contain("Duplicate output path '/tags/zzz/' — 'z.md' collides with 'tags/zzz/_index.md'")
   end
 
+  it "prefers _index.<lang>.md over _index.<lang>.markdown for a language's term page" do
+    log = with_captured_log do
+      build_site(MULTILINGUAL_CONFIG,
+        content_files: {
+          "a.ko.md"                      => post("가", ["rust"]),
+          "tags/rust/_index.ko.md"       => "+++\ntitle = \"MD\"\n+++\n",
+          "tags/rust/_index.ko.markdown" => "+++\ntitle = \"MARKDOWN\"\n+++\n",
+        },
+        template_files: TEMPLATES) do |dir|
+        File.read(File.join(dir, "public/ko/tags/rust/index.html")).should start_with("T=MD|")
+      end
+    end
+    log.should contain("content/tags/rust/_index.ko.markdown is ignored: content/tags/rust/_index.ko.md already describes the term page /ko/tags/rust/")
+  end
+
+  it "prefers a plain _index.md over _index.<default>.md for a default-language term page" do
+    log = with_captured_log do
+      build_site(MULTILINGUAL_CONFIG,
+        content_files: {
+          "a.md"                   => post("A", ["rust"]),
+          "tags/rust/_index.md"    => "+++\ntitle = \"PLAIN\"\n+++\n",
+          "tags/rust/_index.en.md" => "+++\ntitle = \"EN\"\n+++\n",
+        },
+        template_files: TEMPLATES) do |dir|
+        File.read(File.join(dir, "public/tags/rust/index.html")).should start_with("T=PLAIN|")
+      end
+    end
+    log.should contain("content/tags/rust/_index.en.md is ignored: content/tags/rust/_index.md already describes the term page /tags/rust/")
+  end
+
+  # Page 1 of a term lives at the term URL; nothing is written at page/1/,
+  # so an alias there (a common SEO redirect) is free.
+  it "writes a term-file alias at the term's page/1/" do
+    log = with_captured_log do
+      build_site(CONFIG.sub(%(feed = true), %(feed = true\npaginate_by = 1)),
+        content_files: {
+          "posts/p1.md"         => post("P1", ["rust"]),
+          "posts/p2.md"         => post("P2", ["rust"]),
+          "tags/rust/_index.md" => "+++\ntitle = \"Rust\"\naliases = [\"/tags/rust/page/1/\"]\n+++\n",
+        },
+        template_files: TEMPLATES) do |dir|
+        File.read(File.join(dir, "public/tags/rust/page/1/index.html")).should contain("/tags/rust/")
+        File.read(File.join(dir, "public/tags/rust/page/2/index.html")).should start_with("T=Rust|")
+      end
+    end
+    log.should_not contain("Duplicate alias output path")
+  end
+
+  it "warns about front-matter keys a term page does not take" do
+    log = with_captured_log do
+      build_site(CONFIG,
+        content_files: {
+          "posts/p1.md"         => post("P1", ["rust"]),
+          "tags/rust/_index.md" => "+++\ntitle = \"Rust\"\nin_sitemap = false\npaginate_by = 2\nweight = 3\n+++\n",
+        },
+        template_files: TEMPLATES) do |dir|
+        File.read(File.join(dir, "public/sitemap.xml")).should contain("https://ex.com/tags/rust/</loc>")
+      end
+    end
+    log.should contain("content/tags/rust/_index.md: `in_sitemap`, `paginate_by` do not apply to a taxonomy term page")
+    log.should_not contain("`weight`")
+  end
+
+  # `sort_by`/`reverse` still order the pages nested in the term directory.
+  it "keeps sort_by on a term file ordering its nested pages, without a warning" do
+    log = with_captured_log do
+      build_site(CONFIG,
+        content_files: {
+          "posts/p1.md"         => post("P1", ["rust"]),
+          "tags/rust/_index.md" => "+++\ntitle = \"Rust\"\nsort_by = \"title\"\nreverse = true\n+++\n",
+          "tags/rust/a.md"      => "+++\ntitle = \"Alpha\"\ndate = 2024-01-02\n+++\n",
+          "tags/rust/b.md"      => "+++\ntitle = \"Beta\"\ndate = 2024-01-01\n+++\n",
+        },
+        template_files: TEMPLATES.merge({"page.html" => %({% set s = get_section(path="tags/rust/_index.md") %}{% for p in s.pages %}{{ p.title }};{% endfor %})})) do |dir|
+        File.read(File.join(dir, "public/tags/rust/a/index.html")).should eq("Beta;Alpha;")
+      end
+    end
+    log.should_not contain("do not apply to a taxonomy term page")
+    log.should_not contain("does not apply to a taxonomy term page")
+  end
+
   it "refuses a term-file alias onto a term's pager page" do
     log = with_captured_log do
       build_site(CONFIG.sub(%(feed = true), %(feed = true\npaginate_by = 1)),

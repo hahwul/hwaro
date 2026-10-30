@@ -135,8 +135,9 @@ On the term page:
 
 - `page.title`, `page.description`, `page.image` and `page.extra` take the file's values. Without a `title`, the generated "Tags: crystal" stays. The `<title>`, og/twitter tags and the term's RSS feed title use the same values.
 - `term_content` is the file's rendered body. Markdown, shortcodes, syntax highlighting and `@/` links are processed like any other page, and `[links]` checks report its broken `@/` links and its broken anchors into other pages. Links pointing into the term page itself (`@/tags/crystal/_index.md#part`, or a `#part` link inside the body) are not anchor-checked. `content` stays the generated page list, so existing templates keep working; print `{{ term_content }}` where the text should go.
-- `aliases` in the file become redirects to the term page, which is useful when a tag is renamed. An alias that names a generated taxonomy page or one of its `page/N/` pages, or that another page already claims, is not written; the build warns.
+- `aliases` in the file become redirects to the term page, which is useful when a tag is renamed. An alias that names a generated taxonomy page or one of its `page/N/` pages (N ≥ 2), or that another page already claims, is not written; the build warns. Nothing is generated at `page/1/`, so an alias there is written.
 - `template` is ignored (the build warns): term pages always render with `taxonomy_term.html`, falling back to `taxonomy.html`, then `page.html`.
+- Keys that shape a section's own page — `in_sitemap`, `in_search_index`, `paginate`, `paginate_by`, `paginate_path`, `pagination_enabled`, `generate_feeds`, `redirect_to` — do not apply to the term page either; the build warns and names them. Sitemap, pagination, sorting and feeds of term pages are set per taxonomy in `[[taxonomies]]`. `sort_by` and `reverse` in the file still order the ordinary pages nested in its directory (`section.pages`, previous/next links), not the term page's list.
 - [`get_taxonomy()`](#get-taxonomy-function) terms get `title` and `description` from the file (default-language files only, since `get_taxonomy()` is a site-wide view). Terms without a file have no `title` key, so use `{{ term.title or term.name }}`.
 
 On a multilingual site each language reads its own file: `content/tags/crystal/_index.ko.md` decorates `/ko/tags/crystal/`.
@@ -147,9 +148,9 @@ A file only counts as term metadata when all of these hold:
 - the build generates a term page for that taxonomy in the file's language (some published page in that language carries the term and keeps its own URL, i.e. doesn't lose an output-path collision to another page, and `[languages.<code>] taxonomies` doesn't leave the taxonomy out);
 - the file would publish at that term page's URL: `<dir>` is the term's URL slug, and no `path` front matter or `[permalinks]` rule moves the section elsewhere.
 
-Such a file is not published as a page of its own. It stays out of the sitemap, feeds, search index, llms.txt and page listings (`section.pages`), so the term URL appears once. `get_section()` still finds it, and its parent's `subsections` still list it, with the term page's URL. If two files match the same term page (`_index.md` beside `_index.markdown`), `_index.md` wins and the build warns about the other.
+Such a file is not published as a page of its own. It stays out of the sitemap, feeds, search index, llms.txt and page listings (`section.pages`), so the term URL appears once. `get_section()` still finds it, and its parent's `subsections` still list it, with the term page's URL. If two files match the same term page (`_index.md` beside `_index.markdown`, or `_index.ko.md` beside `_index.ko.markdown`), the `.md` file wins and the build warns about the other.
 
-Any other `_index.md` under `content/tags/` is an ordinary section and publishes as before. Pages nested inside a term directory, such as `content/tags/crystal/notes.md`, always publish as ordinary pages.
+Any other `_index.md` under `content/tags/` is an ordinary section and publishes as before; `hwaro doctor` notes each one (`taxonomy-term-file-unmatched`), since a directory named after the term's spelling instead of its slug is the usual cause. Pages nested inside a term directory, such as `content/tags/crystal/notes.md`, always publish as ordinary pages.
 
 `content/<taxonomy>/_index.md` (one level up) is different: the generated term list still replaces it at `/tags/`, and the build warns about the replacement as before. Sites use it to put the taxonomy into menus.
 
