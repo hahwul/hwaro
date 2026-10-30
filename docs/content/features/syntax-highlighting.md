@@ -60,6 +60,7 @@ mode = "server"
 | mode | string | "server" | `"server"` highlights at build time; `"client"` highlights in the browser via Highlight.js |
 | line_numbers | bool | false | Add line numbers to every fenced code block by default (see below) |
 | copy | bool | false | Add a copy-to-clipboard button to fenced code blocks (see below) |
+| lexers_dir | string | (unset) | Directory of extra grammar files for server mode (see [Custom Grammars](#custom-grammars)) |
 
 ## Server-Side Highlighting (Default)
 
@@ -74,6 +75,89 @@ injects the theme stylesheet, while `{{ highlight_js }}` becomes empty.
 Over 250 languages are supported (via [Tartrazine](https://github.com/ralsina/tartrazine)
 lexers, ported from Pygments/Chroma). Code blocks in languages without a
 lexer fall back to plain, unhighlighted output.
+
+## Custom Grammars
+
+Server mode can highlight languages Tartrazine has no lexer for (an
+in-house DSL, a new language, a config format). Put grammar files in a
+directory and point `[highlight] lexers_dir` at it, relative to the
+project root:
+
+```toml
+[highlight]
+lexers_dir = "lexers"
+```
+
+Each `*.xml` file directly in that directory is a lexer in the
+[Chroma](https://github.com/alecthomas/chroma/tree/master/lexers/embedded)/Pygments
+XML format, the same format as the bundled lexers. It registers under its
+`<name>` and every `<alias>`, case-insensitively. A minimal
+`lexers/deployfile.xml`:
+
+```xml
+<lexer>
+  <config>
+    <name>Deployfile</name>
+    <alias>deployfile</alias>
+    <alias>deploy</alias>
+  </config>
+  <rules>
+    <state name="root">
+      <rule pattern="#.*$"><token type="CommentSingle"/></rule>
+      <rule pattern="\b(task|run|on|env)\b"><token type="Keyword"/></rule>
+      <rule pattern="&quot;[^&quot;]*&quot;"><token type="LiteralString"/></rule>
+      <rule pattern="\d+"><token type="LiteralNumber"/></rule>
+      <rule pattern="\s+"><token type="Text"/></rule>
+      <rule pattern="."><token type="Text"/></rule>
+    </state>
+  </rules>
+</lexer>
+```
+
+Fences tagged with the name or an alias now highlight at build time:
+
+````markdown
+```deploy
+# ship it
+task "web" on 3 run "make deploy"
+```
+````
+
+Rules are tried in order at each position; `<token type="...">` takes a
+Pygments token type (`Keyword`, `NameFunction`, `LiteralString`,
+`CommentSingle`, ...), which is mapped to the matching Highlight.js class,
+so your theme colors it. States, `<push>`/`<pop>`, `<bygroups>` and
+`<using lexer="..."/>` work as in the bundled grammars; copying one of
+those is the quickest start.
+
+- **Precedence:** a custom name or alias wins over a bundled lexer, so a
+  grammar can also replace a bundled one (an `<alias>ini</alias>` takes
+  over ```` ```ini ```` fences). When two of your files claim the same
+  name, the first file in sorted order keeps it.
+- **Errors:** a missing directory, an unreadable file, malformed XML, a
+  regex that does not compile, or a file without `<name>` or a `root`
+  state is a warning naming the file; that file is skipped, the build goes
+  on and its fences fall back to plain output. A `<push>`, `<include>` or
+  `<combined>` naming a state the file does not define is a warning too,
+  but the grammar still loads (a few bundled grammars have one): only a
+  code block that reaches that rule falls back to plain. `hwaro doctor`
+  reports the same problems, name clashes included
+  (`highlight-lexer-invalid`).
+- **Runaway rules:** a rule that matches the empty string without
+  changing state, or a `<usingself>`/`<using>` that keeps delegating to
+  itself (more than 32 levels deep), would never finish; the code block
+  falls back to plain output with a warning instead. A regex that
+  backtracks catastrophically is just slow, as it would be in a bundled
+  grammar.
+- **`include_code`:** a file matching one of a grammar's `<filename>`
+  globs (`<filename>*.dpl</filename>`) is highlighted with it, ahead of
+  the bundled lexers.
+- **Rebuilds:** editing, adding or removing a grammar re-highlights every
+  page, under `hwaro build --cache` and in `hwaro serve`, which watches
+  the directory (only a `lexers_dir` inside the project: an absolute path
+  or one starting with `../` is read by every build but not watched).
+- **Client mode:** Highlight.js cannot read these grammars, so
+  `lexers_dir` is ignored (with a warning) when `mode = "client"`.
 
 ## Client-Side Highlighting
 

@@ -234,7 +234,9 @@ module Hwaro
         static : Array(String),
         data : Array(String),
       )
-        if content_ignored?(path)
+        if lexers_path?(path)
+          data << path
+        elsif content_ignored?(path)
           # Only a file a page reads by name gets here (see content_ignored?).
           # It is no page, so like an include source outside the roots it
           # takes the data bucket's full rebuild.
@@ -386,22 +388,35 @@ module Hwaro
       #   build's own writes as source changes;
       # - anything a fixed root already covers, which would stamp the same
       #   files twice per scan.
+      #
+      # `[highlight] lexers_dir` is resolved the same way: grammar files feed
+      # every highlighted page, so their edits take the data bucket's full
+      # rebuild (see lexers_path?).
       private def resolve_extra_watch_roots(config : Models::Config?, output_dir : String) : Array(String)
         roots = [] of String
-        return roots unless config && config.assets.enabled
-
-        source_dir = Path[config.assets.source_dir].normalize.to_s
-        return roots if source_dir.empty? || source_dir == "." || Utils::PathUtils.escapes_parent?(source_dir)
-        return roots if Utils::PathUtils.absolute?(source_dir)
-
+        return roots unless config
         output = Path[output_dir].normalize.to_s
-        return roots if source_dir == output ||
-                        source_dir.starts_with?("#{output}/") ||
-                        output.starts_with?("#{source_dir}/")
-        return roots if Server::WATCH_ROOTS.any? { |r| source_dir == r || source_dir.starts_with?("#{r}/") }
-
-        roots << source_dir
+        add_watch_root(roots, config.assets.source_dir, output) if config.assets.enabled
+        config.highlight.lexers_dir.try { |dir| add_watch_root(roots, dir, output) }
         roots
+      end
+
+      private def add_watch_root(roots : Array(String), dir : String, output : String) : Nil
+        dir = Path[dir].normalize.to_s
+        return if dir.empty? || dir == "." || Utils::PathUtils.escapes_parent?(dir)
+        return if Utils::PathUtils.absolute?(dir)
+        return if dir == output || dir.starts_with?("#{output}/") || output.starts_with?("#{dir}/")
+        return if Server::WATCH_ROOTS.any? { |r| dir == r || dir.starts_with?("#{r}/") }
+        roots << dir unless roots.includes?(dir)
+      end
+
+      # Is `path` a grammar file under `[highlight] lexers_dir`? Checked
+      # before every other bucket, since the directory may sit under a fixed
+      # root (`data/lexers`) or share an extra root with the assets sources.
+      private def lexers_path?(path : String) : Bool
+        return false unless dir = @builder.config.try(&.highlight.lexers_dir)
+        dir = Path[dir].normalize.to_s
+        dir != "." && path.starts_with?("#{dir}/")
       end
 
       # Is `path` under a fixed or config-resolved watch root?

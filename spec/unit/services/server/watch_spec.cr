@@ -20,6 +20,10 @@ module Hwaro
         apply_changeset(changeset, options)
       end
 
+      def watch_spec_resolve_roots : Array(String)
+        @extra_watch_roots = resolve_extra_watch_roots(@builder.config, "public")
+      end
+
       # How often the watcher asked whether a path is ignored.
       class_property watch_spec_ignore_probes = 0
 
@@ -217,5 +221,85 @@ describe "serve: [content] ignore" do
         server.watch_spec_detect(before, server.watch_spec_scan).empty?.should be_true
       end
     end
+  end
+end
+
+# `[highlight] lexers_dir` grammars feed every highlighted page: the
+# directory is watched, and an edit, an added file or a removed one takes
+# the full rebuild that re-registers them.
+describe "serve: [highlight] lexers_dir grammars" do
+  grammar = ->(keywords : String) do
+    <<-XML
+      <lexer><config><name>MyDSL</name></config><rules><state name="root">
+      <rule pattern="\\b(#{keywords})\\b"><token type="Keyword"/></rule>
+      <rule pattern="[\\s\\S]"><token type="Text"/></rule>
+      </state></rules></lexer>
+      XML
+  end
+
+  it "re-highlights pages when a grammar is added or edited" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "t"\nbase_url = "https://example.com"\n[highlight]\nlexers_dir = "lexers"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("content/p.md", "+++\ntitle = \"P\"\n+++\n\n```mydsl\nlet x\n```\n")
+
+        server = Hwaro::Services::Server.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: true)
+        options.serve_mode = true
+        options.preserve_output = true
+        with_captured_log { server.watch_spec_builder.run(options).should be_true }
+        File.read("public/p/index.html").should contain(%(hljs">let x))
+        server.watch_spec_resolve_roots.should eq(["lexers"])
+
+        before = server.watch_spec_scan
+        FileUtils.mkdir_p("lexers")
+        File.write("lexers/mydsl.xml", grammar.call("let"))
+        changeset = server.watch_spec_detect(before, server.watch_spec_scan)
+        changeset.added_files.should eq(["lexers/mydsl.xml"])
+        server.watch_spec_apply(changeset, options)
+        File.read("public/p/index.html").should contain(%(<span class="hljs-keyword">let</span> x))
+
+        before = server.watch_spec_scan
+        File.write("lexers/mydsl.xml", grammar.call("emit"))
+        File.touch("lexers/mydsl.xml", Time.local + 2.seconds)
+        changeset = server.watch_spec_detect(before, server.watch_spec_scan)
+        changeset.modified_data.should eq(["lexers/mydsl.xml"])
+        changeset.rebuild_strategy.should eq(:full)
+        server.watch_spec_apply(changeset, options)
+        File.read("public/p/index.html").should contain(%(hljs">let x))
+      end
+    end
+  ensure
+    Hwaro::Content::Processors::CustomLexers.apply(Hwaro::Models::Config.new)
+  end
+
+  it "sends a grammar under a fixed root to the full rebuild, not that root's bucket" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "t"\nbase_url = "https://example.com"\n[highlight]\nlexers_dir = "templates/lexers"\n))
+        FileUtils.mkdir_p("templates/lexers")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("templates/lexers/mydsl.xml", grammar.call("let"))
+
+        server = Hwaro::Services::Server.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: true)
+        options.serve_mode = true
+        with_captured_log { server.watch_spec_builder.run(options).should be_true }
+        # Already scanned through templates/; no second root.
+        server.watch_spec_resolve_roots.should be_empty
+
+        before = server.watch_spec_scan
+        File.write("templates/lexers/mydsl.xml", grammar.call("emit"))
+        File.touch("templates/lexers/mydsl.xml", Time.local + 2.seconds)
+        changeset = server.watch_spec_detect(before, server.watch_spec_scan)
+        changeset.modified_templates.should be_empty
+        changeset.modified_data.should eq(["templates/lexers/mydsl.xml"])
+      end
+    end
+  ensure
+    Hwaro::Content::Processors::CustomLexers.apply(Hwaro::Models::Config.new)
   end
 end

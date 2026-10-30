@@ -253,6 +253,26 @@ module Hwaro
         end
       end
 
+      # `[highlight] lexers_dir`: the build only warns (and falls back to
+      # plain output) when the directory is missing or a grammar does not
+      # parse; doctor reports the same through the build's own parser.
+      # Anchored next to config.toml, like check_sass. Client mode never
+      # reads the grammars, so there is nothing to check.
+      private def check_lexers(issues : Array(Issue), config : Models::Config)
+        return unless (dir = config.highlight.lexers_dir) && config.highlight.enabled && config.highlight.server?
+        path = Utils::PathUtils.absolute?(dir) ? dir : Path[File.dirname(@config_path), dir].normalize.to_s
+        unless Dir.exists?(path)
+          issues << Issue.new(id: "config-dir-missing", level: :warning, category: "config", file: @config_path,
+            message: "[highlight] lexers_dir: #{dir} — directory not found")
+          return
+        end
+        _, problems, _ = Content::Processors::CustomLexers.scan(path)
+        problems.each do |file, message|
+          issues << Issue.new(id: "highlight-lexer-invalid", level: :warning, category: "config", file: file,
+            message: "syntax grammar #{message}")
+        end
+      end
+
       # Strip query string and fragment off a config-style path so values
       # like `/images/og.png?v=2` or `/og.png#anchor` resolve against the
       # underlying file rather than failing.

@@ -26,6 +26,10 @@ module Hwaro
       # `{copy=false}`/`{copy=true}` overrides). Off by default so existing
       # output is byte-identical.
       property copy : Bool
+      # Directory (relative to the project root) of extra Chroma/Pygments
+      # XML grammars for server mode; see Content::Processors::CustomLexers.
+      # Unset by default, which loads nothing.
+      property lexers_dir : String? = nil
 
       def initialize
         @enabled = true
@@ -111,6 +115,7 @@ module Hwaro
         config.highlight.use_cdn = bool_value(s["use_cdn"]?, config.highlight.use_cdn)
         config.highlight.line_numbers = bool_value(s["line_numbers"]?, config.highlight.line_numbers)
         config.highlight.copy = bool_value(s["copy"]?, config.highlight.copy)
+        config.highlight.lexers_dir = string_or_default(s, "lexers_dir", "").strip.presence
         if mode = s["mode"]?.try(&.as_s?)
           if mode == "client" || mode == "server"
             config.highlight.mode = mode

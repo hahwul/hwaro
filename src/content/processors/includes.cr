@@ -196,6 +196,10 @@ module Hwaro
         def language_for(path : String) : String
           base = File.basename(path)
           low = base.downcase
+          # `[highlight] lexers_dir` grammars win, as they do by name.
+          if custom = Tartrazine.hwaro_custom_language_for(low)
+            return custom
+          end
           if names = Tartrazine::LEXERS_BY_FILENAME[low]?
             return names.first
           end

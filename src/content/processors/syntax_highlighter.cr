@@ -19,6 +19,8 @@ require "tartrazine"
 require "../../ext/tartrazine_mt_fix"
 require "../../ext/tartrazine_bygroups_none_fix"
 require "../../ext/tartrazine_lexer_alias_fix"
+require "../../ext/tartrazine_loop_guard"
+require "./custom_lexers"
 require "digest/md5"
 require "./markdown_extensions"
 require "./heading_ids"
@@ -138,6 +140,14 @@ module Hwaro
         MAX_CACHED_BLOCK_BYTES = 65_536
         MAX_CACHE_ENTRIES      =  2_048
 
+        # Forget memoized output and unknown languages: the set of lexers
+        # changed (`CustomLexers.apply`, between builds — never while
+        # rendering).
+        def reset_memos : Nil
+          @@unknown_mutex.synchronize { @@unknown_languages.clear }
+          @@result_mutex.synchronize { @@result_cache.clear }
+        end
+
         # Highlight `code` as `lang`, returning HTML-escaped markup with
         # hljs-class spans — or nil when no lexer exists for the language
         # (callers fall back to plain client-style output).
@@ -196,7 +206,10 @@ module Hwaro
             end
           rescue ex
             # A lexer bug must never take down the build — degrade to plain.
-            Logger.debug "Server highlight failed for '#{lang}': #{ex.message}"
+            # A user grammar (`[highlight] lexers_dir`) is the user's to fix,
+            # so say so; a bundled lexer's failure stays at debug.
+            message = "Server highlight failed for '#{lang}': #{ex.message}"
+            CustomLexers.custom?(normalized) ? Logger.warn(message) : Logger.debug(message)
             nil
           ensure
             @@tokenize_gate.receive
@@ -1111,6 +1124,8 @@ module Hwaro
             io << (@@server_mode ? '1' : '0')
             io << (@@default_line_numbers ? '1' : '0')
             io << (@@default_copy ? '1' : '0')
+            # Custom grammars change highlighted bodies; "" when none.
+            io << CustomLexers.digest
           end
         end
 
