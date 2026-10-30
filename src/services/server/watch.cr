@@ -133,7 +133,6 @@ module Hwaro
           next if old_stamp == new_stamp # unchanged (cheapest test first)
           next if hidden.call(path)
           if old_stamp
-
             if watched_config_file?(path)
               # A config stamp that moved only because OUR OWN last build
               # rewrote it byte-identically is the #760 config loop:

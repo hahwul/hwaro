@@ -258,13 +258,45 @@ describe "[content] ignore in the content tools" do
   end
 
   # `_*` reads as "underscore folders" but also hides every `_index.md`.
-  it "warns about an ignore pattern that hides section index files" do
-    config = %(title = "t"\nbase_url = "https://example.com"\n[content]\nignore = ["_*", "**/_*/", "README.md"]\n)
-    with_ignore_project(config) do
-      issues = Hwaro::Services::Doctor.new(content_dir: "content", config_path: "config.toml").run
-      warned = issues.select { |i| i.id == "content-ignore-hides-sections" }.map(&.message)
-      warned.size.should eq(1)
-      warned.first.should contain(%("_*"))
+  # Judged against the real `_index.*` files: a pattern is reported only
+  # when it hides an index whose section still has pages that build.
+  it "reports ignore patterns that hide a section index whose pages still build" do
+    patterns = %(["_*", "blog/_*", "notes/_index.md", "**/_*/", "gone", "README.md"])
+    with_ignore_project(%(title = "t"\nbase_url = "https://example.com"\n[content]\nignore = #{patterns}\n)) do
+      {
+        "content/_index.md"       => "+++\ntitle = \"Home\"\n+++\n",
+        "content/blog/_index.md"  => "+++\ntitle = \"Blog\"\n+++\n",
+        "content/blog/a.md"       => "+++\ntitle = \"A\"\n+++\n",
+        "content/notes/_index.md" => "+++\ntitle = \"Notes\"\n+++\n",
+        "content/notes/n.md"      => "+++\ntitle = \"N\"\n+++\n",
+        "content/gone/_index.md"  => "+++\ntitle = \"Gone\"\n+++\n",
+        "content/gone/x.md"       => "+++\ntitle = \"X\"\n+++\n",
+      }.each do |path, body|
+        FileUtils.mkdir_p(File.dirname(path))
+        File.write(path, body)
+      end
+      found = Hwaro::Services::Doctor.new(content_dir: "content", config_path: "config.toml").run
+        .select(&.id.==("content-ignore-hides-sections"))
+      by_pattern = found.to_h { |issue| {issue.message[/pattern "([^"]+)"/, 1], issue} }
+      by_pattern.keys.sort.should eq(["_*", "blog/_*", "notes/_index.md"])
+      by_pattern["_*"].level.should eq(:warning)
+      by_pattern["_*"].message.should contain(%("_*/"))
+      by_pattern["_*"].message.should contain("content/_index.md")
+      by_pattern["blog/_*"].message.should contain(%("blog/_*/"))
+      by_pattern["blog/_*"].message.should contain("content/blog/_index.md")
+      by_pattern["notes/_index.md"].level.should eq(:info)
+      by_pattern["notes/_index.md"].message.should contain("hides the section index content/notes/_index.md")
+      by_pattern["notes/_index.md"].message.should_not contain("end it with /")
+    end
+  end
+
+  it "does not tell a pattern aimed at index files to end with /" do
+    with_ignore_project(%(title = "t"\nbase_url = "https://example.com"\n[content]\nignore = ["**/_index*"]\n)) do
+      found = Hwaro::Services::Doctor.new(content_dir: "content", config_path: "config.toml").run
+        .select(&.id.==("content-ignore-hides-sections"))
+      found.size.should eq(1)
+      found.first.level.should eq(:info)
+      found.first.message.should contain("content/docs/_index.md")
     end
   end
 end

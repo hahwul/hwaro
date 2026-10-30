@@ -89,10 +89,10 @@ module Hwaro
           new(Models::ContentFilesConfig.new, ".", ".")
         end
 
-        def initialize(@rules : Models::ContentFilesConfig, root : String, dir : String)
+        def initialize(@rules : Models::ContentFilesConfig, root : String, @dir : String)
           @root = File.expand_path(root)
-          @dir_prefix = dir.ends_with?('/') ? dir : "#{dir}/"
-          base = Path[File.expand_path(dir)].relative_to(@root).to_posix.to_s
+          @dir_prefix = @dir.ends_with?('/') ? @dir : "#{@dir}/"
+          base = Path[File.expand_path(@dir)].relative_to(@root).to_posix.to_s
           @base = if base == "."
                     ""
                   elsif base != ".." && !base.starts_with?("../")
@@ -102,6 +102,11 @@ module Hwaro
 
         def empty? : Bool
           @rules.ignore.empty?
+        end
+
+        # The same root and walked directory, other rules.
+        def with_rules(rules : Models::ContentFilesConfig) : Ignore
+          Ignore.new(rules, @root, @dir)
         end
 
         # True when `path` (as the tools spell it) is hidden.

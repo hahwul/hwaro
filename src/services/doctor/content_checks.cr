@@ -42,17 +42,53 @@ module Hwaro
         walk_section_dirs(@content_dir, issues, index_names(config), version_parents)
       end
 
-      # `[content] ignore = ["_*"]` (or `**/_*`, `*`) means to hide underscore
-      # folders, but a pattern without a trailing `/` matches files too, so
-      # it also hides every section's `_index.md`, and with it the section
-      # page and its listing. Say so; the folders-only form keeps the indexes.
+      # A pattern that hides a section's `_index.*` while pages of that
+      # section still build: the section page and its listing are gone. Each
+      # pattern is tested against the real index files.
+      #
+      # `["_*"]` (or `**/_*`, `blog/_*`) usually means "underscore folders",
+      # but without a trailing `/` it matches files too: the advice is the
+      # folders-only form. A pattern naming index files itself
+      # (`notes/_index.md`, `**/_index*`) is deliberate, so it gets an info
+      # line saying which index it hides instead.
       private def check_broad_ignore_patterns(issues : Array(Issue), config : Models::Config) : Nil
-        config.content_files.ignore.each do |pattern|
+        patterns = config.content_files.ignore
+        return if patterns.empty?
+
+        indexes = [] of String
+        built_dirs = Set(String).new
+        ContentWalk.find_content_files(@content_dir, ContentWalk::Ignore.none).each do |file|
+          if File.basename(file).starts_with?("_index.")
+            indexes << file
+          elsif !@content_ignore.ignored?(file)
+            # Every folder above a page that builds holds that page.
+            dir = File.dirname(file)
+            loop do
+              break unless built_dirs.add?(dir)
+              parent = File.dirname(dir)
+              break if parent == dir
+              dir = parent
+            end
+          end
+        end
+        return if indexes.empty?
+
+        patterns.each do |pattern|
           probe = Models::ContentFilesConfig.new
           probe.ignore = [pattern]
-          next unless probe.ignored?("_index.md") || probe.ignored?("hwaro-probe/_index.md")
-          issues << Issue.new(id: "content-ignore-hides-sections", level: :warning, category: "structure", file: @config_path,
-            message: "[content] ignore pattern \"#{pattern}\" also hides section index files (_index.md); end it with / to match folders only (e.g. \"_*/\" or \"**/_*/\")")
+          rules = @content_ignore.with_rules(probe)
+          hidden = indexes.select { |index| rules.ignored?(index) && built_dirs.includes?(File.dirname(index)) }
+          next if hidden.empty?
+
+          named = hidden.first(3).join(", ") + (hidden.size > 3 ? ", …" : "")
+          last = pattern.rstrip('/').split('/').last
+          if last.includes?("_index") || last.each_char.none?(&.in?('*', '?', '[', '{'))
+            issues << Issue.new(id: "content-ignore-hides-sections", level: :info, category: "structure", file: @config_path,
+              message: "[content] ignore pattern \"#{pattern}\" hides the section index #{named}; its pages still build, without a section page")
+          else
+            issues << Issue.new(id: "content-ignore-hides-sections", level: :warning, category: "structure", file: @config_path,
+              message: "[content] ignore pattern \"#{pattern}\" also hides section index files whose pages still build (#{named}); end it with / to match folders only (\"#{pattern.rstrip('/')}/\")")
+          end
         end
       end
 
