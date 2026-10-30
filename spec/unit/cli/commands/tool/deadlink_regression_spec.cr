@@ -205,6 +205,16 @@ describe "check-links regressions" do
       end
     end
 
+    it "finds a raw HTML link after a quoted attribute value containing '>'" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "a.md"),
+          %(---\ntitle: A\n---\n<img title="Home > Docs" src="/img/pic.png">\n<a title='a>b' href="/html-link/">x</a>\n))
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        cmd.scan_internal_for_test(dir).map(&.url).should eq(["/img/pic.png", "/html-link/"])
+      end
+    end
+
     it "ignores footnote definitions, prose definitions and template expressions" do
       # `[^1]: See the docs.` and `[note]: plain prose` are not links; a
       # `src="{{ page.image }}"` resolves at build time. Treating any of them
