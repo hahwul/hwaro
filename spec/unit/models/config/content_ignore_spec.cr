@@ -78,6 +78,17 @@ describe "[content] ignore" do
       rules.ignored?("a/b/x.excalidraw.md").should be_true
     end
 
+    # `content/` is stripped from PATTERNS only: a real folder named
+    # `content` inside content/ is just a folder.
+    it "does not read a content/ folder in the path as the content root" do
+      rules.ignored?("content/README.md").should be_false
+      nested = Hwaro::Models::ContentFilesConfig.new
+      nested.ignore = ["x.md"]
+      nested.ignored?("content/x.md").should be_false
+      nested.denied?("content/x.md").should be_false
+      nested.ignored?("./x.md").should be_true
+    end
+
     it "is case-sensitive, like disallow_paths" do
       rules.ignored?("readme.md").should be_false
     end

@@ -97,6 +97,14 @@ describe "[content] ignore in the build" do
     end
   end
 
+  it "keeps a page under a folder named content/ that a root pattern does not name" do
+    content = {"x.md" => "+++\ntitle = \"Root\"\n+++\n", "content/x.md" => "+++\ntitle = \"Nested\"\n+++\n"}
+    build_site(ignore_config(%(["x.md"])), content_files: content, template_files: IGNORE_TEMPLATES) do
+      File.exists?("public/x/index.html").should be_false
+      File.exists?("public/content/x/index.html").should be_true
+    end
+  end
+
   it "builds byte-identically when the key is unset" do
     plain = %(title = "t"\nbase_url = "https://example.com"\n[content.files]\nallow_extensions = ["pdf", "png"]\n)
     build_site(plain, content_files: IGNORE_CONTENT, template_files: IGNORE_TEMPLATES) do

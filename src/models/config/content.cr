@@ -137,6 +137,7 @@ module Hwaro
         return false if ext.empty?
         return false if ext == ".md"
         return false unless @allow_extensions.includes?(ext)
+        return false if ignored?(relative_path)
         !denied_normalized?(normalized_path)
       end
 
@@ -145,16 +146,20 @@ module Hwaro
       # `.json`/`.xml` files publish without an allow-list entry, but the deny
       # rules still apply to them.
       def denied?(relative_path : String) : Bool
-        denied_normalized?(ContentFilesConfig.normalize_path(relative_path))
+        ignored?(relative_path) || denied_normalized?(ContentFilesConfig.normalize_path(relative_path))
       end
 
       # True when `[content] ignore` hides `relative_path` (content-relative).
       # A pattern matching any ancestor directory hides the whole subtree, so
       # `_templates` alone covers `_templates/note.md`, like `_templates/**`.
       # Case-sensitive, like `disallow_paths`.
+      #
+      # `relative_path` is only tidied (backslashes to `/`, a leading `./` dropped),
+      # never stripped of a leading `content/` the way patterns are: that
+      # segment of a real `content/content/x.md` is a folder of its own.
       def ignored?(relative_path : String) : Bool
         return false if @ignore.empty?
-        ignored_normalized?(ContentFilesConfig.normalize_path(relative_path))
+        ignored_normalized?(relative_path.gsub('\\', '/').lchop("./"))
       end
 
       private def ignored_normalized?(path : String) : Bool
@@ -201,7 +206,6 @@ module Hwaro
       end
 
       private def denied_normalized?(normalized_path : String) : Bool
-        return true if ignored_normalized?(normalized_path)
         return true if @disallow_extensions.includes?(File.extname(normalized_path).downcase)
         # A malformed glob is treated as non-matching by glob_match?, so a
         # config typo can't crash the build; other patterns still apply.
