@@ -399,20 +399,25 @@ module Hwaro
         # a generated page on macOS that Linux CI publishes — the same
         # config must produce the same page set on every platform
         # (build-determinism invariant).
-        def authored_twin_exists?(path : String, content_root : String = "content") : Bool
-          dir = File.join(content_root, File.dirname(path))
+        #
+        # A source `[content] ignore` hides (`ignore`, the site's
+        # content_files) claims nothing: the build never reads it.
+        def authored_twin_exists?(path : String, content_root : String = "content", ignore : Models::ContentFilesConfig? = nil) : Bool
+          parent = File.dirname(path)
+          dir = File.join(content_root, parent)
           stem = File.basename(path, ".md")
           entries = dir_children(dir)
           return false if entries.empty?
+          visible = ->(rel : String) { !ignore.try(&.ignored?(File.join(parent, rel))) }
 
           Phases::ReadContent::PAGE_EXTENSIONS.each do |ext|
-            return true if entries.includes?("#{stem}#{ext}")
+            return true if entries.includes?("#{stem}#{ext}") && visible.call("#{stem}#{ext}")
           end
 
           if entries.includes?(stem)
             bundle_entries = dir_children(File.join(dir, stem))
             Phases::ReadContent::PAGE_EXTENSIONS.each do |ext|
-              return true if bundle_entries.includes?("index#{ext}")
+              return true if bundle_entries.includes?("index#{ext}") && visible.call("#{stem}/index#{ext}")
             end
           end
 

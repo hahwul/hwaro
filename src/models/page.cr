@@ -460,7 +460,7 @@ module Hwaro
         @assets = Dir.glob(File.join(Utils::PathUtils.glob_escape(page_dir), "**", "*")).sort!.compact_map do |file|
           next unless File.file?(file)
           next if Core::Build::Phases::ReadContent::PAGE_EXTENSIONS.includes?(File.extname(file).downcase)
-          next if nested_bundle?(page_dir, file, content_dir, bundle_dirs)
+          next if nested_bundle?(page_dir, file, content_dir, bundle_dirs, content_files)
 
           relative = Path[file].relative_to(content_dir).to_s
           # Honor [content.files] so the bundle path can't bypass the user's
@@ -489,11 +489,13 @@ module Hwaro
       # `index.md`/`_index.md` probe, `bundle_dirs` membership catches
       # translated-only bundles (`index.ko.md`) whose assets would otherwise
       # be re-published by every ancestor bundle.
-      private def nested_bundle?(page_dir : String, file : String, content_dir : String, bundle_dirs : Set(String)?) : Bool
+      # An index `[content] ignore` hides is no bundle: the build never reads
+      # it, so its directory stays an ordinary part of this bundle.
+      private def nested_bundle?(page_dir : String, file : String, content_dir : String, bundle_dirs : Set(String)?, content_files : ContentFilesConfig? = nil) : Bool
         dir = File.dirname(file)
         while dir != page_dir && dir.size > page_dir.size
-          return true if File.exists?(File.join(dir, "index.md")) ||
-                         File.exists?(File.join(dir, "_index.md"))
+          return true if visible_index?(dir, "index.md", content_dir, content_files) ||
+                         visible_index?(dir, "_index.md", content_dir, content_files)
           if bundle_dirs
             return true if bundle_dirs.includes?(Path[dir].relative_to(content_dir).to_s)
           end
@@ -502,6 +504,11 @@ module Hwaro
           dir = parent
         end
         false
+      end
+
+      private def visible_index?(dir : String, name : String, content_dir : String, content_files : ContentFilesConfig?) : Bool
+        index = File.join(dir, name)
+        File.exists?(index) && !content_files.try(&.ignored?(Path[index].relative_to(content_dir).to_s))
       end
 
       # Calculate word count from raw content

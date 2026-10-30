@@ -35,6 +35,11 @@ module Hwaro::Core::Build::Phases::ReadContent
     # order on HFS+), which would otherwise leak into `site.pages`,
     # sitemap.xml and the search index, so one tree built differently per host.
     Dir.glob("content/**/*").sort!.each do |file_path|
+      # `[content] ignore` first: a matched path is invisible to the build —
+      # no page, section, raw file, and no symlink warning either.
+      relative_path = Path[file_path].relative_to("content").to_s
+      next if config && config.content_files.ignored?(relative_path)
+
       # lstat, not `File.directory?`: that follows symlinks, and following a
       # symlink cycle (`ln -s loop content/loop`) fails with ELOOP, which
       # `File.info?` raises as `File::Error` — aborting the whole build with a
@@ -79,7 +84,6 @@ module Hwaro::Core::Build::Phases::ReadContent
       # dropped above.
       next unless target.file?
 
-      relative_path = Path[file_path].relative_to("content").to_s
       ext = Path[file_path].extension.downcase
 
       if PAGE_EXTENSIONS.includes?(ext)
@@ -212,7 +216,7 @@ module Hwaro::Core::Build::Phases::ReadContent
 
     added = Hash(String, Int32).new(0)
     plans.each do |plan|
-      if collected_paths.includes?(plan.path) || ContentGenerate.authored_twin_exists?(plan.path)
+      if collected_paths.includes?(plan.path) || ContentGenerate.authored_twin_exists?(plan.path, ignore: config.content_files)
         Logger.warn "  #{plan.origin}: skipping generated page '#{plan.path}' — an authored content file already claims that path (authored content wins)."
         next
       end

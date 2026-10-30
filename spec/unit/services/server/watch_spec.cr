@@ -79,3 +79,66 @@ describe "serve: OG image assets outside the watch roots" do
     end
   end
 end
+
+# `[content] ignore` (#890): the build never reads an ignored path, so its
+# edits, additions and removals are not changes; editing the patterns is a
+# config change and runs the full rebuild that applies them.
+describe "serve: [content] ignore" do
+  it "reports no change for an ignored path and still reports real content" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "t"\nbase_url = "https://example.com"\n[content]\nignore = ["_templates"]\n))
+        FileUtils.mkdir_p("content/_templates")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("content/p.md", "+++\ntitle = \"P\"\n+++\none\n")
+        File.write("content/_templates/n.md", "# n\n")
+
+        server = Hwaro::Services::Server.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        server.watch_spec_builder.run(options).should be_true
+        Dir.exists?("public/_templates").should be_false
+
+        before = server.watch_spec_scan
+        File.write("content/_templates/n.md", "# edited, and longer\n")
+        File.write("content/_templates/new.md", "# new\n")
+        File.write("content/_templates/pic.png", "png")
+        after = server.watch_spec_scan
+        server.watch_spec_detect(before, after).empty?.should be_true
+
+        File.delete("content/_templates/n.md")
+        server.watch_spec_detect(after, server.watch_spec_scan).empty?.should be_true
+
+        before = server.watch_spec_scan
+        File.write("content/p.md", "+++\ntitle = \"P\"\n+++\ntwo, longer\n")
+        server.watch_spec_detect(before, server.watch_spec_scan).modified_content.should eq(["content/p.md"])
+      end
+    end
+  end
+
+  it "applies an edited ignore list through a full rebuild" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "t"\nbase_url = "https://example.com"\n[content]\nignore = ["README.md"]\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("content/README.md", "readme\n")
+
+        server = Hwaro::Services::Server.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        server.watch_spec_builder.run(options).should be_true
+        File.exists?("public/README/index.html").should be_false
+
+        before = server.watch_spec_scan
+        File.write("config.toml", %(title = "t"\nbase_url = "https://example.com"\n))
+        changeset = server.watch_spec_detect(before, server.watch_spec_scan)
+        changeset.needs_full_rebuild?.should be_true
+        server.watch_spec_apply(changeset, options)
+        File.exists?("public/README/index.html").should be_true
+      end
+    end
+  end
+end

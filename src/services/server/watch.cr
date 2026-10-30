@@ -118,6 +118,7 @@ module Hwaro
 
         # --- Files that exist in both snapshots but with different stamps ---
         new_mtimes.each do |path, new_stamp|
+          next if content_ignored?(path)
           if old_stamp = old_mtimes[path]?
             next if old_stamp == new_stamp # unchanged
 
@@ -155,7 +156,7 @@ module Hwaro
 
         # --- Files that existed before but are now gone ---
         old_mtimes.each_key do |path|
-          next if new_mtimes.has_key?(path)
+          next if new_mtimes.has_key?(path) || content_ignored?(path)
           # An include source outside the roots leaves the snapshot when no
           # page includes it any more; a deleted one keeps a MISSING_STAMP.
           removed_files << path if watched_root_path?(path) || watched_config_file?(path)
@@ -172,6 +173,15 @@ module Hwaro
           config_changed: config_changed,
           config_files: config_files,
         )
+      end
+
+      # A `content/` path the last build's `[content] ignore` hides. The build
+      # never reads it, so editing, adding or removing it is no change at
+      # all. The snapshots keep stamping it, so editing the patterns (a config
+      # change: full rebuild) never reads as a burst of adds or removals.
+      private def content_ignored?(path : String) : Bool
+        return false unless path.starts_with?("content/")
+        !!@builder.config.try(&.content_files.ignored?(path.lchop("content/")))
       end
 
       # Put a modified path into the right bucket.
