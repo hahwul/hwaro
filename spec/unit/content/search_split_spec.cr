@@ -160,6 +160,12 @@ describe "search split_by_heading" do
     Hwaro::Content::Search.heading_sections("<p>none</p>").should be_empty
   end
 
+  it "reads the id after a quoted attribute value containing '>'" do
+    html = %(<h2 title="a > b" id="sec">Sec</h2><p>x</p>)
+    sections = Hwaro::Content::Search.heading_sections(html)
+    sections.map { |s| {s[:id], s[:heading], s[:body]} }.should eq([{"sec", "Sec", "<p>x</p>"}])
+  end
+
   it "ignores headings inside HTML comments" do
     html = %(<!-- <h2 id="ghost">Ghost</h2> --><h2 id="real">Real</h2><p>x</p><!--\n<h3 id="g2">G</h3>\n-->)
     Hwaro::Content::Search.heading_sections(html).map { |s| s[:id] }.should eq(["real"])
