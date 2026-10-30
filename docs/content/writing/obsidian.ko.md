@@ -17,6 +17,13 @@ backlinks = true   # page.backlinks
 
 볼트를 한 번만 일반 마크다운으로 변환하려면 [`hwaro tool import obsidian`](/ko/start/tools/import/)을 사용하세요.
 
+볼트에는 노트가 아닌 파일도 있습니다. `_templates/` 폴더, `README.md`, Excalidraw 그림 같은 것들입니다. 이런 파일을 [`[content] ignore`](/ko/start/config/#콘텐츠-파일-제외)에 적으면 Hwaro가 읽지 않으므로 발행되지 않고, `[[링크]]`나 `![[임베드]]`도 그 파일로 해석되지 않습니다. `.obsidian/` 같은 점(.)으로 시작하는 폴더는 처음부터 읽지 않습니다.
+
+```toml
+[content]
+ignore = ["_templates", "README.md", "**/*.excalidraw.md"]
+```
+
 ## 위키링크
 
 | 문법 | 링크 대상 |

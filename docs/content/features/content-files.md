@@ -101,6 +101,8 @@ disallow_paths = ["drafts/**", "**/_*", "private/**"]
 
 Paths are matched relative to the `content/` directory. The deny rules (`disallow_extensions` and `disallow_paths`) also keep files out of page bundles, with or without `allow_extensions`.
 
+`disallow_paths` only covers non-Markdown files. To keep a path out of the site entirely, Markdown included (a `README.md`, a `_templates/` folder), use [`[content] ignore`](/start/config/#ignoring-content-files). It takes the same patterns, and an ignored file is never a page, a bundle asset or a published file.
+
 ## Referencing Content Files
 
 ### In Markdown

@@ -146,6 +146,7 @@ math_engine = "katex"
 summary_length = 70
 summary_ellipsis = "…"
 backlinks = false
+ignore = ["README.md", "_templates", "**/*.excalidraw.md"]
 ```
 
 | 키 | 타입 | 기본값 | 설명 |
@@ -153,6 +154,19 @@ backlinks = false
 | summary_length | int | 70 | `<!-- more -->`도 `description`도 없는 페이지의 자동 요약 길이. 공백으로 구분되는 텍스트는 단어 수, CJK 위주 텍스트는 글자 수 ×2. `0`이면 자동 요약 비활성화 |
 | summary_ellipsis | string | "…" | 자동 요약이 잘린 경우에만 끝에 추가되는 문자열 |
 | backlinks | bool | false | 각 페이지로 링크하는 페이지를 `page.backlinks`에 채움 ([위키링크와 백링크](/ko/writing/obsidian/#백링크) 참고) |
+| ignore | array | [] | Hwaro가 읽지 않을 파일의 글롭 패턴. `content/` 기준 상대 경로 (아래 참고) |
+
+### 콘텐츠 파일 제외
+
+`content/` 아래의 마크다운 파일은 모두 페이지가 되므로 `content/README.md`는 `/README/`로 발행됩니다. 콘텐츠가 아닌 경로를 `ignore`에 적으면 Hwaro는 그 파일이 없는 것처럼 다룹니다. 페이지, 섹션, 번들 에셋, 발행 파일 어느 것도 되지 않고, 목록·피드·검색·사이트맵에도 나오지 않으며, 그 파일로 향하는 링크도 해석되지 않습니다. `hwaro serve`, `hwaro tool`(`list`, `stats`, `validate`, `check-links`, `convert`, `export`, `unused-assets`, `platform`), `hwaro tool doctor`도 똑같이 건너뜁니다.
+
+- 패턴은 `content/` 기준입니다. 앞에 붙은 `/`, `./`, `content/`는 떼어 내므로 `/README.md`와 `README.md`는 같은 패턴입니다.
+- `[content.files] disallow_paths`와 같은 글롭 매처를 씁니다. `*`와 `?`는 경로 한 단계 안에서만 일치하고, `**`는 디렉터리를 넘나들며, 대소문자를 구분합니다. `README.md`는 루트의 파일 하나만 가리키므로 모든 디렉터리에 적용하려면 `**/README.md`를 씁니다.
+- 디렉터리에 일치하는 패턴은 그 아래 전체를 숨깁니다. `_templates`, `_templates/`, `_templates/**`는 모두 폴더 전체를 제외합니다.
+- 섹션의 `_index.md`만 제외하면 나머지 페이지는 그대로 빌드됩니다. `_index.md`가 없는 디렉터리와 같은 상태가 됩니다.
+- 값의 타입이 잘못되면(문자열이나 문자열 목록이 아니면) 경고를 출력하고 무시합니다.
+
+`hwaro new`는 제외된 경로에도 파일을 만들지만, 빌드가 그 파일을 읽지 않는다고 경고합니다. `ignore`를 바꾸는 것은 설정 변경이므로 `hwaro serve`는 전체 재빌드를 실행하고, `--cache` 빌드는 새로 제외된 페이지의 출력물을 지웁니다.
 
 `page.summary`가 선택되는 방식은 [콘텐츠 요약](/ko/writing/pages/#콘텐츠-요약)을 참고하세요. `[content.files]`, `[content.new]`, `[[content.generate]]`, `[[content.schema]]`는 아래 기능 설정 레퍼런스에 있습니다.
 

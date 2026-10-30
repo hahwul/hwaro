@@ -148,6 +148,7 @@ See [Markdown Extensions](/features/markdown-extensions/) for syntax details and
 summary_length = 70
 summary_ellipsis = "…"
 backlinks = false
+ignore = ["README.md", "_templates", "**/*.excalidraw.md"]
 ```
 
 | Key | Type | Default | Description |
@@ -155,6 +156,19 @@ backlinks = false
 | summary_length | int | 70 | Automatic summary length for pages without `<!-- more -->` or `description`: words for space-delimited text, characters ×2 for CJK-dominant text. `0` disables the automatic summary |
 | summary_ellipsis | string | "…" | Appended to an automatic summary only when text was cut |
 | backlinks | bool | false | Fill `page.backlinks` with the pages linking to each page (see [Wikilinks & Backlinks](/writing/obsidian/#backlinks)) |
+| ignore | array | [] | Glob patterns, relative to `content/`, for files Hwaro never reads (see below) |
+
+### Ignoring content files
+
+Every Markdown file under `content/` becomes a page, so a `content/README.md` publishes `/README/`. List the paths that are not content in `ignore`, and Hwaro treats them as if they did not exist: no page, no section, no bundle asset and no published file, nothing in listings, feeds, search or the sitemap, and no link resolves to them. `hwaro serve`, `hwaro tool` (`list`, `stats`, `validate`, `check-links`, `convert`, `export`, `unused-assets`, `platform`) and `hwaro tool doctor` skip them too.
+
+- Patterns are relative to `content/`. A leading `/`, `./` or `content/` is dropped, so `/README.md` and `README.md` are the same pattern.
+- They use the same glob matcher as `[content.files] disallow_paths`: `*` and `?` stay within one path segment, `**` crosses directories, and matching is case-sensitive. `README.md` matches only the root file. Use `**/README.md` for every directory.
+- A pattern that matches a directory hides everything under it, so `_templates`, `_templates/` and `_templates/**` all hide the whole folder.
+- Ignoring a section's `_index.md` leaves its other pages in place. They build as if the directory had no `_index.md`.
+- A mistyped value (not a string or a list of strings) is reported with a warning and ignored.
+
+`hwaro new` still creates a file at an ignored path, and warns that the build will not read it. Changing `ignore` is a config change: `hwaro serve` runs a full rebuild, and a `--cache` build removes the output of pages that became ignored.
 
 See [Content Summary](/writing/pages/#content-summary) for how `page.summary` is chosen. `[content.files]`, `[content.new]`, `[[content.generate]]` and `[[content.schema]]` are documented in the feature reference below.
 
