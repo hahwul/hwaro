@@ -257,7 +257,7 @@ Rows marked ✗ are error level and **cannot** be ignored.
 | `deployment-target-undefined` | config | deployment.target names no `[[deployment.targets]]` |
 | `related-taxonomy-undefined` | config | `[related]` references an undefined taxonomy |
 | `menu-parent-undefined` | config | Menu entry's `parent` matches no identifier in that menu |
-| `version-path-missing` | config | A `[[versions.list]]` path does not exist under `content/` |
+| `version-path-missing` | config | A `[[versions.list]]` path does not exist under `content/`, or `[content] ignore` hides it |
 | `config-path-missing` | config | Referenced file does not exist |
 | `config-dir-missing` | config | Referenced directory does not exist |
 | `build-output-unusable` | config | `[build] output_dir` could not validate a route (absent, or `hwaro serve` output) |
@@ -277,6 +277,7 @@ Rows marked ✗ are error level and **cannot** be ignored.
 | `content-template-missing` | content | Front matter `template` / `page_template` / `[cascade] template` names a missing template |
 | `content-schema-violation` | content | Front matter violates its `[[content.schema]]` ✗ |
 | `structure-missing-index` | structure | Section missing _index.md |
+| `content-ignore-hides-sections` | structure | A `[content] ignore` pattern hides a section's `_index.md` while the section's pages still build |
 | `translation-missing` | i18n | Page or section has no counterpart in a configured language |
 | `translation-orphan` | i18n | Translation has no default-language original |
 
