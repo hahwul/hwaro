@@ -45,7 +45,7 @@ describe "doctor: [highlight] lexers_dir" do
 
       messages = lexer_doctor_issues(dir, %(lexers_dir = "lexers")).select { |i| i.id == "highlight-lexer-invalid" }.map(&.message)
       messages.should eq([
-        %(syntax grammar not loaded — <push> names undefined state "nope"),
+        %(syntax grammar references undefined state "nope" (<push>); code blocks that reach it fall back to plain),
         "syntax grammar 'ok' is already defined by #{File.join(dir, "lexers", "a.xml")}; keeping #{File.join(dir, "lexers", "a.xml")}",
       ])
     end

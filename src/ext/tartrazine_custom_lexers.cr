@@ -37,18 +37,21 @@ module Tartrazine
 
   # Parse one grammar file's XML. Returns the lowercased names it registers
   # under (`<name>` first, then each `<alias>`), its lowercased
-  # `<filename>` globs, and its template. Raises with a readable message on
-  # malformed XML, a missing `<name>` or `root` state, a `<push>`,
-  # `<include>` or `<combined>` naming a state the grammar does not define
-  # (stock Tartrazine only fails on those mid-tokenization), an unknown
-  # action, or a regex PCRE2 refuses to compile.
-  def self.hwaro_parse_custom_lexer(xml : String) : {Array(String), Array(String), LexerTemplate}
+  # `<filename>` globs, its template, and warnings for a `<push>`,
+  # `<include>` or `<combined>` naming a state the grammar does not define.
+  # Those only fail once tokenization reaches them (the block then falls
+  # back to plain), and three bundled grammars have one, so they warn
+  # rather than reject. Raises with a readable message on malformed XML, a
+  # missing `<name>` or `root` state, an unknown action, or a regex PCRE2
+  # refuses to compile.
+  def self.hwaro_parse_custom_lexer(xml : String) : {Array(String), Array(String), LexerTemplate, Array(String)}
     doc = XML.parse(xml)
-    # Chroma writes several states as repeated attributes
+    # Chroma writes several states as repeated `state` attributes
     # (`<push state="a" state="b"/>`): libxml2 reports each repeat but keeps
     # it in recovery mode, and Tartrazine reads them all. Every bundled
-    # grammar that has any error has only that one.
-    if error = doc.errors.try(&.find { |err| !err.message.to_s.matches?(/\AAttribute \S+ redefined/) })
+    # grammar that has any error has only that one; any other repeated
+    # attribute (`pattern`) is a real mistake.
+    if error = doc.errors.try(&.find { |err| !err.message.to_s.starts_with?("Attribute state redefined") })
       raise Exception.new("invalid XML (line #{error.line_number}): #{error.message.try(&.strip)}")
     end
     root = doc.first_element_child
@@ -72,16 +75,17 @@ module Tartrazine
 
     template = parse_xml_to_template(xml)
     raise Exception.new(%(missing <state name="root">)) unless template.states.has_key?("root")
+    warnings = [] of String
     root.xpath_nodes(".//*").each do |node|
       next unless HWARO_STATE_REFS.includes?(node.name)
       node.attributes.each do |attr|
         next unless attr.name == "state"
         state = attr.content
         next if state.starts_with?('#') || template.states.has_key?(state)
-        raise Exception.new(%(<#{node.name}> names undefined state "#{state}"))
+        warnings << %(references undefined state "#{state}" (<#{node.name}>); code blocks that reach it fall back to plain)
       end
     end
-    {names.uniq, filenames.uniq, template}
+    {names.uniq, filenames.uniq, template, warnings.uniq}
   end
 
   # Replace every previously registered custom lexer with `entries`

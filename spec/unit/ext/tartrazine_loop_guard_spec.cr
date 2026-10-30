@@ -10,7 +10,7 @@ private def guard_grammar(name : String, rule : String) : String
 end
 
 private def with_guard_grammar(xml : String, &)
-  names, filenames, template = Tartrazine.hwaro_parse_custom_lexer(xml)
+  names, filenames, template, _ = Tartrazine.hwaro_parse_custom_lexer(xml)
   Tartrazine.hwaro_register_custom_lexers([{names, filenames, template}])
   Hwaro::Content::Processors::ServerHighlighter.reset_memos
   yield
@@ -87,6 +87,15 @@ describe "Tartrazine loop guards (ext/tartrazine_loop_guard)" do
       end
       log.should contain("nested deeper than 32 levels")
     end
+  end
+
+  # The bundled batchfile grammar recurses through <usingself> until the
+  # stack overflows (a ```batchfile fence crashed the whole build on
+  # 0.21.0); the depth guard turns that into plain output.
+  it "falls back to plain for a bundled batchfile fence instead of crashing" do
+    finished, html = highlight_within("echo hi\n", "batchfile")
+    finished.should be_true
+    html.should be_nil
   end
 
   it "leaves ordinary nested delegation alone" do

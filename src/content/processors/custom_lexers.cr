@@ -36,10 +36,10 @@ module Hwaro
 
         # Parse every grammar in `dir`. Returns the grammars to register, a
         # `{path, message}` problem for each file that did not load (or lost
-        # a name to an earlier file), and a digest of the loaded files'
-        # bytes ("" when none loaded). Each file is read once, and a read
-        # failure is a problem like a parse failure — build and doctor both
-        # report exactly this list.
+        # a name to an earlier file, or references an undefined state), and
+        # a digest of the loaded files' bytes ("" when none loaded). Each
+        # file is read once, and a read failure is a problem like a parse
+        # failure — build and doctor both report exactly this list.
         def scan(dir : String) : {Array(Grammar), Array({String, String}), String}
           grammars = [] of Grammar
           problems = [] of {String, String}
@@ -52,8 +52,9 @@ module Hwaro
           end
           paths.each do |path|
             xml = File.read(path)
-            names, filenames, template = Tartrazine.hwaro_parse_custom_lexer(xml)
+            names, filenames, template, warnings = Tartrazine.hwaro_parse_custom_lexer(xml)
             grammars << Grammar.new(path, names, filenames, template)
+            warnings.each { |warning| problems << {path, warning} }
             md5.update(path)
             md5.update("\0")
             md5.update(xml)

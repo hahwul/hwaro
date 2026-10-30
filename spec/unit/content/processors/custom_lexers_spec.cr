@@ -92,7 +92,10 @@ describe Hwaro::Content::Processors::CustomLexers do
       "c_no_name.xml" => %(<lexer><config></config><rules><state name="root"></state></rules></lexer>),
       "d_no_root.xml" => %(<lexer><config><name>Z</name></config><rules><state name="other"></state></rules></lexer>),
       "e_bad_act.xml" => %(<lexer><config><name>W</name></config><rules><state name="root"><rule pattern="x"><bogus/></rule></state></rules></lexer>),
-      # States the stock loader only trips over mid-tokenization.
+      # A repeated attribute other than Chroma's `state` is malformed.
+      "e_dup_attr.xml" => %(<lexer><config><name>S</name></config><rules><state name="root"><rule pattern="a" pattern="b"><token type="Text"/></rule></state></rules></lexer>),
+      # States the stock loader only trips over mid-tokenization: loaded,
+      # with a warning.
       "f_bad_push.xml" => %(<lexer><config><name>V</name></config><rules><state name="root"><rule pattern="x"><push state="nope"/></rule></state></rules></lexer>),
       "g_bad_incl.xml" => %(<lexer><config><name>U</name></config><rules><state name="root"><rule><include state="missing"/></rule></state></rules></lexer>),
       "h_bad_comb.xml" => %(<lexer><config><name>T</name></config><rules><state name="root"><rule pattern="x"><combined state="root" state="gone"/></rule></state></rules></lexer>),
@@ -107,38 +110,43 @@ describe Hwaro::Content::Processors::CustomLexers do
       log.should contain("lexers/c_no_name.xml: not loaded — missing <config><name>")
       log.should contain(%(lexers/d_no_root.xml: not loaded — missing <state name="root">))
       log.should contain("lexers/e_bad_act.xml:")
-      log.should contain(%(lexers/f_bad_push.xml: not loaded — <push> names undefined state "nope"))
-      log.should contain(%(lexers/g_bad_incl.xml: not loaded — <include> names undefined state "missing"))
-      log.should contain(%(lexers/h_bad_comb.xml: not loaded — <combined> names undefined state "gone"))
+      log.should contain("lexers/e_dup_attr.xml: not loaded — invalid XML (line 1): Attribute pattern redefined")
+      log.should contain(%(lexers/f_bad_push.xml: references undefined state "nope" (<push>); code blocks that reach it fall back to plain))
+      log.should contain(%(lexers/g_bad_incl.xml: references undefined state "missing" (<include>)))
+      log.should contain(%(lexers/h_bad_comb.xml: references undefined state "gone" (<combined>)))
       log.should_not contain("not-a-grammar")
       server_highlight("let", "mydsl").should eq(%(<span class="hljs-keyword">let</span>))
       server_highlight("x", "z").should be_nil
 
       grammars, problems, _ = Hwaro::Content::Processors::CustomLexers.scan("lexers")
-      grammars.map(&.path).should eq(["lexers/mydsl.xml"])
-      problems.map(&.[0]).should eq(%w[a_bad_xml b_bad_re c_no_name d_no_root e_bad_act f_bad_push g_bad_incl h_bad_comb].map { |n| "lexers/#{n}.xml" })
+      grammars.map(&.path).should eq(%w[f_bad_push g_bad_incl h_bad_comb mydsl].map { |n| "lexers/#{n}.xml" })
+      problems.map(&.[0]).should eq(%w[a_bad_xml b_bad_re c_no_name d_no_root e_bad_act e_dup_attr f_bad_push g_bad_incl h_bad_comb].map { |n| "lexers/#{n}.xml" })
+      # A loaded grammar with a dangling state still highlights until it
+      # reaches it.
+      server_highlight("y", "v").should eq("y")
     end
   end
 
   # A bundled grammar is the natural starting point, so the loader's own
   # checks (XML, <name>, root state) must accept them all — Chroma's
-  # repeated `state` attributes included. The rejections left are grammars
-  # the stock loader cannot build either (regexes PCRE2 refuses, actions
-  # Tartrazine lacks), plus three that push a state they never define and
-  # so break as soon as that rule matches.
-  it "accepts the bundled grammars except the ones that are broken anyway" do
-    paths = Tartrazine::LexerFiles.files.map(&.path).select(&.ends_with?(".xml"))
-    paths.size.should be > 200
-    rejected = {} of String => String
-    paths.each do |path|
-      Tartrazine.hwaro_parse_custom_lexer(Tartrazine::LexerFiles.get(path).gets_to_end)
-    rescue ex
-      rejected[path] = ex.message.to_s
-    end
-    rejected.values.select { |m| m.includes?("invalid XML") || m.starts_with?("missing <") || m.includes?("<lexer>") }.should be_empty
-    rejected.select { |_, m| m.includes?("names undefined state") }.keys.sort!.should eq(["/psl.xml", "/sourcepawn.xml", "/yang.xml"])
-    rejected.values.reject(&.includes?("names undefined state")).each do |message|
-      (message.includes?("compiling regex") || message.includes?("Unknown enum Tartrazine::ActionType")).should be_true
+  # repeated `state` attributes included — and a dangling state reference
+  # (psl, sourcepawn, yang) is a warning, not a rejection. The files left
+  # out are the ones the stock loader cannot build either (regexes PCRE2
+  # refuses, actions Tartrazine lacks).
+  it "loads the bundled grammars except the ones the stock loader cannot build" do
+    Dir.mktmpdir do |dir|
+      Tartrazine::LexerFiles.files.map(&.path).select(&.ends_with?(".xml")).each do |path|
+        File.write(File.join(dir, path.lchop('/')), Tartrazine::LexerFiles.get(path).gets_to_end)
+      end
+      grammars, problems, _ = Hwaro::Content::Processors::CustomLexers.scan(dir)
+      grammars.size.should be > 200
+      dangling = problems.select { |_, m| m.starts_with?("references undefined state") }.map { |path, _| File.basename(path) }.uniq!
+      dangling.sort!.should eq(["psl.xml", "sourcepawn.xml", "yang.xml"])
+      dangling.each { |name| grammars.any? { |g| File.basename(g.path) == name }.should be_true }
+      problems.each do |_, message|
+        next if message.starts_with?("references undefined state") || message.includes?("is already defined by")
+        (message.includes?("compiling regex") || message.includes?("Unknown enum Tartrazine::ActionType")).should be_true
+      end
     end
   end
 
