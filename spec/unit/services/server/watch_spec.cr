@@ -141,4 +141,48 @@ describe "serve: [content] ignore" do
       end
     end
   end
+
+  # Ignoring a partials folder hides it from discovery, not from
+  # `include_md` or `load_data()`: an edit must re-render the readers.
+  it "rebuilds when an ignored include_md or load_data source changes" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "t"\nbase_url = "https://example.com"\n[content]\nignore = ["_snippets"]\n))
+        FileUtils.mkdir_p("content/_snippets")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", %({{ content }}|{{ load_data(path="content/_snippets/d.json").v }}))
+        File.write("content/_snippets/s.md", "snippet one\n")
+        File.write("content/_snippets/d.json", %({"v": "data one"}))
+        File.write("content/_snippets/other.md", "unread\n")
+        File.write("content/p.md", "+++\ntitle = \"P\"\n+++\n{{ include_md(path=\"content/_snippets/s.md\") }}\n")
+
+        server = Hwaro::Services::Server.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        server.watch_spec_builder.run(options).should be_true
+        File.read("public/p/index.html").should contain("snippet one")
+        Dir.exists?("public/_snippets").should be_false
+
+        before = server.watch_spec_scan
+        File.write("content/_snippets/s.md", "snippet two, longer\n")
+        changeset = server.watch_spec_detect(before, server.watch_spec_scan)
+        changeset.needs_full_rebuild?.should be_true
+        server.watch_spec_apply(changeset, options)
+        File.read("public/p/index.html").should contain("snippet two")
+
+        before = server.watch_spec_scan
+        File.write("content/_snippets/d.json", %({"v": "data two, longer"}))
+        changeset = server.watch_spec_detect(before, server.watch_spec_scan)
+        changeset.needs_full_rebuild?.should be_true
+        server.watch_spec_apply(changeset, options)
+        File.read("public/p/index.html").should contain("data two")
+        Dir.exists?("public/_snippets").should be_false
+
+        # A file of the same folder that nothing reads stays no change.
+        before = server.watch_spec_scan
+        File.write("content/_snippets/other.md", "still unread, longer\n")
+        server.watch_spec_detect(before, server.watch_spec_scan).empty?.should be_true
+      end
+    end
+  end
 end
