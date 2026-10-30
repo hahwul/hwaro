@@ -1,8 +1,8 @@
-# Guards against two lexer shapes that never finish, kept here so we don't
-# fork the vendored library, like ext/tartrazine_mt_fix.cr. Both turn a
+# Guards against three lexer shapes that never finish, kept here so we don't
+# fork the vendored library, like ext/tartrazine_mt_fix.cr. All turn a
 # grammar bug into an exception, which ServerHighlighter's rescue degrades
 # to plain output (with a warning for a `[highlight] lexers_dir` grammar).
-# A lexer that never hit either case — every bundled one in practice, or
+# A lexer that never hits one — every bundled one in practice, or
 # builds would hang — tokenizes exactly as before.
 #
 # 1. A rule that matches the empty string (`[a-z]*`) without moving the
@@ -18,8 +18,16 @@
 #    each time, until the stack overflows and the process dies. Nesting is
 #    capped at HWARO_MAX_NESTING per fiber (tokenization can suspend on
 #    the template-cache mutex, so a thread-local count could mix fibers).
+# 3. A cycle of `<include state>`s (a state including itself, directly,
+#    through other states or through a `<combined>` state) recurses at one
+#    position until the stack overflows, which no rescue can catch.
+#    Include nesting is capped at HWARO_MAX_INCLUDES per tokenizer — an
+#    acyclic chain is at most a few states deep (4 in the bundled
+#    grammars). `hwaro_parse_custom_lexer` also reports such cycles up
+#    front.
 #
-# Remove when: upstream bounds zero-width progress and delegation depth.
+# Remove when: upstream bounds zero-width progress, delegation depth and
+# include nesting.
 
 require "tartrazine"
 
@@ -29,11 +37,14 @@ class Fiber
 end
 
 module Tartrazine
-  HWARO_MAX_STALLS  = 1_000
-  HWARO_MAX_NESTING =    32
+  HWARO_MAX_STALLS   = 1_000
+  HWARO_MAX_NESTING  =    32
+  HWARO_MAX_INCLUDES =    64
 
   class Tokenizer
     @hwaro_stalls = 0
+    # `<include>` nesting at the current position (see the file comment).
+    property hwaro_include_depth = 0
 
     # Stock body, plus the zero-width counter (see the file comment).
     def next : Iterator::Stop | Token
@@ -75,6 +86,21 @@ module Tartrazine
         end
       end
       self.next
+    end
+  end
+
+  struct IncludeStateRule
+    def match(text : Bytes, pos : Int32, tokenizer : Tokenizer) : Tuple(Bool, Int32, Array(Token))
+      depth = tokenizer.hwaro_include_depth
+      if depth >= HWARO_MAX_INCLUDES
+        raise Exception.new("<include> nested deeper than #{HWARO_MAX_INCLUDES} levels (an include cycle reaching state '#{@state}')")
+      end
+      tokenizer.hwaro_include_depth = depth + 1
+      begin
+        previous_def
+      ensure
+        tokenizer.hwaro_include_depth = depth
+      end
     end
   end
 

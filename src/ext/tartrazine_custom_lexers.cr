@@ -37,14 +37,17 @@ module Tartrazine
 
   # Parse one grammar file's XML. Returns the lowercased names it registers
   # under (`<name>` first, then each `<alias>`), its lowercased
-  # `<filename>` globs, its template, and warnings for a `<push>`,
-  # `<include>` or `<combined>` naming a state the grammar does not define.
-  # Those only fail once tokenization reaches them (the block then falls
-  # back to plain), and three bundled grammars have one, so they warn
-  # rather than reject. Raises with a readable message on malformed XML, a
-  # missing `<name>` or `root` state, an unknown action, or a regex PCRE2
-  # refuses to compile.
-  def self.hwaro_parse_custom_lexer(xml : String) : {Array(String), Array(String), LexerTemplate, Array(String)}
+  # `<filename>` globs, its template, warnings, and the lowercased
+  # `<using lexer>` names that are neither bundled nor its own (the caller
+  # checks them against the other custom grammars). Warnings cover what
+  # only fails once tokenization reaches it, so the block then falls back
+  # to plain: a `<push>`, `<include>` or `<combined>` naming a state the
+  # grammar does not define (three bundled grammars have one, so these warn
+  # rather than reject), a cycle of `<include>`s, a pattern-less rule that
+  # emits a `<token>`, and a negative `<pop depth>`. Raises with a
+  # readable message on malformed XML, a missing `<name>` or `root` state,
+  # an unknown action, or a regex PCRE2 refuses to compile.
+  def self.hwaro_parse_custom_lexer(xml : String) : {Array(String), Array(String), LexerTemplate, Array(String), Array(String)}
     doc = XML.parse(xml)
     # Chroma writes several states as repeated `state` attributes
     # (`<push state="a" state="b"/>`): libxml2 reports each repeat but keeps
@@ -59,6 +62,7 @@ module Tartrazine
     config = root.children.find { |node| node.name == "config" }
     names = [] of String
     filenames = [] of String
+    warnings = [] of String
     if config
       primary = xml_to_s(config, name).try(&.strip)
       names << primary.downcase if primary && !primary.empty?
@@ -75,8 +79,28 @@ module Tartrazine
 
     template = parse_xml_to_template(xml)
     raise Exception.new(%(missing <state name="root">)) unless template.states.has_key?("root")
-    warnings = [] of String
+    includes = {} of String => Array(String)
+    usings = [] of String
     root.xpath_nodes(".//*").each do |node|
+      case node.name
+      when "rule"
+        next if node["pattern"]?
+        first = node.first_element_child
+        if first.try(&.name) == "include"
+          if (from = node.parent.try(&.[]?("name"))) && (to = first.try(&.[]?("state")))
+            (includes[from] ||= [] of String) << to
+          end
+        elsif node.children.any? { |child| child.element? && child.name == "token" }
+          warnings << "has a <rule> without a pattern that emits a <token>; code blocks that reach it fall back to plain"
+        end
+      when "pop"
+        if (depth = node["depth"]?.try(&.to_i?)) && depth < 0
+          warnings << %(has <pop depth="#{depth}">; code blocks that reach it fall back to plain)
+        end
+      when "using"
+        lexer = node["lexer"]?.try(&.downcase)
+        usings << lexer if lexer && !names.includes?(lexer) && !hwaro_bundled_lexer?(lexer)
+      end
       next unless HWARO_STATE_REFS.includes?(node.name)
       node.attributes.each do |attr|
         next unless attr.name == "state"
@@ -85,7 +109,43 @@ module Tartrazine
         warnings << %(references undefined state "#{state}" (<#{node.name}>); code blocks that reach it fall back to plain)
       end
     end
-    {names.uniq, filenames.uniq, template, warnings.uniq}
+    if cycle = hwaro_include_cycle(includes)
+      warnings << %(has an <include> cycle (#{cycle.join(" -> ")}); code blocks that reach it fall back to plain)
+    end
+    {names.uniq, filenames.uniq, template, warnings.uniq, usings.uniq}
+  end
+
+  # A cycle in the state -> included-state graph, as the path that closes
+  # it, or nil. Tokenizing into one recurses until the include guard in
+  # ext/tartrazine_loop_guard.cr gives up.
+  private def self.hwaro_include_cycle(edges : Hash(String, Array(String))) : Array(String)?
+    done = Set(String).new
+    edges.each_key do |state|
+      if cycle = hwaro_include_cycle(edges, state, [] of String, done)
+        return cycle
+      end
+    end
+    nil
+  end
+
+  private def self.hwaro_include_cycle(edges, state, path, done) : Array(String)?
+    if index = path.index(state)
+      return path[index..] + [state]
+    end
+    return unless done.add?(state)
+    path << state
+    edges[state]?.try &.each do |target|
+      if cycle = hwaro_include_cycle(edges, target, path, done)
+        return cycle
+      end
+    end
+    path.pop
+    nil
+  end
+
+  # Whether `name` (lowercased) is a bundled lexer `lexer_by_name` finds.
+  private def self.hwaro_bundled_lexer?(name : String) : Bool
+    LEXERS_BY_NAME.has_key?(HWARO_LEXER_ALIASES.fetch(name, name)) || name.includes?('+')
   end
 
   # Replace every previously registered custom lexer with `entries`

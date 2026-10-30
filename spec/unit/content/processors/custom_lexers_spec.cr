@@ -186,6 +186,27 @@ describe Hwaro::Content::Processors::CustomLexers do
     Hwaro::Content::Processors::Includes.language_for("ops/site.mdsl").should eq("")
   end
 
+  it "warns about grammar defects that would only surface mid-tokenization" do
+    rules = ->(name : String, body : String) { %(<lexer><config><name>#{name}</name></config><rules><state name="root">#{body}</state></rules></lexer>) }
+    files = {
+      "self_inc.xml" => rules.call("selfinc", %(<rule><include state="root"/></rule>)),
+      "two_inc.xml"  => %(<lexer><config><name>twoinc</name></config><rules><state name="root"><rule pattern="a"><token type="Text"/></rule><rule><include state="b"/></rule></state><state name="b"><rule><include state="root"/></rule></state></rules></lexer>),
+      "no_pat.xml"   => rules.call("nopat", %(<rule><token type="Keyword"/></rule><rule><push state="root"/></rule>)),
+      "neg_pop.xml"  => rules.call("negpop", %(<rule pattern="a"><pop depth="-2"/></rule>)),
+      "using.xml"    => rules.call("usingx", %(<rule pattern="(a)(b)(c)"><bygroups><using lexer="nonexistent"/><using lexer="Python"/><using lexer="nopat"/></bygroups></rule>)),
+    }
+    with_lexers(files) do
+      _, problems, _ = Hwaro::Content::Processors::CustomLexers.scan("lexers")
+      problems.should eq([
+        {"lexers/neg_pop.xml", %(has <pop depth="-2">; code blocks that reach it fall back to plain)},
+        {"lexers/no_pat.xml", "has a <rule> without a pattern that emits a <token>; code blocks that reach it fall back to plain"},
+        {"lexers/self_inc.xml", "has an <include> cycle (root -> root); code blocks that reach it fall back to plain"},
+        {"lexers/two_inc.xml", "has an <include> cycle (root -> b -> root); code blocks that reach it fall back to plain"},
+        {"lexers/using.xml", %(<using lexer="nonexistent"> names no bundled or custom lexer; code blocks that reach it fall back to plain)},
+      ])
+    end
+  end
+
   it "warns when the directory is missing" do
     with_lexers({} of String => String) do
       log = with_captured_log { Hwaro::Content::Processors::CustomLexers.apply(lexers_config("nope")).should eq("") }
