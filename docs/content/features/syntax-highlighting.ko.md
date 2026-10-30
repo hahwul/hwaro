@@ -60,6 +60,7 @@ mode = "server"
 | mode | string | "server" | `"server"`는 빌드 시점에 강조, `"client"`는 브라우저에서 Highlight.js로 강조 |
 | line_numbers | bool | false | 모든 펜스 코드 블록에 기본으로 줄 번호 추가(아래 참고) |
 | copy | bool | false | 펜스 코드 블록에 클립보드 복사 버튼 추가(아래 참고) |
+| lexers_dir | string | (없음) | 서버 모드용 추가 문법 파일 디렉터리([사용자 정의 문법](#custom-grammars) 참고) |
 
 ## 서버 사이드 강조(기본값)
 
@@ -68,6 +69,53 @@ mode = "server"
 빌드 시점 하이라이터는 Highlight.js 호환 CSS 클래스를 출력하므로, 아래의 모든 테마가 그대로 동작합니다. `{{ highlight_css }}`는 여전히 테마 스타일시트를 주입하고, `{{ highlight_js }}`는 빈 값이 됩니다.
 
 250개가 넘는 언어를 지원합니다(Pygments/Chroma에서 포팅된 [Tartrazine](https://github.com/ralsina/tartrazine) 렉서 사용). 렉서가 없는 언어의 코드 블록은 강조 없는 일반 출력으로 대체됩니다.
+
+## 사용자 정의 문법 {#custom-grammars}
+
+서버 모드에서는 Tartrazine에 렉서가 없는 언어(사내 DSL, 새 언어, 설정 파일 형식 등)도 강조할 수 있습니다. 문법 파일을 한 디렉터리에 두고 `[highlight] lexers_dir`로 그 디렉터리를 지정합니다. 경로는 프로젝트 루트 기준입니다.
+
+```toml
+[highlight]
+lexers_dir = "lexers"
+```
+
+디렉터리 바로 아래의 `*.xml` 파일은 각각 하나의 렉서이며, 내장 렉서와 같은 [Chroma](https://github.com/alecthomas/chroma/tree/master/lexers/embedded)/Pygments XML 형식을 씁니다. 렉서는 `<name>`과 모든 `<alias>`로 등록되고, 대소문자는 구분하지 않습니다. 최소한의 `lexers/deployfile.xml` 예시는 다음과 같습니다.
+
+```xml
+<lexer>
+  <config>
+    <name>Deployfile</name>
+    <alias>deployfile</alias>
+    <alias>deploy</alias>
+  </config>
+  <rules>
+    <state name="root">
+      <rule pattern="#.*$"><token type="CommentSingle"/></rule>
+      <rule pattern="\b(task|run|on|env)\b"><token type="Keyword"/></rule>
+      <rule pattern="&quot;[^&quot;]*&quot;"><token type="LiteralString"/></rule>
+      <rule pattern="\d+"><token type="LiteralNumber"/></rule>
+      <rule pattern="\s+"><token type="Text"/></rule>
+      <rule pattern="."><token type="Text"/></rule>
+    </state>
+  </rules>
+</lexer>
+```
+
+이제 이름이나 별칭을 붙인 펜스는 빌드 시점에 강조됩니다.
+
+````markdown
+```deploy
+# ship it
+task "web" on 3 run "make deploy"
+```
+````
+
+규칙은 각 위치에서 위에서부터 차례로 시도됩니다. `<token type="...">`에는 Pygments 토큰 타입(`Keyword`, `NameFunction`, `LiteralString`, `CommentSingle` 등)을 쓰며, 이 타입은 대응하는 Highlight.js 클래스로 바뀌므로 테마가 그대로 색을 입힙니다. 상태, `<push>`/`<pop>`, `<bygroups>`, `<using lexer="..."/>`도 내장 문법과 똑같이 동작하니, 내장 문법 하나를 복사해서 시작하는 것이 가장 빠릅니다.
+
+- **우선순위:** 사용자 정의 이름이나 별칭이 내장 렉서보다 우선하므로, 내장 문법을 교체하는 데도 쓸 수 있습니다(`<alias>ini</alias>`를 넣으면 ```` ```ini ```` 펜스를 가져옵니다). 내 파일 두 개가 같은 이름을 쓰면 정렬 순서상 앞선 파일이 그 이름을 가집니다.
+- **오류:** 디렉터리가 없거나, XML이 잘못됐거나, 정규식이 컴파일되지 않거나, `<name>` 또는 `root` 상태가 없는 파일은 파일 이름과 함께 경고로 알립니다. 빌드는 계속되고 해당 펜스는 강조 없는 일반 출력이 됩니다. `hwaro doctor`도 같은 문제를 보고합니다(`highlight-lexer-invalid`).
+- **다시 빌드:** 문법 파일을 고치거나 추가하거나 지우면 `hwaro build --cache`에서도, 디렉터리를 감시하는 `hwaro serve`에서도 모든 페이지가 다시 강조됩니다.
+- **클라이언트 모드:** Highlight.js는 이 문법을 읽지 못하므로 `mode = "client"`에서는 `lexers_dir`를 무시하고 경고를 띄웁니다.
 
 ## 클라이언트 사이드 강조
 
