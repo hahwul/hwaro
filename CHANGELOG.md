@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.22.0
+
+### Added
+- Images: WebP output via `[image_processing] formats = ["webp"]`, wrapped in `<picture>` (#886)
+- Templates: `regex_replace`, `base64_encode`/`base64_decode`, `md5`…`sha512`, `num_format`, `min`/`max` filters; `[a:b]` slicing; `date(locale=)` / `now(locale=)` (#884, #894, #896)
+- Content: `[content] ignore` glob rules; `content/<taxonomy>/<term>/_index.md` describes its term page (#897, #898)
+- i18n: `translation_key` front matter links translations with different file names; `x-default` in hreflang tags and sitemap (#903, #904)
+- Highlighting: custom Chroma XML grammars via `[highlight] lexers_dir` (#905)
+- Doctor: `translation-key-collision`, `highlight-lexer-invalid`, `taxonomy-term-file-unmatched` (#904, #905, #908)
+
+### Changed
+- Much faster template-heavy builds with byte-identical output (heavy-5000: 20.2s → 1.8s) (#884, #885)
+- Alias redirect stubs emit charset, absolute canonical and `noindex` (#882)
+- `page.translation_key` is a page field, no longer read from `page.extra` (#904)
+- File names containing `%` publish to percent-encoded paths (`100%.md` → `/100%25/`); `hwaro serve` 404s case-mismatched paths (#879)
+- A string compared with a number (`<`, `sort`, `min`, `max`) compares as text in either order instead of raising one way (#907)
+- Cached image variants re-encode once after upgrading (#906)
+
+### Fixed
+- Custom grammars: `<include>` cycles no longer crash build/serve; invalid `<filename>` globs no longer fail a render (#909)
+- HTML: long unquoted attribute values no longer fail a page (`JIT stack limit`); a `>` inside a quoted attribute is handled by responsive images, privacy, AMP, check-links, validate and search (#906, #910)
+- Term pages: `_index.<lang>.md` beats `.markdown`, `page/1/` aliases are written, ignored front-matter keys warn (#908)
+- Templates: undefined `attribute=`/`format=` arguments, `|safe` and lowercase RFC 3339 dates, POSIX locale names; sections expose `translation_key` (#907)
+- Builds no longer abort on non-UTF-8 bundle files, a malformed OG manifest or image, or `%00` in CSS `url()`; text extraction stays linear on unclosed tags (#875, #877, #878)
+- ~100 defects across Crinja conformance, markdown, cache, serve, assets and tools (#879)
+- `hwaro version -q` prints the version; `llms-full.txt` gives generated pages a real Source (#899)
+- Docs: EN/KO accuracy audit (#889)
+
 ## v0.21.0
 
 ### Added
