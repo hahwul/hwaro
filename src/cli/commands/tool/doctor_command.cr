@@ -329,9 +329,12 @@ module Hwaro
               Logger.info "Translations:"
               translation_issues.group_by(&.language).each do |code, group|
                 missing = group.count { |i| i.id == "translation-missing" }
+                orphans = group.count { |i| i.id == "translation-orphan" }
+                collisions = group.count { |i| i.id == "translation-key-collision" }
                 counts = [] of String
                 counts << "#{missing} missing" if missing > 0
-                counts << "#{group.size - missing} without original" if group.size > missing
+                counts << "#{orphans} without original" if orphans > 0
+                counts << "#{collisions} key #{collisions == 1 ? "collision" : "collisions"}" if collisions > 0
                 Logger.info "  #{code}: #{counts.join(" · ")}"
                 # A partly translated site can list thousands of pages; the
                 # counts carry the size, --json carries every issue.

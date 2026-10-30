@@ -467,7 +467,9 @@ module Hwaro
         term_files = term_metadata_files(config)
         entries.each { |page, _| page.render = false if term_files.includes?(page.path) } unless term_files.empty?
         files = entries.to_h { |page, file| {page.path, file} }
+        losers = Set(String).new
         Content::Multilingual.link_translations!(entries.map(&.[0]), config).each do |c|
+          losers << c.loser.path
           issues << Issue.new(id: "translation-key-collision", level: :warning, category: "i18n", file: files[c.loser.path],
             message: "translation_key #{c.key.inspect} is already used by the '#{c.code}' page #{files[c.winner.path]} — not linked as a translation", language: c.code)
         end
@@ -478,6 +480,8 @@ module Hwaro
             # A page the build never writes (or that only redirects) needs no
             # translation, and is no one's missing counterpart.
             next if !page.render || page.has_redirect?
+            # A collision loser is reported once, as the collision.
+            next if losers.includes?(page.path)
             code = Content::Multilingual.language_code(page, config)
             codes = page.translations.empty? ? [code] : page.translations.map(&.code)
             if code == default && !codes.includes?(other)

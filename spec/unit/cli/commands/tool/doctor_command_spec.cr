@@ -23,4 +23,16 @@ describe Hwaro::CLI::Commands::Tool::DoctorCommand do
     output.should contain("ja: 1 missing")
     output.scan("more (use --json for all)").size.should eq(1)
   end
+
+  it "counts translation_key collisions apart from orphans" do
+    issues = [
+      Hwaro::Services::Issue.new(id: "translation-key-collision", level: :warning, category: "i18n",
+        file: "content/b.ko.md", message: "translation_key \"about\" is already used", language: "ko"),
+      Hwaro::Services::Issue.new(id: "translation-orphan", level: :info, category: "i18n",
+        file: "content/c.ko.md", message: "'ko' translation has no 'en' original", language: "ko"),
+      missing_translation(1, "ko"),
+    ]
+    output = with_captured_log { Hwaro::CLI::Commands::Tool::DoctorCommand.new.render_human_for_test(issues) }
+    output.should contain("ko: 1 missing · 1 without original · 1 key collision\n")
+  end
 end
