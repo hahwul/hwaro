@@ -249,8 +249,8 @@ hwaro build -i /path/to/my-site -o ./dist
 |------|-------------|
 | -i, --input DIR | 빌드할 프로젝트 디렉터리 (기본값: 현재 디렉터리) |
 | -o, --output DIR | 출력 디렉터리 (기본값: public) |
-| --base-url URL | `config.toml`의 `base_url`을 일시적으로 오버라이드 |
-| -e, --env ENV | 환경 이름 (`config.<env>.toml` 오버라이드 로드) |
+| --base-url URL | `config.toml`의 `base_url`을 일시적으로 오버라이드. `base_url`이 기본값 없이 설정되지 않은 환경 변수(`"${SITE_URL}"`)를 가리키면 이 플래그 없이는 빌드가 `HWARO_E_CONFIG`로 멈춥니다 |
+| -e, --env ENV | 환경 이름 (`config.<env>.toml` 오버라이드 로드, `HWARO_ENV`로도 지정) |
 | -d, --drafts | 초안 콘텐츠 포함 |
 | --include-expired | 만료된 콘텐츠 포함 |
 | --include-future | 미래 날짜 콘텐츠 포함 |
@@ -313,7 +313,7 @@ hwaro build -i /path/to/my-site -o ./dist
 
 **`--cache` (증분 빌드):**
 
-켜면 Hwaro가 파일 수정 시각과 콘텐츠 체크섬을 프로젝트 루트의 `.hwaro_cache.json` 파일에 기록합니다. 이후 빌드에서는 지난 빌드 이후 바뀐 파일만 다시 렌더링합니다. 캐시는 템플릿과 설정 체크섬도 추적합니다. 템플릿이나 `config.toml`이 바뀌면 모든 항목이 자동으로 무효화되어 전체 페이지가 재빌드됩니다.
+켜면 Hwaro가 파일 수정 시각과 콘텐츠 체크섬을 프로젝트 루트의 `.hwaro_cache.json` 파일에 기록합니다. 이후 빌드에서는 지난 빌드 이후 바뀐 파일만 다시 렌더링합니다. 캐시는 템플릿·설정·`data/` 체크섬도 추적합니다. `config.toml`(또는 `--env` 오버라이드)이나 `data/` 파일이 바뀌면 모든 항목이 무효화되어 전체 페이지가 재빌드되고, 템플릿을 고치면 그 파일을 쓰는 페이지만 재빌드됩니다(`[build] template_deps = false`이거나 템플릿이 동적 `include`/`extends`를 쓰면 전체 페이지).
 
 `--full`을 `--cache`와 함께 쓰면 깨끗하게 재빌드하면서도 다음 실행을 위한 캐시는 저장합니다:
 
@@ -376,7 +376,7 @@ hwaro serve -i /path/to/my-site -p 8080
 | -b, --bind HOST | 바인드 주소 (기본값: 127.0.0.1). IPv6 리터럴을 지원하며, 생성되는 모든 URL에서 대괄호로 감싸 표시됩니다(`-b ::1` → `http://[::1]:3000`) |
 | -p, --port PORT | 포트 번호 (기본값: 3000) |
 | --base-url URL | `config.toml`의 `base_url`을 일시적으로 오버라이드. URL에 경로가 있으면 개발 서버가 그 경로 아래에 사이트를 마운트합니다(아래 참고) |
-| -e, --env ENV | 환경 이름 (`config.<env>.toml` 오버라이드 로드) |
+| -e, --env ENV | 환경 이름 (`config.<env>.toml` 오버라이드 로드, `HWARO_ENV`로도 지정) |
 | --minify | 압축된 출력 서빙 |
 | --jobs N | 동시 렌더 워커 수. 기본값은 자동이며 사이트의 리스팅 fan-out에서 산정 |
 | --open | 시작 후 브라우저 열기 |
@@ -409,11 +409,14 @@ hwaro serve -i /path/to/my-site -p 8080
 
 | 변경 유형 | 전략 | 설명 |
 |-------------|----------|-------------|
-| `config.toml` | 전체 재빌드 | 사이트 전체 재빌드 |
+| `config.toml`(또는 `--env` 오버라이드), `data/`, `i18n/` | 전체 재빌드 | 사이트 전체 재빌드 |
+| 새 파일 / 삭제된 파일 | 전체 재빌드 | 사이트 전체 재빌드 |
 | `content/`만 | 증분 | 영향받는 콘텐츠 페이지만 재빌드 |
-| `templates/`만 | 템플릿 재렌더링 | 기존 콘텐츠로 전체 페이지 재렌더링 |
+| `templates/`만 | 템플릿 재렌더링 | 수정한 파일을 쓰는 페이지를 기존 콘텐츠로 재렌더링 |
+| `content/` + `templates/` | 증분 + 재렌더링 | 수정한 페이지를 재빌드한 뒤 위와 같이 재렌더링 |
 | `static/`만 | 정적 복사 | 변경된 정적 파일만 복사 |
-| 혼합 / 새 파일 / 삭제된 파일 | 전체 재빌드 | 사이트 전체 재빌드 |
+
+`templates/`나 `content/`와 함께 `static/`을 고쳐도 전체 재빌드가 아니라 위의 템플릿 재렌더링이나 증분 경로를 탑니다. 정확한 규칙은 [serve 모드](/ko/features/incremental-build/#serve-모드)를 참고합니다.
 
 **라이브 리로드:**
 

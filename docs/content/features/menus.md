@@ -25,7 +25,7 @@ identifier = "about"
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | name | string | — | **Required.** Display label. An entry missing `name` is skipped with a warning. |
-| url | string | "" | Root-relative (`/posts/`) or absolute `http(s)://`/`//` URL. |
+| url | string | "" | Root-relative (`/posts/`), or any URL with its own scheme (`https://`, `mailto:`, …) or `//`. Leave it out for a header that only groups children: the entry keeps an empty `url`/`href` and never matches `active_path`. |
 | weight | int | 0 | Sort order within the menu (ascending), then by `name`, then `identifier`. |
 | identifier | string | `name` | Unique key other entries reference via `parent`. |
 | parent | string | none | Another entry's `identifier`, to nest this entry under it. |
@@ -186,7 +186,7 @@ Always render `item.href`, and compare against `item.url` (as `active_path` does
 | href | String | `url` with `base_path` applied (internal) or unchanged (external) — use this in `<a href>` |
 | identifier | String | Unique key within the menu |
 | weight | Int | Sort order |
-| external | Bool | `true` for `http://`, `https://`, or `//` URLs |
+| external | Bool | `true` for URLs with their own scheme (`https://`, `mailto:`, …) or `//` |
 | children | Array\<Entry\> | Nested entries (see [Hierarchy](#hierarchy)) |
 | page | Page? | The registering page/section's data, when the entry came from front matter and resolves to a `Page` (nil for config-only entries, and for entries registered on a `Section`'s `_index.md`) |
 

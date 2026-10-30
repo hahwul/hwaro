@@ -69,7 +69,7 @@ For JSON, the first balanced `{...}` at the very start of the file is the front 
 | slug | string | Custom URL slug |
 | path | string | Custom URL path |
 | aliases | array | Redirect URLs to this page |
-| authors | array | Author names |
+| authors | array | Author IDs, matched against `data/authors.*` (see [Site Authors](/templates/data-model/#site-authors)) |
 | toc | bool | Show table of contents |
 | in_search_index | bool | Include in search |
 | in_sitemap | bool | Include in sitemap |
@@ -80,6 +80,7 @@ For JSON, the first balanced `{...}` at the very start of the file is the front 
 | series | string | Series name for grouping |
 | series_weight | int | Sort order within series |
 | menus | string / array / table | Register the page in navigation menus (`menu` is an alias). See [Menus](/features/menus/) |
+| taxonomies | table | Zola-style table of taxonomy terms (`[taxonomies]` with `tags = [...]`). See [Taxonomies](/writing/taxonomies/) |
 | extra | table | Custom metadata |
 
 A field holding the wrong type (`draft = "true"`, `weight = "5"`, `date = 20240315`, `categories = "News"`) is ignored, never coerced, and the build warns with the file and key. In particular `draft = "true"` is not a draft and gets published; write `draft = true`.

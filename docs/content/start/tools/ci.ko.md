@@ -14,4 +14,6 @@ hwaro tool ci github-actions
 hwaro tool platform github-pages
 ```
 
+`tool ci github-actions`는 stderr에 사용 중단 경고를 출력한 뒤 `tool platform github-pages`와 같은 워크플로(`.github/workflows/deploy.yml`)를 생성하며, `-o, --output PATH`, `--stdout`, `-f, --force` 플래그도 똑같이 받습니다.
+
 전체 문서는 [platform](/ko/start/tools/platform/)을 참고합니다.

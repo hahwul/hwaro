@@ -97,7 +97,7 @@ A few points worth spelling out:
 
   ```
   Error [HWARO_E_CONTENT]: reports/2026-09.md matches [permalinks] rule
-  "reports" (pattern '/reports/:year/:month/') which requires a date, but the
+  "reports" (pattern 'reports/:year/:month') which requires a date, but the
   page has none.
   ```
 

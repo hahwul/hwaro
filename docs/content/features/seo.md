@@ -334,6 +334,7 @@ Each value is `true` (`yes`) or `false` (`no`). A key you leave out is not emitt
 ```
 User-agent: *
 Allow: /
+
 Sitemap: https://example.com/sitemap.xml
 ```
 

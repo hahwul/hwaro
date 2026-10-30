@@ -161,7 +161,7 @@ Hwaro는 프론트 매터의 `authors` 필드(`authors = ["id"]`)에 정의된 �
 
 #### 작성자 정의
 
-`data/authors.yml`(또는 `.json`, `.toml`) 파일을 만들어 작성자 데이터를 보강할 수 있습니다. 키는 페이지 프론트 매터에서 쓴 작성자 ID와 일치해야 합니다.
+`data/authors.yml`(또는 `.json`, `.toml`) 파일을 만들어 작성자 데이터를 보강할 수 있습니다. 키는 페이지 프론트 매터에서 쓴 작성자 ID와 일치해야 합니다. ID는 앞뒤 공백을 제거하고 소문자로 바꾸며, 데이터 키도 같은 방식으로 비교하므로 `authors = ["John-Doe"]`는 `john-doe:`나 `John-Doe:` 항목을 모두 찾습니다(대소문자만 다른 키가 함께 있으면 정확히 소문자인 키가 우선합니다).
 
 **content/my-post.md**
 
@@ -183,10 +183,10 @@ john-doe:
 
 #### 템플릿에서 사용
 
-`site.authors` 객체는 사이트에서 발견된 모든 작성자를 담습니다. 각 작성자 객체는 다음을 갖습니다.
-- `key`: 작성자 ID(예: "john-doe")
-- `name`: 작성자 이름(데이터에서 가져오거나, 없으면 ID로 폴백)
-- `pages`: 이 작성자가 쓴 페이지 목록(날짜순 정렬)
+`site.authors` 객체는 목록에 나오는 페이지가 참조하는 모든 작성자를 소문자 ID를 키로 담습니다. 초안, 헤드리스(`render = false`) 페이지, 생성된 페이지는 `/authors/` 택소노미와 마찬가지로 건너뛰며, 어느 페이지도 참조하지 않는 `data/authors.yml` 항목은 추가되지 않습니다. 각 작성자 객체는 다음을 갖습니다.
+- `key`: 소문자로 바꾼 작성자 ID(예: "john-doe")
+- `name`: 작성자 이름(데이터에서 가져오거나, 없으면 처음 쓰인 그대로의 ID)
+- `pages`: 이 작성자가 쓴 페이지 목록(최신순). 각 항목에는 `title`, `url`, `date`, `description`, `image`, `summary`, `summary_truncated`, `tags`, `reading_time`, `word_count`, `language`가 있습니다
 - `data/authors.yml`에 정의한 모든 커스텀 필드
 
 ```jinja
@@ -244,15 +244,28 @@ john-doe:
 | section_description | section.description |
 | section_list | 미리 렌더링된 페이지 HTML 목록 |
 
-### 프론트 매터에서 오는 속성
+### 목록 속 섹션 객체
 
-| 속성 | 타입 | 기본값 | 설명 |
-|----------|------|---------|-------------|
-| sort_by | String? | "date" | 정렬 기준: date(최신순), published(최신순, `updated` 무시), weight(낮은 값 우선), title(A→Z) |
-| reverse | Bool? | false | 기본 정렬 순서 뒤집기 — [콘텐츠 작성 › 섹션 › 정렬 방향](/ko/writing/sections/#정렬-방향) 참고 |
-| paginate | Int? | — | 한 페이지에 표시할 페이지 수 |
-| transparent | Bool | false | 페이지를 부모 섹션으로 전달 |
-| generate_feeds | Bool | false | RSS 피드 생성 |
+`section.subsections`, `site.sections`, `get_section()` 결과의 섹션 객체는 현재 페이지의 `section`과 필드 구성이 다르며 더 많습니다(`list`, `page_template`, `paginate_path`, `redirect_to`는 없습니다).
+
+| 속성 | 타입 | 설명 |
+|----------|------|-------------|
+| title, description, url | String | 섹션 페이지와 동일 |
+| path | String | 소스 경로(`blog/_index.md`) |
+| name | String | 섹션 이름(`blog`, `docs/guides`, 루트는 빈 문자열) |
+| top_level | Bool | `name`에 `/`가 없음 |
+| date | String | 섹션 날짜(YYYY-MM-DD, 없으면 빈 문자열) |
+| draft, is_index, transparent | Bool | 프론트 매터 값 |
+| language | String | 적용된 언어 코드 |
+| weight | Int | 섹션 가중치 |
+| sort_by | String | 프론트 매터의 `sort_by`(없으면 빈 문자열이며 날짜순으로 정렬) |
+| reverse | Bool | 프론트 매터의 `reverse` |
+| paginate | Int | 페이지당 항목 수(없으면 `0`) |
+| pagination_enabled | Bool? | 프론트 매터의 `pagination_enabled`(없으면 `none`) |
+| pages, pages_count | Array<Page>, Int | 섹션의 정렬 순서대로 나열된 페이지와 그 수 |
+| assets | Array<String> | 함께 둔 파일 |
+| subsections | Array<Section> | 같은 형태의 하위 섹션(루트 섹션 자신의 항목에서는 빈 배열) |
+| version | Object? | 버전 문서 사이트에서만 |
 
 ### 페이지 순회
 
@@ -331,7 +344,7 @@ john-doe:
 | page.draft | Bool | 초안 여부 |
 | page.weight | Int | 정렬 가중치 |
 | page.image | String? | 대표 이미지 경로 |
-| page.authors | Array<String> | 작성자 이름 |
+| page.authors | Array<String> | 프론트 매터에 쓴 그대로의 작성자 ID([사이트 작성자](#사이트-작성자) 참고) |
 | page.tags | Array<String> | 프론트 매터의 태그 |
 | page.taxonomies | Object | 이 페이지의 택소노미 항목(`page.taxonomies.tags`, `page.taxonomies.<name>`) |
 | page.extra | Object | 커스텀 프론트 매터 필드 |
@@ -345,6 +358,7 @@ john-doe:
 | page.summary | String? | 요약 HTML: `<!-- more -->` 앞부분, 없으면 `page.description`, 그것도 없으면 렌더링된 본문의 자동 발췌문(`[content] summary_length`, 이스케이프된 `<p>` 하나). 삽입할 때는 `\| safe`와 함께 사용(예: `{{ page.summary \| safe }}`). `<meta name="description">`에는 `page.description`을 직접 사용 |
 | page.summary_truncated | Bool | `page.summary`가 잘린 자동 발췌문일 때만 `true` ("더 읽기" 링크에 유용) |
 | page.assets | Array<String> | 페이지 번들의 정적 파일 |
+| page.path | String | `content/` 기준 소스 경로(`blog/my-post.md`) |
 | page.series | String | 프론트 매터의 시리즈 이름(없으면 빈 문자열) |
 | page.series_index | Int | 시리즈 안에서 1부터 시작하는 순번(`[series]` 활성화 필요) |
 | page.series_pages | Array<Page> | 같은 시리즈의 모든 페이지(`series_weight` 순 정렬) |
@@ -418,6 +432,8 @@ john-doe:
 | .url | String | 페이지 URL |
 | .description | String? | 페이지 설명 |
 | .date | String? | 페이지 날짜 |
+
+둘 다 `section.pages` 항목과 같은 형태의 전체 페이지 객체이므로 `page.lower.summary`나 `page.lower.extra`도 쓸 수 있습니다.
 
 ```jinja
 <nav class="post-nav">
@@ -496,7 +512,7 @@ john-doe:
   {% if t.is_current %}
   <span>{{ t.code | upper }}</span>
   {% else %}
-  <a href="{{ t.url }}">{{ t.code | upper }}</a>
+  <a href="{{ base_url }}{{ t.url }}">{{ t.code | upper }}</a>
   {% endif %}
 {% endfor %}
 </nav>
@@ -538,7 +554,7 @@ pros = ["Fast", "Reliable"]
 
 ---
 
-### 시간 변수
+## 시간 변수
 
 | 변수 | 타입 | 설명 |
 |----------|------|-------------|
@@ -552,7 +568,7 @@ pros = ["Fast", "Reliable"]
 
 ---
 
-### SEO 변수
+## SEO 변수
 
 **미리 렌더링된 HTML**(하위 호환):
 
@@ -588,6 +604,7 @@ pros = ["Fast", "Reliable"]
 | seo.twitter_creator | String | Twitter 작성자 핸들 |
 | seo.fb_app_id | String | Facebook 앱 ID |
 | seo.hreflang | Array | `page.translations`와 동일 |
+| seo.noindex | Bool | 버전 문서 사이트에서만: 이전 버전 페이지면 `true`(`[versions] noindex_old = false`이면 `false`) |
 
 페이지 제목, 설명, URL, 이미지는 `page.title`, `page.description`, `page.url`, `page.image`로 얻습니다. `seo` 객체는 SEO에 특화된 계산 값(해석된 URL, 설정 값)을 제공합니다.
 
@@ -612,7 +629,7 @@ pros = ["Fast", "Reliable"]
 
 ---
 
-### 에셋 변수
+## 에셋 변수
 
 편의를 위해 미리 렌더링된 `<link>`·`<script>` 태그입니다. `config.toml` 설정에서 생성됩니다.
 
@@ -643,7 +660,7 @@ pros = ["Fast", "Reliable"]
 
 ---
 
-### 목차
+## 목차
 
 프론트 매터에 `toc = true`가 있을 때만 사용할 수 있습니다.
 
@@ -696,7 +713,7 @@ pros = ["Fast", "Reliable"]
 
 ---
 
-### Paginator
+## Paginator
 
 섹션·택소노미 항목 템플릿에서 페이지네이션이 활성화된 경우([섹션 프론트 매터](/ko/writing/sections/#프론트-매터)의 `paginate`, 택소노미는 `paginate_by`) 사용할 수 있습니다. 1페이지는 섹션 URL에, 이후 페이지는 `{url}/{paginate_path}/{n}/`에 생성됩니다.
 
@@ -727,7 +744,7 @@ pros = ["Fast", "Reliable"]
 
 ---
 
-### 택소노미 변수
+## 택소노미 변수
 
 택소노미 템플릿에서 사용할 수 있습니다.
 
@@ -756,7 +773,7 @@ pros = ["Fast", "Reliable"]
 | 속성 | 타입 | 설명 |
 |----------|------|--------------|
 | name | String | 표시 레이블 |
-| url | String | 아무것도 붙지 않은 루트 상대 경로, 또는 손대지 않은 외부 URL — `page.url`과 비교 가능 |
+| url | String | 아무것도 붙지 않은 루트 상대 경로, 또는 손대지 않은 외부 URL — `page.url`과 비교 가능. `url` 없이 적은 엔트리(그룹 제목)는 빈 문자열이므로 링크 없이 렌더링하세요 |
 | href | String | 내부 링크면 `url`에 사이트 `base_path`를 적용한 값, 외부면 그대로 — `<a href>`에는 이 값을 사용 |
 | identifier | String | 메뉴 안에서 고유한 키 |
 | weight | Int | 정렬 순서 |

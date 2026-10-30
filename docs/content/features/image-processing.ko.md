@@ -32,7 +32,7 @@ quality = 85
 | enabled | bool | false | 이미지 리사이즈 활성화 |
 | widths | array | [] | 생성할 대상 너비(픽셀) |
 | quality | int | 85 | JPEG 출력 품질 (1-100), WebP에도 사용 |
-| formats | array | [] | 원본 포맷 외에 추가로 쓸 출력 포맷: `["webp"]` |
+| formats | array | [] | 원본 포맷 외에 추가로 쓸 출력 포맷: `["webp"]`. 다른 값은 설정 오류 |
 | dimensions | bool | false | 콘텐츠 이미지에 원본 `width`/`height` 추가 (`enabled` 없이도 동작) |
 
 ### LQIP (저화질 이미지 플레이스홀더)
@@ -82,7 +82,7 @@ formats = ["webp"]
 - 인코더는 Hwaro에 내장되어 있어(순수 Crystal) 외부 도구나 라이브러리가 필요 없습니다.
 - WebP 파일은 원본으로 쓰지 않습니다. `static/`이나 페이지 번들의 `.webp`는 그대로 복사됩니다.
 - 같은 디렉터리에 확장자만 다른 원본(`hero.jpg`와 `hero.png`)이 있으면 같은 WebP 이름을 쓰게 됩니다. 경로가 먼저 정렬되는 쪽이 그 이름을 갖고, 다른 쪽은 WebP 변형 없이 경고로 알려 줍니다.
-- WebP 인코딩은 JPEG보다 오래 걸리므로 이미지가 많으면 콜드 빌드가 길어집니다. warm `--cache` 빌드와 `hwaro serve`는 변형을 재사용합니다.
+- WebP 인코딩은 JPEG보다 오래 걸리므로 이미지가 많으면 콜드 빌드가 길어집니다. warm `--cache` 빌드와 `hwaro serve`는 원본 파일과 인코딩 설정(`quality`, LQIP 키)이 그대로인 동안 변형을 재사용하며, 그 기록은 `.hwaro/image_variants.log`에 남습니다.
 
 ### 이미지 크기 속성
 
@@ -247,7 +247,7 @@ LQIP가 비활성화 상태면 `lqip`와 `dominant_color`는 빈 문자열을 �
 
 ### 리사이즈 데모
 
-이 문서 사이트는 `widths = [128, 256, 512]`와 LQIP를 켠 상태로 이미지 처리를 사용합니다. 아래 이미지들은 `static/hwaro.png`에서 자동 생성된 리사이즈 변형입니다:
+이 문서 사이트는 `widths = [128, 256, 512, 640]`와 LQIP를 켠 상태로 이미지 처리를 사용합니다. 아래 이미지들은 `static/hwaro.png`에서 자동 생성된 리사이즈 변형입니다:
 
 **원본** (`hwaro.png`):
 

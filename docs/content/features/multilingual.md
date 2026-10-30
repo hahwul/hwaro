@@ -32,7 +32,7 @@ weight = 3
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| default_language | string | "en" | Default language code |
+| default_language | string | "en" | Default language code (a blank value warns and keeps `"en"`) |
 | language_name | string | the language code | Human-readable language name |
 | weight | int | 1 | Sort order (lower = first) |
 | generate_feed | bool | true | Generate the RSS/Atom/JSON feed for this language |
@@ -99,7 +99,7 @@ Access translation data in templates:
     {% if t.is_current %}
       <span class="active">{{ t.code | upper }}</span>
     {% else %}
-      <a href="{{ t.url }}">{{ t.code | upper }}</a>
+      <a href="{{ base_url }}{{ t.url }}">{{ t.code | upper }}</a>
     {% endif %}
   {% endfor %}
 </nav>
@@ -199,7 +199,7 @@ This generates the configuration and sample content files for each specified lan
   <ul>
     {% for t in page.translations %}
     <li>
-      <a href="{{ t.url }}"{% if t.is_current %} class="current"{% endif %}>
+      <a href="{{ base_url }}{{ t.url }}"{% if t.is_current %} class="current"{% endif %}>
         {{ t.code | upper }}
       </a>
     </li>
@@ -245,7 +245,7 @@ This generates the configuration and sample content files for each specified lan
       {% if t.is_current %}
         <strong>{{ t.code }}</strong>
       {% else %}
-        <a href="{{ t.url }}">{{ t.code }}</a>
+        <a href="{{ base_url }}{{ t.url }}">{{ t.code }}</a>
       {% endif %}
     {% endfor %}
   </nav>

@@ -69,7 +69,7 @@ JSON은 파일 맨 앞에서 처음으로 짝이 맞는 `{...}`가 프론트 매
 | slug | string | 커스텀 URL 슬러그 |
 | path | string | 커스텀 URL 경로 |
 | aliases | array | 이 페이지로 리다이렉트할 URL 목록 |
-| authors | array | 작성자 이름 |
+| authors | array | 작성자 ID, `data/authors.*`와 대조([사이트 작성자](/ko/templates/data-model/#사이트-작성자) 참고) |
 | toc | bool | 목차 표시 |
 | in_search_index | bool | 검색 포함 여부 |
 | in_sitemap | bool | 사이트맵 포함 여부 |
@@ -80,6 +80,7 @@ JSON은 파일 맨 앞에서 처음으로 짝이 맞는 `{...}`가 프론트 매
 | series | string | 묶음용 시리즈 이름 |
 | series_weight | int | 시리즈 내 정렬 순서 |
 | menus | string / array / table | 페이지를 내비게이션 메뉴에 등록(`menu`는 별칭). [메뉴](/ko/features/menus/) 참고 |
+| taxonomies | table | Zola 스타일 택소노미 항목 테이블(`[taxonomies]` 아래 `tags = [...]`). [택소노미](/ko/writing/taxonomies/) 참고 |
 | extra | table | 커스텀 메타데이터 |
 
 타입이 틀린 필드(`draft = "true"`, `weight = "5"`, `date = 20240315`, `categories = "News"`)는 변환 없이 무시되며, 빌드가 파일과 키를 담아 경고합니다. 특히 `draft = "true"`는 초안이 아니므로 발행됩니다. `draft = true`로 쓰세요.

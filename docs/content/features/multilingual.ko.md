@@ -32,7 +32,7 @@ weight = 3
 
 | 키 | 타입 | 기본값 | 설명 |
 |-----|------|---------|-------------|
-| default_language | string | "en" | 기본 언어 코드 |
+| default_language | string | "en" | 기본 언어 코드(빈 값이면 경고 후 `"en"`을 유지) |
 | language_name | string | 언어 코드 | 사람이 읽는 언어 이름 |
 | weight | int | 1 | 정렬 순서(낮을수록 앞) |
 | generate_feed | bool | true | 해당 언어의 RSS/Atom/JSON 피드 생성 여부 |
@@ -99,7 +99,7 @@ Hwaro는 파일 이름을 기준으로 번역된 페이지를 자동으로 연�
     {% if t.is_current %}
       <span class="active">{{ t.code | upper }}</span>
     {% else %}
-      <a href="{{ t.url }}">{{ t.code | upper }}</a>
+      <a href="{{ base_url }}{{ t.url }}">{{ t.code | upper }}</a>
     {% endif %}
   {% endfor %}
 </nav>
@@ -199,7 +199,7 @@ hwaro init mysite --include-multilingual en,ko,ja
   <ul>
     {% for t in page.translations %}
     <li>
-      <a href="{{ t.url }}"{% if t.is_current %} class="current"{% endif %}>
+      <a href="{{ base_url }}{{ t.url }}"{% if t.is_current %} class="current"{% endif %}>
         {{ t.code | upper }}
       </a>
     </li>
@@ -245,7 +245,7 @@ hwaro init mysite --include-multilingual en,ko,ja
       {% if t.is_current %}
         <strong>{{ t.code }}</strong>
       {% else %}
-        <a href="{{ t.url }}">{{ t.code }}</a>
+        <a href="{{ base_url }}{{ t.url }}">{{ t.code }}</a>
       {% endif %}
     {% endfor %}
   </nav>

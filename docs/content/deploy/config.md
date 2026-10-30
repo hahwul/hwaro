@@ -24,8 +24,13 @@ max_deletes = 256
 | source_dir | string | "public" | Directory containing the built site (follows `[build] output_dir` when only that is set) |
 | confirm | bool | false | Prompt for confirmation before deploying |
 | dry_run | bool | false | Show what would be deployed without making changes |
-| force | bool | false | Force deployment even if no changes detected |
+| force | bool | false | Copy every file even when identical at the destination (same as `--force`); also lifts the empty-source refusal and skips the shell-metacharacter confirmation described below |
 | max_deletes | int | 256 | Safety limit on file deletions (any negative value disables the limit) |
+| workers | int | 10 | Accepted but not applied (see below) |
+
+The camelCase spellings `dryRun`, `maxDeletes` and `source` (for
+`source_dir`) are read as well, as are `URL` and `stripIndexHTML` on a target
+and `cacheControl` and `contentType` on a matcher.
 
 `max_deletes` bounds the **built-in** `file://` sync only. Command targets
 (`s3://`, `gs://`, `az://`, or an explicit `command`) delete through the
@@ -45,7 +50,8 @@ Run `hwaro build` and deploy its output instead; there is no override flag
 
 `workers` is accepted for forward compatibility but not applied: the
 built-in sync copies serially and command targets manage their own
-concurrency. Setting it prints a warning.
+concurrency. Setting it to anything other than the default 10 prints a
+warning.
 
 ## Targets
 
@@ -131,6 +137,13 @@ the placeholder stands on its own (`rsync -a {source}/ host:`). Do not wrap a
 placeholder in quotes of your own (`"{source}"`). That undoes the quoting, so
 hwaro checks the expanded value for shell metacharacters and asks for
 confirmation when it finds any.
+
+A command whose own text contains shell metacharacters (`|`, `;`, `&`, a
+backtick or `$`, or `sudo` / `rm -rf`) also warns and asks for confirmation
+before it runs, such as `cd {source} && ./publish.sh`. Without a terminal to
+answer (CI, pipes), that prompt fails the deploy with a usage error (exit 2).
+Move the logic into a script the command calls, or pass `--force` (or set
+`force = true`) to skip the check.
 
 On Windows the command runs through `cmd.exe` instead of `sh`. Placeholder
 values are double-quoted, since `cmd.exe` has no single quotes, and

@@ -197,7 +197,7 @@ content/
 | section.pages | Array<Page> | 현재 섹션 목록에 표시되는 페이지 |
 | section.pages_count | Int | `section.pages`의 항목 수 |
 | section.list | String | 미리 렌더링된 HTML 목록(`section_list`와 동일한 값) |
-| section.subsections | Array<Section> | 직계 하위 섹션(`title`, `description`, `url`, `pages_count`). `weight`, 경로 순으로 정렬되며, 루트 `_index.md`에서는 최상위 섹션 |
+| section.subsections | Array<Section> | 직계 하위 섹션. 각 항목은 `get_section()`이 반환하는 전체 섹션 객체(`title`, `url`, `pages`, `pages_count`, `subsections` 등, [데이터 모델 › 목록 속 섹션 객체](/ko/templates/data-model/#목록-속-섹션-객체) 참고)입니다. `weight`, 경로 순으로 정렬되며, 루트 `_index.md`에서는 최상위 섹션 |
 | section.assets | Array<String> | 섹션과 함께 둔 에셋 |
 | section.page_template | String | 하위 페이지의 기본 템플릿 이름 |
 | section.paginate_path | String | 페이지네이션 경로 세그먼트 |

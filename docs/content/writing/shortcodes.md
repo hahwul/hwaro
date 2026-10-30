@@ -49,6 +49,10 @@ Hwaro ships with built-in shortcodes that work out of the box, with no template 
 Pass parameters by name or in the shortcode's documented order. For example,
 `{{ youtube("VIDEO_ID") }}` and `{{ gist("username", "gist_id") }}` use
 positional arguments; quoted empty values still occupy their position.
+The positional order is: `youtube` and `vimeo` take `id`; `gist` takes `user`,
+`id`, `file`; `tweet` and `codepen` take `user`, `id`; `figure` takes `src`,
+`alt`, `caption`; `alert` and `callout` take `type`, `title`; `include_code`
+and `include_md` take `path`. Other parameters are named only.
 
 ### youtube
 
@@ -110,6 +114,8 @@ Both bare and named closers are supported (named closers are recommended for com
 ```
 
 (We recommend the named closer style for clarity.)
+
+The body is rendered as Markdown, so `**bold**`, `code` and links work inside it.
 
 | Param | Default | Description |
 |-------|---------|-------------|
@@ -182,11 +188,11 @@ Include a source file, or part of it, as a fenced code block. The block goes thr
 
 | Param | Default | Description |
 |-------|---------|-------------|
-| `path` | (required) | File path, relative to the project root |
+| `path` | (required) | File path, relative to the project root (also accepted as the first positional argument) |
 | `region` | (none) | Only the lines between `#region <name>` and `#endregion <name>` |
 | `lines` | (none) | Line range `a-b` or a single line `a` (1-based, inclusive; counted inside `region` when both are set) |
 | `lang` | from the file name or extension (`Makefile`, `Dockerfile`, `.rs`); in client highlight mode, as highlight.js names it | Language of the code block |
-| `title`, `hl_lines`, `hide_lines`, `linenos`, `linenostart`, `copy` | | Passed on as fence options |
+| `title` (or `name`), `hl_lines`, `hide_lines`, `linenos`, `linenostart`, `copy` | | Passed on as fence options |
 
 Region markers can follow any comment leader, so they stay valid code in the source file:
 
@@ -213,7 +219,7 @@ Render a Markdown file in place, as if its text were written at that spot.
 
 | Param | Default | Description |
 |-------|---------|-------------|
-| `path` | (required) | File path, relative to the project root |
+| `path` | (required) | File path, relative to the project root (also accepted as the first positional argument) |
 | `region` | (none) | Only the lines between `<!-- #region <name> -->` and `<!-- #endregion <name> -->` |
 
 Shortcodes inside the included file expand, and its headings take part in the page's table of contents and heading ids. Its front matter is dropped. An included file can include others, up to 8 levels deep. A cycle is an error that shows the chain.

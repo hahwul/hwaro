@@ -20,7 +20,7 @@ disallow_paths = ["drafts/**", "**/_*"]
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| allow_extensions | array | [] | File extensions to publish |
+| allow_extensions | array | [] | File extensions to publish. Publishing is on while this list is non-empty (`extensions` is accepted as an alias) |
 | disallow_extensions | array | [] | File extensions to exclude |
 | disallow_paths | array | [] | Glob patterns for paths to exclude |
 
@@ -70,7 +70,7 @@ Only files with extensions in `allow_extensions` are published:
 allow_extensions = ["jpg", "jpeg", "png", "gif", "svg", "webp"]
 ```
 
-Extensions are normalized, so both `"jpg"` and `".jpg"` are accepted.
+Extensions are normalized, so both `"jpg"` and `".jpg"` are accepted, and matching ignores case (`photo.JPG` matches `"jpg"`). `.md` files are never copied this way.
 
 ### Deny List
 

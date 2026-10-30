@@ -35,9 +35,11 @@ The `hooks/` directory overrides how individual Markdown elements render. See [R
 | content/index.md | index.html or page.html |
 | content/about.md | page.html |
 | content/blog/_index.md | section.html |
-| content/blog/post.md | page.html |
-| Taxonomy index | taxonomy.html |
-| Taxonomy term | taxonomy_term.html |
+| content/blog/post.md | the section's `page_template`, else page.html |
+| Taxonomy index | taxonomy.html, else page.html |
+| Taxonomy term | taxonomy_term.html, else taxonomy.html, else page.html |
+
+A `template` key in a page's or section's front matter overrides this choice. If the named template does not exist, the build warns and falls back to the default above.
 
 ## Quick Example
 

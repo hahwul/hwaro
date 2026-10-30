@@ -56,6 +56,8 @@ taxonomies = { tags = "categories" }                    # 선택
 | `description` | 아니요 | 페이지 설명 필드/템플릿. |
 | `taxonomies` | 아니요 | `taxonomy = "스펙"` 테이블. 배열 필드는 모든 원소를 term으로, 스칼라는 하나를, `null`/`""`은 아무것도 기여하지 않습니다. |
 
+이 표에 없는 키는 규칙 이름과 함께 경고를 남기고 무시됩니다. 필수 키가 없거나, 값의 타입이 틀리거나, 한 규칙에 `body`와 `body_template`을 함께 쓰면 설정 오류(`HWARO_E_CONFIG`)입니다.
+
 ## 템플릿에서 레코드 전체 쓰기
 
 템플릿은 소스 레코드 전체를 `page.extra.item`으로 보므로 필드마다 규칙에 매핑할 필요가 없습니다.
@@ -88,7 +90,7 @@ taxonomies = { tags = "categories" }                    # 선택
 모든 실패는 규칙, 레코드(1부터, 데이터 순서), 고칠 내용을 지목합니다.
 
 ```
-Error [HWARO_E_CONTENT]: [[content.generate]] "products.items": record #37: missing field 'skuu' (available: categories, name, price, released, sku).
+Error [HWARO_E_CONTENT]: [[content.generate]] "products.items": record #37: slug: missing field 'skuu' (available: categories, description_md, name, price, released, sku).
 ```
 
 `source`가 없거나 배열이 아닌 규칙도 빌드를 실패시킵니다. 오타가 조용히 0개의 페이지를 생성하는 일은 없어야 합니다.

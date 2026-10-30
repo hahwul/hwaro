@@ -242,8 +242,8 @@ hwaro build -i /path/to/my-site -o ./dist
 |------|-------------|
 | -i, --input DIR | Project directory to build (default: current directory) |
 | -o, --output DIR | Output directory (default: public) |
-| --base-url URL | Temporarily override `base_url` from `config.toml` |
-| -e, --env ENV | Environment name (loads `config.<env>.toml` override) |
+| --base-url URL | Temporarily override `base_url` from `config.toml`. When `base_url` names an unset environment variable with no default (`"${SITE_URL}"`), the build stops with `HWARO_E_CONFIG` unless this flag is passed |
+| -e, --env ENV | Environment name (loads `config.<env>.toml` override; also `HWARO_ENV`) |
 | -d, --drafts | Include draft content |
 | --include-expired | Include expired content |
 | --include-future | Include future-dated content |
@@ -307,7 +307,7 @@ For more aggressive output shrinking (attribute quoting, entity collapsing, etc.
 
 **About `--cache` (Incremental Build):**
 
-When enabled, Hwaro tracks file modification times and content checksums in a `.hwaro_cache.json` file at the project root. On subsequent builds, only files that have changed since the last build are re-rendered. The cache also tracks template and config checksums. If templates or `config.toml` change, all entries are automatically invalidated and every page is rebuilt.
+When enabled, Hwaro tracks file modification times and content checksums in a `.hwaro_cache.json` file at the project root. On subsequent builds, only files that have changed since the last build are re-rendered. The cache also tracks template, config and `data/` checksums. A change to `config.toml` (or the `--env` override) or to a `data/` file invalidates every entry and rebuilds every page; a template edit rebuilds only the pages whose templates use the edited file (every page when `[build] template_deps = false` or a template uses a dynamic `include`/`extends`).
 
 Use `--full` together with `--cache` to force a clean rebuild while still saving the cache for the next run:
 
@@ -370,7 +370,7 @@ hwaro serve -i /path/to/my-site -p 8080
 | -b, --bind HOST | Bind address (default: 127.0.0.1). IPv6 literals are supported and appear bracketed in every generated URL (`-b ::1` → `http://[::1]:3000`) |
 | -p, --port PORT | Port number (default: 3000) |
 | --base-url URL | Temporarily override `base_url` from `config.toml`. If the URL carries a path, the dev server mounts the site under that prefix (see below) |
-| -e, --env ENV | Environment name (loads `config.<env>.toml` override) |
+| -e, --env ENV | Environment name (loads `config.<env>.toml` override; also `HWARO_ENV`) |
 | --minify | Serve minified output |
 | --jobs N | Concurrent render workers. Default: auto, derived from the site listing fan-out |
 | --open | Open browser after starting |
@@ -403,11 +403,14 @@ The server watches for file changes and rebuilds automatically. It uses **smart 
 
 | Change Type | Strategy | Description |
 |-------------|----------|-------------|
-| `config.toml` | Full rebuild | Rebuilds entire site |
+| `config.toml` (or the `--env` override), `data/`, `i18n/` | Full rebuild | Rebuilds entire site |
+| New or deleted files | Full rebuild | Rebuilds entire site |
 | `content/` only | Incremental | Rebuilds only affected content pages |
-| `templates/` only | Template re-render | Re-renders all pages with existing content |
+| `templates/` only | Template re-render | Re-renders the pages whose templates use an edited file, with existing content |
+| `content/` + `templates/` | Incremental + re-render | Rebuilds the edited pages, then re-renders as above |
 | `static/` only | Static copy | Copies only changed static files |
-| Mixed / new / deleted files | Full rebuild | Rebuilds entire site |
+
+A save that also touches `static/` alongside `templates/` or `content/` still takes the template re-render or incremental path above, not a full rebuild. See [Serve mode](/features/incremental-build/#serve-mode) for the exact rules.
 
 **About live reload:**
 

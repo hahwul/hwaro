@@ -72,7 +72,7 @@ When you run `hwaro new`, archetypes are matched in this order:
 hwaro new notes/my-article.md -t "My Article" -a posts
 ```
 
-Uses `archetypes/posts.md` regardless of the output path.
+Uses `archetypes/posts.md` regardless of the output path. Run `hwaro new --list-archetypes` to see the names available in the project.
 
 ### 2. Path-Based Matching
 
@@ -117,6 +117,12 @@ absent instead of `""` (`weight = 0`, `toc = false`, `in_sitemap = true`,
 `aliases = []`, `extra = {}`), so a new page builds without type warnings.
 Keys with no neutral value (`path`, `redirect_to`, `paginate`, `paginate_by`,
 `pagination_enabled`, `reverse`, `insert_anchor_links`) are left out.
+
+`front_matter_format` and `default_fields` only shape this built-in template.
+When an archetype matches, its front matter is used as written and `hwaro new`
+warns that those two settings were not applied. Every `hwaro init` scaffold
+ships `archetypes/default.md`, so remove it (or the matching archetype) to use
+them. `bundle` applies either way.
 
 ### Leaf-bundle (directory) layout
 

@@ -59,8 +59,17 @@ Each config includes:
 - **Output directory**: your `[build] output_dir` (`public/` by default).
   A customized value is carried into every generated config, so the host
   publishes the directory `hwaro build` actually writes. For `gitlab-ci` a
-  non-default directory also adds `publish:` to the `pages` job.
-- **Redirects**: 301 redirects from page [`aliases`](/writing/pages/) defined in frontmatter (e.g., `aliases: ["/old-url/"]`)
+  non-default directory also adds `publish:` to the `pages` job. The
+  `github-pages` workflow is the exception: the `hahwul/hwaro` action builds
+  with `-o` into its own `output_dir` input (`public` by default) and deploys
+  that, so set the input instead (see
+  [Action Inputs](/deploy/github-pages/#action-inputs)).
+
+`netlify` and `vercel` also include:
+
+- **Redirects**: 301 redirects from page [`aliases`](/writing/pages/) defined in frontmatter (e.g., `aliases: ["/old-url/"]`).
+  `cloudflare` lists the same redirects as comments to copy into
+  `static/_redirects`
 - **Cache headers**: a year-long `immutable` rule for the `[assets]` output directory, emitted only when every file there is content-hashed: the asset pipeline is enabled with `fingerprint = true` and at least one `[[assets.bundles]]`, and no `static/<output_dir>/` directory is copied into the same URLs unhashed
 
 ### Netlify Output

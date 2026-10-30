@@ -17,6 +17,13 @@ Hwaro는 Jinja2 호환 템플릿 엔진인 Crinja를 사용합니다. 이 페이
 {{ content }}
 ```
 
+괄호로 묶은 표현식 뒤에도 속성, 인덱스, 호출 접근을 쓸 수 있으므로 필터나 함수 결과에서 바로 필드를 읽을 수 있습니다.
+
+```jinja
+{{ (section.pages | first).title }}
+{{ (get_section(path="blog").pages | map(attribute="title") | list)[0] }}
+```
+
 ## 주석
 
 ```jinja
@@ -155,6 +162,29 @@ Jinja2처럼 `[start:stop:step]`으로 리스트나 문자열의 일부를 꺼�
 <main>{{ content | safe }}</main>
 {% include "partials/footer.html" %}
 ```
+
+## 매크로
+
+`{% macro %}`로 재사용할 조각을 정의하고(보통 부분 템플릿에 둡니다), 필요한 곳에서 가져와 씁니다.
+
+`templates/partials/macros.html`:
+
+```jinja
+{% macro card(p, show_date=true) %}
+<a href="{{ p.url }}">{{ p.title }}</a>
+{% if show_date and p.date %}<time>{{ p.date }}</time>{% endif %}
+{% endmacro %}
+```
+
+```jinja
+{% import "partials/macros.html" as m %}
+{% for p in section.pages %}{{ m.card(p) }}{% endfor %}
+
+{% from "partials/macros.html" import card %}
+{{ card(page, show_date=false) }}
+```
+
+한 번의 렌더링에서 같은 파일을 여러 번 가져와도 됩니다. 예를 들어 베이스 레이아웃과 그것을 상속하는 자식 템플릿이 각각 가져오거나, 두 이름으로 가져올 수 있습니다. 실제 순환(`a.html`이 `b.html`을, `b.html`이 다시 `a.html`을 가져오는 경우)만 오류입니다.
 
 ## 변수 설정
 

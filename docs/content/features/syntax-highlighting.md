@@ -224,16 +224,19 @@ When `use_cdn = true` (default), assets are loaded from cdnjs:
 ```html
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
 ```
 
 When `use_cdn = false`, assets are loaded from local paths:
 
 ```html
-<link rel="stylesheet" href="/assets/css/highlight/github-dark.min.css">
-<script src="/assets/js/highlight.min.js"></script>
+<link rel="stylesheet" href="/assets/css/highlight/github-dark.min.css?v=<hash>">
+<script src="/assets/js/highlight.min.js?v=<hash>"></script>
+<script>hljs.highlightAll();</script>
 ```
 
 You must provide the local files yourself when using `use_cdn = false`.
+The `?v=` suffix comes from [cache busting](/features/cache-busting/).
 In the default server mode only the theme stylesheet is referenced; the
 `<script>` tags above appear only with `mode = "client"`.
 

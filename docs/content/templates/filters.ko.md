@@ -9,6 +9,8 @@ toc = true
 
 Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `select`, `batch` 등) 위에 자체 필터를 얹어 제공하므로, 아래 어디서든 두 종류 모두 사용할 수 있습니다.
 
+아래 표에 나온 내장 필터 외에 다음 Jinja2 필터도 사용할 수 있습니다: `abs`, `attr`, `batch`, `center`, `dictsort`, `escape`(`e`), `filesizeformat`, `float`, `format`, `groupby`, `indent`, `int`, `list`, `map`, `random`, `reject`, `rejectattr`, `round`, `select`, `selectattr`, `slice`, `string`, `striptags`, `sum`, `title`, `truncate`, `urlencode`, `urlize`, `wordcount`, `wordwrap`, `xmlattr`. `min`과 `max`는 없습니다.
+
 ## 문법
 
 ```jinja
@@ -103,7 +105,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 <a href="{{ item.href }}"{% if item.url | active_path(ancestor=true) %} class="open"{% endif %}>{{ item.name }}</a>
 ```
 
-비교 전에 양쪽 모두 끝 슬래시 하나로 정규화되므로 `/posts`와 `/posts/`는 같습니다. 루트 경로(`/`)는 `ancestor=true`여도 정확히 일치할 때만 매칭됩니다. 외부 `item.url`(`http://`, `https://`, `//`)은 절대 매칭되지 않습니다.
+비교 전에 양쪽 모두 끝 슬래시 하나로 정규화되므로 `/posts`와 `/posts/`는 같습니다. 루트 경로(`/`)는 `ancestor=true`여도 정확히 일치할 때만 매칭됩니다. 외부 `item.url`(`http://`, `https://`, `//`)은 절대 매칭되지 않으며, `url` 없이 적은 엔트리(그룹 제목)의 빈 `url`도 마찬가지입니다.
 
 ## 데이터 필터
 

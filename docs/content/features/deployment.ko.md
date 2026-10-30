@@ -34,10 +34,10 @@ url = "gs://my-bucket"
 | `gs://` | `gsutil -m rsync` | Google Cloud SDK |
 | `az://` | `az storage blob sync` | Azure CLI |
 
-언제든 `command` 필드에 명령을 직접 지정해 완전히 제어할 수도 있습니다.
+로컬 디렉터리는 `path = "/var/www/mysite"`로도 지정할 수 있습니다(`file://`과 동일). 언제든 `command` 필드에 명령을 직접 지정해 완전히 제어할 수도 있습니다.
 
 ```bash
-hwaro deploy              # 기본 대상으로 배포
+hwaro deploy              # [deployment] target, 없으면 첫 번째 대상으로 배포
 hwaro deploy --target s3  # 특정 대상으로 배포
 hwaro deploy --dry-run    # 변경 사항 미리 보기
 ```

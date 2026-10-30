@@ -96,7 +96,7 @@ body = "summary_md"                    # 선택: 마크다운 본문
 
   ```
   Error [HWARO_E_CONTENT]: reports/2026-09.md matches [permalinks] rule
-  "reports" (pattern '/reports/:year/:month/') which requires a date, but the
+  "reports" (pattern 'reports/:year/:month') which requires a date, but the
   page has none.
   ```
 

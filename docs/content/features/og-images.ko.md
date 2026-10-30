@@ -41,7 +41,7 @@ logo = "static/logo.png"
 | overlay_opacity | float | `0.45` | `background` 색이 사진을 덮는 정도 (0.0 = 사진 그대로, 1.0 = 사진 가림) |
 | text_panel | float | `0.0` | 0.0–0.6. 복잡한 배경에서 가독성을 높이는 텍스트 뒤 소프트 패널 |
 | pattern_opacity | float | `0.35` | 패턴 스타일(`dots`, `grid`, …)의 최대 알파. 각 패턴은 이 값을 정점으로 내부에서 점차 옅어짐 |
-| pattern_scale | float | `1.0` | 패턴 스타일의 배율 (최소 0.1) |
+| pattern_scale | float | `1.0` | 패턴 스타일의 배율 (0.1–10.0 범위로 제한) |
 | accent_bars | bool | `false` | 패턴 스타일에 클래식한 얇은 상/하단 액센트 바 추가 |
 | lazy_generate | bool | `false` | `hwaro serve`에서 일괄 생성을 건너뛰고 첫 요청 때 렌더링. 대규모 사이트에 권장. `hwaro build`에는 영향 없음 |
 

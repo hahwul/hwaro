@@ -9,7 +9,7 @@ Cache busting automatically appends a `?v=<hash>` query parameter to locally ser
 
 ## How It Works
 
-Hwaro computes one MD5 content hash over all of your local CSS/JS files and appends the first 8 characters as a query parameter. The hash only changes when file contents actually change, so browsers keep using their cache until a real update occurs.
+Hwaro computes one MD5 content hash over the local CSS/JS files it links (the self-hosted highlight assets when `[highlight] use_cdn = false`, and every `.css`/`.js` file under the [Auto Includes](/features/auto-includes/) directories, plus `.scss` sources when `[sass]` is enabled) and appends the first 8 characters as a query parameter. With neither feature in use there is nothing to hash and no `?v=` is added. The hash only changes when file contents actually change, so browsers keep using their cache until a real update occurs.
 
 ```html
 <!-- With cache busting (default) -->

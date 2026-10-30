@@ -28,6 +28,8 @@ HWARO_ENV=staging hwaro build
 # CLI 플래그가 HWARO_ENV보다 우선
 ```
 
+`--env`는 `build`, `serve`, `deploy`, `doctor`에서 쓸 수 있습니다. `config.<env>.toml`이 없으면 Hwaro는 경고를 남기고(`--env` 오타이거나 커밋하지 않은 파일일 수 있으므로) `config.toml`만으로 계속 진행합니다.
+
 ## 파일 구조
 
 ```
