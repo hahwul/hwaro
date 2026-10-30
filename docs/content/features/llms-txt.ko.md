@@ -94,7 +94,7 @@ Getting started guide content...
 5. **페이지 항목** — `---`로 구분된 각 페이지. 포함 내용:
    - `Title` — 페이지 제목
    - `URL` — 페이지의 절대 URL
-   - `Source` — 프로젝트 루트 기준 소스 파일 경로
+   - `Source` — 프로젝트 루트 기준 소스 파일 경로. [`[[content.generate]]`](/ko/features/content-generation/)로 만든 페이지는 파일이 없으므로 `data.products.items`처럼 원본 데이터 이름을 적습니다
    - `Language` — 언어 코드 (다국어 사이트에만)
    - 페이지의 원본 콘텐츠
 

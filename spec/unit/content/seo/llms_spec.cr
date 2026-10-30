@@ -634,6 +634,29 @@ describe Hwaro::Content::Seo::Llms do
       end
     end
 
+    it "names the data origin as the source of a [[content.generate]] page" do
+      config = Hwaro::Models::Config.new
+      config.llms.enabled = true
+      config.llms.full_enabled = true
+      config.title = "Test Site"
+      config.llms.instructions = ""
+
+      page = Hwaro::Models::Page.new("reports/2026-08.md")
+      page.title = "August"
+      page.url = "/reports/2026-08/"
+      page.render = true
+      page.raw_content = "Report body"
+      page.synthesis = Hwaro::Models::Page::Synthesis.new("", Crinja::Value.new(nil), "data.reports")
+
+      Dir.mktmpdir do |output_dir|
+        Hwaro::Content::Seo::Llms.generate_full([page], config, output_dir)
+
+        content = File.read(File.join(output_dir, "llms-full.txt"))
+        content.should contain("Source: data.reports\n")
+        content.should_not contain("Source: content/")
+      end
+    end
+
     it "generates absolute URLs with base_url" do
       config = Hwaro::Models::Config.new
       config.llms.enabled = true
