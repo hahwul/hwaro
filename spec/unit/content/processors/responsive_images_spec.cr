@@ -203,6 +203,17 @@ describe "Responsive content images" do
     end
   end
 
+  it "scans a 100k-character unquoted src without exhausting the regex stack" do
+    with_resize_map(SAMPLE_MAP) do
+      with_webp_map(WEBP_MAP) do
+        html = %(<p><img src=data:image/gif;base64,#{"A" * 100_000}></p><img src="photo.png">)
+        out = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(html, bundle_page, enabled_config)
+        out.should start_with(html.split("<img src=\"")[0])
+        out.should contain(%(<img srcset="/posts/foo/photo_400w.png 400w))
+      end
+    end
+  end
+
   it "picks up a src after an attribute value containing '>'" do
     with_resize_map(SAMPLE_MAP) do
       out = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(

@@ -65,6 +65,14 @@ describe Hwaro::Content::Processors::Markdown do
   end
 
   describe "lazy loading and external links" do
+    it "lazy-load an <img> with a 100k-character unquoted src" do
+      content = "<img src=data:image/gif;base64,#{"A" * 100_000}>\n\n<img loading=eager src=b.png>\n\n<img data-loading=x src=c.png />\n"
+      html, _ = Hwaro::Processor::Markdown.render(content, lazy_loading: true, safe: false)
+      html.should contain(%(<img loading="lazy" src=data:image/gif;base64,AAAA))
+      html.should contain(%(<img loading=eager src=b.png>))
+      html.should contain(%(<img loading="lazy" data-loading=x src=c.png />))
+    end
+
     it "leave <img>/<a> strings inside a script alone" do
       md_config = Hwaro::Models::MarkdownConfig.new
       md_config.external_links_target_blank = true

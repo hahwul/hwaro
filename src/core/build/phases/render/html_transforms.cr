@@ -26,8 +26,10 @@ module Hwaro::Core::Build::Phases::Render
   # like one with its own srcset.
   #
   # Quote-aware, like IMG_LAZY_REGEX: a `>` inside an attribute value
-  # (`alt="Home > Docs"`) is not the end of the tag.
-  IMG_TAG_RE       = /<img\b(?:[^>"']|"[^"]*"|'[^']*')*>/
+  # (`alt="Home > Docs"`) is not the end of the tag. Possessive, so a long
+  # unquoted value (an inline `src=data:…`) does not exhaust the PCRE JIT
+  # stack one backtrack frame per character.
+  IMG_TAG_RE       = /<img\b(?:[^>"']++|"[^"]*+"|'[^']*+')*+>/
   IMG_SRC_RE       = /\ssrc\s*=\s*("([^"]*)"|'([^']*)')/
   IMG_SIZE_RE      = /\s(?:width|height)\s*=/i
   IMG_SIZES_RE     = /\ssizes\s*=\s*("[^"]*"|'[^']*')/i
