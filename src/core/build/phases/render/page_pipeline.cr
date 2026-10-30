@@ -275,9 +275,10 @@ module Hwaro::Core::Build::Phases::Render
   # claimed as taxonomy outputs so a removed alias is pruned like a removed
   # term page. An alias another page or alias owns lost its claim in
   # compute_output_url_winners (which warned); one naming a taxonomy index
-  # or term page this pass writes (`taxonomy_urls`), or a pager page of one,
+  # or term page this pass writes (`taxonomy_urls`), or a pager page of one
+  # (N >= 2: page 1 is the URL itself, so nothing is written at `page/1/`),
   # is refused here.
-  private TAXONOMY_PAGER_SUFFIX = /page\/[1-9]\d*\/\z/
+  private TAXONOMY_PAGER_SUFFIX = /page\/(?:[2-9]|[1-9]\d+)\/\z/
 
   def write_term_aliases(page : Models::Section, site : Models::Site, output_dir : String, verbose : Bool, taxonomy_urls : Set(String)) : Nil
     return if page.aliases.empty?

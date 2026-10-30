@@ -493,6 +493,24 @@ describe "taxonomy term _index.md metadata" do
     log.should contain("content/tags/rust/_index.ko.markdown is ignored: content/tags/rust/_index.ko.md already describes the term page /ko/tags/rust/")
   end
 
+  # Page 1 of a term lives at the term URL; nothing is written at page/1/,
+  # so an alias there (a common SEO redirect) is free.
+  it "writes a term-file alias at the term's page/1/" do
+    log = with_captured_log do
+      build_site(CONFIG.sub(%(feed = true), %(feed = true\npaginate_by = 1)),
+        content_files: {
+          "posts/p1.md"         => post("P1", ["rust"]),
+          "posts/p2.md"         => post("P2", ["rust"]),
+          "tags/rust/_index.md" => "+++\ntitle = \"Rust\"\naliases = [\"/tags/rust/page/1/\"]\n+++\n",
+        },
+        template_files: TEMPLATES) do |dir|
+        File.read(File.join(dir, "public/tags/rust/page/1/index.html")).should contain("/tags/rust/")
+        File.read(File.join(dir, "public/tags/rust/page/2/index.html")).should start_with("T=Rust|")
+      end
+    end
+    log.should_not contain("Duplicate alias output path")
+  end
+
   it "refuses a term-file alias onto a term's pager page" do
     log = with_captured_log do
       build_site(CONFIG.sub(%(feed = true), %(feed = true\npaginate_by = 1)),
