@@ -30,15 +30,22 @@ module Hwaro
 
         LOG_NAME = "image_variants.log"
 
+        # Bump when the bytes a variant is encoded to change without any
+        # input changing (a WebP/JPEG/PNG encoder or resampler fix): every
+        # stamp then mismatches once and warm builds re-encode, so they keep
+        # writing what a cold build writes. Same rule as OgImage's
+        # RENDER_REVISION.
+        ENCODER_REVISION = 1
+
         @@stamps = {} of String => Hash(String, String)
         @@mutex = Mutex.new
 
-        # Fingerprint of `source` plus `settings`; nil when it cannot be
-        # statted (nothing to reuse then).
+        # Fingerprint of `source` plus `settings` and the encoder revision;
+        # nil when it cannot be statted (nothing to reuse then).
         def fingerprint(source : String, settings : String) : String?
           info = File.info?(source)
           return unless info
-          "#{info.modification_time.to_unix_ms}:#{info.size}:#{settings}"
+          "#{info.modification_time.to_unix_ms}:#{info.size}:#{settings}:r#{ENCODER_REVISION}"
         end
 
         # Was `dest` last written from exactly `fingerprint`?

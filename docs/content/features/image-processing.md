@@ -77,12 +77,12 @@ formats = ["webp"]
   </picture>
   ```
 
-  An `<img>` already inside a `<picture>` you wrote, or one with its own `srcset`, is left alone. AMP pages keep only the `<img>`.
+  An `<img>` already inside a `<picture>` you wrote still gets its `srcset`, but no WebP `<source>` and no second `<picture>`. An `<img>` with its own `srcset` is left alone. An image whose widest variant has no WebP copy (a WebP image is at most 16383px wide or tall, so wider variants are never written as WebP) gets its `srcset` but no `<picture>`, because browsers would pick the WebP `<source>` and never load the wider sizes. AMP pages keep only the `<img>`.
 - In templates, `resize_image(path=…, width=…, format="webp")` returns the WebP variant (see [Using in Templates](#using-in-templates)).
 - The encoder is built into Hwaro (pure Crystal), so no external tool or library is involved.
 - WebP files are not used as sources: a `.webp` in `static/` or a page bundle is copied as is.
 - Two sources that differ only in extension in the same directory (`hero.jpg` and `hero.png`) would write the same WebP names. The one whose path sorts first gets them, and a warning names the other one, which gets no WebP variants.
-- Encoding WebP takes longer than JPEG, so cold builds with many images take longer. Warm `--cache` builds and `hwaro serve` reuse a variant while its source file and the encode settings (`quality`, the LQIP keys) are unchanged; the record is kept in `.hwaro/image_variants.log`.
+- Encoding WebP takes longer than JPEG, so cold builds with many images take longer. Warm `--cache` builds and `hwaro serve` reuse a variant while its source file and the encode settings (`quality`, the LQIP keys) are unchanged; the record is kept in `.hwaro/image_variants.log`. A Hwaro release that changes the encoder's output re-encodes every variant once on the next build.
 
 ### Image Dimensions
 

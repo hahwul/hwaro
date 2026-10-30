@@ -86,6 +86,30 @@ describe Hwaro::Content::Seo::Amp do
       result.should contain(%(<amp-img src="/a.png"))
     end
 
+    it "drops a <source> whose attribute value contains '>'" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      html = %(<html><head></head><body><picture><source media="(width > 600px)" srcset="/a_400w.webp 400w"><img src="/a.png" alt="a" width="4" height="3"></picture></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should_not contain("<source")
+      result.should_not contain("600px)")
+      result.should contain(%(<amp-img src="/a.png"))
+    end
+
+    it "converts an <img> with a 100k-character unquoted src" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      data = "data:image/gif;base64,#{"A" * 100_000}"
+      html = %(<html><head></head><body><picture data-x=#{"b" * 100_000}><source srcset=#{"c" * 100_000}><img src=#{data} width="4" height="3"></picture></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should_not contain("<source")
+      result.should contain(%(<amp-img src=#{data} width="4" height="3" layout="responsive"></amp-img>))
+    end
+
     it "adds amp attribute to html tag" do
       page = Hwaro::Models::Page.new("test.md")
       page.url = "/test/"

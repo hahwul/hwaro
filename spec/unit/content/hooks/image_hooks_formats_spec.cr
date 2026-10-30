@@ -181,6 +181,17 @@ describe "resize_image(format=)" do
     end
   end
 
+  it "accepts the format in any case, like the config's formats" do
+    prior = Hwaro::Content::Hooks::ImageHooks.resize_map
+    begin
+      Hwaro::Content::Hooks::ImageHooks.set_resize_map({"/p.png" => {100 => "/p_100w.png"}})
+      render_crinja(%({{ resize_image(path="/p.png", width=100, format=" WEBP ").url }}), {"base_url" => "https://example.com"})
+        .strip.should eq("https://example.com/p_100w.png")
+    ensure
+      Hwaro::Content::Hooks::ImageHooks.set_resize_map(prior)
+    end
+  end
+
   it "rejects an unknown format" do
     expect_raises(Exception, /unknown format "avif"/) do
       render_crinja(%({{ resize_image(path="/p.png", width=100, format="avif").url }}))

@@ -307,16 +307,19 @@ module Hwaro
           # <picture>/<source> are not AMP elements: keep only the <img>
           # fallback (the WebP sources `formats = ["webp"]` adds, or an
           # author's own picture), which the next step turns into amp-img.
-          result = result.gsub(/<picture\b[^>]*>([\s\S]*?)<\/picture\s*>/i) do |_, m|
-            m[1].gsub(/<source\b[^>]*>/i, "")
+          # Quote-aware like the <img> scan below (`media="(width > 600px)"`).
+          result = result.gsub(/<picture\b(?:[^>"']++|"[^"]*+"|'[^']*+')*+>([\s\S]*?)<\/picture\s*>/i) do |_, m|
+            m[1].gsub(/<source\b(?:[^>"']++|"[^"]*+"|'[^']*+')*+>/i, "")
           end
 
           # Convert <img> to <amp-img>. Quote-aware attribute scan (same
           # pattern as IMG_LAZY_REGEX in markdown.cr): a `>` inside a quoted
           # attribute value (legal HTML5, e.g. alt="Home > Docs") must not be
           # treated as the tag end, or the conversion emits a broken
-          # `<amp-img … alt="Home ></amp-img> Docs" />`.
-          result = result.gsub(/<img((?:[^>"']|"[^"]*"|'[^']*')*?)\s*\/?>/mi) do
+          # `<amp-img … alt="Home ></amp-img> Docs" />`. Possessive (same
+          # matches as the lazy `(?:…)*?\s*\/?>` it replaces), so a long
+          # unquoted `src=data:…` does not exhaust the PCRE JIT stack.
+          result = result.gsub(/<img((?:[^>"'\s\/]++|\s++(?!\/?>)|\/(?!>)|"[^"]*+"|'[^']*+')*+)\s*\/?>/mi) do
             # `[^>]*` greedily swallows the self-closing slash from `<img … />`,
             # which would otherwise be appended mid-tag as
             # `<amp-img … / layout="…">` — invalid AMP. Strip a trailing slash.

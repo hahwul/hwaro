@@ -28,7 +28,12 @@ module Hwaro
         # Matches <img ...> tags that do NOT already have a loading= attribute
         # (the lookahead is quote-aware too, so a loading= sitting after a
         # quoted `>` is still seen, and `data-loading=` doesn't count).
-        IMG_LAZY_REGEX = /<img(?!(?:[^>"']|"[^"]*"|'[^']*')*(?<![\w-])loading\s*=)((?:[^>"']|"[^"]*"|'[^']*')*?)\s*\/?>/i
+        # Both scans are possessive, so a long unquoted value (an inline
+        # `src=data:…`) does not exhaust the PCRE JIT stack: the lookahead
+        # stops only at an `l` that starts `loading=`, and the capture stops
+        # at the whitespace / `/` before the closing `>` as the lazy
+        # `(?:…)*?\s*\/?>` did.
+        IMG_LAZY_REGEX = /<img(?!(?:[^>"'l]++|(?<![\w-])l(?!oading\s*=)|(?<=[\w-])l|"[^"]*+"|'[^']*+')*+(?<![\w-])loading\s*=)((?:[^>"'\s\/]++|\s++(?!\/?>)|\/(?!>)|"[^"]*+"|'[^']*+')*+)\s*\/?>/i
         # Extracts id="value" from an attribute string
         ID_ATTR_REGEX = /(?<![\w-])id\s*=\s*["']([^"']+)["']/
 

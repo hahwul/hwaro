@@ -19,14 +19,23 @@ module Hwaro::Core::Build::Phases::Render
   #
   # With `formats = ["webp"]`, an image that gets a srcset is also wrapped in
   # `<picture>` with a `<source type="image/webp">` listing the WebP copies,
-  # so browsers that support WebP fetch those and the rest keep the <img>.
-  # An <img> already inside an authored <picture> is left to its sources.
-  IMG_TAG_RE       = /<img\b[^>]*>/
-  IMG_SRC_RE       = /\ssrc\s*=\s*("([^"]*)"|'([^']*)')/
-  IMG_SIZE_RE      = /\s(?:width|height)\s*=/i
-  IMG_SIZES_RE     = /\ssizes\s*=\s*("[^"]*"|'[^']*')/i
-  PICTURE_OPEN_RE  = /<picture(?=[\s>\/])/i
-  PICTURE_CLOSE_RE = /<\/picture\s*>/i
+  # so browsers that support WebP fetch those and the rest keep the <img>,
+  # unless a width the <img> offers has no WebP copy (wider than WebP's
+  # 16383px canvas): WebP browsers would never get it, so no <picture>.
+  # An <img> already inside an authored <picture> still gets its srcset (an
+  # art-direction fallback benefits from the widths) but is not wrapped.
+  #
+  # Quote-aware, like IMG_LAZY_REGEX: a `>` inside an attribute value
+  # (`alt="Home > Docs"`) is not the end of the tag. Possessive, so a long
+  # unquoted value (an inline `src=data:…`) does not exhaust the PCRE JIT
+  # stack one backtrack frame per character.
+  IMG_TAG_RE   = /<img\b(?:[^>"']++|"[^"]*+"|'[^']*+')*+>/
+  IMG_SRC_RE   = /\ssrc\s*=\s*("([^"]*)"|'([^']*)')/
+  IMG_SIZE_RE  = /\s(?:width|height)\s*=/i
+  IMG_SIZES_RE = /\ssizes\s*=\s*("[^"]*"|'[^']*')/i
+  # A comment (an unterminated `<!--` is not one, as in html_comment_spans),
+  # or a <picture> open/close tag.
+  PICTURE_TOKEN_RE = /<!--[\s\S]*?-->|<picture(?=[\s>\/])|<\/picture\s*>/i
   # An actual `srcset` attribute (or a lazy-loader's `data-srcset`) — not
   # alt/title text that merely says "srcset". A `data-srcset` image is the
   # lazy-loader's to size; a real `srcset` beside it would load eagerly.
@@ -98,7 +107,8 @@ module Hwaro::Core::Build::Phases::Render
         additions += %( sizes="100vw") unless tag =~ /\ssizes\s*=/
       end
       webp = webp_map.try(&.[key]?) unless has_srcset
-      webp = nil if webp && (webp.empty? || pictures.try(&.any?(&.includes?(match.begin(0)))))
+      webp = nil if webp && (webp.empty? || webp.keys.max < (widths.try(&.keys.max?) || 0) ||
+                    pictures.try(&.any?(&.includes?(match.begin(0)))))
       if dimensions && !tag.matches?(IMG_SIZE_RE) && (source = Content::Hooks::ImageHooks.resolve_source(key, config))
         # The bytes decide the size, so a cached page must re-render when
         # they change.
@@ -114,15 +124,21 @@ module Hwaro::Core::Build::Phases::Render
     end
   end
 
-  # Character ranges of the authored `<picture>…</picture>` elements (an
-  # unclosed one runs to the end).
+  # Character ranges of the authored `<picture>…</picture>` elements. Tags
+  # inside `<!-- … -->` do not count, and an unclosed <picture> covers
+  # nothing.
   private def picture_spans(html : String) : Array(Range(Int32, Int32))
     spans = [] of Range(Int32, Int32)
-    pos = 0
-    while open = html.index(PICTURE_OPEN_RE, pos)
-      close = html.index(PICTURE_CLOSE_RE, open) || html.size
-      spans << (open...close)
-      pos = close + 1
+    open = nil
+    html.scan(PICTURE_TOKEN_RE) do |m|
+      token = m[0]
+      next if token.starts_with?("<!--")
+      if token[1] == '/'
+        spans << (open...m.begin(0)) if open
+        open = nil
+      else
+        open ||= m.begin(0)
+      end
     end
     spans
   end
