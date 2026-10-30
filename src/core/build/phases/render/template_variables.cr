@@ -236,6 +236,7 @@ module Hwaro::Core::Build::Phases::Render
       page_obj["version"] = cached_raw["version"].as(Crinja::Value)
       page_obj["version_links"] = cached_raw["version_links"].as(Crinja::Value)
     end
+    cached_raw["translation_key"]?.try { |key| page_obj["translation_key"] = key.as(Crinja::Value) }
     vars["page"] = Crinja::Value.new(page_obj)
     # Which source file is rendering: `resize_image(op=…)` records the
     # variant it writes as this page's derived output (ImageHooks.op_variant).

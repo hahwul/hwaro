@@ -86,7 +86,30 @@ Hwaro automatically links translated pages based on their filenames. Pages with 
 
 For example, `hello.md`, `hello.ko.md`, and `hello.ja.md` are all linked as translations.
 
-To find pages that are not translated yet, run `hwaro doctor`: on a site with more than one language it lists, per language, every page or section missing a translation and every translation without a default-language original, using the same pairing. See [doctor](/start/tools/doctor/#what-it-checks).
+### Translation Keys
+
+When the file names differ per language, set the same `translation_key` in each translation's front matter (Hugo's `translationKey`):
+
+```
+content/
+├── about.md         # translation_key = "about"
+└── 소개.ko.md        # translation_key = "about"
+```
+
+```toml
++++
+title = "소개"
+translation_key = "about"
++++
+```
+
+Pages that share a key are translations of each other: they get each other in `page.translations`, the hreflang tags and the sitemap alternates. The key replaces file-name pairing for the page that sets it, so set it on every translation of the page: `about.md` with a key and `about.ko.md` without one are not linked. Keys only pair pages inside one version of [versioned docs](/features/versioned-docs/), so `v1/` and `v2/` may reuse the same keys.
+
+A blank key (`translation_key = ""`) counts as unset; a value that is not a string is ignored with a warning. If two pages of the same language share a key, one is linked: a page that is written (not `render = false`, not a `redirect_to` stub) before one that is not, then the one whose path sorts first (byte order). The build and `hwaro doctor` (`translation-key-collision`) warn about the other, which then has no translations; a headless or `redirect_to` page is never linked, so sharing a key with one is not reported.
+
+Templates read the key as `page.translation_key` (also on the pages of a listing). It is a built-in field, so it is no longer in `page.extra`: a template that read `page.extra.translation_key` should read `page.translation_key` instead.
+
+To find pages that are not translated yet, run `hwaro doctor`: on a site with more than one language it lists, per language, every page or section missing a translation and every translation without a default-language original, using the same pairing (translation keys included). See [doctor](/start/tools/doctor/#what-it-checks).
 
 ### Template Variables
 

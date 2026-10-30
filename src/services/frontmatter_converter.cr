@@ -103,7 +103,7 @@ module Hwaro
         "path", "aliases", "transparent", "generate_feeds", "paginate",
         "paginate_by", "pagination_enabled", "sort_by", "reverse",
         "page_template", "paginate_path", "redirect_to", "weight", "categories",
-        "series", "series_weight", "cascade", "menus", "menu",
+        "series", "series_weight", "cascade", "menus", "menu", "translation_key",
       }
 
       # Content directory path

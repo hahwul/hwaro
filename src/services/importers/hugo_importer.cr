@@ -161,6 +161,12 @@ module Hwaro
             aliases = array_string_value(data, "aliases")
             fields["aliases"] = aliases unless aliases.empty?
 
+            # Hugo's `translationKey` links translations whatever their file
+            # names; hwaro spells it `translation_key`.
+            if translation_key = string_value(data, "translationkey")
+              fields["translation_key"] = translation_key
+            end
+
             # Hugo's `url` sets the page's whole published path; dropping it
             # moved the page and broke every link to it.
             apply_source_url(fields, string_value(data, "url"), file_path)
@@ -331,6 +337,8 @@ module Hwaro
             # The spelling `downcase_keys` kept wins, as for mapped keys.
             next if key != lower && source.has_key?(lower)
             next if MAPPED_KEYS.includes?(lower)
+            # Mapped only when it is a string; any other value stays in [extra].
+            next if lower == "translationkey" && mapped.has_key?("translation_key")
             case lower
             when "params" then params = value.as_h?
             when "extra"  then own_extra = value.as_h?

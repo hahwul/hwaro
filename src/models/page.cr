@@ -230,6 +230,10 @@ module Hwaro
       property is_index : Bool    # Is this an index file?
       property language : String? # Language code (e.g. "en", "ko", nil for default)
       property translations : Array(TranslationLink)
+      # Front matter `translation_key`: pages sharing it (within one version)
+      # are translations of each other, whatever their file names. Nil
+      # groups by file name (Content::Multilingual.link_translations!).
+      property translation_key : String? = nil
       # Documentation version this page belongs to (`[[versions.list]]`),
       # resolved from its content directory in ReadContent; nil for
       # unversioned content. See Content::Versions.

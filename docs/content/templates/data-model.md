@@ -332,6 +332,7 @@ An individual content file (`.md`).
 | page.updated | String? | Last updated date |
 | page.language | String | Effective language code |
 | page.translations | Array<TranslationLink> | Language variants |
+| page.translation_key | String | The page's front matter `translation_key`; undefined (prints empty) on pages without one |
 | page.version | Object? | Documentation version (`nil` when unversioned) — see [page.version](#pageversion) |
 | page.version_links | Array<VersionLink> | Version switcher rows (empty when unversioned) |
 

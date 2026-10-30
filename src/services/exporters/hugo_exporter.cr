@@ -127,6 +127,12 @@ module Hwaro
               else
                 hugo_fields["expiryDate"] = value
               end
+            when "translation_key"
+              if authored?(flattened, "translationKey")
+                hugo_fields[key] = value
+              else
+                hugo_fields["translationKey"] = value
+              end
             when "template"
               # Hugo picks a page's template from `layout` (the inverse of
               # the Hugo importer's `layout` → `template`) and ignores an

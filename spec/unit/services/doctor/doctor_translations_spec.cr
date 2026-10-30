@@ -188,3 +188,40 @@ describe "Hwaro::Services::Doctor translations" do
     JSON.parse(other.to_json).as_h.has_key?("language").should be_false
   end
 end
+
+describe "Hwaro::Services::Doctor translation_key" do
+  it "pairs pages by translation_key and warns about a same-language collision" do
+    issues = translation_issues({
+      "about.md"    => "+++\ntitle = \"About\"\ntranslation_key = \"about\"\n+++\n",
+      "intro.ko.md" => "+++\ntitle = \"Intro\"\ntranslation_key = \"about\"\n+++\n",
+      "intro.ja.md" => "+++\ntitle = \"Intro\"\ntranslation_key = \"about\"\n+++\n",
+      "zz.ko.md"    => "+++\ntitle = \"Z\"\ntranslation_key = \"about\"\n+++\n",
+    })
+    # The loser is reported once, as the collision, not again as an orphan.
+    summarize(issues).should eq(["ko translation-key-collision zz.ko.md"])
+    collision = issues.find!(&.id.==("translation-key-collision"))
+    collision.level.should eq(:warning)
+    collision.message.should contain(%(translation_key "about" is already used by the 'ko' page))
+  end
+
+  it "does not ask a default-language collision loser for translations" do
+    issues = translation_issues({
+      "about.md"    => "+++\ntitle = \"About\"\ntranslation_key = \"about\"\n+++\n",
+      "zzz.md"      => "+++\ntitle = \"Z\"\ntranslation_key = \"about\"\n+++\n",
+      "intro.ko.md" => "+++\ntitle = \"Intro\"\ntranslation_key = \"about\"\n+++\n",
+      "intro.ja.md" => "+++\ntitle = \"Intro\"\ntranslation_key = \"about\"\n+++\n",
+    })
+    summarize(issues).should eq(["en translation-key-collision zzz.md"])
+  end
+
+  it "does not report a collision with a page that is never linked anyway" do
+    issues = translation_issues({
+      "about.md"    => "+++\ntitle = \"About\"\ntranslation_key = \"about\"\n+++\n",
+      "intro.ko.md" => "+++\ntitle = \"Intro\"\ntranslation_key = \"about\"\n+++\n",
+      "intro.ja.md" => "+++\ntitle = \"Intro\"\ntranslation_key = \"about\"\n+++\n",
+      "old.ko.md"   => "+++\ntitle = \"Old\"\ntranslation_key = \"about\"\nrender = false\n+++\n",
+      "moved.ko.md" => "+++\ntitle = \"Moved\"\ntranslation_key = \"about\"\nredirect_to = \"/ko/intro/\"\n+++\n",
+    })
+    summarize(issues).should be_empty
+  end
+end

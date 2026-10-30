@@ -457,6 +457,7 @@ module Hwaro
           page = File.basename(relative).starts_with?("_index.") ? Models::Section.new(relative) : Models::Page.new(relative)
           language = menus.filename_language(file)
           page.language = language == default ? nil : language
+          page.version = config.versions.for_path(relative) # scopes `translation_key`
           {page, file}
         end
         apply_render_state(entries, generated)
@@ -465,7 +466,13 @@ module Hwaro
         # nobody's original, and each language's term page exists anyway.
         term_files = term_metadata_files(config)
         entries.each { |page, _| page.render = false if term_files.includes?(page.path) } unless term_files.empty?
-        Content::Multilingual.link_translations!(entries.map(&.[0]), config)
+        files = entries.to_h { |page, file| {page.path, file} }
+        losers = Set(String).new
+        Content::Multilingual.link_translations!(entries.map(&.[0]), config).each do |c|
+          losers << c.loser.path
+          issues << Issue.new(id: "translation-key-collision", level: :warning, category: "i18n", file: files[c.loser.path],
+            message: "translation_key #{c.key.inspect} is already used by the '#{c.code}' page #{files[c.winner.path]} — not linked as a translation", language: c.code)
+        end
 
         # Grouped per language, in configured order.
         others.each do |other|
@@ -473,6 +480,8 @@ module Hwaro
             # A page the build never writes (or that only redirects) needs no
             # translation, and is no one's missing counterpart.
             next if !page.render || page.has_redirect?
+            # A collision loser is reported once, as the collision.
+            next if losers.includes?(page.path)
             code = Content::Multilingual.language_code(page, config)
             codes = page.translations.empty? ? [code] : page.translations.map(&.code)
             if code == default && !codes.includes?(other)
@@ -502,6 +511,7 @@ module Hwaro
             end
             page.render = data[:render]
             page.redirect_to = data[:redirect_to]
+            page.translation_key = data[:translation_key]
             page.front_matter_keys = data[:front_matter_keys]
             {page, data[:cascade]}
           end

@@ -677,3 +677,25 @@ describe "Hugo export: links to translations" do
     end
   end
 end
+
+describe "Hugo export: translation_key" do
+  it "exports translation_key as translationKey unless translationKey is authored" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(content_dir)
+      File.write(File.join(content_dir, "a.md"), "+++\ntitle = \"A\"\ntranslation_key = \"about\"\n+++\na\n")
+      File.write(File.join(content_dir, "b.md"), "+++\ntitle = \"B\"\ntranslation_key = \"b\"\ntranslationKey = \"own\"\n+++\nb\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "hugo", content_dir: content_dir, output_dir: output_dir)
+      Hwaro::Services::Exporters::HugoExporter.new.run(options).success.should be_true
+
+      a = File.read(File.join(output_dir, "content", "a.md"))
+      a.should contain(%(translationKey = "about"))
+      a.should_not contain("translation_key")
+      b = File.read(File.join(output_dir, "content", "b.md"))
+      b.should contain(%(translationKey = "own"))
+      b.should contain(%(translation_key = "b"))
+    end
+  end
+end

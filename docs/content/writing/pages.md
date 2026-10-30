@@ -81,6 +81,7 @@ Every `.md` and `.markdown` file under `content/` becomes a page, front matter o
 | expires | date | Auto-exclude after this date |
 | series | string | Series name for grouping |
 | series_weight | int | Sort order within series |
+| translation_key | string | Links translations whose file names differ: pages sharing the key are translations of each other. See [Translation Keys](/features/multilingual/#translation-keys) |
 | menus | string / array / table | Register the page in navigation menus (`menu` is an alias). See [Menus](/features/menus/) |
 | taxonomies | table | Zola-style table of taxonomy terms (`[taxonomies]` with `tags = [...]`). See [Taxonomies](/writing/taxonomies/) |
 | extra | table | Custom metadata |

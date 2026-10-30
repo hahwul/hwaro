@@ -334,6 +334,10 @@ module Hwaro
         # Ambiguous-wikilink warnings already printed; kept across the index
         # rebuilds of one serve session, cleared by each full build.
         @wikilink_warnings : Content::Processors::Wikilinks::WarnLog = Content::Processors::Wikilinks::WarnLog.new
+        # `translation_key` collisions as {loser, winner} paths, as last
+        # reported: a full build reports all of them, a serve relink only
+        # the ones it introduces (warn_translation_key_collisions).
+        @translation_key_collisions : Set({String, String}) = Set({String, String}).new
         # Project-relative path => MD5 of the bytes read (nil: missing, or a
         # transcluded page) for every file an `include_code` / `include_md`
         # call or a `![[note]]` transclusion read. Serve escalates a save

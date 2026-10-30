@@ -722,3 +722,35 @@ describe "Hugo import: headless pages and sitemap opt-out" do
     end
   end
 end
+
+describe "Hugo import: translationKey" do
+  it "maps translationKey to translation_key" do
+    Dir.mktmpdir do |tmpdir|
+      hugo_dir = setup_hugo_site(tmpdir)
+      output_dir = File.join(tmpdir, "out")
+      write_hugo_content(hugo_dir, "posts/a.md", "---\ntitle: A\ntranslationKey: about\n---\nbody\n")
+
+      Hwaro::Services::Importers::HugoImporter.new.run(make_hugo_options(hugo_dir, output_dir)).success.should be_true
+
+      a = TOML.parse(File.read(File.join(output_dir, "posts", "a.md"))[/\A\+\+\+\n(.*?)\+\+\+/m, 1])
+      a["translation_key"].as_s.should eq("about")
+      a.has_key?("extra").should be_false
+    end
+  end
+end
+
+describe "Hugo import: non-string translationKey" do
+  it "keeps a translationKey it cannot map in [extra]" do
+    Dir.mktmpdir do |tmpdir|
+      hugo_dir = setup_hugo_site(tmpdir)
+      output_dir = File.join(tmpdir, "out")
+      write_hugo_content(hugo_dir, "posts/a.md", "---\ntitle: A\ntranslationKey: [a, b]\n---\nbody\n")
+
+      Hwaro::Services::Importers::HugoImporter.new.run(make_hugo_options(hugo_dir, output_dir)).success.should be_true
+
+      a = TOML.parse(File.read(File.join(output_dir, "posts", "a.md"))[/\A\+\+\+\n(.*?)\+\+\+/m, 1])
+      a.has_key?("translation_key").should be_false
+      a["extra"]["translationKey"].as_a.map(&.as_s).should eq(["a", "b"])
+    end
+  end
+end

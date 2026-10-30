@@ -27,7 +27,7 @@ module Hwaro
           "sort_by", "reverse", "authors", "in_search_index", "insert_anchor_links",
           "page_template", "paginate_path", "redirect_to", "weight", "categories",
           "series", "series_weight", "expires", "paginate_by", "taxonomies",
-          "cascade", "menus", "menu",
+          "cascade", "menus", "menu", "translation_key",
         }
 
         # Warn about unknown front-matter keys that look like typos of known keys.
@@ -155,6 +155,7 @@ module Hwaro
               expires:             result[:expires],
               cascade:             result[:cascade],
               menus:               result[:menus],
+              translation_key:     result[:translation_key],
             }
           else
             # No front matter found — return defaults
@@ -195,6 +196,7 @@ module Hwaro
               expires:             nil.as(Time?),
               cascade:             {} of String => Models::ExtraValue,
               menus:               {} of String => Models::MenuRegistration,
+              translation_key:     nil.as(String?),
             }
           end
         end
@@ -693,6 +695,7 @@ module Hwaro
             tags:                tags,
             cascade:             cascade,
             menus:               extract_menus(fm),
+            translation_key:     fm_value?(fm, "translation_key", file_path).try(&.strip),
           }
         end
 

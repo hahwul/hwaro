@@ -81,6 +81,7 @@ JSON은 파일 맨 앞에서 처음으로 짝이 맞는 `{...}`가 프론트 매
 | expires | date | 이 날짜 이후 자동 제외 |
 | series | string | 묶음용 시리즈 이름 |
 | series_weight | int | 시리즈 내 정렬 순서 |
+| translation_key | string | 파일 이름이 다른 번역을 연결. 키가 같은 페이지끼리 서로의 번역이 됨. [번역 키](/ko/features/multilingual/#번역-키) 참고 |
 | menus | string / array / table | 페이지를 내비게이션 메뉴에 등록(`menu`는 별칭). [메뉴](/ko/features/menus/) 참고 |
 | taxonomies | table | Zola 스타일 택소노미 항목 테이블(`[taxonomies]` 아래 `tags = [...]`). [택소노미](/ko/writing/taxonomies/) 참고 |
 | extra | table | 커스텀 메타데이터 |
