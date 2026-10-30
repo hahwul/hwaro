@@ -156,17 +156,25 @@ module Tartrazine
 
   # Why File.match? would raise for `glob`, or nil. It only raises once a
   # path reaches the bad spot, so mirror its parser up front: a trailing
-  # backslash, and a `[` class without its `]` (the first member, even
-  # `]`, is always taken literally, and a backslash escapes inside a class
-  # too).
+  # backslash, a `[` class without its `]` (the first member, even `]`, is
+  # always taken literally, and a backslash escapes inside a class too),
+  # and `{` braces nested more than 10 deep. It may reject a glob no path
+  # ever trips over; `hwaro_custom_language_for` is the backstop for one
+  # it misses.
   private def self.hwaro_glob_error(glob : String) : String?
     chars = glob.chars
     i = 0
+    braces = 0
     while i < chars.size
       case chars[i]
       when '\\'
         i += 1
         return "trailing escape" if i >= chars.size
+      when '{'
+        braces += 1
+        return "brace nesting deeper than 10 levels" if braces > 10
+      when '}'
+        braces -= 1 if braces > 0
       when '['
         i += 1
         i += 1 if i < chars.size && chars[i] == '^'
@@ -209,10 +217,11 @@ module Tartrazine
   # The custom lexer for a lowercased file base name (an exact
   # `<filename>` entry or a glob), or nil.
   def self.hwaro_custom_language_for(basename : String) : String?
-    @@hwaro_custom_filenames.each do |glob, name|
-      return name if glob == basename || File.match?(glob, basename)
-    end
-    nil
+    @@hwaro_custom_filenames.find do |glob, _|
+      glob == basename || File.match?(glob, basename)
+    rescue File::BadPatternError
+      false
+    end.try(&.[1])
   end
 
   def self.hwaro_custom_lexer?(name : String) : Bool

@@ -202,14 +202,30 @@ describe Hwaro::Content::Processors::CustomLexers do
       Hwaro::Content::Processors::Includes.language_for("unterminated.toml").should eq("toml")
       Hwaro::Content::Processors::Includes.language_for("site.mdsl").should eq("mydsl")
     end
+    deep = "{" * 11 + "x" + "}" * 11
+    with_lexers({"mydsl.xml" => CUSTOM_GRAMMAR.sub("</config>", "<filename>#{deep}</filename></config>")}) do
+      log = with_captured_log { Hwaro::Content::Processors::CustomLexers.apply(lexers_config) }
+      log.should contain(%(<filename> "#{deep}" is not a valid glob (brace nesting deeper than 10 levels); ignored))
+      Hwaro::Content::Processors::Includes.language_for("x").should eq("")
+    end
   end
 
-  it "mirrors File.match?'s glob errors exactly" do
-    glob_chars = %q(a[]^\-*b)
+  # The backstop for a shape the up-front check does not know.
+  it "treats a glob File.match? refuses as no match at lookup" do
+    _, _, template, _, _ = Tartrazine.hwaro_parse_custom_lexer(CUSTOM_GRAMMAR)
+    Tartrazine.hwaro_register_custom_lexers([{["mydsl"], ["[unterminated", "*.mdsl"], template}])
+    Tartrazine.hwaro_custom_language_for("unterminated.toml").should be_nil
+    Tartrazine.hwaro_custom_language_for("site.mdsl").should eq("mydsl")
+  ensure
+    Tartrazine.hwaro_register_custom_lexers([] of {Array(String), Array(String), Tartrazine::LexerTemplate})
+  end
+
+  it "never accepts a glob File.match? raises on" do
+    glob_chars = %q(a[]^\-*b{},{{)
     rng = Random.new(42)
-    paths = ["", "a", "ab-c", "]]", "^a", "\\a", "zzzzzzzz"]
-    3000.times do
-      glob = String.build { |io| rng.rand(1..7).times { io << glob_chars.char_at(rng.rand(glob_chars.size)) } }
+    paths = ["", "a", "b", "ab-c", "]]", "^a", "\\a", "zzzzzzzz", "aaaaaaaaaaaa"]
+    5000.times do
+      glob = String.build { |io| rng.rand(1..28).times { io << glob_chars.char_at(rng.rand(glob_chars.size)) } }
       raises = paths.any? do |path|
         File.match?(glob, path)
         false
@@ -223,6 +239,10 @@ describe Hwaro::Content::Processors::CustomLexers do
     Tartrazine.test_glob_error("[]").should eq("unterminated character set")
     Tartrazine.test_glob_error("[]]").should be_nil
     Tartrazine.test_glob_error("a\\").should eq("trailing escape")
+    Tartrazine.test_glob_error("{a,{b,{c,{d,{e,{f,{g,{h,{i,{j,{k}}}}}}}}}}}").should eq("brace nesting deeper than 10 levels")
+    Tartrazine.test_glob_error("{" * 10 + "a" + "}" * 10).should be_nil
+    Tartrazine.test_glob_error("[{{{{{{{{{{{]").should be_nil
+    Tartrazine.test_glob_error("\\{" * 11).should be_nil
   end
 
   it "warns about grammar defects that would only surface mid-tokenization" do
