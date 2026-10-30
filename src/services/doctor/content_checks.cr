@@ -60,9 +60,14 @@ module Hwaro
       # taxonomy term metadata (Content::Taxonomies.match_term_metadata, over
       # the published files with their front-matter terms and URLs). Empty
       # without a candidate (`term_metadata_path?`), which skips the parse.
-      # Unlike the build it ignores `[cascade]`-inherited terms and output
-      # collisions — doctor approximates, the build decides.
+      # Terms a section `[cascade]` hands down count, as in the build; output
+      # collisions don't — doctor approximates, the build decides. Computed
+      # once per run (two checks read it).
       private def term_metadata_files(config : Models::Config) : Set(String)
+        @term_metadata_files ||= compute_term_metadata_files(config)
+      end
+
+      private def compute_term_metadata_files(config : Models::Config) : Set(String)
         return Set(String).new if config.taxonomies.empty? || !Dir.exists?(@content_dir)
         infos = ContentLister.new(@content_dir, GeneratedContent.infos(@content_dir, @content_ignore.rules), @content_ignore).list_all.select(&.published?)
         relative = ->(info : ContentInfo) { info.generated_from ? info.path : Path[info.path].relative_to(@content_dir).to_s }
@@ -90,6 +95,7 @@ module Hwaro
               section.language = language
               section.url = Utils::PermalinkResolver.resolve_url_lenient(path, config, slug: data[:slug], custom_path: data[:custom_path],
                 language: language, date: data[:date], title: data[:title], version: config.versions.for_path(path))[0]
+              section.cascade = data[:cascade]
               sections << section
             else
               page = Models::Page.new(path)
@@ -98,10 +104,14 @@ module Hwaro
               page.tags = data[:tags]
               page.taxonomies = data[:taxonomies]
               page.authors = data[:authors]
+              page.front_matter_keys = data[:front_matter_keys]
               page.version = config.versions.for_path(path)
               pages << page
             end
           end
+          builder = Core::Build::Builder.new
+          cascade_map = builder.build_cascade_map(sections)
+          pages.each { |page| builder.apply_cascade_to(page, cascade_map) } unless cascade_map.empty?
         ensure
           Logger.level = previous
         end
@@ -450,7 +460,11 @@ module Hwaro
           {page, file}
         end
         apply_render_state(entries, generated)
+        # A file that describes a term page is headless in the build, which
+        # is what link_translations! pairs on: a matched `_index.md` is then
+        # nobody's original, and each language's term page exists anyway.
         term_files = term_metadata_files(config)
+        entries.each { |page, _| page.render = false if term_files.includes?(page.path) } unless term_files.empty?
         Content::Multilingual.link_translations!(entries.map(&.[0]), config)
 
         # Grouped per language, in configured order.
@@ -459,9 +473,6 @@ module Hwaro
             # A page the build never writes (or that only redirects) needs no
             # translation, and is no one's missing counterpart.
             next if !page.render || page.has_redirect?
-            # A file that describes a term page (term_metadata_files): each
-            # language's term page exists with or without it.
-            next if term_files.includes?(page.path)
             code = Content::Multilingual.language_code(page, config)
             codes = page.translations.empty? ? [code] : page.translations.map(&.code)
             if code == default && !codes.includes?(other)

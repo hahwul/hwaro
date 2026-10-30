@@ -157,6 +157,21 @@ describe "Hwaro::Services::Doctor translations" do
     ])
   end
 
+  # The matched `_index.md` is headless in the build, so the ko section that
+  # no ko term page takes has no original to pair with.
+  it "reports a term-directory translation whose original describes a term page" do
+    config = TRANSLATIONS_CONFIG.sub(%(language_name = "Korean"), %(language_name = "Korean"\ntaxonomies = []))
+    config += %(\n[[taxonomies]]\nname = "tags"\n)
+    summarize(translation_issues({
+      "a.md"                   => "+++\ntitle = \"A\"\ntags = [\"rust\"]\n+++\n",
+      "a.ko.md"                => PAGE,
+      "a.ja.md"                => "+++\ntitle = \"A\"\ntags = [\"rust\"]\n+++\n",
+      "tags/rust/_index.md"    => PAGE,
+      "tags/rust/_index.ja.md" => PAGE,
+      "tags/rust/_index.ko.md" => PAGE,
+    }, config)).should eq(["ko translation-orphan tags/rust/_index.ko.md"])
+  end
+
   it "reports nothing on a single-language site" do
     translation_issues({"a.md" => PAGE, "a.ko.md" => PAGE}, %(title = "T"\nbase_url = "https://example.com"\n)).should be_empty
   end

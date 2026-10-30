@@ -1058,6 +1058,14 @@ describe Hwaro::Services::Doctor do
         missing.any?(&.includes?("guides/")).should be_true
       end
 
+      it "counts cascaded terms when deciding a taxonomy directory holds term files" do
+        issues = run_doctor(base_config + %(\n[[taxonomies]]\nname = "tags"\n),
+          {"tags/rust/_index.md" => "+++\ntitle = \"Rust\"\n+++\n",
+           "posts/_index.md"     => "+++\ntitle = \"Posts\"\n[cascade]\ntags = [\"rust\"]\n+++\n",
+           "posts/a.md"          => "+++\ntitle = \"A\"\n+++\n"})
+        issues.select { |i| i.id == "structure-missing-index" }.map(&.message).any?(&.includes?("tags/")).should be_false
+      end
+
       # Only files a term page takes are exempt: an ordinary section under a
       # taxonomy directory still is one.
       it "still asks for an _index.md when a taxonomy directory holds ordinary sections" do

@@ -103,6 +103,7 @@ module Hwaro
       end
 
       def run : Array(Issue)
+        @term_metadata_files = nil
         issues = [] of Issue
         config = check_config(issues)
         template_names = check_templates(issues)
@@ -143,6 +144,8 @@ module Hwaro
       # production builder configures aren't needed to detect tag/syntax
       # mistakes.
       @template_parse_env : Crinja?
+      # Memo of term_metadata_files for one `run`.
+      @term_metadata_files : Set(String)? = nil
     end
   end
 end
