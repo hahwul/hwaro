@@ -178,6 +178,12 @@ Access the current page's language in templates:
 {% endif %}
 ```
 
+Pass it to the `date` filter to print month and weekday names in the page's language (`5 mars 2024` on a French page, `5 марта 2024` on a Russian one). [Date Formatting](/templates/filters/#date-formatting) lists the built-in locales:
+
+```jinja
+<time>{{ page.date | date(format="%-d %B %Y", locale=page.language) }}</time>
+```
+
 ## Scaffolding with Multilingual
 
 Create a new site with multilingual support:

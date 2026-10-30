@@ -134,7 +134,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 | default | 정의되지 않았거나 none이거나 빈 값일 때의 폴백 값([기본값](#기본값) 참고) | {{ value \| default(value="N/A") }} |
 | jsonify | JSON 인코딩 | {{ data \| jsonify }} |
 | tojson | JSON 인코딩. `indent`를 주면 그만큼의 공백(0–16)으로 들여쓰기 | {{ data \| tojson(indent=2) }} |
-| date | 날짜 포맷(기본 포맷 `%Y-%m-%d`) | {{ page.date \| date("%Y-%m-%d") }} |
+| date | 날짜 포맷(기본 포맷 `%Y-%m-%d`). `locale`을 주면 월·요일 이름을 번역([날짜 포맷](#날짜-포맷) 참고) | {{ page.date \| date(format="%B %-d", locale="ko") }} |
 
 ## 예시
 
@@ -169,6 +169,21 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 - `%d` — 일(01-31)
 - `%B` — 월 이름(January)
 - `%b` — 월 축약형(Jan)
+- `%A` / `%a` — 요일 이름 / 축약형(Tuesday / Tue)
+- `%P` / `%p` — AM/PM / am/pm
+
+`locale`을 넘기면 이름이 해당 언어로 바뀝니다. 여러 언어가 함께 쓰는 템플릿에서는 `locale=page.language`를 넘기면 됩니다.
+
+```jinja
+{{ page.date | date(format="%B %-d일 (%a)", locale="ko") }}   {# 3월 5일 (화) #}
+{{ page.date | date(format="%A %-d %B %Y", locale=page.language) }}
+```
+
+`locale`이 번역하는 코드는 `%B`, `%b`(`%h` 포함), `%A`, `%a`, `%P`, `%p`와 `%^` 대문자 형식입니다. 복합 코드인 `%c`, `%r`을 비롯한 나머지 코드는 `locale`이 없을 때와 똑같이 출력됩니다.
+
+내장 로케일은 `ko`, `ja`, `zh`(간체), `zh_TW`(번체, `zh_Hant`·`zh_HK`·`zh_MO`도 이 표를 사용), `de`, `fr`, `es`, `it`, `pt`(브라질 포르투갈어이므로 `pt_BR`도 이 표를 사용), `ru`, `nl`, `pl`, `tr`, `vi`, `id`, 그리고 영어입니다. `ko`, `ko_KR`, `ko-KR`, `KO-kr`는 모두 같은 로케일이고, 전용 표가 없는 지역 코드는 언어 코드로 대체됩니다(`fr_CA`는 `fr` 사용).
+
+이름은 CLDR의 날짜 내 형식("format")을 따르므로 러시아어와 폴란드어의 월 이름은 속격입니다(`5 марта`, `5 marca`). 일 숫자와 함께 쓸 때는 자연스럽지만 월 이름만 단독으로 제목에 쓰기에는 맞지 않습니다. 알 수 없는 로케일은 빌드마다 한 번 경고를 남기고 영어 이름으로 출력합니다. `locale`이 없거나 비어 있으면 출력은 이전과 같습니다. `now(format=..., locale=...)`도 같은 인자를 받습니다.
 
 ### URL 처리
 
