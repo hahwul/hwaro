@@ -459,7 +459,7 @@ base_url이 포함된 URL을 생성합니다.
 | height | Int | 요청 높이(픽셀, 0 = 원본) |
 | op | String | `fit`(기본값), `fill`, `crop` — [자르기와 채우기](/ko/features/image-processing/#자르기와-채우기) 참고 |
 | anchor | String | `fill`/`crop`이 남길 위치: `center`(기본값), `top`, `bottom`, `left`, `right`, `top_left`, `top_right`, `bottom_left`, `bottom_right` |
-| format | String | `auto`(기본값, 원본 포맷) 또는 `webp`. `fit`이면 [WebP 변형](/ko/features/image-processing/#webp-출력)을 반환합니다(없으면 원본 포맷 변형). `fill`/`crop`이면 변형을 WebP로 씁니다 |
+| format | String | `auto`(기본값, 원본 포맷) 또는 `webp`(대소문자 무관). `fit`이면 [WebP 변형](/ko/features/image-processing/#webp-출력)을 반환합니다(없으면 원본 포맷 변형). `fill`/`crop`이면 변형을 WebP로 씁니다 |
 
 **반환값:** 다음 속성을 가진 객체:
 

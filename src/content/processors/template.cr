@@ -422,7 +422,8 @@ module Hwaro
             if op != "fit" && (width <= 0 || height <= 0)
               raise Crinja::RuntimeError.new("resize_image: op=#{op.inspect} needs both width and height")
             end
-            format = arguments["format"].to_s
+            # Case-insensitive like `[image_processing] formats`.
+            format = arguments["format"].to_s.strip.downcase
             unless format == "auto" || Models::ImageProcessingConfig::VALID_FORMATS.includes?(format)
               raise Crinja::RuntimeError.new("resize_image: unknown format #{format.inspect} (expected one of: auto, #{Models::ImageProcessingConfig::VALID_FORMATS.join(", ")})")
             end
