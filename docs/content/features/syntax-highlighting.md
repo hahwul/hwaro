@@ -135,11 +135,14 @@ those is the quickest start.
   over ```` ```ini ```` fences). When two of your files claim the same
   name, the first file in sorted order keeps it.
 - **Errors:** a missing directory, an unreadable file, malformed XML, a
-  regex that does not compile, a file without `<name>` or a `root` state,
-  or a `<push>`/`<include>`/`<combined>` naming a state the file does not
-  define is a warning naming the file; that file is skipped, the build
-  goes on and its fences fall back to plain output. `hwaro doctor` reports
-  the same problems, name clashes included (`highlight-lexer-invalid`).
+  regex that does not compile, or a file without `<name>` or a `root`
+  state is a warning naming the file; that file is skipped, the build goes
+  on and its fences fall back to plain output. A `<push>`, `<include>` or
+  `<combined>` naming a state the file does not define is a warning too,
+  but the grammar still loads (a few bundled grammars have one): only a
+  code block that reaches that rule falls back to plain. `hwaro doctor`
+  reports the same problems, name clashes included
+  (`highlight-lexer-invalid`).
 - **Runaway rules:** a rule that matches the empty string without
   changing state, or a `<usingself>`/`<using>` that keeps delegating to
   itself (more than 32 levels deep), would never finish; the code block

@@ -267,7 +267,7 @@ Rows marked ✗ are error level and **cannot** be ignored.
 | `build-output-stale` | config | A route was accepted from build output older than the sources |
 | `sass-dir-not-scanned` | config | SCSS files under a root `sass/` directory, which the build never scans |
 | `sass-disabled-with-sources` | config | SCSS entry files under `static/` while `[sass]` is off |
-| `highlight-lexer-invalid` | config | A grammar file in `[highlight] lexers_dir` is not loaded (unreadable, bad XML or regex, missing `<name>`, undefined state) or loses a name to an earlier file |
+| `highlight-lexer-invalid` | config | A grammar file in `[highlight] lexers_dir` is not loaded (unreadable, bad XML or regex, missing `<name>`), references an undefined state, or loses a name to an earlier file |
 | `missing-config-*` | config_missing | Missing config section (e.g. `missing-config-pwa`) |
 | `template-dir-missing` | template | Templates directory not found ✗ |
 | `template-required-missing` | template | `page.html` (or `default.html`) missing ✗ |
