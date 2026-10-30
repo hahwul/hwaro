@@ -319,7 +319,6 @@ module Hwaro
           "title", "date", "publishdate", "lastmod", "draft", "description",
           "summary", "tags", "categories", "authors", "series", "weight", "slug",
           "aliases", "url", "images", "featured_image", "expirydate", "layout",
-          "translationkey",
         }
 
         # The front matter `process_file` does not map: CARRIED_KEYS as-is,
@@ -338,6 +337,8 @@ module Hwaro
             # The spelling `downcase_keys` kept wins, as for mapped keys.
             next if key != lower && source.has_key?(lower)
             next if MAPPED_KEYS.includes?(lower)
+            # Mapped only when it is a string; any other value stays in [extra].
+            next if lower == "translationkey" && mapped.has_key?("translation_key")
             case lower
             when "params" then params = value.as_h?
             when "extra"  then own_extra = value.as_h?
