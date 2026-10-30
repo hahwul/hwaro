@@ -77,7 +77,7 @@ same text renders in page bodies. The rest of the extension pipeline
 | sort_by | Sort objects by field | {{ posts \| sort_by(attribute="date", reverse=true) }} |
 | group_by | Group objects by field | {{ posts \| group_by(attribute="section") }} |
 
-`min` and `max` work as in Jinja2: they compare like `sort` (strings case-insensitively unless `case_sensitive=true`), `attribute=` takes a dotted path such as `"extra.weight"` and the whole item is returned, the first one wins a tie, and an empty list gives an undefined value.
+`min` and `max` work as in Jinja2: they compare like `sort` (strings case-insensitively unless `case_sensitive=true`), `attribute=` takes a dotted path such as `"extra.weight"` and the whole item is returned, the first one wins a tie, a mapping compares its keys, and an empty list gives an undefined value.
 
 ## Collection Filters
 
@@ -197,6 +197,7 @@ Format codes:
 - `$1` or `${1}` inserts a numbered group, `$name` or `${name}` a named group (`(?<name>…)`), `$$` a literal `$`.
 - `$name` takes the longest run of letters, digits and `_`, so `$1a` means a group called `1a`: write `${1}a` for group 1 followed by `a`.
 - A group that doesn't exist or didn't match inserts nothing. A `$` not followed by a name stays as is, and a backslash is an ordinary character (`\1` is not a group reference).
+- Empty matches follow Rust and Go too: one that starts right where the previous match ended is skipped, so `"aab" | regex_replace("a*", "-")` gives `-b-`.
 
 ```jinja
 {{ "2024-03-05" | regex_replace(pattern="(\d+)-(\d+)-(\d+)", rep="$3/$2/$1") }}  {# 05/03/2024 #}
@@ -208,7 +209,7 @@ An invalid pattern, or one that backtracks past PCRE2's match limit, stops the b
 
 ### Number Formatting
 
-`num_format` groups the integer digits of a number, or of a string holding a plain decimal number, in threes. It takes three optional arguments: `decimals` (fixed decimal places, 0–20, rounded half away from zero; by default the number keeps its own decimals), `separator` (default `,`) and `decimal_point` (default `.`).
+`num_format` groups the integer digits of a number, or of a string holding a plain decimal number, in threes. It takes three optional arguments: `decimals` (fixed decimal places, 0–20, rounded half away from zero; by default the number keeps its own decimals, and a float prints its shortest form, so `1e-7` is `0.0000001`), `separator` (default `,`) and `decimal_point` (default `.`).
 
 ```jinja
 {{ 1234567 | num_format }}                                    {# 1,234,567 #}
@@ -217,7 +218,7 @@ An invalid pattern, or one that backtracks past PCRE2's match limit, stops the b
 {{ 1234567 | num_format(separator=" ") }}                     {# 1 234 567 #}
 ```
 
-A value that isn't a number (text, `true`, an undefined value, NaN) comes back unchanged, so a missing front matter field doesn't break the page.
+A value that isn't a number (text, `true`, an undefined value, NaN) comes back unchanged, so a missing front matter field doesn't break the page. Only ASCII digits count, so `"１２３"` is text. `decimals` also accepts a whole number written as a string (`decimals="2"`); any other value, such as `"x"` or `1.5`, is ignored, as if `decimals` were not given.
 
 ### Collection Querying
 
