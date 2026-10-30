@@ -179,11 +179,13 @@ Pass `locale` to translate the names. A template shared by several languages pas
 {{ page.date | date(format="%A %-d %B %Y", locale=page.language) }}
 ```
 
-`locale` translates `%B`, `%b` (and `%h`), `%A`, `%a`, `%P`, `%p`, and the `%^` uppercase forms. Every other code, including the composite `%c` and `%r`, prints exactly as it does without a locale.
+`locale` translates `%B`, `%b` (and `%h`), `%A`, `%a`, `%P`, `%p`, and the `%^` uppercase forms. Every other code, including the composite `%c` and `%r`, prints exactly as it does without a locale. Outside English, `%p` and `%P` print the same locale form (`오후`, `CH`, `p.m.`); only English has a lowercase `am`/`pm`.
+
+`page.date` reaches templates as a date-only string (`2024-03-05`), so `%p`/`%P` on it always print the morning form. Use a value with a time of day (a datetime from front matter `extra` or data, or `now()`) when you need AM/PM.
 
 Built-in locales: `ko`, `ja`, `zh` (Simplified), `zh_TW` (Traditional; also used for `zh_Hant`, `zh_HK`, `zh_MO`), `de`, `fr`, `es`, `it`, `pt` (Brazilian, so `pt_BR` uses it), `ru`, `nl`, `pl`, `tr`, `vi`, `id`, and English. `ko`, `ko_KR`, `ko-KR` and `KO-kr` are the same locale, and a region without its own table falls back to its language (`fr_CA` uses `fr`).
 
-Names follow CLDR's in-date ("format") forms, so Russian and Polish months are genitive (`5 марта`, `5 marca`): right next to a day number, not as a standalone month heading. An unknown locale logs one warning per build and prints English names. Without `locale`, or with an empty one, output is unchanged. `now(format=..., locale=...)` takes the same argument.
+Names follow CLDR's in-date ("format") forms, so Russian and Polish months are genitive (`5 марта`, `5 marca`): right next to a day number, not as a standalone month heading. An unknown locale logs one warning per build (and per `serve` rebuild) and prints English names. Without `locale`, or with an empty or blank one, output is unchanged. `now(format=..., locale=...)` takes the same argument.
 
 ### URL Handling
 
