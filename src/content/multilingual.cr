@@ -109,7 +109,8 @@ module Hwaro
             group_pages.sort_by! { |p| {p.render && !p.has_redirect? ? 0 : 1, p.path} }.each do |p|
               code = language_code(p, config)
               if winner = by_code[code]?
-                collisions << KeyCollision.new(key, code, winner, p)
+                # A headless or redirecting page is never linked anyway.
+                collisions << KeyCollision.new(key, code, winner, p) if p.render && !p.has_redirect?
                 p.translations = [] of Models::TranslationLink
               else
                 by_code[code] = p

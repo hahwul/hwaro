@@ -332,6 +332,7 @@ john-doe:
 | page.updated | String? | 마지막 수정일 |
 | page.language | String | 적용된 언어 코드 |
 | page.translations | Array<TranslationLink> | 언어별 번역본 |
+| page.translation_key | String | 페이지 프론트 매터의 `translation_key`. 지정하지 않은 페이지에서는 정의되지 않음(빈 값으로 출력) |
 | page.version | Object? | 문서 버전 (버전이 없으면 `nil`) — [page.version](#pageversion) 참고 |
 | page.version_links | Array<VersionLink> | 버전 전환기 행 (버전이 없으면 빈 배열) |
 

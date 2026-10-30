@@ -544,6 +544,8 @@ module Hwaro::Core::Build::Phases::Render
     if version = p.version
       fp_value(digest, "v:#{version.name}")
     end
+    # Listings can read `p.translation_key`; folded only when set.
+    p.translation_key.try { |key| fp_value(digest, "k:#{key}") }
     # A transparent subsection lists its pages in the parent's
     # `section.pages` instead of itself, so flipping it changes what every
     # page of the parent section lists. Folded only when set, so sites

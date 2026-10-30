@@ -228,10 +228,28 @@ describe "Hwaro::Content::Multilingual translation_key" do
     redirect = keyed_page("b.ko.md", "/ko/b/", "about", "ko")
     redirect.redirect_to = "/elsewhere/"
     real = keyed_page("c.ko.md", "/ko/c/", "about", "ko")
-    collisions = Hwaro::Content::Multilingual.link_translations!([en, headless, redirect, real], key_config)
-    collisions.map { |c| {c.winner.path, c.loser.path} }.should eq([{"c.ko.md", "a.ko.md"}, {"c.ko.md", "b.ko.md"}])
+    # Never linkable anyway, so not reported as collisions either.
+    Hwaro::Content::Multilingual.link_translations!([en, headless, redirect, real], key_config).should be_empty
     en.translations.map(&.url).should eq(["/about/", "/ko/c/"])
     real.translations.map(&.url).should eq(["/about/", "/ko/c/"])
+  end
+
+  it "exposes page.translation_key to templates only on pages that set it" do
+    build_site(KEY_SITE_CONFIG,
+      content_files: {
+        "_index.md" => "+++\ntitle = \"Home\"\n+++\n",
+        "about.md"  => "+++\ntitle = \"About\"\ntranslation_key = \"about\"\n+++\n",
+        "plain.md"  => "+++\ntitle = \"Plain\"\n+++\n",
+      },
+      template_files: {
+        "page.html"    => "[{{ page.translation_key }}]{{ page.extra | tojson }}{% if page.translation_key is defined %}D{% endif %}",
+        "section.html" => "{% for p in section.pages %}{{ p.path }}={{ p.translation_key }};{% endfor %}",
+        "index.html"   => "{% for p in section.pages %}{{ p.path }}={{ p.translation_key }};{% endfor %}",
+      }) do
+      File.read("public/about/index.html").should eq("[about]{}D")
+      File.read("public/plain/index.html").should eq("[]{}")
+      File.read("public/index.html").should eq("about.md=about;plain.md=;")
+    end
   end
 
   it "does nothing on a single-language site" do
@@ -314,5 +332,22 @@ describe "Hwaro::Content::Multilingual translation_key" do
         File.read("public/ko/old/index.html").should eq("|")
       end
     end
+  end
+end
+
+describe "translation_key build warnings" do
+  it "does not warn about a headless or redirecting page sharing a key" do
+    log = with_captured_log do
+      build_site(KEY_SITE_CONFIG,
+        content_files: {
+          "about.md" => "+++\ntitle = \"About\"\ntranslation_key = \"about\"\n+++\n",
+          "a.ko.md"  => "+++\ntitle = \"A\"\ntranslation_key = \"about\"\nrender = false\n+++\n",
+          "b.ko.md"  => "+++\ntitle = \"B\"\ntranslation_key = \"about\"\n+++\n",
+        },
+        template_files: {"page.html" => KEY_TEMPLATE, "section.html" => "", "index.html" => ""}) do
+        File.read("public/about/index.html").should start_with("[en /about/][ko /ko/b/]|")
+      end
+    end
+    log.should_not contain("translation_key")
   end
 end
