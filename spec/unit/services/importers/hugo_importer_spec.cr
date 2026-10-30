@@ -737,6 +737,20 @@ describe "Hugo import: translationKey" do
       a.has_key?("extra").should be_false
     end
   end
+
+  it "maps a numeric translationKey as the string Hugo reads it as" do
+    Dir.mktmpdir do |tmpdir|
+      hugo_dir = setup_hugo_site(tmpdir)
+      output_dir = File.join(tmpdir, "out")
+      write_hugo_content(hugo_dir, "posts/a.md", "---\ntitle: A\ntranslationKey: 42\n---\nbody\n")
+
+      Hwaro::Services::Importers::HugoImporter.new.run(make_hugo_options(hugo_dir, output_dir)).success.should be_true
+
+      a = TOML.parse(File.read(File.join(output_dir, "posts", "a.md"))[/\A\+\+\+\n(.*?)\+\+\+/m, 1])
+      a["translation_key"].as_s.should eq("42")
+      a.has_key?("extra").should be_false
+    end
+  end
 end
 
 describe "Hugo import: non-string translationKey" do

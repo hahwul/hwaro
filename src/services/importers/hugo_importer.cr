@@ -162,7 +162,8 @@ module Hwaro
             fields["aliases"] = aliases unless aliases.empty?
 
             # Hugo's `translationKey` links translations whatever their file
-            # names; hwaro spells it `translation_key`.
+            # names; hwaro spells it `translation_key`. Hugo stringifies a
+            # number (`translationKey = 42` is "42"), so the importer does too.
             if translation_key = string_value(data, "translationkey")
               fields["translation_key"] = translation_key
             end
@@ -337,7 +338,8 @@ module Hwaro
             # The spelling `downcase_keys` kept wins, as for mapped keys.
             next if key != lower && source.has_key?(lower)
             next if MAPPED_KEYS.includes?(lower)
-            # Mapped only when it is a string; any other value stays in [extra].
+            # Mapped when it reads as a string (a number too: Hugo applies
+            # `cast.ToString`); any other value stays in [extra].
             next if lower == "translationkey" && mapped.has_key?("translation_key")
             case lower
             when "params" then params = value.as_h?
