@@ -198,7 +198,7 @@ module Hwaro
                 DateFilters.format_time(value, format, locale)
               when String, Crinja::SafeString
                 parsed = DateFilters.parse_string(value.to_s)
-                parsed ? DateFilters.format_time(parsed, format, locale) : value
+                parsed ? DateFilters.format_time(parsed, format, locale) : value.to_s
               else
                 value.to_s
               end

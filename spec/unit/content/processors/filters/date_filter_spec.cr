@@ -217,6 +217,8 @@ describe "DateFilters locale" do
     render_crinja(%({{ ("2024-03-05" | safe) | date("%B %d, %Y") }})).should eq("March 05, 2024")
     render_crinja(%({{ "2024-03-05t14:07:09z" | date("%B %d %H:%M %z") }})).should eq("March 05 14:07 +0000")
     render_crinja(%({{ "2024-03-05t14:07" | date("%H:%M") }})).should eq("14:07")
+    # An unparseable one comes back as a plain string (escaped), as before.
+    render_crinja(%({% autoescape true %}{{ ("<b>" | safe) | date }}{% endautoescape %})).should eq("&lt;b&gt;")
   end
 
   it "passes the locale through now(format=...)" do
