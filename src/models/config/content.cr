@@ -70,11 +70,19 @@ module Hwaro
       property allow_extensions : Array(String)
       property disallow_extensions : Array(String)
       property disallow_paths : Array(String)
+      # `[content] ignore` — content-relative globs Hwaro never sees: no
+      # page, section, bundle asset or published file comes from a match.
+      # Read from `[content]`, not `[content.files]`, but held here because
+      # every non-page consumer of content/ already asks `publish?` /
+      # `denied?`, so they honour it without extra plumbing; the page lanes
+      # ask `ignored?` directly.
+      property ignore : Array(String)
 
       def initialize
         @allow_extensions = [] of String
         @disallow_extensions = [] of String
         @disallow_paths = [] of String
+        @ignore = [] of String
       end
 
       def enabled? : Bool
@@ -98,7 +106,29 @@ module Hwaro
         denied_normalized?(ContentFilesConfig.normalize_path(relative_path))
       end
 
+      # True when `[content] ignore` hides `relative_path` (content-relative).
+      # A pattern matching any ancestor directory hides the whole subtree, so
+      # `_templates` alone covers `_templates/note.md`, like `_templates/**`.
+      # Case-sensitive, like `disallow_paths`.
+      def ignored?(relative_path : String) : Bool
+        return false if @ignore.empty?
+        ignored_normalized?(ContentFilesConfig.normalize_path(relative_path))
+      end
+
+      private def ignored_normalized?(path : String) : Bool
+        return false if @ignore.empty? || path.empty? || path == ".." || path.starts_with?("../")
+        from = 0
+        loop do
+          slash = path.index('/', from)
+          prefix = slash ? path[0, slash] : path
+          return true if @ignore.any? { |pattern| Utils::PathUtils.glob_match?(pattern, prefix) }
+          return false unless slash
+          from = slash + 1
+        end
+      end
+
       private def denied_normalized?(normalized_path : String) : Bool
+        return true if ignored_normalized?(normalized_path)
         return true if @disallow_extensions.includes?(File.extname(normalized_path).downcase)
         # A malformed glob is treated as non-matching by glob_match?, so a
         # config typo can't crash the build; other patterns still apply.
@@ -118,8 +148,18 @@ module Hwaro
         end
       end
 
+      # `[content] ignore` patterns: normalized like `disallow_paths`, with a
+      # trailing `/` dropped (`_templates/` names the directory itself).
+      def self.normalize_ignore(values : Array(String)) : Array(String)
+        values.compact_map do |pattern|
+          normalized = normalize_path(pattern).rstrip('/')
+          normalized.empty? ? nil : normalized
+        end
+      end
+
       def self.normalize_path(path : String) : String
         path = path.strip.gsub('\\', '/')
+        path = path.lchop("./")
         path = path.lchop("/")
         path = path.lchop("content/")
         path
@@ -223,6 +263,9 @@ module Hwaro
     class Config
       private def self.load_content_files(config : Config)
         return unless content_section = config.raw["content"]?.try(&.as_h?)
+        if patterns = string_list?(content_section["ignore"]?, "[content] ignore")
+          config.content_files.ignore = ContentFilesConfig.normalize_ignore(patterns)
+        end
         return unless s = content_section["files"]?.try(&.as_h?)
 
         allow_any = s["allow_extensions"]? || s["extensions"]?
