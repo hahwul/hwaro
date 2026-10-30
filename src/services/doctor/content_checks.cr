@@ -262,7 +262,7 @@ module Hwaro
           menus = MenuScope.new(config)
           sections = [] of Models::Section
           pages = [] of {Models::Page, String, String, Hash(String, Models::ExtraValue), Bool}
-          ContentLister.new(content_dir, GeneratedContent.infos(content_dir), ignore).list_all.each do |info|
+          ContentLister.new(content_dir, GeneratedContent.infos(content_dir, ignore.rules), ignore).list_all.each do |info|
             generated = !info.generated_from.nil?
             relative = generated ? info.path : Path[info.path].relative_to(content_dir).to_s
             file = generated ? File.join(content_dir, info.path) : info.path
@@ -337,7 +337,7 @@ module Hwaro
         # build (`products/blue.ko.md` ↔ generated `products/blue.md`), so they
         # count as originals; they have no file to report as untranslated.
         generated = {} of String => String
-        entries = ContentLister.new(@content_dir, GeneratedContent.infos(@content_dir), @content_ignore).list_all.select(&.published?).sort_by!(&.path).map do |info|
+        entries = ContentLister.new(@content_dir, GeneratedContent.infos(@content_dir, @content_ignore.rules), @content_ignore).list_all.select(&.published?).sort_by!(&.path).map do |info|
           relative = info.generated_from ? info.path : Path[info.path].relative_to(@content_dir).to_s
           file = info.generated_from ? File.join(@content_dir, info.path) : info.path
           info.generated_source.try { |source| generated[file] = source }

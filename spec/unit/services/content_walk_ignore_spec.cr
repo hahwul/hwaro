@@ -173,6 +173,34 @@ describe "[content] ignore in the content tools" do
   # `doctor --env X` validates what `build --env X` loads: the overlay's
   # ignore list must reach every content check, translations and
   # [[content.schema]] included, not the base config's.
+  # An overlay that ignores an authored file frees its path for a
+  # [[content.generate]] page; doctor --env must plan that page too.
+  it "plans generated pages with the --env overlay's ignore list in doctor" do
+    base = <<-TOML
+      title = "t"
+      base_url = "https://example.com"
+      [[content.generate]]
+      source = "items"
+      section = "items"
+      slug = "slug"
+      title = "title"
+      [[content.schema]]
+      sections = "items"
+      [content.schema.fields.author]
+      type = "string"
+      required = true
+      TOML
+    with_ignore_project(base) do
+      FileUtils.mkdir_p("data")
+      File.write("data/items.json", %([{"slug": "a", "title": "Generated"}]))
+      FileUtils.mkdir_p("content/items")
+      File.write("content/items/a.md", "+++\ntitle = \"Authored\"\nauthor = \"me\"\n+++\n")
+      File.write("config.prod.toml", %([content]\nignore = ["items/a.md"]\n))
+      issues = Hwaro::Services::Doctor.new(content_dir: "content", config_path: "config.toml", env: "prod").run
+      issues.select(&.id.==("content-schema-violation")).map(&.file.to_s).should contain("content/items/a.md")
+    end
+  end
+
   it "uses the --env overlay's ignore list in every doctor content check" do
     base = <<-TOML
       title = "t"

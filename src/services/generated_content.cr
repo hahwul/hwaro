@@ -31,7 +31,10 @@ module Hwaro
       # resolved from the working directory, so planning against a foreign
       # `--content-dir` would interleave this project's generated rows into
       # another site's listing.
-      def infos(content_dir : String) : Array(ContentInfo)
+      #
+      # `ignore` is the caller's `[content] ignore` rules (doctor's come from
+      # its `--env` config); the base config's when nil.
+      def infos(content_dir : String, ignore : Models::ContentFilesConfig? = nil) : Array(ContentInfo)
         unless File.expand_path(content_dir) == File.expand_path("content")
           Logger.debug "Generated-content rows are only planned for this project's content/ (got --content-dir #{content_dir})."
           return [] of ContentInfo
@@ -87,7 +90,7 @@ module Hwaro
           plans.each do |plan|
             # Authored-wins, exactly like the build: a contested path lists
             # the authored file only, never a duplicate generated row.
-            next if Core::Build::ContentGenerate.authored_twin_exists?(plan.path, ignore: config.content_files)
+            next if Core::Build::ContentGenerate.authored_twin_exists?(plan.path, ignore: ignore || config.content_files)
 
             date = plan.date_raw.try { |raw| Utils::DateUtils.parse_content_date(raw) }
             state = date && date > now ? PublishState::Future : PublishState::Published
