@@ -69,7 +69,7 @@ module Hwaro
           custom = grammars.flat_map(&.names).to_set
           usings.each do |path, lexers|
             lexers.each do |lexer|
-              problems << {path, %(<using lexer="#{lexer}"> names no bundled or custom lexer; code blocks that reach it fall back to plain)} unless custom.includes?(lexer)
+              problems << {path, %(<using lexer="#{lexer}"> names no bundled or custom lexer; code blocks that reach it fall back to plain)} unless Tartrazine.hwaro_lexer_known?(lexer, custom)
             end
           end
           {grammars, problems, grammars.empty? ? "" : md5.final.hexstring}

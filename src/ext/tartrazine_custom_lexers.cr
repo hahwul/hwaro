@@ -112,7 +112,7 @@ module Tartrazine
         end
       when "using"
         lexer = node["lexer"]?.try(&.downcase)
-        usings << lexer if lexer && !names.includes?(lexer) && !hwaro_bundled_lexer?(lexer)
+        usings << lexer if lexer && !hwaro_lexer_known?(lexer, names)
       end
       next unless HWARO_STATE_REFS.includes?(node.name)
       node.attributes.each do |attr|
@@ -156,9 +156,13 @@ module Tartrazine
     nil
   end
 
-  # Whether `name` (lowercased) is a bundled lexer `lexer_by_name` finds.
-  private def self.hwaro_bundled_lexer?(name : String) : Bool
-    LEXERS_BY_NAME.has_key?(HWARO_LEXER_ALIASES.fetch(name, name)) || name.includes?('+')
+  # Whether `lexer_by_name` resolves `name` (lowercased), given the custom
+  # lexer names in `custom`: a custom or bundled name, or `a+b` (a
+  # delegating lexer, split at the first `+`) whose halves both resolve.
+  def self.hwaro_lexer_known?(name : String, custom : Enumerable(String)) : Bool
+    return true if custom.includes?(name) || LEXERS_BY_NAME.has_key?(HWARO_LEXER_ALIASES.fetch(name, name))
+    language, plus, root = name.partition('+')
+    !plus.empty? && hwaro_lexer_known?(language, custom) && hwaro_lexer_known?(root, custom)
   end
 
   # Why File.match? would raise for `glob`, or nil. It only raises once a
