@@ -200,6 +200,9 @@ module Hwaro::Core::Build::Phases::Render
     # count it. Read here, not pruned from site.taxonomies, because every
     # serve pass re-claims the winners before building these vars.
     suppressed = site.pages.any?(&.output_suppressed)
+    # A root term's `_index.md` adds its title/description to the term object.
+    # (Content::Taxonomies.match_term_metadata), by term page URL.
+    term_meta = site.sections.select(&.term_metadata).index_by(&.url)
     site.taxonomies.each do |name, terms|
       if suppressed
         terms = terms.transform_values(&.reject(&.output_suppressed)).reject! { |_, term_pages| term_pages.empty? }
@@ -270,12 +273,17 @@ module Hwaro::Core::Build::Phases::Render
             tax_map[term] = lang_slugs[term]? || slug
           end
         end
-        Crinja::Value.new({
+        term_obj = {
           "name"  => Crinja::Value.new(term),
           "slug"  => Crinja::Value.new(slug),
           "pages" => Crinja::Value.new(term_pages_array),
           "count" => Crinja::Value.new(term_pages.size),
-        })
+        }
+        if has_root && !term_meta.empty? && (meta = term_meta["/#{name}/#{slug}/"]?)
+          term_obj["title"] = Crinja::Value.new(meta.untitled? ? term : meta.title)
+          term_obj["description"] = Crinja::Value.new(meta.description || "")
+        end
+        Crinja::Value.new(term_obj)
       end
       taxonomies_hash[name] = Crinja::Value.new({
         "name"  => Crinja::Value.new(name),

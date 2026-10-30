@@ -112,6 +112,47 @@ under its prefix (`/ko/tags/crystal/`), listing only that language's pages.
 `[languages.<code>] taxonomies` picks which taxonomies a language generates
 (every `[[taxonomies]]` name when omitted); see [Multilingual](/features/multilingual/).
 
+## Term Pages from Content
+
+A term page can carry its own title, description and text. Put an `_index.md` in `content/<taxonomy>/<slug>/`, where `<slug>` is the last segment of the term page's URL:
+
+```markdown
++++
+title = "Crystal"
+description = "Posts about the Crystal language"
+image = "/images/crystal.png"
+
+[extra]
+icon = "gem"
++++
+
+Crystal is a compiled language with Ruby-like syntax.
+```
+
+`content/tags/crystal/_index.md` decorates `/tags/crystal/`. The directory name is the term's URL slug, not its spelling: the term `Rust Lang` lives at `/tags/rust-lang/`, so its file is `content/tags/rust-lang/_index.md`. When two terms share a slug (`C#` and `C++` both slugify to `c`), the second one's page is `/tags/c-2/` and its file is `content/tags/c-2/_index.md`.
+
+On the term page:
+
+- `page.title`, `page.description`, `page.image` and `page.extra` take the file's values. Without a `title`, the generated "Tags: crystal" stays. The `<title>`, og/twitter tags and the term's RSS feed title use the same values.
+- `term_content` is the file's rendered body. Markdown, shortcodes, syntax highlighting and `@/` links are processed like any other page, and `[links]` checks report its broken `@/` links and its broken anchors into other pages. Links pointing into the term page itself (`@/tags/crystal/_index.md#part`, or a `#part` link inside the body) are not anchor-checked. `content` stays the generated page list, so existing templates keep working; print `{{ term_content }}` where the text should go.
+- `aliases` in the file become redirects to the term page, which is useful when a tag is renamed. An alias that names a generated taxonomy page or one of its `page/N/` pages, or that another page already claims, is not written; the build warns.
+- `template` is ignored (the build warns): term pages always render with `taxonomy_term.html`, falling back to `taxonomy.html`, then `page.html`.
+- [`get_taxonomy()`](#get-taxonomy-function) terms get `title` and `description` from the file (default-language files only, since `get_taxonomy()` is a site-wide view). Terms without a file have no `title` key, so use `{{ term.title or term.name }}`.
+
+On a multilingual site each language reads its own file: `content/tags/crystal/_index.ko.md` decorates `/ko/tags/crystal/`.
+
+A file only counts as term metadata when all of these hold:
+
+- it is an `_index` file exactly two levels below `content/`, in a directory named after a configured taxonomy (`content/tags/<dir>/_index.md`);
+- the build generates a term page for that taxonomy in the file's language (some published page in that language carries the term and keeps its own URL, i.e. doesn't lose an output-path collision to another page, and `[languages.<code>] taxonomies` doesn't leave the taxonomy out);
+- the file would publish at that term page's URL: `<dir>` is the term's URL slug, and no `path` front matter or `[permalinks]` rule moves the section elsewhere.
+
+Such a file is not published as a page of its own. It stays out of the sitemap, feeds, search index, llms.txt and page listings (`section.pages`), so the term URL appears once. `get_section()` still finds it, and its parent's `subsections` still list it, with the term page's URL. If two files match the same term page (`_index.md` beside `_index.markdown`), `_index.md` wins and the build warns about the other.
+
+Any other `_index.md` under `content/tags/` is an ordinary section and publishes as before. Pages nested inside a term directory, such as `content/tags/crystal/notes.md`, always publish as ordinary pages.
+
+`content/<taxonomy>/_index.md` (one level up) is different: the generated term list still replaces it at `/tags/`, and the build warns about the replacement as before. Sites use it to put the taxonomy into menus.
+
 ## Templates
 
 Both templates receive a ready-made listing as `{{ content }}`: the term list in `taxonomy.html`, the page list in `taxonomy_term.html`. For custom markup, use [`get_taxonomy()`](#get-taxonomy-function) instead of `content`.
@@ -179,6 +220,7 @@ Available in both `taxonomy.html` and `taxonomy_term.html`:
 | taxonomy_name | String | Taxonomy name ("tags") |
 | taxonomy_term | String | Current term name (empty on the index page) |
 | content | String | Pre-rendered listing HTML (terms or pages) |
+| term_content | String | Rendered body of the term's `_index.md` (term pages only; empty without one). See [Term Pages from Content](#term-pages-from-content) |
 
 ### Term Object
 
@@ -188,6 +230,8 @@ Available in both `taxonomy.html` and `taxonomy_term.html`:
 | slug | String | URL-safe name |
 | pages | Array<Page> | Pages with this term |
 | count | Int | Number of pages |
+| title | String | Title from the term's `_index.md` (only when that file exists) |
+| description | String | Description from the term's `_index.md` (only when that file exists) |
 
 ## get_taxonomy() Function
 

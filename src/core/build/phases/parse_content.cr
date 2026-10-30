@@ -17,6 +17,10 @@ module Hwaro::Core::Build::Phases::ParseContent
 
     # Link multilingual translations between pages/sections (for language switchers)
     if config = ctx.config
+      # First, while nothing downstream has read `render` yet: translations,
+      # navigation, listings, output claims, the cache fingerprints and every
+      # discovery surface then see a matched term `_index.md` as headless.
+      mark_term_metadata(ctx.sections, match_term_files(ctx.pages, ctx.sections, config))
       Content::Multilingual.link_translations!(ctx.all_pages, config)
       Content::Versions.link!(ctx.all_pages, config)
     end
@@ -855,6 +859,54 @@ module Hwaro::Core::Build::Phases::ParseContent
     end
   end
 
+  # Content::Taxonomies.match_term_metadata over the pages that will publish:
+  # a page that loses its URL to another (a dry run of the render phase's
+  # claims, which run later) puts no term page up. A matched file is
+  # headless and claims nothing; an unmatched one publishes and claims its
+  # URL — and may beat the only page carrying some other term — so the
+  # claims and the match are iterated until they agree.
+  protected def match_term_files(pages : Array(Models::Page), sections : Array(Models::Section), config : Models::Config) : Hash(String, Content::Taxonomies::TermFile)
+    matches = {} of String => Content::Taxonomies::TermFile
+    candidates, others = sections.partition { |s| Content::Taxonomies.term_metadata_path?(s.path, config) }
+    return matches if candidates.empty?
+    # ponytail: fixed-point loop, capped; a site needs chained collisions
+    # between term files and pages to take more than two rounds.
+    4.times do
+      writers = (pages + others + candidates.reject { |s| matches.has_key?(s.path) }).as(Array(Models::Page))
+      losers = output_losers(writers)
+      found = Content::Taxonomies.match_term_metadata(losers.empty? ? pages : pages.reject { |p| losers.includes?(p.path) }, sections, config)
+      break if found == matches
+      matches = found
+    end
+    matches
+  end
+
+  # Make each `content/<taxonomy>/<slug>/_index.md` that matched a generated
+  # term page (Content::Taxonomies.match_term_metadata) headless: the term
+  # page carries its values, and only the term page publishes the URL. Its
+  # URL becomes the term page's, so its aliases and `get_section` point
+  # there. A section no term page takes is left exactly as parsed.
+  protected def mark_term_metadata(sections : Array(Models::Section), matches : Hash(String, Content::Taxonomies::TermFile)) : Nil
+    return if matches.empty?
+    sections.each do |section|
+      next unless file = matches[section.path]?
+      section.render = false
+      section.term_page_url = file.url
+      if winner = file.shadowed_by
+        Logger.warn "content/#{section.path} is ignored: content/#{winner} already describes the term page #{file.url}. Remove one of them."
+        next
+      end
+      section.term_metadata = true
+      unless section.url == file.url
+        section.url = file.url
+        section.permalink = nil
+      end
+      if section.front_matter_keys.includes?("template")
+        Logger.warn "content/#{section.path}: `template` is ignored — a taxonomy term page renders with taxonomy_term.html (or taxonomy.html, page.html)."
+      end
+    end
+  end
+
   # Template lookups are keyed by extension-stripped names ("section", not
   # "section.html"), but users coming from Zola write `template = "section.html"`
   # in frontmatter. Strip the known template extensions here so both spellings
@@ -934,6 +986,8 @@ module Hwaro::Core::Build::Phases::ParseContent
     page.front_matter_keys = data[:front_matter_keys]
     page.taxonomy_name = nil
     page.taxonomy_term = nil
+    page.term_page_url = nil
+    page.term_metadata = false
 
     # New fields assignment
     page.authors = data[:authors]
@@ -1212,7 +1266,8 @@ module Hwaro::Core::Build::Phases::ParseContent
   # Merge ancestor cascades (root → leaf) for `page` and apply the values the
   # page did not set itself. Also stamps `page.cascade_fingerprint` so the
   # build cache invalidates descendants when a parent cascade changes.
-  protected def apply_cascade_to(page : Models::Page, cascade_map : Hash(Tuple(String, String), Hash(String, Models::ExtraValue)))
+  # Public for doctor, which resolves cascaded taxonomy terms the same way.
+  def apply_cascade_to(page : Models::Page, cascade_map : Hash(Tuple(String, String), Hash(String, Models::ExtraValue)))
     merged = merged_cascade_for(page, cascade_map)
     page.cascade_fingerprint = merged.empty? ? "" : cascade_fingerprint(merged)
     return if merged.empty?

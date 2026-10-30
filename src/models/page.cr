@@ -207,6 +207,15 @@ module Hwaro
       # own sitemap points at.
       property output_suppressed : Bool = false
 
+      # A `content/<taxonomy>/<slug>/_index.md` matched to the term page this
+      # build generates at `term_page_url` (Content::Taxonomies.
+      # match_term_metadata). Such a section is headless: `term_metadata` (the
+      # file that won that page) lends it its title, description, extra,
+      # image, body and aliases; a losing duplicate only stays unpublished.
+      # Set after parsing (Builder#mark_term_metadata), reset by every parse.
+      property term_page_url : String? = nil
+      property term_metadata : Bool = false
+
       # Runtime / Computed Properties
       property content : String
       property raw_content : String

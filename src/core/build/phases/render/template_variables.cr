@@ -46,6 +46,9 @@ module Hwaro::Core::Build::Phases::Render
     vars["__page_path__"] = Crinja::Value.new(page.path)
     vars["taxonomy_name"] = Crinja::Value.new(page.taxonomy_name || "")
     vars["taxonomy_term"] = Crinja::Value.new(page.taxonomy_term || "")
+    # A term page's authored `_index.md` body ("" without one); see
+    # Content::Taxonomies.match_term_metadata.
+    vars["term_content"] = Crinja::Value.new(page.content) if page.generated && page.taxonomy_term
     default_lang = config.default_language
     page_language = page.language || default_lang
     vars["page_language"] = Crinja::Value.new(page_language)
@@ -72,7 +75,10 @@ module Hwaro::Core::Build::Phases::Render
 
     # Reuse cached Crinja arrays for tags/authors/assets/extra/translations
     # (avoids per-page .map allocation)
-    cached_page_val = cached_page_crinja_value(page, default_lang)
+    # Not for generated taxonomy pages: `/tags/x/` and `/ko/tags/x/` share
+    # one path but not their term `_index.md` values (`extra`), and nothing
+    # else reads them through the cache.
+    cached_page_val = page.generated ? build_page_crinja_value(page, default_lang) : cached_page_crinja_value(page, default_lang)
     cached_raw = cached_page_val.raw.as(Hash)
     tags_crinja = cached_raw["tags"].as(Crinja::Value)
     authors_crinja = cached_raw["authors"].as(Crinja::Value)

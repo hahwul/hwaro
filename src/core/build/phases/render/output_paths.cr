@@ -74,75 +74,29 @@ module Hwaro::Core::Build::Phases::Render
     # filesystem actually folds — suppressing on a case-sensitive host would
     # stop publishing a page that legitimately has both spellings there.
     by_fold = Hash(String, String).new
-    folds_case : Bool? = nil
 
-    # Authored pages claim before `[[content.generate]]` pages: when a
-    # generated slug lands on an authored URL, the authored page must own
-    # the file deterministically — never "whichever path sorts first".
-    # Sites without generated pages sort identically to the plain
-    # path sort this replaces (every key is {0, path}).
-    writers = all_pages.select(&.render).sort_by! { |p| {p.synthesized? ? 1 : 0, p.path} }
+    writers = output_writers(all_pages)
+    page_by_path = writers.index_by(&.path)
 
     # Cleared before every pass, not just set: this runs again on incremental
     # and serve rerenders, so a collision the author has since resolved must
     # stop suppressing the page (and its sitemap/feed/search entries).
     all_pages.each(&.output_suppressed=(false))
 
-    writers.each do |page|
-      url = page.url
-      if prev_path = winners[url]?
-        Logger.warn "Duplicate output path '#{url}' — '#{page.path}' collides with '#{prev_path}' and is not written"
-        page.output_suppressed = true
-        next
-      end
-
-      # nil = this URL is unpublishable (a segment traverses or hides a
-      # separator); write_output refuses it by itself and it claims nothing.
-      # It still has to be marked suppressed: the discovery surfaces
-      # (sitemap, feeds, search index, llms.txt) and the auto-OG generator
-      # only consult `output_suppressed`, so without this the build warned
-      # "Not publishing", wrote no file, and then advertised the URL in
-      # sitemap.xml and search.json anyway — and rendered an OG image for it.
-      file_key = Utils::PathUtils.output_file_key(url)
-      page.output_suppressed = true if file_key.nil?
-      if file_key
-        if prev_path = by_file[file_key]?
-          Logger.warn "Duplicate output path '#{url}' — '#{page.path}' collides with '#{prev_path}' and is not written"
-          # Point the loser's own URL key at the winner: every sink asks
-          # `collision_suppressed?(page, page.url)`, so this is what makes the
-          # warning true instead of merely informative.
-          winners[url] = prev_path
-          page.output_suppressed = true
-          next
-        end
-
-        fold_key = Utils::PathUtils.output_fold_key(file_key)
-        if prev_path = by_fold[fold_key]?
-          Logger.warn "Duplicate output path '#{url}' — '#{page.path}' differs from '#{prev_path}' only in letter case or Unicode form, which name the same file on macOS and Windows"
-          # Probed lazily: a collision like this is rare, and the probe costs
-          # two stat calls. `Dir.current` stands in for the output directory,
-          # which hwaro always writes inside the project it was invoked on.
-          folds_case = Utils::PathUtils.case_folding_fs?(Dir.current) if folds_case.nil?
-          if folds_case
-            winners[url] = prev_path
-            page.output_suppressed = true
-            next
-          end
-        else
-          by_fold[fold_key] = page.path
-        end
-
-        by_file[file_key] = page.path
-      end
-
-      winners[url] = page.path
-    end
+    suppressed, folds_case = claim_page_urls(writers, winners, by_file, by_fold)
+    suppressed.each { |path| page_by_path[path].output_suppressed = true } unless suppressed.empty?
 
     # Snapshot before the alias pass: only a page's own HTML counts as
     # authored output for the generated writers (see `page_output_owner`).
     @page_output_files = by_file.dup
 
-    writers.each do |page|
+    # A term `_index.md` writes no page, but its aliases redirect to its term
+    # page (Builder#write_term_aliases), so they claim like any other.
+    alias_owners = writers
+    if all_pages.any?(&.term_metadata)
+      alias_owners = (writers + all_pages.select(&.term_metadata)).sort_by! { |p| {p.synthesized? ? 1 : 0, p.path} }
+    end
+    alias_owners.each do |page|
       page.aliases.each do |a|
         norm = Utils::PathUtils.normalize_alias_url(a)
         if prev_path = winners[norm]?
@@ -193,6 +147,89 @@ module Hwaro::Core::Build::Phases::Render
     end
 
     winners
+  end
+
+  # Pages that write their own HTML, in claim order. Authored pages claim
+  # before `[[content.generate]]` pages: when a generated slug lands on an
+  # authored URL, the authored page must own the file deterministically —
+  # never "whichever path sorts first". Sites without generated pages sort
+  # identically to the plain path sort this replaces (every key is {0, path}).
+  private def output_writers(pages : Array(Models::Page)) : Array(Models::Page)
+    pages.select(&.render).sort_by! { |p| {p.synthesized? ? 1 : 0, p.path} }
+  end
+
+  # The URL-claim pass of compute_output_url_winners: fills `winners`,
+  # `by_file` and `by_fold` and returns the paths of the writers that lose
+  # their URL (plus whether the filesystem folds case, when it was probed).
+  # `quiet` is the dry run the parse phase takes to know, before the render
+  # phase claims for real, which pages will publish (ParseContent's term
+  # metadata match).
+  private def claim_page_urls(
+    writers : Array(Models::Page),
+    winners : Hash(String, String),
+    by_file : Hash(String, String),
+    by_fold : Hash(String, String),
+    quiet : Bool = false,
+  ) : {Set(String), Bool?}
+    suppressed = Set(String).new
+    folds_case : Bool? = nil
+    writers.each do |page|
+      url = page.url
+      if prev_path = winners[url]?
+        Logger.warn "Duplicate output path '#{url}' — '#{page.path}' collides with '#{prev_path}' and is not written" unless quiet
+        suppressed << page.path
+        next
+      end
+
+      # nil = this URL is unpublishable (a segment traverses or hides a
+      # separator); write_output refuses it by itself and it claims nothing.
+      # It still has to be marked suppressed: the discovery surfaces
+      # (sitemap, feeds, search index, llms.txt) and the auto-OG generator
+      # only consult `output_suppressed`, so without this the build warned
+      # "Not publishing", wrote no file, and then advertised the URL in
+      # sitemap.xml and search.json anyway — and rendered an OG image for it.
+      file_key = Utils::PathUtils.output_file_key(url)
+      suppressed << page.path if file_key.nil?
+      if file_key
+        if prev_path = by_file[file_key]?
+          Logger.warn "Duplicate output path '#{url}' — '#{page.path}' collides with '#{prev_path}' and is not written" unless quiet
+          # Point the loser's own URL key at the winner: every sink asks
+          # `collision_suppressed?(page, page.url)`, so this is what makes the
+          # warning true instead of merely informative.
+          winners[url] = prev_path
+          suppressed << page.path
+          next
+        end
+
+        fold_key = Utils::PathUtils.output_fold_key(file_key)
+        if prev_path = by_fold[fold_key]?
+          Logger.warn "Duplicate output path '#{url}' — '#{page.path}' differs from '#{prev_path}' only in letter case or Unicode form, which name the same file on macOS and Windows" unless quiet
+          # Probed lazily: a collision like this is rare, and the probe costs
+          # two stat calls. `Dir.current` stands in for the output directory,
+          # which hwaro always writes inside the project it was invoked on.
+          folds_case = Utils::PathUtils.case_folding_fs?(Dir.current) if folds_case.nil?
+          if folds_case
+            winners[url] = prev_path
+            suppressed << page.path
+            next
+          end
+        else
+          by_fold[fold_key] = page.path
+        end
+
+        by_file[file_key] = page.path
+      end
+
+      winners[url] = page.path
+    end
+
+    {suppressed, folds_case}
+  end
+
+  # The writers that would lose their URL to another page; no warnings, no
+  # page state touched.
+  private def output_losers(pages : Array(Models::Page)) : Set(String)
+    claim_page_urls(output_writers(pages), {} of String => String, {} of String => String, {} of String => String, quiet: true)[0]
   end
 
   # The section whose render writes the pager page `url`
@@ -297,7 +334,7 @@ module Hwaro::Core::Build::Phases::Render
     target
   end
 
-  private def generate_aliases(page : Models::Page, site : Models::Site, output_dir : String, verbose : Bool)
+  private def generate_aliases(page : Models::Page, site : Models::Site, output_dir : String, verbose : Bool, except : Set(String)? = nil)
     own_url = Utils::PathUtils.normalize_alias_url(page.url)
     # The page's own output FILE, not just its URL string: `/about/`,
     # `/about//` and `/about/index.html` are three spellings of
@@ -317,6 +354,7 @@ module Hwaro::Core::Build::Phases::Render
       next if norm == own_url
       next if own_file_key && Utils::PathUtils.output_file_key(norm) == own_file_key
       next if collision_suppressed?(page, norm)
+      next if except.try(&.includes?(norm))
 
       alias_clean = url_output_path(alias_path.lchop("/"))
       unless alias_clean

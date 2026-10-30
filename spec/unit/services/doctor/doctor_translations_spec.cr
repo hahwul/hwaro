@@ -125,6 +125,53 @@ describe "Hwaro::Services::Doctor translations" do
     end
   end
 
+  # gh#891: every language generates its own term page; the file only
+  # decorates it, so a missing or lone translation is no one's gap.
+  it "skips taxonomy term _index files" do
+    config = TRANSLATIONS_CONFIG + %(\n[[taxonomies]]\nname = "tags"\n)
+    summarize(translation_issues({
+      "a.md"                 => PAGE,
+      "a.ko.md"              => PAGE,
+      "a.ja.md"              => PAGE,
+      "b.md"                 => "+++\ntitle = \"B\"\ntags = [\"rust\"]\n+++\n",
+      "b.ko.md"              => "+++\ntitle = \"B\"\ntags = [\"go\"]\n+++\n",
+      "b.ja.md"              => PAGE,
+      "tags/rust/_index.md"  => PAGE,
+      "tags/go/_index.ko.md" => PAGE,
+    }, config)).should be_empty
+  end
+
+  it "still checks a taxonomy-directory section no term page takes" do
+    config = TRANSLATIONS_CONFIG.sub(%(language_name = "Korean"), %(language_name = "Korean"\ntaxonomies = []))
+    config += %(\n[[taxonomies]]\nname = "tags"\n)
+    summarize(translation_issues({
+      "a.md"                    => "+++\ntitle = \"A\"\ntags = [\"rust\"]\n+++\n",
+      "a.ko.md"                 => "+++\ntitle = \"A\"\ntags = [\"rust\"]\n+++\n",
+      "a.ja.md"                 => PAGE,
+      "tags/notes/_index.md"    => PAGE,
+      "tags/notes/_index.ja.md" => PAGE,
+      "tags/rust/_index.ko.md"  => PAGE,
+    }, config)).should eq([
+      "ko translation-missing tags/notes/_index.md",
+      "ko translation-orphan tags/rust/_index.ko.md",
+    ])
+  end
+
+  # The matched `_index.md` is headless in the build, so the ko section that
+  # no ko term page takes has no original to pair with.
+  it "reports a term-directory translation whose original describes a term page" do
+    config = TRANSLATIONS_CONFIG.sub(%(language_name = "Korean"), %(language_name = "Korean"\ntaxonomies = []))
+    config += %(\n[[taxonomies]]\nname = "tags"\n)
+    summarize(translation_issues({
+      "a.md"                   => "+++\ntitle = \"A\"\ntags = [\"rust\"]\n+++\n",
+      "a.ko.md"                => PAGE,
+      "a.ja.md"                => "+++\ntitle = \"A\"\ntags = [\"rust\"]\n+++\n",
+      "tags/rust/_index.md"    => PAGE,
+      "tags/rust/_index.ja.md" => PAGE,
+      "tags/rust/_index.ko.md" => PAGE,
+    }, config)).should eq(["ko translation-orphan tags/rust/_index.ko.md"])
+  end
+
   it "reports nothing on a single-language site" do
     translation_issues({"a.md" => PAGE, "a.ko.md" => PAGE}, %(title = "T"\nbase_url = "https://example.com"\n)).should be_empty
   end

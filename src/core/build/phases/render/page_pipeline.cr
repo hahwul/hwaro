@@ -234,6 +234,68 @@ module Hwaro::Core::Build::Phases::Render
     page.warned_messages.clear
   end
 
+  # The bodies of term `_index.md` files (`Page#term_metadata`): headless, so
+  # no page render writes them, yet each is its term page's `term_content`.
+  # Rendered by the pass that renders pages — all of them on a full build,
+  # only the ones a serve edit can have changed on a partial one — BEFORE its
+  # `[links]` checks, so their `@/` links and anchors are reported (or fail
+  # the build) like any page's. The taxonomy generator reads the result from
+  # `page.content`, which keeps the last render between serve passes.
+  private def render_term_bodies(
+    sections : Array(Models::Section),
+    site : Models::Site,
+    templates : Hash(String, String),
+    highlight : Bool,
+    global_vars : Hash(String, Crinja::Value),
+    parallel : Bool,
+  ) : Nil
+    pages = sections.select(&.term_metadata).map(&.as(Models::Page))
+    return if pages.empty?
+    safe = site.config.markdown.safe
+    render = ->(page : Models::Page, env : Crinja?, cache : Hash(UInt64, Crinja::Template)?) do
+      page.build_warnings.clear
+      render_page_content(page, site, templates, highlight, safe, global_vars,
+        crinja_env_override: env, template_cache_override: cache)
+      nil
+    end
+    if parallel && pages.size > 1
+      worker_count = render_worker_count(pages, site, templates, pages.size)
+      worker_envs = Array.new(worker_count) { create_fresh_crinja_env }
+      worker_caches = Array.new(worker_count) { {} of UInt64 => Crinja::Template }
+      ParallelHelper.each_concurrently(pages, worker_count) do |page, worker_id|
+        render.call(page, worker_envs[worker_id], worker_caches[worker_id])
+      end
+    else
+      pages.each { |page| render.call(page, nil, nil) }
+    end
+  end
+
+  # A term `_index.md`'s `aliases`: redirect stubs to its term page (the
+  # section's URL is the term page's, see ParseContent#mark_term_metadata),
+  # claimed as taxonomy outputs so a removed alias is pruned like a removed
+  # term page. An alias another page or alias owns lost its claim in
+  # compute_output_url_winners (which warned); one naming a taxonomy index
+  # or term page this pass writes (`taxonomy_urls`), or a pager page of one,
+  # is refused here.
+  private TAXONOMY_PAGER_SUFFIX = /page\/[1-9]\d*\/\z/
+
+  def write_term_aliases(page : Models::Section, site : Models::Site, output_dir : String, verbose : Bool, taxonomy_urls : Set(String)) : Nil
+    return if page.aliases.empty?
+    refused = Set(String).new
+    page.aliases.each do |a|
+      norm = Utils::PathUtils.normalize_alias_url(a)
+      # A taxonomy URL itself or one of its pager pages (`<url>page/N/`;
+      # generated taxonomy pages keep the default paginate_path).
+      pager_base = norm.sub(TAXONOMY_PAGER_SUFFIX, "")
+      next if norm == page.url || !(taxonomy_urls.includes?(norm) || taxonomy_urls.includes?(pager_base)) || !refused.add?(norm)
+      Logger.warn "Duplicate alias output path '#{norm}' — alias on '#{page.path}' collides with the generated taxonomy page '#{norm}' and is not written"
+    end
+    clear_page_derived_outputs(page.path)
+    generate_aliases(page, site, output_dir, verbose, except: refused)
+    written = @page_derived_mutex.synchronize { @page_derived_outputs.delete(page.path) }
+    written.try(&.each { |path| claim_generated_output(path) })
+  end
+
   private def render_page(
     page : Models::Page,
     site : Models::Site,

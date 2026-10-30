@@ -1046,6 +1046,47 @@ describe Hwaro::Services::Doctor do
         missing.any?(&.includes?("guides/")).should be_true
       end
 
+      # gh#891: `tags/<term>/_index.md` decorates a generated term page, and
+      # the build generates `/tags/` itself.
+      it "does not ask for an _index.md in a taxonomy directory holding term files" do
+        issues = run_doctor(base_config + %(\n[[taxonomies]]\nname = "tags"\n),
+          {"tags/rust/_index.md" => "+++\ntitle = \"Rust\"\n+++\n", "tags/go/_index.md" => "+++\ntitle = \"Go\"\n+++\n",
+           "post.md" => "+++\ntitle = \"P\"\ntags = [\"rust\", \"go\"]\n+++\n",
+           "guides/a/b.md" => "+++\ntitle = \"B\"\n+++\n"})
+        missing = issues.select { |i| i.id == "structure-missing-index" }.map(&.message)
+        missing.any?(&.includes?("tags/")).should be_false
+        missing.any?(&.includes?("guides/")).should be_true
+      end
+
+      # `[content] ignore`: an ignored post puts no term page up, so its
+      # term's file is an ordinary section and `tags/` a section directory.
+      it "reads term files over the ignore-aware page set" do
+        config = base_config + %(\n[[taxonomies]]\nname = "tags"\n\n[content]\nignore = ["hidden.md"]\n)
+        files = {"tags/go/_index.md" => "+++\ntitle = \"Go\"\n+++\n",
+                 "hidden.md"         => "+++\ntitle = \"H\"\ntags = [\"go\"]\n+++\n"}
+        run_doctor(config, files).select { |i| i.id == "structure-missing-index" }.map(&.message).any?(&.includes?("tags/")).should be_true
+      end
+
+      it "counts cascaded terms when deciding a taxonomy directory holds term files" do
+        issues = run_doctor(base_config + %(\n[[taxonomies]]\nname = "tags"\n),
+          {"tags/rust/_index.md" => "+++\ntitle = \"Rust\"\n+++\n",
+           "posts/_index.md"     => "+++\ntitle = \"Posts\"\n[cascade]\ntags = [\"rust\"]\n+++\n",
+           "posts/a.md"          => "+++\ntitle = \"A\"\n+++\n"})
+        issues.select { |i| i.id == "structure-missing-index" }.map(&.message).any?(&.includes?("tags/")).should be_false
+      end
+
+      # Only files a term page takes are exempt: an ordinary section under a
+      # taxonomy directory still is one.
+      it "still asks for an _index.md when a taxonomy directory holds ordinary sections" do
+        issues = run_doctor(base_config + %(\n[[taxonomies]]\nname = "tags"\n\n[[taxonomies]]\nname = "authors"\n),
+          {"tags/rust/_index.md" => "+++\ntitle = \"Rust\"\n+++\n", "tags/notes/_index.md" => "+++\ntitle = \"Notes\"\n+++\n",
+           "authors/a/b.md" => "+++\ntitle = \"B\"\n+++\n",
+           "post.md" => "+++\ntitle = \"P\"\ntags = [\"rust\"]\n+++\n"})
+        missing = issues.select { |i| i.id == "structure-missing-index" }.map(&.message)
+        missing.any?(&.includes?("tags/")).should be_true
+        missing.any?(&.includes?("authors/")).should be_true
+      end
+
       it "reports info when section dir missing _index.md" do
         Dir.mktmpdir do |dir|
           config_path = File.join(dir, "config.toml")

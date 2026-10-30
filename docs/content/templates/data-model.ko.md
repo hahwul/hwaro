@@ -753,6 +753,9 @@ pros = ["Fast", "Reliable"]
 | taxonomy_name | String | 택소노미 이름(예: "tags") |
 | taxonomy_term | String | 현재 항목 이름(인덱스 페이지에서는 빈 문자열) |
 | content | String | 미리 렌더링된 목록 HTML(항목 또는 페이지) |
+| term_content | String | 항목의 `content/<taxonomy>/<slug>/_index.md` 본문을 렌더링한 HTML(항목 페이지 전용, 파일이 없으면 빈 문자열) |
+
+`_index.md`가 있는 항목 페이지에서는 `page.title`, `page.description`, `page.image`, `page.extra`가 그 파일의 값을 따릅니다. [콘텐츠로 항목 페이지 꾸미기](/ko/writing/taxonomies/#콘텐츠로-항목-페이지-꾸미기)를 참고합니다.
 
 목록을 직접 구성하려면 `get_taxonomy()`를 사용합니다. [택소노미](/ko/writing/taxonomies/)를 참고합니다.
 

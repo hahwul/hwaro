@@ -756,6 +756,9 @@ Available in taxonomy templates:
 | taxonomy_name | String | Taxonomy name (e.g., "tags") |
 | taxonomy_term | String | Current term name (empty on the index page) |
 | content | String | Pre-rendered listing HTML (terms or pages) |
+| term_content | String | Rendered body of the term's `content/<taxonomy>/<slug>/_index.md` (term pages only; empty without one) |
+
+On a term page with an `_index.md`, `page.title`, `page.description`, `page.image` and `page.extra` come from that file. See [Term Pages from Content](/writing/taxonomies/#term-pages-from-content).
 
 For custom listings, use `get_taxonomy()`. See [Taxonomies](/writing/taxonomies/).
 
