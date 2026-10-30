@@ -310,4 +310,150 @@ describe "taxonomy term _index.md metadata" do
       File.read(term).should start_with("T=Tags: rust|D=|X=|B=|")
     end
   end
+  it "keeps a term file's aliases off other term pages and other claims" do
+    log = with_captured_log do
+      build_site(CONFIG,
+        content_files: {
+          "posts/p1.md"          => post("P1", ["solo", "other", "hello"]),
+          "tags/solo/_index.md"  => "+++\ntitle = \"Solo\"\naliases = [\"/shared/\", \"/tags/hello/\"]\n+++\n",
+          "tags/other/_index.md" => "+++\ntitle = \"Other\"\naliases = [\"/shared/\"]\n+++\n",
+        },
+        template_files: TEMPLATES) do |dir|
+        File.read(File.join(dir, "public/tags/hello/index.html")).should start_with("T=Tags: hello|")
+        File.read(File.join(dir, "public/shared/index.html")).should contain("https://ex.com/tags/other/")
+      end
+    end
+    log.scan("alias on 'tags/solo/_index.md' collides with 'tags/other/_index.md'").size.should eq(1)
+    log.scan("alias on 'tags/solo/_index.md' collides with the generated taxonomy page '/tags/hello/'").size.should eq(1)
+  end
+
+  it "renders term bodies in a parallel build" do
+    build_site(CONFIG,
+      content_files: {
+        "posts/p1.md"      => post("P1", ["a", "b", "c"]),
+        "tags/a/_index.md" => "+++\ntitle = \"A\"\n+++\nbody a\n",
+        "tags/b/_index.md" => "+++\ntitle = \"B\"\n+++\nbody b\n",
+        "tags/c/_index.md" => "+++\ntitle = \"C\"\n+++\nbody c\n",
+      },
+      template_files: TEMPLATES, parallel: true) do |dir|
+      %w[a b c].each do |t|
+        File.read(File.join(dir, "public/tags/#{t}/index.html")).should start_with("T=#{t.upcase}|D=|X=|B=<p>body #{t}</p>")
+      end
+    end
+  end
+
+  it "prints term_content on every page of a paginated term" do
+    build_site(CONFIG.sub(%(feed = true), %(feed = true\npaginate_by = 1)),
+      content_files: {
+        "posts/p1.md"         => post("P1", ["rust"]),
+        "posts/p2.md"         => post("P2", ["rust"]),
+        "tags/rust/_index.md" => "+++\ntitle = \"Rust\"\n+++\nintro\n",
+      },
+      template_files: TEMPLATES) do |dir|
+      File.read(File.join(dir, "public/tags/rust/index.html")).should contain("B=<p>intro</p>")
+      File.read(File.join(dir, "public/tags/rust/page/2/index.html")).should contain("B=<p>intro</p>")
+    end
+  end
+
+  # Both pages claim `/dup/`; b.md loses, so `solo` (only on b.md) gets no
+  # term page and the file stays the ordinary section it was.
+  it "keeps a file publishing when its term's only page loses an output collision" do
+    build_site(CONFIG,
+      content_files: {
+        "a.md"                => "+++\ntitle = \"A\"\npath = \"dup\"\n+++\n",
+        "b.md"                => "+++\ntitle = \"B\"\npath = \"dup\"\ntags = [\"solo\"]\n+++\n",
+        "tags/solo/_index.md" => "+++\ntitle = \"Solo section\"\n+++\n",
+      },
+      template_files: TEMPLATES) do |dir, builder|
+      dest = File.join(dir, "public/tags/solo/index.html")
+      File.read(dest).should start_with("SECTION=Solo section|")
+
+      # A serve pass agrees with the cold build.
+      options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)
+      options.serve_mode = true
+      options.preserve_output = true
+      File.write("content/a.md", "+++\ntitle = \"A2\"\npath = \"dup\"\n+++\n")
+      builder.run_incremental(["content/a.md"], options).should be_true
+      File.read(dest).should start_with("SECTION=Solo section|")
+    end
+  end
+
+  it "refreshes get_taxonomy() titles on a --cache build" do
+    build_site(CONFIG,
+      content_files: {"posts/p1.md" => post("P1", ["rust"]), "tags/rust/_index.md" => "+++\ntitle = \"Old\"\n+++\n"},
+      template_files: TEMPLATES, cache: true) do |dir, builder|
+      File.read(File.join(dir, "public/posts/p1/index.html")).should eq("P1|rust=Old/;")
+      File.write("content/tags/rust/_index.md", "+++\ntitle = \"New\"\n+++\n")
+      builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false))
+      File.read(File.join(dir, "public/posts/p1/index.html")).should eq("P1|rust=New/;")
+    end
+  end
+
+  it "leaves term bodies alone on a layout edit and re-renders them on a shortcode edit" do
+    # `post.html` is no taxonomy page's template (page.html is: it is the
+    # term page's last fallback).
+    templates = TEMPLATES.merge({"shortcodes/hi.html" => "HI1", "post.html" => "POST {{ page.title }}"})
+    build_site(CONFIG,
+      content_files: {
+        "posts/p1.md"         => "+++\ntitle = \"P1\"\ntemplate = \"post\"\ntags = [\"rust\"]\n+++\n",
+        "tags/rust/_index.md" => "+++\ntitle = \"Rust\"\n+++\n{{ hi() }} [x](@/missing.md)\n",
+      },
+      template_files: templates) do |dir, builder|
+      options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)
+      options.serve_mode = true
+      options.preserve_output = true
+      dest = File.join(dir, "public/tags/rust/index.html")
+      File.read(dest).should contain("HI1")
+
+      written = File.info(dest).modification_time
+      File.write("templates/post.html", "EDITED {{ page.title }}")
+      log = with_captured_log { builder.run_rerender(options).should be_true }
+      File.read(File.join(dir, "public/posts/p1/index.html")).should eq("EDITED P1")
+      log.should_not contain("@/missing.md")
+      # Neither the body nor the term page is redone for a layout edit.
+      File.info(dest).modification_time.should eq(written)
+
+      File.write("templates/shortcodes/hi.html", "HI2")
+      builder.run_rerender(options).should be_true
+      File.read(dest).should contain("HI2")
+    end
+  end
+
+  it "does not re-check a term body on an unrelated serve edit" do
+    build_site(CONFIG,
+      content_files: {
+        "posts/p1.md"         => post("P1", ["rust"]),
+        "posts/p2.md"         => post("P2", ["go"]),
+        "tags/rust/_index.md" => "+++\ntitle = \"Rust\"\n+++\n[x](@/missing.md)\n",
+      },
+      template_files: TEMPLATES) do |_dir, builder|
+      options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)
+      options.serve_mode = true
+      options.preserve_output = true
+      File.write("content/posts/p2.md", post("P2 edited", ["go"]))
+      log = with_captured_log { builder.run_incremental(["content/posts/p2.md"], options).should be_true }
+      log.should_not contain("@/missing.md")
+
+      File.write("content/tags/rust/_index.md", "+++\ntitle = \"Rust 2\"\n+++\n[x](@/missing.md)\n")
+      log = with_captured_log { builder.run_incremental(["content/tags/rust/_index.md"], options).should be_true }
+      log.scan("@/missing.md").size.should eq(1)
+    end
+  end
+
+  it "warns once per serve pass about a colliding term alias" do
+    build_site(CONFIG,
+      content_files: {
+        "posts/p1.md"          => post("P1", ["solo", "other"]),
+        "tags/solo/_index.md"  => "+++\ntitle = \"Solo\"\naliases = [\"/shared/\"]\n+++\n",
+        "tags/other/_index.md" => "+++\ntitle = \"Other\"\naliases = [\"/shared/\"]\n+++\n",
+      },
+      template_files: TEMPLATES) do |_dir, builder|
+      options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)
+      options.serve_mode = true
+      options.preserve_output = true
+      File.write("content/tags/solo/_index.md", "+++\ntitle = \"Solo 2\"\naliases = [\"/shared/\"]\n+++\n")
+      log = with_captured_log { builder.run_incremental(["content/tags/solo/_index.md"], options).should be_true }
+      log.scan("alias on 'tags/solo/_index.md' collides with 'tags/other/_index.md'").size.should eq(1)
+    end
+  end
 end

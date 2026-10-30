@@ -149,6 +149,7 @@ module Hwaro
 
           reparsed = reparse_changed_pages(changed_content_files, site, config, output_dir, pages_map)
           return run(options) unless reparsed
+          restore_term_metadata(reparsed.changed_pages, term_state)
           changed_pages = reparsed.changed_pages
           affected_sections = reparsed.affected_sections
           old_taxonomies_snapshot = reparsed.old_taxonomies_snapshot
@@ -174,7 +175,7 @@ module Hwaro
           # term counts until the next full build.
           excluded_pages = apply_publication_exclusions!(changed_pages, options)
           return run(options) if excluded_section?(excluded_pages) || bundle_variants_move?(changed_pages, excluded_pages, page_urls)
-          unless refresh_term_metadata(site, config, changed_pages, term_state)
+          unless refresh_term_metadata(site, config, changed_pages, excluded_pages, term_state)
             Logger.info "  Taxonomy term _index files changed role — running full rebuild."
             return run(options)
           end
@@ -311,7 +312,9 @@ module Hwaro
           else
             process_files_sequential(renderable_list, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
           end
-          render_term_bodies(site, templates, highlight, global_vars, options.parallel)
+          # Only the bodies this edit can have changed: an edited term file,
+          # or one linking to a page the edit moved.
+          render_term_bodies((changed_pages + linkers).compact_map(&.as?(Models::Section)), site, templates, highlight, global_vars, options.parallel)
           raise_on_broken_internal_links!(output_dir)
           regenerate_amp_mirrors(renderable_list, site, output_dir, verbose)
 
@@ -372,6 +375,7 @@ module Hwaro
 
           reparsed = reparse_changed_pages(changed_content_files, site, config, output_dir, pages_map)
           return run(options) unless reparsed
+          restore_term_metadata(reparsed.changed_pages, term_state)
           changed_pages = reparsed.changed_pages
           affected_sections = reparsed.affected_sections
           old_output_paths = reparsed.old_output_paths
@@ -383,7 +387,7 @@ module Hwaro
           # applied the filters.
           excluded_pages = apply_publication_exclusions!(changed_pages, options)
           return run(options) if excluded_section?(excluded_pages) || bundle_variants_move?(changed_pages, excluded_pages, page_urls)
-          unless refresh_term_metadata(site, config, changed_pages, term_state)
+          unless refresh_term_metadata(site, config, changed_pages, excluded_pages, term_state)
             Logger.info "  Taxonomy term _index files changed role — running full rebuild."
             return run(options)
           end
@@ -963,24 +967,39 @@ module Hwaro
           state
         end
 
-        # A re-parse reset the term-metadata flags of the files it read;
-        # derive them again from the edited page set. False when the edit
-        # changed WHICH files describe a term page, or which page (a term
-        # appeared or vanished, a slug moved): a section then starts or stops
-        # publishing, which only a full build gets right. `before` is
-        # `term_metadata_state` from before the re-parse.
-        private def refresh_term_metadata(site : Models::Site, config : Models::Config, changed_pages : Array(Models::Page), before : Hash(String, {String, Bool})) : Bool
-          matches = Content::Taxonomies.match_term_metadata(site.pages, site.sections, config)
+        # A re-parse reset the term-metadata flags of the files it read. Put
+        # them back as they stood before it (`before`, term_metadata_state),
+        # so this pass's first URL claims still see those files headless;
+        # refresh_term_metadata then checks the edit left them true.
+        private def restore_term_metadata(changed_pages : Array(Models::Page), before : Hash(String, {String, Bool})) : Nil
+          return if before.empty?
+          changed_pages.each do |page|
+            next unless page.is_a?(Models::Section) && (state = before[page.path]?)
+            page.render = false
+            page.term_page_url = state[0]
+            page.term_metadata = state[1]
+          end
+        end
+
+        # Re-derive which files describe a term page from the edited page set
+        # (minus the pages this edit excluded). False when the edit changed
+        # that — a term appeared or vanished, a page lost its URL, a file
+        # moved: a section then starts or stops publishing, which only a full
+        # build gets right.
+        private def refresh_term_metadata(site : Models::Site, config : Models::Config, changed_pages : Array(Models::Page), excluded_pages : Array(Models::Page), before : Hash(String, {String, Bool})) : Bool
+          excluded = excluded_pages.map(&.path).to_set
+          pages = excluded.empty? ? site.pages : site.pages.reject { |p| excluded.includes?(p.path) }
+          matches = match_term_files(pages, site.sections, config)
           after = {} of String => {String, Bool}
           matches.each { |path, file| after[path] = {file.url, file.shadowed_by.nil?} }
           return false unless after == before
-          return true if matches.empty?
 
-          changed_sections = changed_pages.compact_map(&.as?(Models::Section))
-          return true unless changed_sections.any? { |s| matches.has_key?(s.path) }
-          mark_term_metadata(changed_sections, matches)
-          # The claims taken after the re-parse saw these files as writers.
-          @output_url_winners = compute_output_url_winners((site.pages + site.sections).as(Array(Models::Page)))
+          changed_pages.each do |page|
+            next unless page.is_a?(Models::Section) && (file = matches[page.path]?) && file.shadowed_by.nil?
+            next if page.url == file.url
+            page.url = file.url
+            page.permalink = nil
+          end
           true
         end
 
@@ -1286,10 +1305,12 @@ module Hwaro
                   else
                     process_files_sequential(pages_to_render, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
                   end
-          # A shortcode template edit reaches term bodies too; the term pages
-          # then regenerate below.
-          term_bodies = site.sections.any?(&.term_metadata)
-          render_term_bodies(site, templates, highlight, global_vars, options.parallel) if term_bodies
+          # Term bodies change only with content semantics: a template set the
+          # selective path can't scope (shortcode/hook edits land here), or a
+          # forced re-parse of the term file itself. A layout edit leaves them
+          # — and their link checks — alone. Every case that renders one also
+          # regenerates the taxonomy pages below.
+          render_term_bodies(affected_templates.nil? ? site.sections : forced.compact_map(&.as?(Models::Section)), site, templates, highlight, global_vars, options.parallel)
           raise_on_broken_internal_links!(output_dir)
           regenerate_amp_mirrors(pages_to_render, site, output_dir, verbose)
 
@@ -1310,7 +1331,6 @@ module Hwaro
                                  (force_pages && !force_pages.empty?) ||
                                  membership_changed ||
                                  feed_templates_affected ||
-                                 term_bodies ||
                                  ["taxonomy", "taxonomy_term", "page"].any? { |name| affected_templates.includes?(name) }
                                 Content::Taxonomies.generate(site, output_dir, templates, verbose, builder: self)
                               else

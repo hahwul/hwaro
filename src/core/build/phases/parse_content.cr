@@ -20,7 +20,7 @@ module Hwaro::Core::Build::Phases::ParseContent
       # First, while nothing downstream has read `render` yet: translations,
       # navigation, listings, output claims, the cache fingerprints and every
       # discovery surface then see a matched term `_index.md` as headless.
-      mark_term_metadata(ctx.sections, Content::Taxonomies.match_term_metadata(ctx.pages, ctx.sections, config))
+      mark_term_metadata(ctx.sections, match_term_files(ctx.pages, ctx.sections, config))
       Content::Multilingual.link_translations!(ctx.all_pages, config)
       Content::Versions.link!(ctx.all_pages, config)
     end
@@ -857,6 +857,17 @@ module Hwaro::Core::Build::Phases::ParseContent
         end
       end
     end
+  end
+
+  # Content::Taxonomies.match_term_metadata over the pages that will publish:
+  # a page that loses its URL to another (a dry run of the render phase's
+  # claims, which run later) puts no term page up. Candidate files claim
+  # nothing in that dry run — the ones that match are headless.
+  protected def match_term_files(pages : Array(Models::Page), sections : Array(Models::Section), config : Models::Config) : Hash(String, Content::Taxonomies::TermFile)
+    return {} of String => Content::Taxonomies::TermFile unless sections.any? { |s| Content::Taxonomies.term_metadata_path?(s.path, config) }
+    writers = (pages + sections.reject { |s| Content::Taxonomies.term_metadata_path?(s.path, config) }).as(Array(Models::Page))
+    losers = output_losers(writers)
+    Content::Taxonomies.match_term_metadata(losers.empty? ? pages : pages.reject { |p| losers.includes?(p.path) }, sections, config)
   end
 
   # Make each `content/<taxonomy>/<slug>/_index.md` that matched a generated

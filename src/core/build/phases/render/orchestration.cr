@@ -189,7 +189,7 @@ module Hwaro::Core::Build::Phases::Render
           end
           hydrate_cached_page_content(skipped, site, templates, use_highlight, global_vars, parallel)
         end
-        render_term_bodies(site, templates, use_highlight, global_vars, parallel)
+        render_term_bodies(site.sections, site, templates, use_highlight, global_vars, parallel)
         # Strict [links] broken_internal = "error": fail the phase with one
         # aggregated error after the whole fan-out so every offender is
         # listed. The lifecycle manager re-raises HwaroError unchanged

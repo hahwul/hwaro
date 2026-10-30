@@ -63,8 +63,18 @@ module Hwaro
         # `taxonomy.sitemap` / `taxonomy.feed` had no effect.
         collected = [] of Models::Section
 
-        term_spaces(config, site.pages, site.taxonomies).each do |space|
-          generate_term_space(space, site, output_dir, templates, builder, verbose, global_vars, collected, term_meta)
+        spaces = term_spaces(config, site.pages, site.taxonomies)
+        # Every index and term URL this pass writes: a term file's alias must
+        # not replace one of them with a redirect.
+        taxonomy_urls = Set(String).new
+        unless term_meta.empty?
+          spaces.each do |space|
+            taxonomy_urls << "#{space.lang_prefix}/#{space.taxonomy.name}/"
+            space.index_terms.each { |term| taxonomy_urls << "#{space.lang_prefix}/#{space.taxonomy.name}/#{space.slug_map[term]}/" }
+          end
+        end
+        spaces.each do |space|
+          generate_term_space(space, site, output_dir, templates, builder, verbose, global_vars, collected, term_meta, taxonomy_urls)
         end
 
         collected
@@ -208,6 +218,7 @@ module Hwaro
         global_vars : Hash(String, Crinja::Value),
         collected : Array(Models::Section),
         term_meta : Hash(String, Models::Section),
+        taxonomy_urls : Set(String),
       )
         taxonomy, language, lang_prefix = space.taxonomy, space.language, space.lang_prefix
         terms_map, index_terms, slug_map = space.terms_map, space.index_terms, space.slug_map
@@ -243,7 +254,7 @@ module Hwaro
 
           slug = slug_map[term]
           meta = term_meta.empty? ? nil : term_meta["#{lang_prefix}/#{taxonomy.name}/#{slug}/"]?
-          collected << render_taxonomy_term(taxonomy, term, filtered_pages, templates, site, output_dir, builder, verbose, global_vars, slug, lang_prefix: lang_prefix, language: language, meta: meta)
+          collected << render_taxonomy_term(taxonomy, term, filtered_pages, templates, site, output_dir, builder, verbose, global_vars, slug, lang_prefix: lang_prefix, language: language, meta: meta, taxonomy_urls: taxonomy_urls)
         end
       end
 
@@ -280,9 +291,9 @@ module Hwaro
         return result if candidates.empty?
 
         urls = Set(String).new
-        # Output-collision verdicts (`output_suppressed`) come from the render
-        # phase, after this runs on a cold build; ignoring them keeps a serve
-        # pass, which still holds the last pass's verdicts, matching the same.
+        # `pages` already leaves out the pages that lose their URL
+        # (Builder#match_term_files), so the stored `output_suppressed` —
+        # unset on a cold build, the last pass's on a serve one — is ignored.
         term_spaces(config, pages, term_index(pages, config), honor_suppressed: false).each do |space|
           space.index_terms.each do |term|
             urls << "#{space.lang_prefix}/#{space.taxonomy.name}/#{space.slug_map[term]}/"
@@ -459,6 +470,7 @@ module Hwaro
         lang_prefix : String = "",
         language : String? = nil,
         meta : Models::Section? = nil,
+        taxonomy_urls : Set(String) = Set(String).new,
       ) : Models::Section
         base_url = "#{lang_prefix}/#{taxonomy.name}/#{slug}/"
 
@@ -488,7 +500,7 @@ module Hwaro
           index_page.image = meta.image
           index_page.extra = meta.extra
           index_page.content = meta.content
-          builder.write_term_aliases(meta, site, output_dir, verbose)
+          builder.write_term_aliases(meta, site, output_dir, verbose, taxonomy_urls)
         end
 
         paginated_pages = paginate_taxonomy(taxonomy, pages, index_page)

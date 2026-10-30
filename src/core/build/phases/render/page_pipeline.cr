@@ -234,19 +234,22 @@ module Hwaro::Core::Build::Phases::Render
     page.warned_messages.clear
   end
 
-  # The bodies of the term `_index.md` files (`Page#term_metadata`): headless,
-  # so no page render writes them, yet each is its term page's `term_content`.
-  # Rendered in every pass that renders pages, BEFORE its `[links]` checks, so
-  # their `@/` links and anchors are reported (or fail the build) like any
-  # page's. The taxonomy generator reads the result from `page.content`.
+  # The bodies of term `_index.md` files (`Page#term_metadata`): headless, so
+  # no page render writes them, yet each is its term page's `term_content`.
+  # Rendered by the pass that renders pages — all of them on a full build,
+  # only the ones a serve edit can have changed on a partial one — BEFORE its
+  # `[links]` checks, so their `@/` links and anchors are reported (or fail
+  # the build) like any page's. The taxonomy generator reads the result from
+  # `page.content`, which keeps the last render between serve passes.
   private def render_term_bodies(
+    sections : Array(Models::Section),
     site : Models::Site,
     templates : Hash(String, String),
     highlight : Bool,
     global_vars : Hash(String, Crinja::Value),
     parallel : Bool,
   ) : Nil
-    pages = site.sections.select(&.term_metadata).map(&.as(Models::Page))
+    pages = sections.select(&.term_metadata).map(&.as(Models::Page))
     return if pages.empty?
     safe = site.config.markdown.safe
     render = ->(page : Models::Page, env : Crinja?, cache : Hash(UInt64, Crinja::Template)?) do
@@ -270,19 +273,19 @@ module Hwaro::Core::Build::Phases::Render
   # A term `_index.md`'s `aliases`: redirect stubs to its term page (the
   # section's URL is the term page's, see ParseContent#mark_term_metadata),
   # claimed as taxonomy outputs so a removed alias is pruned like a removed
-  # term page. An alias some page or another alias already owns is not
-  # written.
-  def write_term_aliases(page : Models::Section, site : Models::Site, output_dir : String, verbose : Bool) : Nil
+  # term page. An alias another page or alias owns lost its claim in
+  # compute_output_url_winners (which warned); one naming a taxonomy index
+  # or term page this pass writes (`taxonomy_urls`) is refused here.
+  def write_term_aliases(page : Models::Section, site : Models::Site, output_dir : String, verbose : Bool, taxonomy_urls : Set(String)) : Nil
     return if page.aliases.empty?
-    if winners = @output_url_winners
-      page.aliases.each do |a|
-        norm = Utils::PathUtils.normalize_alias_url(a)
-        next unless (owner = winners[norm]?) && owner != page.path
-        Logger.warn "Duplicate alias output path '#{norm}' — alias on '#{page.path}' collides with '#{owner}' and is not written"
-      end
+    refused = Set(String).new
+    page.aliases.each do |a|
+      norm = Utils::PathUtils.normalize_alias_url(a)
+      next if norm == page.url || !taxonomy_urls.includes?(norm) || !refused.add?(norm)
+      Logger.warn "Duplicate alias output path '#{norm}' — alias on '#{page.path}' collides with the generated taxonomy page '#{norm}' and is not written"
     end
     clear_page_derived_outputs(page.path)
-    generate_aliases(page, site, output_dir, verbose)
+    generate_aliases(page, site, output_dir, verbose, except: refused)
     written = @page_derived_mutex.synchronize { @page_derived_outputs.delete(page.path) }
     written.try(&.each { |path| claim_generated_output(path) })
   end
