@@ -129,6 +129,24 @@ describe "Responsive content images" do
       end
     end
 
+    it "ignores <picture> tags inside comments, and an unclosed <picture>" do
+      with_resize_map(SAMPLE_MAP) do
+        with_webp_map(WEBP_MAP) do
+          builder = Hwaro::Core::Build::Builder.new
+          commented = builder.test_apply_responsive_images(
+            %(<!-- <picture> --><img src="photo.png"><!-- </picture> -->), bundle_page, enabled_config)
+          commented.should contain(%(--><picture><source type="image/webp"))
+          unclosed = builder.test_apply_responsive_images(
+            %(<picture><img src="other.png"><p>text</p><img src="photo.png">), bundle_page, enabled_config)
+          unclosed.should contain(%(<p>text</p><picture><source type="image/webp"))
+          # A closing tag in a comment does not end a real <picture> early.
+          inside = builder.test_apply_responsive_images(
+            %(<picture><!-- </picture> --><img src="photo.png"></picture>), bundle_page, enabled_config)
+          inside.should_not contain("image/webp")
+        end
+      end
+    end
+
     it "recognises an authored <PICTURE> in any case, but not custom elements named picture-*" do
       with_resize_map(SAMPLE_MAP) do
         with_webp_map(WEBP_MAP) do
