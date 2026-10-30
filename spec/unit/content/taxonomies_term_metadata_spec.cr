@@ -518,4 +518,20 @@ describe "taxonomy term _index.md metadata" do
       File.read(dest).should contain(%(href="/posts/again/"))
     end
   end
+  # `[content] ignore` (#890): the build never reads an ignored file, so an
+  # ignored term file decorates nothing, and an ignored post puts no term up.
+  it "ignores an ignored term file and terms only ignored posts carry" do
+    config = CONFIG + %(\n[content]\nignore = ["tags/rust/_index.md", "posts/hidden.md"]\n)
+    build_site(config,
+      content_files: {
+        "posts/p1.md"         => post("P1", ["rust"]),
+        "posts/hidden.md"     => post("Hidden", ["solo"]),
+        "tags/rust/_index.md" => "+++\ntitle = \"Ignored\"\n+++\n",
+        "tags/solo/_index.md" => "+++\ntitle = \"Solo section\"\n+++\n",
+      },
+      template_files: TEMPLATES) do |dir|
+      File.read(File.join(dir, "public/tags/rust/index.html")).should start_with("T=Tags: rust|D=|X=|B=|")
+      File.read(File.join(dir, "public/tags/solo/index.html")).should start_with("SECTION=Solo section|")
+    end
+  end
 end

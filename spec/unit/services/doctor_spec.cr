@@ -1058,6 +1058,15 @@ describe Hwaro::Services::Doctor do
         missing.any?(&.includes?("guides/")).should be_true
       end
 
+      # `[content] ignore`: an ignored post puts no term page up, so its
+      # term's file is an ordinary section and `tags/` a section directory.
+      it "reads term files over the ignore-aware page set" do
+        config = base_config + %(\n[[taxonomies]]\nname = "tags"\n\n[content]\nignore = ["hidden.md"]\n)
+        files = {"tags/go/_index.md" => "+++\ntitle = \"Go\"\n+++\n",
+                 "hidden.md"         => "+++\ntitle = \"H\"\ntags = [\"go\"]\n+++\n"}
+        run_doctor(config, files).select { |i| i.id == "structure-missing-index" }.map(&.message).any?(&.includes?("tags/")).should be_true
+      end
+
       it "counts cascaded terms when deciding a taxonomy directory holds term files" do
         issues = run_doctor(base_config + %(\n[[taxonomies]]\nname = "tags"\n),
           {"tags/rust/_index.md" => "+++\ntitle = \"Rust\"\n+++\n",
