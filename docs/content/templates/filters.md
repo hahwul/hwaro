@@ -77,7 +77,7 @@ same text renders in page bodies. The rest of the extension pipeline
 | sort_by | Sort objects by field | {{ posts \| sort_by(attribute="date", reverse=true) }} |
 | group_by | Group objects by field | {{ posts \| group_by(attribute="section") }} |
 
-`min` and `max` work as in Jinja2: they compare like `sort` (strings case-insensitively unless `case_sensitive=true`), `attribute=` takes a dotted path such as `"extra.weight"` and the whole item is returned, the first one wins a tie, a mapping compares its keys, and an empty list gives an undefined value.
+`min` and `max` work as in Jinja2: they compare like `sort` (strings case-insensitively unless `case_sensitive=true`), `attribute=` takes a dotted path such as `"extra.weight"` and the whole item is returned, the first one wins a tie, a mapping compares its keys, and an empty list gives an undefined value. A string and a number compare as text whichever comes first (`[1, "a"] | max` and `["a", 1] | max` both give `a`), and an undefined `attribute=` is ignored, as with `sort`.
 
 ## Collection Filters
 

@@ -20,6 +20,12 @@ describe "Crinja comparison tests" do
       .should eq("truetruetruefalse")
   end
 
+  it "compares a string with a number or an array in either operand order" do
+    render_test("{{ 'a' > 1 }}{{ 1 < 'a' }}{{ [1] < 'a' }}{{ 'a' > [1] }}|{{ ['a', 1] | sort | join(',') }}|{{ [1, 'a'] | sort | join(',') }}")
+      .should eq("truetruetruetrue|1,a|1,a")
+    expect_raises(Crinja::TypeError) { render_test("{{ [1] < 2 }}") }
+  end
+
   it "keeps equalto" do
     render_test("{{ users | selectattr('name', 'equalto', 'Bob') | list | length }}{{ 'a' is eq 'a' }}").should eq("1true")
   end

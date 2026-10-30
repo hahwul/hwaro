@@ -77,7 +77,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 | sort_by | 필드로 객체 정렬 | {{ posts \| sort_by(attribute="date", reverse=true) }} |
 | group_by | 필드로 객체 그룹화 | {{ posts \| group_by(attribute="section") }} |
 
-`min`과 `max`는 Jinja2와 같이 동작합니다. 비교 방식은 `sort`와 같고(`case_sensitive=true`를 주지 않으면 문자열은 대소문자를 구분하지 않음), `attribute=`에는 `"extra.weight"` 같은 점 경로를 쓸 수 있으며 요소 전체를 돌려줍니다. 값이 같으면 앞의 요소가 선택됩니다. 매핑은 키를 비교하고, 빈 리스트는 정의되지 않은 값을 돌려줍니다.
+`min`과 `max`는 Jinja2와 같이 동작합니다. 비교 방식은 `sort`와 같고(`case_sensitive=true`를 주지 않으면 문자열은 대소문자를 구분하지 않음), `attribute=`에는 `"extra.weight"` 같은 점 경로를 쓸 수 있으며 요소 전체를 돌려줍니다. 값이 같으면 앞의 요소가 선택됩니다. 매핑은 키를 비교하고, 빈 리스트는 정의되지 않은 값을 돌려줍니다. 문자열과 숫자는 순서와 관계없이 텍스트로 비교하며(`[1, "a"] | max`와 `["a", 1] | max` 모두 `a`), 정의되지 않은 `attribute=`는 `sort`처럼 무시합니다.
 
 ## 컬렉션 필터
 
