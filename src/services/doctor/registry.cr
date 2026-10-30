@@ -129,7 +129,7 @@ module Hwaro
           CheckSpec.new("section index files (_index.md)",
             ["structure-missing-index", "content-ignore-hides-sections"], blocked_by: CONFIG_BLOCKING_IDS),
           CheckSpec.new("translations (pages in every language)",
-            ["translation-missing", "translation-orphan"], blocked_by: CONFIG_BLOCKING_IDS),
+            ["translation-missing", "translation-orphan", "translation-key-collision"], blocked_by: CONFIG_BLOCKING_IDS),
         ],
         blocked_by: ["content-dir-missing"],
       ),

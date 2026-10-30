@@ -188,3 +188,21 @@ describe "Hwaro::Services::Doctor translations" do
     JSON.parse(other.to_json).as_h.has_key?("language").should be_false
   end
 end
+
+describe "Hwaro::Services::Doctor translation_key" do
+  it "pairs pages by translation_key and warns about a same-language collision" do
+    issues = translation_issues({
+      "about.md"    => "+++\ntitle = \"About\"\ntranslation_key = \"about\"\n+++\n",
+      "intro.ko.md" => "+++\ntitle = \"Intro\"\ntranslation_key = \"about\"\n+++\n",
+      "intro.ja.md" => "+++\ntitle = \"Intro\"\ntranslation_key = \"about\"\n+++\n",
+      "zz.ko.md"    => "+++\ntitle = \"Z\"\ntranslation_key = \"about\"\n+++\n",
+    })
+    summarize(issues).should eq([
+      "ko translation-key-collision zz.ko.md",
+      "ko translation-orphan zz.ko.md",
+    ])
+    collision = issues.find!(&.id.==("translation-key-collision"))
+    collision.level.should eq(:warning)
+    collision.message.should contain(%(translation_key "about" is already used by the 'ko' page))
+  end
+end
