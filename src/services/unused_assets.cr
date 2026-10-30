@@ -244,7 +244,9 @@ module Hwaro
         scan_files = [] of String
 
         if Dir.exists?(@content_dir)
-          scan_files.concat(ContentWalk.find_content_files(@content_dir))
+          # Ignored Markdown too: a page can `include_md` an ignored partial,
+          # and an asset only that partial names is still published.
+          scan_files.concat(ContentWalk.find_content_files(@content_dir, ContentWalk::Ignore.none))
         end
 
         if Dir.exists?(@templates_dir)

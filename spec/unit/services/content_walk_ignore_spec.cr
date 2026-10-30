@@ -115,6 +115,20 @@ describe "[content] ignore in the content tools" do
     end
   end
 
+  # An ignored partial is still read by `include_md`, so an asset only it
+  # names is published and must not be reported (or deleted) as unused.
+  it "counts references from ignored Markdown a page includes" do
+    with_ignore_project(%(title = "t"\n[content]\nignore = ["_partials/"]\n)) do
+      FileUtils.mkdir_p("content/_partials")
+      FileUtils.mkdir_p("static/img")
+      File.write("static/img/only-in-partial.png", "png")
+      File.write("content/_partials/snippet.md", "![x](/img/only-in-partial.png)\n")
+      File.write("content/about.md", "+++\ntitle = \"About\"\n+++\n{{ include_md(path=\"content/_partials/snippet.md\") }}\n")
+      result = Hwaro::Services::UnusedAssets.new(content_dir: "content", static_dir: "static", templates_dir: "templates").run
+      result.unused_files.none?(&.includes?("only-in-partial")).should be_true
+    end
+  end
+
   it "exports neither ignored pages nor ignored assets" do
     with_ignore_project do
       Hwaro::Services::Exporters::HugoExporter.new.run(
