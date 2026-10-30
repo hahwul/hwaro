@@ -121,12 +121,22 @@ Crystal은 Ruby와 닮은 문법의 컴파일 언어입니다.
 항목 페이지에서는 이렇게 쓰입니다.
 
 - `page.title`, `page.description`, `page.image`, `page.extra`가 파일의 값을 따릅니다. `title`이 없으면 생성된 "Tags: crystal"이 그대로 쓰입니다. `<title>`, og/twitter 태그, 항목 RSS 피드 제목도 같은 값을 씁니다.
-- `term_content`에는 파일 본문을 렌더링한 HTML이 들어갑니다(Markdown, 숏코드, `@/` 링크를 다른 페이지와 똑같이 처리합니다). `content`는 지금처럼 생성된 페이지 목록이라 기존 템플릿은 그대로 동작하며, 본문을 보여 줄 자리에 `{{ term_content }}`를 넣으면 됩니다.
+- `term_content`에는 파일 본문을 렌더링한 HTML이 들어갑니다. Markdown, 숏코드, 구문 강조, `@/` 링크를 다른 페이지와 똑같이 처리하고, `[links]` 검사도 본문의 깨진 링크와 앵커를 보고합니다. `content`는 지금처럼 생성된 페이지 목록이라 기존 템플릿은 그대로 동작하며, 본문을 보여 줄 자리에 `{{ term_content }}`를 넣으면 됩니다.
+- 파일의 `aliases`는 항목 페이지로 가는 리다이렉트가 됩니다. 태그 이름을 바꿨을 때 유용합니다.
+- `template`은 무시되며 빌드가 경고합니다. 항목 페이지는 항상 `taxonomy_term.html`로 렌더링되고, 없으면 `taxonomy.html`, 그다음 `page.html`을 씁니다.
 - [`get_taxonomy()`](#get-taxonomy-함수)의 항목에 파일의 `title`과 `description`이 붙습니다. `get_taxonomy()`는 사이트 전체를 보는 함수라 기본 언어 파일만 반영합니다. 파일이 없는 항목에는 `title` 키가 없으니 `{{ term.title or term.name }}`처럼 씁니다.
 
 다국어 사이트에서는 언어마다 자기 파일을 읽습니다. `content/tags/crystal/_index.ko.md`는 `/ko/tags/crystal/`을 꾸밉니다.
 
-이 파일은 별도 페이지로 게시되지 않습니다. 사이트맵, 피드, 검색 색인, llms.txt, 섹션 목록에 들어가지 않으므로 항목 URL은 한 번만 나옵니다. 어떤 항목 페이지와도 맞지 않는 파일(그 언어에서 해당 항목을 단 게시 페이지가 없거나, 디렉터리 이름이 항목 슬러그가 아닌 경우)도 게시되지 않으며, 빌드가 경고를 출력합니다.
+파일은 다음 조건을 모두 만족할 때만 항목 메타데이터로 쓰입니다.
+
+- `content/` 바로 아래 두 단계, 설정한 택소노미 이름의 디렉터리 안에 있는 `_index` 파일이어야 합니다(`content/tags/<dir>/_index.md`).
+- 빌드가 그 파일의 언어로 해당 택소노미의 항목 페이지를 만들어야 합니다. 그 언어의 게시 페이지 중 하나가 그 항목을 달고 있고, `[languages.<code>] taxonomies`가 그 택소노미를 빼지 않아야 합니다.
+- `<dir>`이 그 항목 페이지의 URL 슬러그여야 합니다.
+
+이런 파일은 별도 페이지로 게시되지 않습니다. 사이트맵, 피드, 검색 색인, llms.txt, 섹션 목록에 들어가지 않으므로 항목 URL은 한 번만 나옵니다. 같은 항목 페이지에 맞는 파일이 둘이면(`_index.md`와 `_index.markdown`) `_index.md`가 쓰이고, 나머지는 빌드가 경고합니다.
+
+`content/tags/` 아래의 다른 `_index.md`는 일반 섹션이라 전과 같이 게시됩니다. `content/tags/crystal/notes.md`처럼 항목 디렉터리 안에 있는 페이지는 언제나 일반 페이지로 게시됩니다.
 
 한 단계 위의 `content/<taxonomy>/_index.md`는 다르게 동작합니다. 생성된 항목 목록이 전과 같이 `/tags/`에서 이 파일을 대체하고, 빌드는 대체 경고를 그대로 출력합니다. 택소노미를 메뉴에 넣을 때 쓰는 파일입니다.
 

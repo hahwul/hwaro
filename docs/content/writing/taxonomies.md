@@ -134,12 +134,22 @@ Crystal is a compiled language with Ruby-like syntax.
 On the term page:
 
 - `page.title`, `page.description`, `page.image` and `page.extra` take the file's values. Without a `title`, the generated "Tags: crystal" stays. The `<title>`, og/twitter tags and the term's RSS feed title use the same values.
-- `term_content` is the file's rendered body (Markdown, shortcodes and `@/` links are processed like any other page). `content` stays the generated page list, so existing templates keep working; print `{{ term_content }}` where the text should go.
+- `term_content` is the file's rendered body. Markdown, shortcodes, syntax highlighting and `@/` links are processed like any other page, and `[links]` checks report its broken links and anchors. `content` stays the generated page list, so existing templates keep working; print `{{ term_content }}` where the text should go.
+- `aliases` in the file become redirects to the term page, which is useful when a tag is renamed.
+- `template` is ignored (the build warns): term pages always render with `taxonomy_term.html`, falling back to `taxonomy.html`, then `page.html`.
 - [`get_taxonomy()`](#get-taxonomy-function) terms get `title` and `description` from the file (default-language files only, since `get_taxonomy()` is a site-wide view). Terms without a file have no `title` key, so use `{{ term.title or term.name }}`.
 
 On a multilingual site each language reads its own file: `content/tags/crystal/_index.ko.md` decorates `/ko/tags/crystal/`.
 
-The file is not published as a page of its own. It stays out of the sitemap, feeds, search index, llms.txt and section listings, so the term URL appears once. A file that matches no term page (no published page in its language carries that term, or the directory isn't the term's slug) is not published either; the build warns about it.
+A file only counts as term metadata when all of these hold:
+
+- it is an `_index` file exactly two levels below `content/`, in a directory named after a configured taxonomy (`content/tags/<dir>/_index.md`);
+- the build generates a term page for that taxonomy in the file's language (some published page in that language carries the term, and `[languages.<code>] taxonomies` doesn't leave the taxonomy out);
+- `<dir>` is that term page's URL slug.
+
+Such a file is not published as a page of its own. It stays out of the sitemap, feeds, search index, llms.txt and section listings, so the term URL appears once. If two files match the same term page (`_index.md` beside `_index.markdown`), `_index.md` wins and the build warns about the other.
+
+Any other `_index.md` under `content/tags/` is an ordinary section and publishes as before. Pages nested inside a term directory, such as `content/tags/crystal/notes.md`, always publish as ordinary pages.
 
 `content/<taxonomy>/_index.md` (one level up) is different: the generated term list still replaces it at `/tags/`, and the build warns about the replacement as before. Sites use it to put the taxonomy into menus.
 
