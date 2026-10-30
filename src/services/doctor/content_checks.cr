@@ -39,6 +39,9 @@ module Hwaro
         # without it the build writes a redirect stub there.
         version_parents = config.versions.list.map(&.parent_dir).reject(&.empty?).to_set
         check_broad_ignore_patterns(issues, config)
+        # Nor is `content/tags/` holding only term `_index.md` files (see
+        # Content::Taxonomies.term_metadata_path?): the build generates `/tags/`.
+        config.taxonomies.each { |t| version_parents << t.name }
         walk_section_dirs(@content_dir, issues, index_names(config), version_parents)
       end
 
@@ -392,6 +395,9 @@ module Hwaro
             # A page the build never writes (or that only redirects) needs no
             # translation, and is no one's missing counterpart.
             next if !page.render || page.has_redirect?
+            # A term `_index.md` describes a generated term page; each
+            # language's term page exists with or without it.
+            next if Content::Taxonomies.term_metadata_path?(page.path, config)
             code = Content::Multilingual.language_code(page, config)
             codes = page.translations.empty? ? [code] : page.translations.map(&.code)
             if code == default && !codes.includes?(other)

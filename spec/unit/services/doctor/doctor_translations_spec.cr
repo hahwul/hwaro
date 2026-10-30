@@ -125,6 +125,19 @@ describe "Hwaro::Services::Doctor translations" do
     end
   end
 
+  # gh#891: every language generates its own term page; the file only
+  # decorates it, so a missing or lone translation is no one's gap.
+  it "skips taxonomy term _index files" do
+    config = TRANSLATIONS_CONFIG + %(\n[[taxonomies]]\nname = "tags"\n)
+    summarize(translation_issues({
+      "a.md"                 => PAGE,
+      "a.ko.md"              => PAGE,
+      "a.ja.md"              => PAGE,
+      "tags/rust/_index.md"  => PAGE,
+      "tags/go/_index.ko.md" => PAGE,
+    }, config)).should be_empty
+  end
+
   it "reports nothing on a single-language site" do
     translation_issues({"a.md" => PAGE, "a.ko.md" => PAGE}, %(title = "T"\nbase_url = "https://example.com"\n)).should be_empty
   end

@@ -1046,6 +1046,17 @@ describe Hwaro::Services::Doctor do
         missing.any?(&.includes?("guides/")).should be_true
       end
 
+      # gh#891: `tags/<term>/_index.md` decorates a generated term page, and
+      # the build generates `/tags/` itself.
+      it "does not ask for an _index.md in a taxonomy directory holding term files" do
+        issues = run_doctor(base_config + %(\n[[taxonomies]]\nname = "tags"\n),
+          {"tags/rust/_index.md" => "+++\ntitle = \"Rust\"\n+++\n", "tags/go/_index.md" => "+++\ntitle = \"Go\"\n+++\n",
+           "guides/a/b.md" => "+++\ntitle = \"B\"\n+++\n"})
+        missing = issues.select { |i| i.id == "structure-missing-index" }.map(&.message)
+        missing.any?(&.includes?("tags/")).should be_false
+        missing.any?(&.includes?("guides/")).should be_true
+      end
+
       it "reports info when section dir missing _index.md" do
         Dir.mktmpdir do |dir|
           config_path = File.join(dir, "config.toml")
