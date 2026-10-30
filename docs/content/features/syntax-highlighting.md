@@ -143,8 +143,9 @@ those is the quickest start.
   code block that reaches that rule falls back to plain. The same goes
   for a cycle of `<include>`s, a rule without a `pattern` that emits a
   `<token>`, a negative `<pop depth>`, and a `<using lexer>` naming no
-  bundled or custom lexer. `hwaro doctor` reports the same problems, name
-  clashes included (`highlight-lexer-invalid`).
+  bundled or custom lexer. A `<filename>` that is not a valid glob (an
+  unclosed `[`) is ignored with a warning. `hwaro doctor` reports the same
+  problems, name clashes included (`highlight-lexer-invalid`).
 - **Runaway rules:** a rule that matches the empty string without
   changing state, a `<usingself>`/`<using>` that keeps delegating to
   itself (more than 32 levels deep), or `<include>`s that loop back

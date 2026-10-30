@@ -44,7 +44,8 @@ module Tartrazine
   # to plain: a `<push>`, `<include>` or `<combined>` naming a state the
   # grammar does not define (three bundled grammars have one, so these warn
   # rather than reject), a cycle of `<include>`s, a pattern-less rule that
-  # emits a `<token>`, and a negative `<pop depth>`. Raises with a
+  # emits a `<token>`, and a negative `<pop depth>`. A `<filename>` glob
+  # File.match? would refuse is dropped with a warning. Raises with a
   # readable message on malformed XML, a missing `<name>` or `root` state,
   # an unknown action, or a regex PCRE2 refuses to compile.
   def self.hwaro_parse_custom_lexer(xml : String) : {Array(String), Array(String), LexerTemplate, Array(String), Array(String)}
@@ -72,7 +73,12 @@ module Tartrazine
       end
       xml_to_a(config, filename).each do |value|
         value = value.strip.downcase
-        filenames << value unless value.empty?
+        next if value.empty?
+        if error = hwaro_glob_error(value)
+          warnings << %(<filename> "#{value}" is not a valid glob (#{error}); ignored)
+        else
+          filenames << value
+        end
       end
     end
     raise Exception.new("missing <config><name>") if names.empty?
@@ -146,6 +152,35 @@ module Tartrazine
   # Whether `name` (lowercased) is a bundled lexer `lexer_by_name` finds.
   private def self.hwaro_bundled_lexer?(name : String) : Bool
     LEXERS_BY_NAME.has_key?(HWARO_LEXER_ALIASES.fetch(name, name)) || name.includes?('+')
+  end
+
+  # Why File.match? would raise for `glob`, or nil. It only raises once a
+  # path reaches the bad spot, so mirror its parser up front: a trailing
+  # backslash, and a `[` class without its `]` (the first member, even
+  # `]`, is always taken literally, and a backslash escapes inside a class
+  # too).
+  private def self.hwaro_glob_error(glob : String) : String?
+    chars = glob.chars
+    i = 0
+    while i < chars.size
+      case chars[i]
+      when '\\'
+        i += 1
+        return "trailing escape" if i >= chars.size
+      when '['
+        i += 1
+        i += 1 if i < chars.size && chars[i] == '^'
+        first = true
+        while i < chars.size && (first || chars[i] != ']')
+          i += 1 if chars[i] == '\\'
+          i += 1
+          first = false
+        end
+        return "unterminated character set" if i >= chars.size
+      end
+      i += 1
+    end
+    nil
   end
 
   # Replace every previously registered custom lexer with `entries`

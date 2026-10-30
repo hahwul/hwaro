@@ -50,6 +50,12 @@ ensure
   Hwaro::Content::Processors::CustomLexers.apply(Hwaro::Models::Config.new)
 end
 
+module Tartrazine
+  def self.test_glob_error(glob : String) : String?
+    hwaro_glob_error(glob)
+  end
+end
+
 private def server_highlight(code : String, lang : String) : String?
   Hwaro::Content::Processors::ServerHighlighter.highlight(code, lang)
 end
@@ -184,6 +190,39 @@ describe Hwaro::Content::Processors::CustomLexers do
       Hwaro::Content::Processors::Includes.language_for("app.cr").should eq("crystal")
     end
     Hwaro::Content::Processors::Includes.language_for("ops/site.mdsl").should eq("")
+  end
+
+  # File.match? raises on a malformed glob only once a path reaches the bad
+  # spot, so a bad <filename> used to crash include_code mid-build.
+  it "drops a <filename> glob File.match? would refuse, with a warning" do
+    grammar = CUSTOM_GRAMMAR.sub("</config>", "<filename>[unterminated</filename><filename>*.mdsl</filename></config>")
+    with_lexers({"mydsl.xml" => grammar}) do
+      log = with_captured_log { Hwaro::Content::Processors::CustomLexers.apply(lexers_config) }
+      log.should contain(%(lexers/mydsl.xml: <filename> "[unterminated" is not a valid glob (unterminated character set); ignored))
+      Hwaro::Content::Processors::Includes.language_for("unterminated.toml").should eq("toml")
+      Hwaro::Content::Processors::Includes.language_for("site.mdsl").should eq("mydsl")
+    end
+  end
+
+  it "mirrors File.match?'s glob errors exactly" do
+    glob_chars = %q(a[]^\-*b)
+    rng = Random.new(42)
+    paths = ["", "a", "ab-c", "]]", "^a", "\\a", "zzzzzzzz"]
+    3000.times do
+      glob = String.build { |io| rng.rand(1..7).times { io << glob_chars.char_at(rng.rand(glob_chars.size)) } }
+      raises = paths.any? do |path|
+        File.match?(glob, path)
+        false
+      rescue File::BadPatternError
+        true
+      end
+      # Paths can miss the bad spot, so only an accepted glob is checked
+      # against every probe.
+      (Tartrazine.test_glob_error(glob).nil? && raises).should be_false
+    end
+    Tartrazine.test_glob_error("[]").should eq("unterminated character set")
+    Tartrazine.test_glob_error("[]]").should be_nil
+    Tartrazine.test_glob_error("a\\").should eq("trailing escape")
   end
 
   it "warns about grammar defects that would only surface mid-tokenization" do
