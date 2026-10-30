@@ -5,16 +5,119 @@ module Hwaro
     module Processors
       module Filters
         module DateFilters
+          # Month, weekday and AM/PM names for one locale: CLDR "format"
+          # context, wide and abbreviated. Weekdays run Monday first, matching
+          # `Time::DayOfWeek#value` (Monday = 1 … Sunday = 7).
+          struct LocaleNames
+            getter months : Array(String)
+            getter months_abbr : Array(String)
+            getter days : Array(String)
+            getter days_abbr : Array(String)
+            getter am : String
+            getter pm : String
+            # `%p` is the lowercase form (Crystal prints `am`/`pm` for it).
+            getter am_lower : String
+            getter pm_lower : String
+
+            def initialize(@months, @months_abbr, @days, @days_abbr, @am, @pm)
+              @am_lower = am.downcase
+              @pm_lower = pm.downcase
+            end
+          end
+
           # `Time#to_s(format)` raises a bare Crystal `IndexError` on a
           # malformed format string (a trailing `%`, e.g. `date("%")`) — not a
           # `Crinja::Error`, so it escapes the render phase's rescue and
           # aborts the whole build with `Index out of bounds` and no template
           # file:line. Re-raise as a Crinja error so the failure names the bad
           # format AND points at the template line that wrote it.
-          def self.format_time(time : Time, format : String) : String
-            time.to_s(format)
+          #
+          # `locale` (`ko`, `ko_KR`, `ko-KR`, …) localizes the name directives
+          # `%a %A %b %h %B %p %P` (and their `%^` upcase forms). Empty, or any
+          # English locale, is Crystal's own output byte for byte.
+          def self.format_time(time : Time, format : String, locale : String = "") : String
+            names = locale.empty? ? nil : locale_names(locale)
+            time.to_s(names ? localize_format(format, time, names) : format)
           rescue ex : IndexError | ArgumentError
             raise Crinja::TypeError.new("invalid date format #{format.inspect}: #{ex.message}")
+          end
+
+          # The `locale=` argument as a string; none/undefined (an unset
+          # `page.language`) or a non-string means "no locale".
+          def self.locale_arg(value : Crinja::Value) : String
+            (raw = value.raw).is_a?(String) ? raw : ""
+          end
+
+          # The name table for `locale`, or nil for Crystal's English names.
+          # Case-insensitive, `-` or `_` separated, and falls back one
+          # subtag at a time (`zh-Hant-TW` → `zh_hant` → `zh`). An unknown
+          # locale warns once per build and renders English.
+          def self.locale_names(locale : String) : LocaleNames?
+            # Fast path: the canonical keys `page.language` usually holds.
+            LOCALES[locale]?.try { |names| return names }
+            return if locale == "en"
+            key = locale.strip.downcase.tr("-", "_")
+            loop do
+              return if key == "en"
+              LOCALES[key]?.try { |names| return names }
+              cut = key.rindex('_') || break
+              key = key[0, cut]
+            end
+            warn_unknown_locale(locale)
+            nil
+          end
+
+          @@warned_locales = Set(String).new
+          @@warned_mutex = Mutex.new
+
+          private def self.warn_unknown_locale(locale : String) : Nil
+            first = @@warned_mutex.synchronize { @@warned_locales.add?(locale) }
+            Logger.warn "date: unknown locale #{locale.inspect}; month and weekday names render in English." if first
+          end
+
+          # Called at the start of every build (Builder#run), so a locale that
+          # is still wrong warns again on the next `serve` rebuild.
+          def self.clear_locale_warnings : Nil
+            @@warned_mutex.synchronize { @@warned_locales.clear }
+          end
+
+          # Rewrites `format` with the localized names spliced in as literal
+          # text, leaving every other directive for `Time#to_s` exactly as
+          # written. A `%` pair that is not a name directive (`%%`, `%-d`,
+          # `%_m`, `%3N`, `%::z`, …) is copied verbatim, two chars at a time,
+          # which tokenizes the same way `Time::Format` does.
+          def self.localize_format(format : String, time : Time, names : LocaleNames) : String
+            String.build(format.bytesize + 16) do |io|
+              reader = Char::Reader.new(format)
+              while reader.has_next?
+                char = reader.current_char
+                reader.next_char
+                unless char == '%' && reader.has_next?
+                  io << char # a trailing `%` stays and raises in `Time#to_s`
+                  next
+                end
+                directive = reader.current_char
+                upcase = directive == '^' && reader.peek_next_char.in?('a', 'A', 'b', 'h', 'B')
+                directive = reader.next_char if upcase
+                reader.next_char
+                if name = localized_name(directive, time, names)
+                  io << (upcase ? name.upcase : name)
+                else
+                  io << '%' << directive
+                end
+              end
+            end
+          end
+
+          private def self.localized_name(directive : Char, time : Time, names : LocaleNames) : String?
+            case directive
+            when 'a'      then names.days_abbr[time.day_of_week.value - 1]
+            when 'A'      then names.days[time.day_of_week.value - 1]
+            when 'b', 'h' then names.months_abbr[time.month - 1]
+            when 'B'      then names.months[time.month - 1]
+            when 'p'      then time.hour < 12 ? names.am_lower : names.pm_lower
+            when 'P'      then time.hour < 12 ? names.am : names.pm
+            end
           end
 
           # Zoned forms come first: `Time.parse` ignores trailing input, so a
@@ -49,21 +152,127 @@ module Hwaro
 
           def self.register(env : Crinja)
             # Date formatting filter
-            env.filters["date"] = Crinja.filter({format: "%Y-%m-%d"}) do
+            env.filters["date"] = Crinja.filter({format: "%Y-%m-%d", locale: nil}) do
               value = target.raw
               format = arguments["format"].to_s
+              locale = DateFilters.locale_arg(arguments["locale"])
 
               case value
               when Time
-                DateFilters.format_time(value, format)
+                DateFilters.format_time(value, format, locale)
               when String
                 parsed = DateFilters.parse_string(value)
-                parsed ? DateFilters.format_time(parsed, format) : value
+                parsed ? DateFilters.format_time(parsed, format, locale) : value
               else
                 value.to_s
               end
             end
           end
+
+          # Built-in name tables, CLDR "format" context (the form used inside a
+          # date, so Russian and Polish months are genitive: "5 марта",
+          # "5 marca"). `pt` is Brazilian Portuguese, as in CLDR, so `pt_BR`
+          # resolves to it; Traditional Chinese (`zh_TW`) also serves `zh_Hant`,
+          # `zh_HK` and `zh_MO`. English is Crystal's own names, not a table.
+          ZH_HANT = LocaleNames.new(
+            months: %w[1月 2月 3月 4月 5月 6月 7月 8月 9月 10月 11月 12月],
+            months_abbr: %w[1月 2月 3月 4月 5月 6月 7月 8月 9月 10月 11月 12月],
+            days: %w[星期一 星期二 星期三 星期四 星期五 星期六 星期日],
+            days_abbr: %w[週一 週二 週三 週四 週五 週六 週日],
+            am: "上午", pm: "下午")
+
+          LOCALES = {
+            "ko" => LocaleNames.new(
+              months: %w[1월 2월 3월 4월 5월 6월 7월 8월 9월 10월 11월 12월],
+              months_abbr: %w[1월 2월 3월 4월 5월 6월 7월 8월 9월 10월 11월 12월],
+              days: %w[월요일 화요일 수요일 목요일 금요일 토요일 일요일],
+              days_abbr: %w[월 화 수 목 금 토 일],
+              am: "오전", pm: "오후"),
+            "ja" => LocaleNames.new(
+              months: %w[1月 2月 3月 4月 5月 6月 7月 8月 9月 10月 11月 12月],
+              months_abbr: %w[1月 2月 3月 4月 5月 6月 7月 8月 9月 10月 11月 12月],
+              days: %w[月曜日 火曜日 水曜日 木曜日 金曜日 土曜日 日曜日],
+              days_abbr: %w[月 火 水 木 金 土 日],
+              am: "午前", pm: "午後"),
+            "zh" => LocaleNames.new(
+              months: %w[一月 二月 三月 四月 五月 六月 七月 八月 九月 十月 十一月 十二月],
+              months_abbr: %w[1月 2月 3月 4月 5月 6月 7月 8月 9月 10月 11月 12月],
+              days: %w[星期一 星期二 星期三 星期四 星期五 星期六 星期日],
+              days_abbr: %w[周一 周二 周三 周四 周五 周六 周日],
+              am: "上午", pm: "下午"),
+            "zh_tw"   => ZH_HANT,
+            "zh_hant" => ZH_HANT,
+            "zh_hk"   => ZH_HANT,
+            "zh_mo"   => ZH_HANT,
+            "de"      => LocaleNames.new(
+              months: %w[Januar Februar März April Mai Juni Juli August September Oktober November Dezember],
+              months_abbr: %w[Jan. Feb. März Apr. Mai Juni Juli Aug. Sept. Okt. Nov. Dez.],
+              days: %w[Montag Dienstag Mittwoch Donnerstag Freitag Samstag Sonntag],
+              days_abbr: %w[Mo. Di. Mi. Do. Fr. Sa. So.],
+              am: "AM", pm: "PM"),
+            "fr" => LocaleNames.new(
+              months: %w[janvier février mars avril mai juin juillet août septembre octobre novembre décembre],
+              months_abbr: %w[janv. févr. mars avr. mai juin juil. août sept. oct. nov. déc.],
+              days: %w[lundi mardi mercredi jeudi vendredi samedi dimanche],
+              days_abbr: %w[lun. mar. mer. jeu. ven. sam. dim.],
+              am: "AM", pm: "PM"),
+            "es" => LocaleNames.new(
+              months: %w[enero febrero marzo abril mayo junio julio agosto septiembre octubre noviembre diciembre],
+              months_abbr: %w[ene feb mar abr may jun jul ago sept oct nov dic],
+              days: %w[lunes martes miércoles jueves viernes sábado domingo],
+              days_abbr: %w[lun mar mié jue vie sáb dom],
+              am: "a. m.", pm: "p. m."),
+            "it" => LocaleNames.new(
+              months: %w[gennaio febbraio marzo aprile maggio giugno luglio agosto settembre ottobre novembre dicembre],
+              months_abbr: %w[gen feb mar apr mag giu lug ago set ott nov dic],
+              days: %w[lunedì martedì mercoledì giovedì venerdì sabato domenica],
+              days_abbr: %w[lun mar mer gio ven sab dom],
+              am: "AM", pm: "PM"),
+            "pt" => LocaleNames.new(
+              months: %w[janeiro fevereiro março abril maio junho julho agosto setembro outubro novembro dezembro],
+              months_abbr: %w[jan. fev. mar. abr. mai. jun. jul. ago. set. out. nov. dez.],
+              days: %w[segunda-feira terça-feira quarta-feira quinta-feira sexta-feira sábado domingo],
+              days_abbr: %w[seg. ter. qua. qui. sex. sáb. dom.],
+              am: "AM", pm: "PM"),
+            "ru" => LocaleNames.new(
+              months: %w[января февраля марта апреля мая июня июля августа сентября октября ноября декабря],
+              months_abbr: %w[янв. февр. мар. апр. мая июн. июл. авг. сент. окт. нояб. дек.],
+              days: %w[понедельник вторник среда четверг пятница суббота воскресенье],
+              days_abbr: %w[пн вт ср чт пт сб вс],
+              am: "AM", pm: "PM"),
+            "nl" => LocaleNames.new(
+              months: %w[januari februari maart april mei juni juli augustus september oktober november december],
+              months_abbr: %w[jan feb mrt apr mei jun jul aug sep okt nov dec],
+              days: %w[maandag dinsdag woensdag donderdag vrijdag zaterdag zondag],
+              days_abbr: %w[ma di wo do vr za zo],
+              am: "a.m.", pm: "p.m."),
+            "pl" => LocaleNames.new(
+              months: %w[stycznia lutego marca kwietnia maja czerwca lipca sierpnia września października listopada grudnia],
+              months_abbr: %w[sty lut mar kwi maj cze lip sie wrz paź lis gru],
+              days: %w[poniedziałek wtorek środa czwartek piątek sobota niedziela],
+              days_abbr: %w[pon. wt. śr. czw. pt. sob. niedz.],
+              am: "AM", pm: "PM"),
+            "tr" => LocaleNames.new(
+              months: %w[Ocak Şubat Mart Nisan Mayıs Haziran Temmuz Ağustos Eylül Ekim Kasım Aralık],
+              months_abbr: %w[Oca Şub Mar Nis May Haz Tem Ağu Eyl Eki Kas Ara],
+              days: %w[Pazartesi Salı Çarşamba Perşembe Cuma Cumartesi Pazar],
+              days_abbr: %w[Pzt Sal Çar Per Cum Cmt Paz],
+              am: "ÖÖ", pm: "ÖS"),
+            "vi" => LocaleNames.new(
+              months: ["tháng 1", "tháng 2", "tháng 3", "tháng 4", "tháng 5", "tháng 6",
+                       "tháng 7", "tháng 8", "tháng 9", "tháng 10", "tháng 11", "tháng 12"],
+              months_abbr: ["thg 1", "thg 2", "thg 3", "thg 4", "thg 5", "thg 6",
+                            "thg 7", "thg 8", "thg 9", "thg 10", "thg 11", "thg 12"],
+              days: ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ Nhật"],
+              days_abbr: ["Th 2", "Th 3", "Th 4", "Th 5", "Th 6", "Th 7", "CN"],
+              am: "SA", pm: "CH"),
+            "id" => LocaleNames.new(
+              months: %w[Januari Februari Maret April Mei Juni Juli Agustus September Oktober November Desember],
+              months_abbr: %w[Jan Feb Mar Apr Mei Jun Jul Agu Sep Okt Nov Des],
+              days: %w[Senin Selasa Rabu Kamis Jumat Sabtu Minggu],
+              days_abbr: %w[Sen Sel Rab Kam Jum Sab Min],
+              am: "AM", pm: "PM"),
+          }
         end
       end
     end
