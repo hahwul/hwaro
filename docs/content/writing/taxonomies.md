@@ -145,7 +145,7 @@ A file only counts as term metadata when all of these hold:
 
 - it is an `_index` file exactly two levels below `content/`, in a directory named after a configured taxonomy (`content/tags/<dir>/_index.md`);
 - the build generates a term page for that taxonomy in the file's language (some published page in that language carries the term, and `[languages.<code>] taxonomies` doesn't leave the taxonomy out);
-- `<dir>` is that term page's URL slug.
+- the file would publish at that term page's URL: `<dir>` is the term's URL slug, and no `path` front matter or `[permalinks]` rule moves the section elsewhere.
 
 Such a file is not published as a page of its own. It stays out of the sitemap, feeds, search index, llms.txt and section listings, so the term URL appears once. If two files match the same term page (`_index.md` beside `_index.markdown`), `_index.md` wins and the build warns about the other.
 
