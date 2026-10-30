@@ -122,7 +122,7 @@ Crystal은 Ruby와 닮은 문법의 컴파일 언어입니다.
 
 - `page.title`, `page.description`, `page.image`, `page.extra`가 파일의 값을 따릅니다. `title`이 없으면 생성된 "Tags: crystal"이 그대로 쓰입니다. `<title>`, og/twitter 태그, 항목 RSS 피드 제목도 같은 값을 씁니다.
 - `term_content`에는 파일 본문을 렌더링한 HTML이 들어갑니다. Markdown, 숏코드, 구문 강조, `@/` 링크를 다른 페이지와 똑같이 처리하고, `[links]` 검사도 본문의 깨진 `@/` 링크와 다른 페이지로 가는 깨진 앵커를 보고합니다. 항목 페이지 자신을 가리키는 링크(`@/tags/crystal/_index.md#part`, 또는 본문 안의 `#part` 링크)는 앵커를 검사하지 않습니다. `content`는 지금처럼 생성된 페이지 목록이라 기존 템플릿은 그대로 동작하며, 본문을 보여 줄 자리에 `{{ term_content }}`를 넣으면 됩니다.
-- 파일의 `aliases`는 항목 페이지로 가는 리다이렉트가 됩니다. 태그 이름을 바꿨을 때 유용합니다.
+- 파일의 `aliases`는 항목 페이지로 가는 리다이렉트가 됩니다. 태그 이름을 바꿨을 때 유용합니다. 생성되는 택소노미 페이지나 그 `page/N/` 페이지를 가리키는 별칭, 다른 페이지가 이미 차지한 별칭은 쓰지 않으며 빌드가 경고합니다.
 - `template`은 무시되며 빌드가 경고합니다. 항목 페이지는 항상 `taxonomy_term.html`로 렌더링되고, 없으면 `taxonomy.html`, 그다음 `page.html`을 씁니다.
 - [`get_taxonomy()`](#get-taxonomy-함수)의 항목에 파일의 `title`과 `description`이 붙습니다. `get_taxonomy()`는 사이트 전체를 보는 함수라 기본 언어 파일만 반영합니다. 파일이 없는 항목에는 `title` 키가 없으니 `{{ term.title or term.name }}`처럼 씁니다.
 

@@ -135,7 +135,7 @@ On the term page:
 
 - `page.title`, `page.description`, `page.image` and `page.extra` take the file's values. Without a `title`, the generated "Tags: crystal" stays. The `<title>`, og/twitter tags and the term's RSS feed title use the same values.
 - `term_content` is the file's rendered body. Markdown, shortcodes, syntax highlighting and `@/` links are processed like any other page, and `[links]` checks report its broken `@/` links and its broken anchors into other pages. Links pointing into the term page itself (`@/tags/crystal/_index.md#part`, or a `#part` link inside the body) are not anchor-checked. `content` stays the generated page list, so existing templates keep working; print `{{ term_content }}` where the text should go.
-- `aliases` in the file become redirects to the term page, which is useful when a tag is renamed.
+- `aliases` in the file become redirects to the term page, which is useful when a tag is renamed. An alias that names a generated taxonomy page or one of its `page/N/` pages, or that another page already claims, is not written; the build warns.
 - `template` is ignored (the build warns): term pages always render with `taxonomy_term.html`, falling back to `taxonomy.html`, then `page.html`.
 - [`get_taxonomy()`](#get-taxonomy-function) terms get `title` and `description` from the file (default-language files only, since `get_taxonomy()` is a site-wide view). Terms without a file have no `title` key, so use `{{ term.title or term.name }}`.
 
