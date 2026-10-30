@@ -113,6 +113,7 @@ module Hwaro
           check_content_schema(issues, config)
           check_translations(issues, config)
           check_referenced_paths(issues, config)
+          check_lexers(issues, config)
           check_sass(issues, config)
         end
         @observed_blocking_ids = issues.map(&.id).to_set & ALL_BLOCKING_IDS

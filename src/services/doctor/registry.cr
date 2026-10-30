@@ -93,7 +93,7 @@ module Hwaro
           CheckSpec.new("menus (parent references)",
             ["menu-parent-undefined"]),
           CheckSpec.new("referenced files & dirs",
-            ["config-path-missing", "config-dir-missing"]),
+            ["config-path-missing", "config-dir-missing", "highlight-lexer-invalid"]),
           CheckSpec.new("build output (route evidence)",
             ["build-output-unusable", "build-output-stale"]),
           CheckSpec.new("sass (sources & enablement)",
