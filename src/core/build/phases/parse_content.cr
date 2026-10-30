@@ -21,7 +21,9 @@ module Hwaro::Core::Build::Phases::ParseContent
       # navigation, listings, output claims, the cache fingerprints and every
       # discovery surface then see a matched term `_index.md` as headless.
       mark_term_metadata(ctx.sections, match_term_files(ctx.pages, ctx.sections, config))
-      Content::Multilingual.link_translations!(ctx.all_pages, config)
+      Content::Multilingual.link_translations!(ctx.all_pages, config).each do |c|
+        Logger.warn "content/#{c.loser.path}: translation_key #{c.key.inspect} is already used by the '#{c.code}' page content/#{c.winner.path} — this page is not linked as a translation."
+      end
       Content::Versions.link!(ctx.all_pages, config)
     end
 
@@ -1011,6 +1013,7 @@ module Hwaro::Core::Build::Phases::ParseContent
 
     # Redirect support — applies to both regular pages and sections
     page.redirect_to = data[:redirect_to]
+    page.translation_key = data[:translation_key]
 
     # `[git]` metadata + date fallbacks. Must run before calculate_page_url
     # so a `[permalinks]` date token can resolve from a git-derived `date`.

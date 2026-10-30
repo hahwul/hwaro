@@ -60,19 +60,36 @@ module Hwaro
         dir == "." ? cleaned : "#{dir}/#{cleaned}"
       end
 
-      def link_translations!(pages : Array(Models::Page), config : Models::Config)
-        return unless multilingual?(config)
+      # A front matter `translation_key` displaced from its group by
+      # another page of the same language: `loser` gets no translations of
+      # its own and nobody links to it.
+      record KeyCollision, key : String, code : String, winner : Models::Page, loser : Models::Page
 
-        groups = Hash(String, Array(Models::Page)).new { |h, k| h[k] = [] of Models::Page }
+      # Fill `page.translations` for every page. A page's group is its
+      # `translation_key` (scoped to its version, so `v1/` and `v2/` copies
+      # sharing a key stay apart) or, without one, its file name minus the
+      # language suffix (`about.md` ↔ `about.ko.md`). The two never mix: a
+      # keyed page does not join the file-name group of an unkeyed one.
+      # Inside a keyed group the first path (byte order) of each language
+      # wins; the others are returned so callers can report them.
+      def link_translations!(pages : Array(Models::Page), config : Models::Config) : Array(KeyCollision)
+        collisions = [] of KeyCollision
+        return collisions unless multilingual?(config)
+
+        groups = Hash({String?, String, Bool}, Array(Models::Page)).new { |h, k| h[k] = [] of Models::Page }
         pages.each do |page|
           next unless page_extension(page.path)
-          groups[translation_key(page.path, config)] << page
+          if key = page.translation_key
+            groups[{page.version.try(&.name), key, true}] << page
+          else
+            groups[{nil, translation_key(page.path, config), false}] << page
+          end
         end
 
         order = ordered_language_codes(config)
         default = config.default_language
 
-        groups.each_value do |group_pages|
+        groups.each do |(_, key, keyed), group_pages|
           # A group of size 1 has no cross-language variants, just the
           # page itself; leaving `page.translations` empty matches the
           # canonical `{% if page.translations %}` guard from the
@@ -83,8 +100,21 @@ module Hwaro
           end
 
           by_code = {} of String => Models::Page
-          group_pages.each do |p|
-            by_code[language_code(p, config)] = p
+          if keyed
+            group_pages.sort_by!(&.path).each do |p|
+              code = language_code(p, config)
+              if winner = by_code[code]?
+                collisions << KeyCollision.new(key, code, winner, p)
+                p.translations = [] of Models::TranslationLink
+              else
+                by_code[code] = p
+              end
+            end
+            group_pages = by_code.values
+          else
+            group_pages.each do |p|
+              by_code[language_code(p, config)] = p
+            end
           end
 
           group_pages.each do |current_page|
@@ -107,6 +137,7 @@ module Hwaro
             current_page.translations = links.size > 1 ? links : [] of Models::TranslationLink
           end
         end
+        collisions
       end
     end
   end

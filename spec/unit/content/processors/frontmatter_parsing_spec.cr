@@ -2307,4 +2307,32 @@ describe Hwaro::Content::Processors::Markdown do
       processor.parse("+++\ntitle = \"\"\n+++\nBody\n")[:title].should eq("")
     end
   end
+
+  describe "translation_key" do
+    it "reads it from TOML, YAML and JSON front matter" do
+      processor.parse("+++\ntitle = \"A\"\ntranslation_key = \"about\"\n+++\nx")[:translation_key].should eq("about")
+      processor.parse("---\ntitle: A\ntranslation_key: about\n---\nx")[:translation_key].should eq("about")
+      processor.parse(%({"title": "A", "translation_key": "about"}\nx))[:translation_key].should eq("about")
+    end
+
+    it "strips it, treats a blank one as unset and keeps it out of extra" do
+      result = processor.parse("+++\ntranslation_key = \" about \"\n+++\nx")
+      result[:translation_key].should eq("about")
+      result[:extra].has_key?("translation_key").should be_false
+      processor.parse("+++\ntranslation_key = \"  \"\n+++\nx")[:translation_key].should be_nil
+      processor.parse("+++\ntitle = \"A\"\n+++\nx")[:translation_key].should be_nil
+      processor.parse("no front matter")[:translation_key].should be_nil
+    end
+
+    it "warns about and ignores a value that is not a string" do
+      log = with_captured_log do
+        processor.parse("+++\ntranslation_key = 42\n+++\nx", "a.md")[:translation_key].should be_nil
+        processor.parse("---\ntranslation_key: [a]\n---\nx", "b.md")[:translation_key].should be_nil
+        processor.parse(%({"translation_key": true}\nx), "c.md")[:translation_key].should be_nil
+      end
+      log.should contain("a.md: `translation_key` must be a string — ignored.")
+      log.should contain("b.md: `translation_key` must be a string — ignored.")
+      log.should contain("c.md: `translation_key` must be a string — ignored.")
+    end
+  end
 end

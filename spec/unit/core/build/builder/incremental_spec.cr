@@ -521,3 +521,48 @@ describe "Builder#run_incremental case-only URL change" do
     end
   end
 end
+
+describe "Builder#run_incremental translation_key" do
+  it "re-links the old and the new partner when an edit moves a page's key" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", <<-TOML)
+          title = "T"
+          base_url = "http://localhost"
+          default_language = "en"
+          [languages.en]
+          language_name = "English"
+          [languages.ko]
+          language_name = "Korean"
+          TOML
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{% for t in page.translations %}[{{ t.url }}]{% endfor %}")
+        File.write("content/about.md", "+++\ntitle = \"About\"\ntranslation_key = \"about\"\n+++\n")
+        File.write("content/old.ko.md", "+++\ntitle = \"Old\"\ntranslation_key = \"about\"\n+++\n")
+        File.write("content/new.ko.md", "+++\ntitle = \"New\"\n+++\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/old.ko.md"], options)
+        File.read("public/about/index.html").should eq("[/about/][/ko/old/]")
+
+        # Only new.ko.md is edited: about.md and old.ko.md re-render anyway.
+        File.write("content/new.ko.md", "+++\ntitle = \"New\"\ntranslation_key = \"about\"\n+++\n")
+        File.write("content/old.ko.md", "+++\ntitle = \"Old\"\n+++\n")
+        builder.run_incremental(["content/new.ko.md", "content/old.ko.md"], options)
+        File.read("public/about/index.html").should eq("[/about/][/ko/new/]")
+        File.read("public/ko/new/index.html").should eq("[/about/][/ko/new/]")
+        File.read("public/ko/old/index.html").should eq("")
+
+        # A key edit on one page alone moves the partner pair back.
+        File.write("content/new.ko.md", "+++\ntitle = \"New\"\n+++\n")
+        builder.run_incremental(["content/new.ko.md"], options)
+        File.read("public/about/index.html").should eq("")
+        File.read("public/ko/new/index.html").should eq("")
+      end
+    end
+  end
+end

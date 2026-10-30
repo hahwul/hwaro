@@ -34,6 +34,7 @@ module Hwaro
         "title" => "string", "description" => "string", "image" => "string", "template" => "string",
         "slug" => "string", "path" => "string", "sort_by" => "string", "page_template" => "string",
         "paginate_path" => "string", "redirect_to" => "string", "series" => "string",
+        "translation_key" => "string",
         "draft" => "bool", "in_sitemap" => "bool", "toc" => "bool", "render" => "bool",
         "transparent" => "bool", "generate_feeds" => "bool", "pagination_enabled" => "bool",
         "reverse" => "bool", "in_search_index" => "bool", "insert_anchor_links" => "bool",
