@@ -86,18 +86,25 @@ module Tartrazine
     template = parse_xml_to_template(xml)
     raise Exception.new(%(missing <state name="root">)) unless template.states.has_key?("root")
     includes = {} of String => Array(String)
+    # States with a pattern-less rule (always matches): rules after it are
+    # dead, so their includes cannot recurse.
+    closed = Set(String).new
     usings = [] of String
     root.xpath_nodes(".//*").each do |node|
       case node.name
       when "rule"
         next if node["pattern"]?
+        from = node.parent.try(&.[]?("name"))
         first = node.first_element_child
         if first.try(&.name) == "include"
-          if (from = node.parent.try(&.[]?("name"))) && (to = first.try(&.[]?("state")))
+          if from && !closed.includes?(from) && (to = first.try(&.[]?("state")))
             (includes[from] ||= [] of String) << to
           end
-        elsif node.children.any? { |child| child.element? && child.name == "token" }
-          warnings << "has a <rule> without a pattern that emits a <token>; code blocks that reach it fall back to plain"
+        else
+          closed << from if from
+          if node.children.any? { |child| child.element? && child.name == "token" }
+            warnings << "has a <rule> without a pattern that emits a <token>; code blocks that reach it fall back to plain"
+          end
         end
       when "pop"
         if (depth = node["depth"]?.try(&.to_i?)) && depth < 0

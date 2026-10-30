@@ -249,6 +249,8 @@ describe Hwaro::Content::Processors::CustomLexers do
     rules = ->(name : String, body : String) { %(<lexer><config><name>#{name}</name></config><rules><state name="root">#{body}</state></rules></lexer>) }
     files = {
       "self_inc.xml" => rules.call("selfinc", %(<rule><include state="root"/></rule>)),
+      # An include after a rule that always matches is never reached.
+      "dead_inc.xml" => rules.call("deadinc", %(<rule pattern="a"><token type="Text"/></rule><rule><pop depth="1"/></rule><rule><include state="root"/></rule>)),
       "two_inc.xml"  => %(<lexer><config><name>twoinc</name></config><rules><state name="root"><rule pattern="a"><token type="Text"/></rule><rule><include state="b"/></rule></state><state name="b"><rule><include state="root"/></rule></state></rules></lexer>),
       "no_pat.xml"   => rules.call("nopat", %(<rule><token type="Keyword"/></rule><rule><push state="root"/></rule>)),
       "neg_pop.xml"  => rules.call("negpop", %(<rule pattern="a"><pop depth="-2"/></rule>)),
