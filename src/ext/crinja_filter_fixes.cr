@@ -1,5 +1,6 @@
 # Built-in Crinja filters whose results differed from Jinja2's, each
-# re-registered after the original so it replaces it.
+# re-registered after the original so it replaces it, and the Jinja2
+# built-ins Crinja lacks (`min`, `max`).
 
 # `dictsort(reverse=true)` was accepted and ignored.
 Crinja.filter({
@@ -126,4 +127,33 @@ Crinja.filter({default: 0, base: 10}, :int) do
            when Float  then raw.to_i
            end
   result ? Crinja::Value.new(result) : arguments["default"].to_i
+end
+
+# `min` / `max` (Jinja2 built-ins Crinja lacks): the first smallest / largest
+# item, compared like `sort` (strings case-insensitively unless
+# `case_sensitive=true`), by an `attribute=` path (dotted, as in `sort`) when
+# given. An empty or undefined sequence gives undefined; items that cannot be
+# compared raise a template error.
+module Crinja::Filter
+  def self.__extreme(target : Value, arguments : Arguments, sign : Int32) : Value
+    return Value.new(Undefined.new) if target.undefined?
+    attribute = arguments["attribute"]
+    case_sensitive = arguments["case_sensitive"].truthy?
+    best = nil
+    target.to_a.each do |item|
+      key = attribute.none? ? item : __attr_path(attribute, item)
+      best = {key, item} if best.nil? || __compare(key, best[0], case_sensitive) * sign > 0
+    end
+    best ? best[1] : Value.new(Undefined.new)
+  rescue ex : ArgumentError
+    raise TypeError.new(ex.message)
+  end
+end
+
+Crinja.filter({case_sensitive: false, attribute: nil}, :min) do
+  Crinja::Filter.__extreme(target, arguments, -1)
+end
+
+Crinja.filter({case_sensitive: false, attribute: nil}, :max) do
+  Crinja::Filter.__extreme(target, arguments, 1)
 end

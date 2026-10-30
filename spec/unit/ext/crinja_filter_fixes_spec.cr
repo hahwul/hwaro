@@ -77,4 +77,41 @@ describe "Crinja built-in filter fixes" do
         .should eq("1|0|4|42|5")
     end
   end
+
+  describe "min and max" do
+    it "returns the smallest and largest item" do
+      render_filter("{{ [3, 1, 2.5] | min }}|{{ [3, 1, 2.5] | max }}").should eq("1|3")
+      render_filter("{{ ['b', 'A', 'c'] | min }}|{{ ['b', 'A', 'c'] | max }}").should eq("A|c")
+    end
+
+    it "compares strings case-insensitively unless case_sensitive=true" do
+      render_filter("{{ ['b', 'a', 'C'] | max }}|{{ ['b', 'a', 'C'] | max(case_sensitive=true) }}").should eq("C|b")
+      render_filter("{{ ['b', 'a', 'C'] | min(case_sensitive=true) }}").should eq("C")
+      # Ties keep the first item, as in Python's min/max.
+      render_filter("{{ ['a', 'A'] | min }}{{ ['A', 'a'] | max }}").should eq("aA")
+    end
+
+    it "compares by a (dotted) attribute and returns the whole item" do
+      posts = Crinja.value([
+        {"title" => "b", "extra" => {"weight" => 3}},
+        {"title" => "A", "extra" => {"weight" => 1}},
+        {"title" => "c", "extra" => {"weight" => 3}},
+      ])
+      Crinja.new.from_string("{{ (posts | max(attribute='extra.weight')).title }}|{{ (posts | min(attribute='title')).title }}")
+        .render({"posts" => posts}).should eq("b|A")
+    end
+
+    it "gives undefined for an empty or undefined sequence" do
+      render_filter("<{{ [] | max }}{{ [] | min }}{{ nope | max }}>|{{ ([] | max) is undefined }}").should eq("<>|true")
+    end
+
+    it "raises a template error for items that cannot be compared" do
+      expect_raises(Crinja::TypeError) { render_filter("{{ [true, false] | max }}") }
+      # NaN has no order: `<=>` returns nil, which must not escape as a bare
+      # ArgumentError (that aborts the build without a template location).
+      expect_raises(Crinja::TypeError) do
+        Crinja.new.from_string("{{ xs | min }}").render({"xs" => Crinja.value([1.0, Float64::NAN])})
+      end
+    end
+  end
 end
