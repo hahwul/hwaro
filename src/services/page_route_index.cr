@@ -50,9 +50,9 @@ module Hwaro
       # `{paginate_path, per_page, source directory}`.
       @pagers = {} of String => {String, Int32, String}
       # `[content] ignore` rules: a hidden bundle file is never copied.
-      @ignore : Models::ContentFilesConfig
+      @ignore : ContentWalk::Ignore
 
-      def initialize(@content_dir : String, config : Models::Config?)
+      def initialize(content_dir : String, config : Models::Config?)
         @ignore = ContentWalk.ignore_rules(content_dir)
         # Reading every page through the build's parsers replays the build's
         # diagnostics (unknown front-matter keys, unparseable dates, skipped
@@ -61,7 +61,7 @@ module Hwaro
         previous = Logger.level
         Logger.level = Logger::Level::Error
         begin
-          lister = ContentLister.new(content_dir, GeneratedContent.infos(content_dir))
+          lister = ContentLister.new(content_dir, GeneratedContent.infos(content_dir), @ignore)
           lister.list_all.each do |info|
             if info.generated_from
               add_generated(info, config)
@@ -109,7 +109,7 @@ module Hwaro
           if dir = @bundle_dirs[prefix]?
             candidate = File.join(dir, path[prefix.size..])
             return true if File.file?(candidate) && !ContentWalk.markdown?(candidate) && !nested_bundle?(dir, candidate) &&
-                           !ContentWalk.ignored?(candidate, @content_dir, @ignore)
+                           !@ignore.ignored?(candidate)
           end
           break if prefix == "/"
         end

@@ -229,7 +229,7 @@ module Hwaro
             ext = File.extname(path).downcase
             next if CONTENT_EXTENSIONS.includes?(ext)
             next unless ASSET_EXTENSIONS.includes?(ext)
-            next if ContentWalk.ignored?(path, @content_dir, ignore)
+            next if ignore.ignored?(path)
             assets << path if ContentWalk.readable_file?(path)
           end
         end

@@ -21,7 +21,6 @@ module Hwaro
           private def check_internal_links(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String, base_path : String = "", language_codes : Array(String) = [] of String, generated_routes : GeneratedRoutes = GeneratedRoutes.new, oracle : Utils::BuildOutput::Oracle = Utils::BuildOutput.oracle("public", tool: "check-links"), config : Models::Config? = nil) : Array(Result)
             results = [] of Result
             project_root = Utils::PathUtils.find_project_root(content_dir)
-            @content_root = content_dir
             @content_ignore = Services::ContentWalk.ignore_rules(content_dir)
             link_index : Services::InternalLinkIndex? = nil
             page_routes : Services::PageRouteIndex? = nil
@@ -598,7 +597,7 @@ module Hwaro
           # A source `[content] ignore` hides is no link target: the build
           # never publishes it. Rules are set per check_internal_links run.
           private def content_ignored?(path : String) : Bool
-            Services::ContentWalk.ignored?(path, @content_root, @content_ignore)
+            @content_ignore.ignored?(path)
           end
 
           # Map a link destination onto a path under the content directory.

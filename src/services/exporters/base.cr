@@ -218,14 +218,14 @@ module Hwaro
           rules = ContentWalk.ignore_rules(content_dir)
           Dir.glob(File.join(Utils::PathUtils.glob_escape(content_dir), "**", "*.md")) do |file|
             next if File.symlink?(file) && !Utils::PathUtils.resolves_within?(file, project_root)
-            next if ContentWalk.ignored?(file, content_dir, rules)
+            next if rules.ignored?(file)
             # Directories named `x.md` and FIFOs (whose `File.read` blocks
             # forever) are skipped, as the build and the other tools do.
             files << file if ContentWalk.readable_file?(file)
           end
           Dir.glob(File.join(Utils::PathUtils.glob_escape(content_dir), "**", "*.markdown")) do |file|
             next if File.symlink?(file) && !Utils::PathUtils.resolves_within?(file, project_root)
-            next if ContentWalk.ignored?(file, content_dir, rules)
+            next if rules.ignored?(file)
             # Directories named `x.md` and FIFOs (whose `File.read` blocks
             # forever) are skipped, as the build and the other tools do.
             files << file if ContentWalk.readable_file?(file)
@@ -280,6 +280,7 @@ module Hwaro
             dir unless dir == root
           end.to_set
           rules = content_files_rules(content_dir)
+          ignore = ContentWalk.ignore_rules(content_dir)
 
           Dir.glob(File.join(Utils::PathUtils.glob_escape(content_dir), "**", "*")).sort!.each do |src|
             info = File.info?(src, follow_symlinks: false)
@@ -287,7 +288,7 @@ module Hwaro
             next if ContentWalk.markdown?(src)
 
             relative = src.sub(content_dir, "").lstrip('/')
-            next if rules.ignored?(relative)
+            next if ignore.ignored?(src)
             owner = nil
             dir = File.dirname(File.expand_path(src))
             while dir.size > root.size

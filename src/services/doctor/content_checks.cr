@@ -121,7 +121,7 @@ module Hwaro
       # Hidden by the site's `[content] ignore`: never a page, so never a
       # finding either.
       private def content_ignored?(path : String) : Bool
-        ContentWalk.ignored?(path, @content_dir, @content_ignore)
+        @content_ignore.ignored?(path)
       end
 
       # Returns true if the directory contains markdown files anywhere
@@ -219,7 +219,7 @@ module Hwaro
 
       # `[[content.schema]]` violations, one error per violation.
       private def check_content_schema(issues : Array(Issue), config : Models::Config)
-        Doctor.content_schema_results(@content_dir, config).each do |_, result|
+        Doctor.content_schema_results(@content_dir, config, @content_ignore).each do |_, result|
           issues.concat(result.violations.map { |v| Doctor.schema_issue(v) })
         end
       end
@@ -235,7 +235,7 @@ module Hwaro
       # pages), with section cascades resolved by the build's own
       # `build_cascade_map` / `merged_cascade_for`. {file, result} per
       # checked page, in path order. Shared by doctor and `tool validate`.
-      def self.content_schema_results(content_dir : String, config : Models::Config) : Array({String, Content::FrontMatterSchema::Result})
+      def self.content_schema_results(content_dir : String, config : Models::Config, ignore : ContentWalk::Ignore = ContentWalk.ignore_rules(content_dir)) : Array({String, Content::FrontMatterSchema::Result})
         results = [] of {String, Content::FrontMatterSchema::Result}
         return results if config.content_schema.empty? || !Dir.exists?(content_dir)
 
@@ -247,7 +247,7 @@ module Hwaro
           menus = MenuScope.new(config)
           sections = [] of Models::Section
           pages = [] of {Models::Page, String, String, Hash(String, Models::ExtraValue), Bool}
-          ContentLister.new(content_dir, GeneratedContent.infos(content_dir)).list_all.each do |info|
+          ContentLister.new(content_dir, GeneratedContent.infos(content_dir), ignore).list_all.each do |info|
             generated = !info.generated_from.nil?
             relative = generated ? info.path : Path[info.path].relative_to(content_dir).to_s
             file = generated ? File.join(content_dir, info.path) : info.path
@@ -322,7 +322,7 @@ module Hwaro
         # build (`products/blue.ko.md` ↔ generated `products/blue.md`), so they
         # count as originals; they have no file to report as untranslated.
         generated = {} of String => String
-        entries = ContentLister.new(@content_dir, GeneratedContent.infos(@content_dir)).list_all.select(&.published?).sort_by!(&.path).map do |info|
+        entries = ContentLister.new(@content_dir, GeneratedContent.infos(@content_dir), @content_ignore).list_all.select(&.published?).sort_by!(&.path).map do |info|
           relative = info.generated_from ? info.path : Path[info.path].relative_to(@content_dir).to_s
           file = info.generated_from ? File.join(@content_dir, info.path) : info.path
           info.generated_source.try { |source| generated[file] = source }

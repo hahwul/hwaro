@@ -133,4 +133,57 @@ describe "[content] ignore in the content tools" do
       result.should_not contain("/old-a/")
     end
   end
+
+  # Patterns are written against the project's content/, so a walk of a
+  # subdirectory (`-c content/blog`) must still read `blog/b.md` as
+  # `blog/b.md`, not as `b.md`.
+  it "matches patterns against the project content root when walking a subdirectory" do
+    with_ignore_project(%([content]\nignore = ["blog/b.md", "README.md"]\n)) do
+      FileUtils.mkdir_p("content/blog")
+      File.write("content/blog/b.md", "x")
+      File.write("content/blog/README.md", "x")
+      Hwaro::Services::ContentWalk.find_content_files("content/blog").should eq(["content/blog/README.md"])
+      Hwaro::Services::ContentLister.new("content/blog").list_all.map(&.path).should eq(["content/blog/README.md"])
+    end
+  end
+
+  it "applies no rules to a directory outside the project's content root" do
+    with_ignore_project(%([content]\nignore = ["**"]\n)) do
+      FileUtils.mkdir_p("elsewhere")
+      File.write("elsewhere/a.md", "x")
+      Hwaro::Services::ContentWalk.find_content_files("elsewhere").should eq(["elsewhere/a.md"])
+      Hwaro::Services::ContentWalk.find_content_files("content").should be_empty
+    end
+  end
+
+  # `doctor --env X` validates what `build --env X` loads: the overlay's
+  # ignore list must reach every content check, translations and
+  # [[content.schema]] included, not the base config's.
+  it "uses the --env overlay's ignore list in every doctor content check" do
+    base = <<-TOML
+      title = "t"
+      base_url = "https://example.com"
+      default_language = "en"
+      [languages.en]
+      [languages.ko]
+      [[content.schema]]
+      sections = "docs"
+      [content.schema.fields.author]
+      type = "string"
+      required = true
+      TOML
+    with_ignore_project(base) do
+      File.write("config.prod.toml", %([content]\nignore = ["docs/draft-notes", "docs/kept.md"]\n))
+      ids = Hwaro::Services::Doctor.new(content_dir: "content", config_path: "config.toml", env: "prod").run
+        .select { |i| i.file.to_s.includes?("draft-notes") || i.file.to_s.includes?("kept") }
+        .map(&.id)
+      ids.should be_empty
+
+      # Control: the same checks do report those files without the overlay.
+      flagged = Hwaro::Services::Doctor.new(content_dir: "content", config_path: "config.toml").run
+        .select(&.file.to_s.includes?("kept")).map(&.id)
+      flagged.should contain("translation-missing")
+      flagged.should contain("content-schema-violation")
+    end
+  end
 end

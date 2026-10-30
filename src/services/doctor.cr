@@ -97,7 +97,7 @@ module Hwaro
       @env : String?
       # The loaded config's `[content] ignore` rules (set by `run`): the
       # content checks skip what the build never reads.
-      @content_ignore = Models::ContentFilesConfig.new
+      @content_ignore = ContentWalk::Ignore.none
 
       def initialize(@content_dir : String = "content", @config_path : String = "config.toml", @templates_dir : String = "templates", @static_dir : String = "static", @env : String? = nil)
       end
@@ -105,7 +105,6 @@ module Hwaro
       def run : Array(Issue)
         issues = [] of Issue
         config = check_config(issues)
-        @content_ignore = config.content_files if config
         template_names = check_templates(issues)
         check_directory_structure(issues, config)
         check_content_frontmatter(issues, config, template_names)
