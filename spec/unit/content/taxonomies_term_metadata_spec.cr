@@ -478,6 +478,21 @@ describe "taxonomy term _index.md metadata" do
     log.should contain("Duplicate output path '/tags/zzz/' — 'z.md' collides with 'tags/zzz/_index.md'")
   end
 
+  it "prefers _index.<lang>.md over _index.<lang>.markdown for a language's term page" do
+    log = with_captured_log do
+      build_site(MULTILINGUAL_CONFIG,
+        content_files: {
+          "a.ko.md"                      => post("가", ["rust"]),
+          "tags/rust/_index.ko.md"       => "+++\ntitle = \"MD\"\n+++\n",
+          "tags/rust/_index.ko.markdown" => "+++\ntitle = \"MARKDOWN\"\n+++\n",
+        },
+        template_files: TEMPLATES) do |dir|
+        File.read(File.join(dir, "public/ko/tags/rust/index.html")).should start_with("T=MD|")
+      end
+    end
+    log.should contain("content/tags/rust/_index.ko.markdown is ignored: content/tags/rust/_index.ko.md already describes the term page /ko/tags/rust/")
+  end
+
   it "refuses a term-file alias onto a term's pager page" do
     log = with_captured_log do
       build_site(CONFIG.sub(%(feed = true), %(feed = true\npaginate_by = 1)),
