@@ -86,7 +86,28 @@ Hwaro는 파일 이름을 기준으로 번역된 페이지를 자동으로 연�
 
 예를 들어 `hello.md`, `hello.ko.md`, `hello.ja.md`는 모두 번역 관계로 연결됩니다.
 
-아직 번역되지 않은 페이지는 `hwaro doctor`로 찾을 수 있습니다. 언어가 둘 이상인 사이트에서는 같은 짝짓기 규칙으로, 번역이 없는 페이지·섹션과 기본 언어 원본이 없는 번역을 언어별로 보여 줍니다. [doctor](/ko/start/tools/doctor/#검사-항목)를 참고하세요.
+### 번역 키
+
+언어마다 파일 이름이 다르다면 각 번역의 프론트 매터에 같은 `translation_key`를 지정합니다(Hugo의 `translationKey`):
+
+```
+content/
+├── about.md         # translation_key = "about"
+└── 소개.ko.md        # translation_key = "about"
+```
+
+```toml
++++
+title = "소개"
+translation_key = "about"
++++
+```
+
+키가 같은 페이지들은 서로의 번역이 되어 `page.translations`, hreflang 태그, 사이트맵 대체 링크에 서로 들어갑니다. 키를 지정한 페이지는 파일 이름 대신 키로만 짝지어지므로, 한 페이지의 모든 번역에 키를 지정하세요. 키가 있는 `about.md`와 키가 없는 `about.ko.md`는 연결되지 않습니다. [버전별 문서](/ko/features/versioned-docs/)에서는 키가 같은 버전 안에서만 짝지어지므로 `v1/`과 `v2/`에서 같은 키를 다시 써도 됩니다.
+
+키는 비어 있지 않은 문자열이어야 하며, 다른 값은 경고와 함께 무시됩니다. 같은 언어의 두 페이지가 같은 키를 쓰면 경로가 먼저 정렬되는(바이트 순) 페이지가 연결되고, 나머지 페이지는 번역 없이 남으며 빌드와 `hwaro doctor`(`translation-key-collision`)가 경고합니다.
+
+아직 번역되지 않은 페이지는 `hwaro doctor`로 찾을 수 있습니다. 언어가 둘 이상인 사이트에서는 같은 짝짓기 규칙(번역 키 포함)으로, 번역이 없는 페이지·섹션과 기본 언어 원본이 없는 번역을 언어별로 보여 줍니다. [doctor](/ko/start/tools/doctor/#검사-항목)를 참고하세요.
 
 ### 템플릿 변수
 

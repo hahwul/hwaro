@@ -114,15 +114,18 @@ hwaro doctor --json
 - A page or section that exists in the default language but has no
   counterpart in another configured language (`translation-missing`)
 - A translation with no default-language original (`translation-orphan`)
+- Two pages of one language sharing a `translation_key`
+  (`translation-key-collision`, warning): the build links only the one whose
+  path sorts first
 
-Pages are paired exactly as the build pairs `page.translations` (same base
-name without the language suffix, so `about.md`, `about.en.md` and
-`about.ko.md` belong together), and only pages a default build publishes
+Pages are paired exactly as the build pairs `page.translations` (their
+`translation_key`, else the same base name without the language suffix, so
+`about.md`, `about.en.md` and `about.ko.md` belong together), and only pages a default build publishes
 count: a draft or future-dated page neither has nor provides a translation.
 A headless (`render = false`, also from a section `[cascade]`) or `redirect_to`
 page is never asked for a translation and does not count as one, because the
 build leaves it out of `page.translations` and hreflang.
-Both are `info` level, so `--strict` never fails on a partial translation.
+Missing and orphaned translations are `info` level, so `--strict` never fails on a partial translation.
 The human report groups them per language with counts:
 
 ```
@@ -280,6 +283,7 @@ Rows marked ✗ are error level and **cannot** be ignored.
 | `content-ignore-hides-sections` | structure | A `[content] ignore` pattern hides a section's `_index.md` while the section's pages still build |
 | `translation-missing` | i18n | Page or section has no counterpart in a configured language |
 | `translation-orphan` | i18n | Translation has no default-language original |
+| `translation-key-collision` | i18n | Two pages of one language share a `translation_key`; only the first by path is linked |
 
 An entry that matches no rule id is reported as having no effect, so a typo
 in this list never passes silently.
