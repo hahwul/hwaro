@@ -260,6 +260,20 @@ describe "Hwaro::Content::Multilingual translation_key" do
     end
   end
 
+  it "gives a keyed pair the x-default alternate in head and sitemap" do
+    build_site(KEY_SITE_CONFIG,
+      content_files: {
+        "about.md"    => "+++\ntitle = \"About\"\ntranslation_key = \"about\"\n+++\n",
+        "intro.ko.md" => "+++\ntitle = \"소개\"\ntranslation_key = \"about\"\n+++\n",
+      },
+      template_files: {"page.html" => KEY_TEMPLATE, "section.html" => "", "index.html" => ""}) do
+      x_default = %(<link rel="alternate" hreflang="x-default" href="https://example.com/about/">)
+      File.read("public/about/index.html").should contain(x_default)
+      File.read("public/ko/intro/index.html").should contain(x_default)
+      File.read("public/sitemap.xml").scan(%(hreflang="x-default" href="https://example.com/about/")).size.should eq(2)
+    end
+  end
+
   it "warns about a same-language key collision in a build" do
     log = with_captured_log do
       build_site(KEY_SITE_CONFIG,
