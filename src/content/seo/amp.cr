@@ -179,6 +179,12 @@ module Hwaro
         # images; amp-img rejects both the same way.
         AMP_DISALLOWED_ATTR_RE = /\s+(?:loading|decoding|fetchpriority)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+)/i
 
+        # Quote-aware tag scans: `media="(width >= 600px)"` or
+        # `title="a > b"` does not end the tag.
+        AMP_LINK_TAG_RE = /<link\b#{Utils::TextUtils::HTML_TAG_ATTRS}>/i
+        AMP_VIDEO_RE    = /<video(#{Utils::TextUtils::HTML_TAG_ATTRS})>(.*?)<\/video>/mi
+        AMP_IFRAME_RE   = /<iframe(#{Utils::TextUtils::HTML_TAG_ATTRS})>(.*?)<\/iframe>/mi
+
         private def self.strip_non_amp_attributes(attrs : String) : String
           attrs.gsub(AMP_DISALLOWED_ATTR_RE, "")
         end
@@ -287,7 +293,7 @@ module Hwaro
           # all other CSS must live in a single `<style amp-custom>`. Without
           # this the site CSS and highlight.js/KaTeX CDN links make every AMP
           # page fail validation.
-          result = result.gsub(/<link\b[^>]*>/i) do |tag|
+          result = result.gsub(AMP_LINK_TAG_RE) do |tag|
             if tag =~ /rel=["']stylesheet["']/i
               href = tag.match(/href=["']([^"']*)["']/i).try(&.[1]) || ""
               AMP_FONT_PROVIDERS.any? { |provider| href.includes?(provider) } ? tag : ""
@@ -347,14 +353,14 @@ module Hwaro
 
           # Convert <video> to <amp-video>
           needs_amp_video = false
-          result = result.gsub(/<video([^>]*)>(.*?)<\/video>/mi) do
+          result = result.gsub(AMP_VIDEO_RE) do
             needs_amp_video = true
             %(<amp-video#{strip_non_amp_attributes($1)} layout="responsive">#{$2}</amp-video>)
           end
 
           # Convert <iframe> to <amp-iframe>
           needs_amp_iframe = false
-          result = result.gsub(/<iframe([^>]*)>(.*?)<\/iframe>/mi) do
+          result = result.gsub(AMP_IFRAME_RE) do
             needs_amp_iframe = true
             # Capture both groups before any inner match: `$~` is per-scope,
             # so the src lookup below would otherwise clobber `$2`.
