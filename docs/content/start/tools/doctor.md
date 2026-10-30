@@ -107,7 +107,11 @@ hwaro doctor --json
 
 **Structure diagnostics:**
 
-- Section directories missing `_index.md`
+- Section directories missing `_index.md` (never a taxonomy directory such as
+  `content/tags/`: the build generates `/tags/` itself)
+- A `content/tags/<dir>/_index.md` that matches no term page, usually because
+  `<dir>` is the term's spelling rather than its URL slug
+  (`taxonomy-term-file-unmatched`)
 
 **Translation report** (sites with more than one language):
 
@@ -282,6 +286,7 @@ Rows marked ✗ are error level and **cannot** be ignored.
 | `content-schema-violation` | content | Front matter violates its `[[content.schema]]` ✗ |
 | `structure-missing-index` | structure | Section missing _index.md |
 | `content-ignore-hides-sections` | structure | A `[content] ignore` pattern hides a section's `_index.md` while the section's pages still build |
+| `taxonomy-term-file-unmatched` | structure | A `content/<taxonomy>/<dir>/_index.md` matches no generated term page (usually `<dir>` is not the term's URL slug), so it publishes as an ordinary section |
 | `translation-missing` | i18n | Page or section has no counterpart in a configured language |
 | `translation-orphan` | i18n | Translation has no default-language original |
 | `translation-key-collision` | i18n | Two pages of one language share a `translation_key`; only one is linked (a written page first, then path order) |

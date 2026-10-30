@@ -39,21 +39,18 @@ module Hwaro
         # without it the build writes a redirect stub there.
         version_parents = config.versions.list.map(&.parent_dir).reject(&.empty?).to_set
         check_broad_ignore_patterns(issues, config)
-        # Nor is `content/tags/` holding only files that describe term pages
-        # (term_metadata_files): the build generates `/tags/` itself.
-        term_files = term_metadata_files(config)
-        unless term_files.empty?
-          config.taxonomies.each do |taxonomy|
-            dir = File.join(@content_dir, taxonomy.name)
-            next unless Dir.exists?(dir)
-            markdown = [] of String
-            Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "**", "*")) do |path|
-              markdown << Path[path].relative_to(@content_dir).to_s if ContentWalk.markdown?(path) && !content_ignored?(path)
-            end
-            version_parents << taxonomy.name if !markdown.empty? && markdown.all? { |f| term_files.includes?(f) }
-          end
-        end
+        # Nor is a taxonomy directory (`content/tags/`): the build generates
+        # `/tags/` itself and replaces an authored `tags/_index.md`, warning.
+        config.taxonomies.each { |taxonomy| version_parents << taxonomy.name }
         walk_section_dirs(@content_dir, issues, index_names(config), version_parents)
+
+        # A `tags/<dir>/_index.md` no term page takes (usually `<dir>` spelled
+        # as the term rather than its URL slug) quietly publishes as a section.
+        term_metadata(config).strays.each do |path, file|
+          taxonomy = Path[path].parts[0]
+          issues << Issue.new(id: "taxonomy-term-file-unmatched", level: :info, category: "structure", file: file,
+            message: "Matches no term page of taxonomy #{taxonomy}, so it publishes as an ordinary section; name its directory after the term's URL slug (/#{taxonomy}/<slug>/) to describe that term page")
+        end
       end
 
       # Content-relative paths of the `_index` files a default build reads as
@@ -62,21 +59,24 @@ module Hwaro
       # without a candidate (`term_metadata_path?`), which skips the parse.
       # Terms a section `[cascade]` hands down count, as in the build; output
       # collisions don't — doctor approximates, the build decides. Computed
-      # once per run (two checks read it).
-      private def term_metadata_files(config : Models::Config) : Set(String)
-        @term_metadata_files ||= compute_term_metadata_files(config)
+      # once per run (two checks read it). The candidates no term page takes
+      # are `strays`, minus those a `path` moves on purpose.
+      private def term_metadata(config : Models::Config) : TermMetadata
+        @term_metadata ||= compute_term_metadata(config)
       end
 
-      private def compute_term_metadata_files(config : Models::Config) : Set(String)
-        return Set(String).new if config.taxonomies.empty? || !Dir.exists?(@content_dir)
+      private def compute_term_metadata(config : Models::Config) : TermMetadata
+        none = TermMetadata.new(Set(String).new, [] of {String, String})
+        return none if config.taxonomies.empty? || !Dir.exists?(@content_dir)
         infos = ContentLister.new(@content_dir, GeneratedContent.infos(@content_dir, @content_ignore.rules), @content_ignore).list_all.select(&.published?)
         relative = ->(info : ContentInfo) { info.generated_from ? info.path : Path[info.path].relative_to(@content_dir).to_s }
-        return Set(String).new unless infos.any? { |info| Content::Taxonomies.term_metadata_path?(relative.call(info), config) }
+        return none unless infos.any? { |info| Content::Taxonomies.term_metadata_path?(relative.call(info), config) }
 
         default = config.default_language
         menus = MenuScope.new(config)
         pages = [] of Models::Page
         sections = [] of Models::Section
+        candidates = [] of {String, String}
         previous = Logger.level
         Logger.level = Logger::Level::Error # the build reports front-matter warnings
         begin
@@ -97,6 +97,7 @@ module Hwaro
                 language: language, date: data[:date], title: data[:title], version: config.versions.for_path(path))[0]
               section.cascade = data[:cascade]
               sections << section
+              candidates << {path, file} if data[:custom_path].nil? && Content::Taxonomies.term_metadata_path?(path, config)
             else
               page = Models::Page.new(path)
               page.language = language
@@ -115,7 +116,8 @@ module Hwaro
         ensure
           Logger.level = previous
         end
-        Content::Taxonomies.match_term_metadata(pages, sections, config).keys.to_set
+        files = Content::Taxonomies.match_term_metadata(pages, sections, config).keys.to_set
+        TermMetadata.new(files, candidates.reject { |path, _| files.includes?(path) })
       end
 
       # A pattern that hides a section's `_index.*` while pages of that
@@ -464,7 +466,7 @@ module Hwaro
         # A file that describes a term page is headless in the build, which
         # is what link_translations! pairs on: a matched `_index.md` is then
         # nobody's original, and each language's term page exists anyway.
-        term_files = term_metadata_files(config)
+        term_files = term_metadata(config).files
         entries.each { |page, _| page.render = false if term_files.includes?(page.path) } unless term_files.empty?
         files = entries.to_h { |page, file| {page.path, file} }
         losers = Set(String).new

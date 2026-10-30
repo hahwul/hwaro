@@ -150,7 +150,7 @@ A file only counts as term metadata when all of these hold:
 
 Such a file is not published as a page of its own. It stays out of the sitemap, feeds, search index, llms.txt and page listings (`section.pages`), so the term URL appears once. `get_section()` still finds it, and its parent's `subsections` still list it, with the term page's URL. If two files match the same term page (`_index.md` beside `_index.markdown`, or `_index.ko.md` beside `_index.ko.markdown`), the `.md` file wins and the build warns about the other.
 
-Any other `_index.md` under `content/tags/` is an ordinary section and publishes as before. Pages nested inside a term directory, such as `content/tags/crystal/notes.md`, always publish as ordinary pages.
+Any other `_index.md` under `content/tags/` is an ordinary section and publishes as before; `hwaro doctor` notes each one (`taxonomy-term-file-unmatched`), since a directory named after the term's spelling instead of its slug is the usual cause. Pages nested inside a term directory, such as `content/tags/crystal/notes.md`, always publish as ordinary pages.
 
 `content/<taxonomy>/_index.md` (one level up) is different: the generated term list still replaces it at `/tags/`, and the build warns about the replacement as before. Sites use it to put the taxonomy into menus.
 

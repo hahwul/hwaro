@@ -137,7 +137,7 @@ Crystal은 Ruby와 닮은 문법의 컴파일 언어입니다.
 
 이런 파일은 별도 페이지로 게시되지 않습니다. 사이트맵, 피드, 검색 색인, llms.txt, 페이지 목록(`section.pages`)에 들어가지 않으므로 항목 URL은 한 번만 나옵니다. `get_section()`으로는 여전히 찾을 수 있고, 상위 섹션의 `subsections`에도 항목 페이지 URL로 그대로 나옵니다. 같은 항목 페이지에 맞는 파일이 둘이면(`_index.md`와 `_index.markdown`, 또는 `_index.ko.md`와 `_index.ko.markdown`) `.md` 파일이 쓰이고, 나머지는 빌드가 경고합니다.
 
-`content/tags/` 아래의 다른 `_index.md`는 일반 섹션이라 전과 같이 게시됩니다. `content/tags/crystal/notes.md`처럼 항목 디렉터리 안에 있는 페이지는 언제나 일반 페이지로 게시됩니다.
+`content/tags/` 아래의 다른 `_index.md`는 일반 섹션이라 전과 같이 게시됩니다. 디렉터리를 항목의 슬러그가 아니라 철자대로 지은 경우가 흔하므로 `hwaro doctor`가 이런 파일을 하나씩 알려 줍니다(`taxonomy-term-file-unmatched`). `content/tags/crystal/notes.md`처럼 항목 디렉터리 안에 있는 페이지는 언제나 일반 페이지로 게시됩니다.
 
 한 단계 위의 `content/<taxonomy>/_index.md`는 다르게 동작합니다. 생성된 항목 목록이 전과 같이 `/tags/`에서 이 파일을 대체하고, 빌드는 대체 경고를 그대로 출력합니다. 택소노미를 메뉴에 넣을 때 쓰는 파일입니다.
 

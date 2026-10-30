@@ -103,7 +103,7 @@ module Hwaro
       end
 
       def run : Array(Issue)
-        @term_metadata_files = nil
+        @term_metadata = nil
         issues = [] of Issue
         config = check_config(issues)
         template_names = check_templates(issues)
@@ -145,8 +145,13 @@ module Hwaro
       # production builder configures aren't needed to detect tag/syntax
       # mistakes.
       @template_parse_env : Crinja?
-      # Memo of term_metadata_files for one `run`.
-      @term_metadata_files : Set(String)? = nil
+      # Memo of term_metadata for one `run`.
+      @term_metadata : TermMetadata? = nil
+
+      # `files`: the `_index` files a build reads as term metadata.
+      # `strays`: the other candidates (`{relative path, file}`) that publish
+      # as ordinary sections.
+      record TermMetadata, files : Set(String), strays : Array({String, String})
     end
   end
 end
