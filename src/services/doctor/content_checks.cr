@@ -68,6 +68,7 @@ module Hwaro
         Dir.each_child(root) do |entry|
           next if entry.starts_with?(".") || entry.starts_with?("_")
           child = File.join(root, entry)
+          next if content_ignored?(child)
           # A symlinked directory can close a cycle (`ln -s .. content/x/y`),
           # and this walk follows it: `File.directory?` resolves the link, so
           # the recursion only stops when the kernel gives up at MAXSYMLINKS
@@ -113,8 +114,14 @@ module Hwaro
       # case-insensitively, like `ReadContent`: a `*.{md,markdown}` glob
       # missed `Post.MD`, which the build publishes.
       private def dir_contains_markdown?(dir : String) : Bool
-        Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "**", "*")) { |path| return true if ContentWalk.markdown?(path) }
+        Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "**", "*")) { |path| return true if ContentWalk.markdown?(path) && !content_ignored?(path) }
         false
+      end
+
+      # Hidden by the site's `[content] ignore`: never a page, so never a
+      # finding either.
+      private def content_ignored?(path : String) : Bool
+        ContentWalk.ignored?(path, @content_dir, @content_ignore)
       end
 
       # Returns true if the directory contains markdown files anywhere
@@ -124,11 +131,12 @@ module Hwaro
       # bundles rather than true sections.
       private def dir_has_markdown_in_subdirs?(dir : String, index_names : Set(String)) : Bool
         # Any markdown deeper than direct children of this dir?
-        Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "*", "*")) { |path| return true if ContentWalk.markdown?(path) }
+        Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "*", "*")) { |path| return true if ContentWalk.markdown?(path) && !content_ignored?(path) }
 
         # Any direct markdown file that is *not* an index page?
         Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "*")) do |path|
           next unless ContentWalk.markdown?(path)
+          next if content_ignored?(path)
           return true unless index_names.includes?(markdown_stem(File.basename(path)))
         end
 
@@ -138,16 +146,21 @@ module Hwaro
       # True when `dir` holds a section index (`_index.md`, or a declared
       # per-language spelling such as `_index.ko.md`).
       private def section_index?(dir : String, index_names : Set(String)) : Bool
-        return true if File.exists?(File.join(dir, "_index.md")) ||
-                       File.exists?(File.join(dir, "_index.markdown"))
+        return true if visible_file?(File.join(dir, "_index.md")) ||
+                       visible_file?(File.join(dir, "_index.markdown"))
         # Only a multilingual site has more spellings to look for, and only
         # then is the extra glob per directory worth paying for.
         return false if index_names.size <= 2
 
         Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "_index.*.{md,markdown}")) do |path|
+          next if content_ignored?(path)
           return true if index_names.includes?(markdown_stem(File.basename(path)))
         end
         false
+      end
+
+      private def visible_file?(path : String) : Bool
+        File.exists?(path) && !content_ignored?(path)
       end
 
       # `index.ko.md` -> "index.ko". Only the markdown extension is
@@ -192,7 +205,7 @@ module Hwaro
         # glob skipped `Post.MD`, so doctor reported a clean site the build
         # then failed on), and lstat-first so a symlink cycle
         # (`ln -s loop.md content/loop.md`) can't raise ELOOP out of the run.
-        files = ContentWalk.find_content_files(@content_dir)
+        files = ContentWalk.find_content_files(@content_dir, @content_ignore)
         return if files.empty?
 
         menus = MenuScope.new(config)

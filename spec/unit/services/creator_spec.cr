@@ -1754,3 +1754,28 @@ describe Hwaro::Services::Creator, "translation suffix" do
     end
   end
 end
+
+# `[content] ignore` (#890): `hwaro new` still writes the file (an Obsidian
+# template folder is a fine place to create one) but says the build skips it.
+describe "Creator with [content] ignore" do
+  it "warns when the new page sits on an ignored path, and only then" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("content")
+        config = Hwaro::Models::Config.new
+        config.content_files.ignore = ["_templates"]
+
+        log = with_captured_log do
+          Hwaro::Services::Creator.new.run(Hwaro::Config::Options::NewOptions.new(path: "_templates/note.md"), config)
+        end
+        File.exists?("content/_templates/note.md").should be_true
+        log.should contain("matches [content] ignore")
+
+        log = with_captured_log do
+          Hwaro::Services::Creator.new.run(Hwaro::Config::Options::NewOptions.new(path: "posts/real.md"), config)
+        end
+        log.should_not contain("[content] ignore")
+      end
+    end
+  end
+end

@@ -215,14 +215,17 @@ module Hwaro
           files = [] of String
           return files unless Dir.exists?(content_dir)
           project_root = Utils::PathUtils.find_project_root(content_dir)
+          rules = ContentWalk.ignore_rules(content_dir)
           Dir.glob(File.join(Utils::PathUtils.glob_escape(content_dir), "**", "*.md")) do |file|
             next if File.symlink?(file) && !Utils::PathUtils.resolves_within?(file, project_root)
+            next if ContentWalk.ignored?(file, content_dir, rules)
             # Directories named `x.md` and FIFOs (whose `File.read` blocks
             # forever) are skipped, as the build and the other tools do.
             files << file if ContentWalk.readable_file?(file)
           end
           Dir.glob(File.join(Utils::PathUtils.glob_escape(content_dir), "**", "*.markdown")) do |file|
             next if File.symlink?(file) && !Utils::PathUtils.resolves_within?(file, project_root)
+            next if ContentWalk.ignored?(file, content_dir, rules)
             # Directories named `x.md` and FIFOs (whose `File.read` blocks
             # forever) are skipped, as the build and the other tools do.
             files << file if ContentWalk.readable_file?(file)
@@ -284,6 +287,7 @@ module Hwaro
             next if ContentWalk.markdown?(src)
 
             relative = src.sub(content_dir, "").lstrip('/')
+            next if rules.ignored?(relative)
             owner = nil
             dir = File.dirname(File.expand_path(src))
             while dir.size > root.size
@@ -326,20 +330,9 @@ module Hwaro
         private def site_config(content_dir : String) : Models::Config?
           cached = @site_config
           return cached.as?(Models::Config) unless cached.nil?
-          @site_config = false
-          parent = File.dirname(content_dir.rstrip(File::SEPARATOR))
-          path = {File.join(parent, "config.toml"), "config.toml"}.find { |candidate| File.exists?(candidate) }
-          return unless path
-          # The build owns config diagnostics; here they would only repeat.
-          previous = Logger.level
-          Logger.level = Logger::Level::Error
-          begin
-            @site_config = Models::Config.load(path)
-          ensure
-            Logger.level = previous
-          end
-        rescue Exception
-          nil
+          config = ContentWalk.project_config(content_dir)
+          @site_config = config || false
+          config
         end
 
         # Whether the target serves a translation (`about.ko.md`) under its

@@ -222,10 +222,14 @@ module Hwaro
 
         # Co-located assets in content directory
         if Dir.exists?(@content_dir)
+          # A file `[content] ignore` hides is not the site's asset: never
+          # reported, never deleted.
+          ignore = ContentWalk.ignore_rules(@content_dir)
           Dir.glob(File.join(Utils::PathUtils.glob_escape(@content_dir), "**", "*")) do |path|
             ext = File.extname(path).downcase
             next if CONTENT_EXTENSIONS.includes?(ext)
             next unless ASSET_EXTENSIONS.includes?(ext)
+            next if ContentWalk.ignored?(path, @content_dir, ignore)
             assets << path if ContentWalk.readable_file?(path)
           end
         end

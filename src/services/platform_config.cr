@@ -388,6 +388,8 @@ module Hwaro
         end
         children.each do |entry|
           path = File.join(dir, entry)
+          # `[content] ignore` hides it from the build: no page, no alias.
+          next if ContentWalk.ignored?(path, "content", @config.content_files)
           # `follow_symlinks: false` keeps a symlinked directory (including a
           # cycle like `ln -s . content/loop`) from being recursed into —
           # following one used to recurse until ELOOP aborted the whole

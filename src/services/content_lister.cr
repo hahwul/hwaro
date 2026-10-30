@@ -6,6 +6,7 @@
 require "json"
 require "yaml"
 require "toml"
+require "../models/config"
 require "../utils/date_utils"
 require "../utils/frontmatter_scanner"
 require "../utils/logger"
@@ -53,7 +54,10 @@ module Hwaro
       # for files the build itself skips. `tool list`, `tool stats`,
       # `tool validate` and `tool convert` all walk through here, so they
       # stay consistent with each other.
-      def find_content_files(content_dir : String) : Array(String)
+      #
+      # Files `[content] ignore` hides are left out, so no tool lists,
+      # validates, converts or link-checks what the build never reads.
+      def find_content_files(content_dir : String, ignore : Models::ContentFilesConfig = ignore_rules(content_dir)) : Array(String)
         files = [] of String
 
         # Match ReadContent's case-insensitive extension check. Lowercase-only
@@ -62,10 +66,45 @@ module Hwaro
         # silently disagreed with the build.
         Dir.glob(File.join(Utils::PathUtils.glob_escape(content_dir), "**", "*")) do |file|
           next unless markdown?(file)
+          next if ignored?(file, content_dir, ignore)
           files << file if readable_file?(file)
         end
 
         files.sort
+      end
+
+      # The project config a content-walking tool reads: `config.toml`
+      # beside `content_dir`, else the working directory's (ContentLister's
+      # language lookup). Loaded quietly — the build owns config diagnostics,
+      # here they would only repeat. Nil when there is none or it won't load.
+      def project_config(content_dir : String) : Models::Config?
+        parent = File.dirname(content_dir.rstrip(File::SEPARATOR))
+        path = {File.join(parent, "config.toml"), "config.toml"}.find { |candidate| File.exists?(candidate) }
+        return unless path
+        previous = Logger.level
+        Logger.level = Logger::Level::Error
+        begin
+          Models::Config.load(path)
+        ensure
+          Logger.level = previous
+        end
+      rescue Exception
+        nil
+      end
+
+      # The `[content] ignore` rules of `content_dir`'s project (see
+      # `project_config`); no rules when there is no loadable config.
+      # ponytail: base config only — a `--env` overlay's ignore list is not
+      # read by the tools; thread the command's env through if that matters.
+      def ignore_rules(content_dir : String) : Models::ContentFilesConfig
+        project_config(content_dir).try(&.content_files) || Models::ContentFilesConfig.new
+      end
+
+      # True when `path` (anywhere under `content_dir`, as the tools spell
+      # it) is hidden by `[content] ignore`.
+      def ignored?(path : String, content_dir : String, ignore : Models::ContentFilesConfig) : Bool
+        return false if ignore.ignore.empty?
+        ignore.ignored?(Path[File.expand_path(path)].relative_to(File.expand_path(content_dir)).to_posix.to_s)
       end
 
       # True when `path` carries a Markdown page extension, compared

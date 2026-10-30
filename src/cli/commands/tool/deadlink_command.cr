@@ -402,6 +402,11 @@ module Hwaro
           # `[dir/leaf.MD]`), so route probes list each directory once per run.
           @markdown_stems = {} of String => Hash(String, Array(String))
 
+          # The checked tree's root and `[content] ignore` rules (set by
+          # check_internal_links); an ignored source resolves no link.
+          @content_root = "content"
+          @content_ignore = Models::ContentFilesConfig.new
+
           # Internal page links that carry a `#fragment`, gathered by
           # find_internal_links (url keeps the fragment, kind `:anchor`).
           @anchor_links = [] of Link

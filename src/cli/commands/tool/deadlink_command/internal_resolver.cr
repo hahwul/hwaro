@@ -21,6 +21,8 @@ module Hwaro
           private def check_internal_links(links : Array(Link), content_dir : String, taxonomy_names : Array(String) = [] of String, base_path : String = "", language_codes : Array(String) = [] of String, generated_routes : GeneratedRoutes = GeneratedRoutes.new, oracle : Utils::BuildOutput::Oracle = Utils::BuildOutput.oracle("public", tool: "check-links"), config : Models::Config? = nil) : Array(Result)
             results = [] of Result
             project_root = Utils::PathUtils.find_project_root(content_dir)
+            @content_root = content_dir
+            @content_ignore = Services::ContentWalk.ignore_rules(content_dir)
             link_index : Services::InternalLinkIndex? = nil
             page_routes : Services::PageRouteIndex? = nil
 
@@ -286,7 +288,7 @@ module Hwaro
           # SECTION_INDEX_EXTENSIONS.
           private def section_generates_feeds?(dir : String) : Bool
             Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "_index*.{md,markdown}")).any? do |path|
-              frontmatter_flag?(path, "generate_feeds")
+              !content_ignored?(path) && frontmatter_flag?(path, "generate_feeds")
             end
           end
 
@@ -371,6 +373,7 @@ module Hwaro
             count = 0
             Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "**", "*")) do |path|
               next unless Services::ContentWalk.markdown?(path)
+              next if content_ignored?(path)
               next if File.basename(path).starts_with?("_index.") && SECTION_INDEX_EXTENSIONS.includes?(File.extname(path))
               count += 1
             end
@@ -387,7 +390,7 @@ module Hwaro
             base = content_target(url, content_dir, base_dir).rstrip("/")
             {"_index.md", "_index.markdown"}.each do |name|
               candidate = File.join(base, name)
-              return candidate if File.exists?(candidate)
+              return candidate if File.exists?(candidate) && !content_ignored?(candidate)
             end
             nil
           end
@@ -439,7 +442,7 @@ module Hwaro
               # A Markdown source is published as a page, never under its own
               # name, so `/posts/a.md` is not a route even though the file
               # exists.
-              return true if File.exists?(target) && !Services::ContentWalk.markdown?(target_no_slash)
+              return true if File.exists?(target) && !Services::ContentWalk.markdown?(target_no_slash) && !content_ignored?(target)
             elsif serves_page?(sources, url, routes)
               return true
             end
@@ -581,6 +584,7 @@ module Hwaro
                   next unless Services::ContentWalk.markdown?(child)
                   path = File.join(dir, child)
                   next unless File.exists?(path)
+                  next if content_ignored?(path)
                   (found[child[0, child.size - File.extname(child).size]] ||= [] of String) << path
                 end
               end
@@ -589,6 +593,12 @@ module Hwaro
             by_stem[File.basename(stem)]? || [] of String
           rescue File::Error
             [] of String
+          end
+
+          # A source `[content] ignore` hides is no link target: the build
+          # never publishes it. Rules are set per check_internal_links run.
+          private def content_ignored?(path : String) : Bool
+            Services::ContentWalk.ignored?(path, @content_root, @content_ignore)
           end
 
           # Map a link destination onto a path under the content directory.

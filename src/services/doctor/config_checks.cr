@@ -293,6 +293,7 @@ module Hwaro
         ids = Set(String).new
         Dir.glob(File.join(Utils::PathUtils.glob_escape(@content_dir), "**", "_index.*")) do |path|
           next unless ContentWalk.markdown?(path)
+          next if ContentWalk.ignored?(path, @content_dir, config.content_files)
           dir = Path[File.dirname(path)].relative_to(@content_dir).to_posix.to_s
           dir = "" if dir == "."
           Content::Menus.top_level_dir(dir, config.versions.for_path(dir)).try { |id| ids << id }
