@@ -921,7 +921,7 @@ module Hwaro::Core::Build::Phases::ParseContent
       end
       dropped = section.front_matter_keys.select { |key| TERM_PAGE_IGNORED_KEYS.includes?(key) }
       unless dropped.empty?
-        Logger.warn "content/#{section.path}: #{dropped.map { |key| "`#{key}`" }.join(", ")} #{dropped.size == 1 ? "does" : "do"} not apply to a taxonomy term page — it takes title, description, image, extra and aliases from this file; set sitemap, pagination, sorting and feeds on the taxonomy in [[taxonomies]]."
+        Logger.warn "content/#{section.path}: #{dropped.map { |key| "`#{key}`" }.join(", ")} #{dropped.size == 1 ? "does" : "do"} not apply to a taxonomy term page — it takes title, description, image, extra and aliases from this file; set sitemap, pagination and feeds on the taxonomy in [[taxonomies]]."
       end
     end
   end
@@ -929,10 +929,12 @@ module Hwaro::Core::Build::Phases::ParseContent
   # Section front-matter keys that govern a section's own page output, which
   # a matched term file no longer has (Content::Taxonomies#render_taxonomy_term
   # reads only title/description/image/extra/aliases and the body). `template`
-  # has its own warning above.
+  # has its own warning above. `sort_by`/`reverse` are not here: they still
+  # order the ordinary pages nested in the term directory (`section.pages`,
+  # prev/next).
   private TERM_PAGE_IGNORED_KEYS = Set{
     "in_sitemap", "in_search_index", "paginate", "paginate_by", "paginate_path",
-    "pagination_enabled", "sort_by", "reverse", "generate_feeds", "redirect_to",
+    "pagination_enabled", "generate_feeds", "redirect_to",
   }
 
   # Template lookups are keyed by extension-stripped names ("section", not

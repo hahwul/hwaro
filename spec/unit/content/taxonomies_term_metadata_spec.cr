@@ -531,14 +531,32 @@ describe "taxonomy term _index.md metadata" do
       build_site(CONFIG,
         content_files: {
           "posts/p1.md"         => post("P1", ["rust"]),
-          "tags/rust/_index.md" => "+++\ntitle = \"Rust\"\nin_sitemap = false\npaginate_by = 2\nsort_by = \"title\"\nweight = 3\n+++\n",
+          "tags/rust/_index.md" => "+++\ntitle = \"Rust\"\nin_sitemap = false\npaginate_by = 2\nweight = 3\n+++\n",
         },
         template_files: TEMPLATES) do |dir|
         File.read(File.join(dir, "public/sitemap.xml")).should contain("https://ex.com/tags/rust/</loc>")
       end
     end
-    log.should contain("content/tags/rust/_index.md: `in_sitemap`, `paginate_by`, `sort_by` do not apply to a taxonomy term page")
+    log.should contain("content/tags/rust/_index.md: `in_sitemap`, `paginate_by` do not apply to a taxonomy term page")
     log.should_not contain("`weight`")
+  end
+
+  # `sort_by`/`reverse` still order the pages nested in the term directory.
+  it "keeps sort_by on a term file ordering its nested pages, without a warning" do
+    log = with_captured_log do
+      build_site(CONFIG,
+        content_files: {
+          "posts/p1.md"         => post("P1", ["rust"]),
+          "tags/rust/_index.md" => "+++\ntitle = \"Rust\"\nsort_by = \"title\"\nreverse = true\n+++\n",
+          "tags/rust/a.md"      => "+++\ntitle = \"Alpha\"\ndate = 2024-01-02\n+++\n",
+          "tags/rust/b.md"      => "+++\ntitle = \"Beta\"\ndate = 2024-01-01\n+++\n",
+        },
+        template_files: TEMPLATES.merge({"page.html" => %({% set s = get_section(path="tags/rust/_index.md") %}{% for p in s.pages %}{{ p.title }};{% endfor %})})) do |dir|
+        File.read(File.join(dir, "public/tags/rust/a/index.html")).should eq("Beta;Alpha;")
+      end
+    end
+    log.should_not contain("do not apply to a taxonomy term page")
+    log.should_not contain("does not apply to a taxonomy term page")
   end
 
   it "refuses a term-file alias onto a term's pager page" do

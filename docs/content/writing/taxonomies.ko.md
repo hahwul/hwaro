@@ -124,7 +124,7 @@ Crystal은 Ruby와 닮은 문법의 컴파일 언어입니다.
 - `term_content`에는 파일 본문을 렌더링한 HTML이 들어갑니다. Markdown, 숏코드, 구문 강조, `@/` 링크를 다른 페이지와 똑같이 처리하고, `[links]` 검사도 본문의 깨진 `@/` 링크와 다른 페이지로 가는 깨진 앵커를 보고합니다. 항목 페이지 자신을 가리키는 링크(`@/tags/crystal/_index.md#part`, 또는 본문 안의 `#part` 링크)는 앵커를 검사하지 않습니다. `content`는 지금처럼 생성된 페이지 목록이라 기존 템플릿은 그대로 동작하며, 본문을 보여 줄 자리에 `{{ term_content }}`를 넣으면 됩니다.
 - 파일의 `aliases`는 항목 페이지로 가는 리다이렉트가 됩니다. 태그 이름을 바꿨을 때 유용합니다. 생성되는 택소노미 페이지나 그 `page/N/` 페이지(N ≥ 2)를 가리키는 별칭, 다른 페이지가 이미 차지한 별칭은 쓰지 않으며 빌드가 경고합니다. `page/1/`에는 아무것도 생성되지 않으므로 그 자리의 별칭은 그대로 씁니다.
 - `template`은 무시되며 빌드가 경고합니다. 항목 페이지는 항상 `taxonomy_term.html`로 렌더링되고, 없으면 `taxonomy.html`, 그다음 `page.html`을 씁니다.
-- 섹션 자체 페이지를 정하는 키(`in_sitemap`, `in_search_index`, `paginate`, `paginate_by`, `paginate_path`, `pagination_enabled`, `sort_by`, `reverse`, `generate_feeds`, `redirect_to`)도 항목 페이지에는 적용되지 않으며, 빌드가 해당 키를 짚어 경고합니다. 항목 페이지의 사이트맵, 페이지 나누기, 정렬, 피드는 `[[taxonomies]]`에서 택소노미마다 설정합니다.
+- 섹션 자체 페이지를 정하는 키(`in_sitemap`, `in_search_index`, `paginate`, `paginate_by`, `paginate_path`, `pagination_enabled`, `generate_feeds`, `redirect_to`)도 항목 페이지에는 적용되지 않으며, 빌드가 해당 키를 짚어 경고합니다. 항목 페이지의 사이트맵, 페이지 나누기, 정렬, 피드는 `[[taxonomies]]`에서 택소노미마다 설정합니다. 파일의 `sort_by`와 `reverse`는 항목 페이지 목록이 아니라 그 디렉터리 안의 일반 페이지 순서(`section.pages`, 이전/다음 링크)를 정합니다.
 - [`get_taxonomy()`](#get-taxonomy-함수)의 항목에 파일의 `title`과 `description`이 붙습니다. `get_taxonomy()`는 사이트 전체를 보는 함수라 기본 언어 파일만 반영합니다. 파일이 없는 항목에는 `title` 키가 없으니 `{{ term.title or term.name }}`처럼 씁니다.
 
 다국어 사이트에서는 언어마다 자기 파일을 읽습니다. `content/tags/crystal/_index.ko.md`는 `/ko/tags/crystal/`을 꾸밉니다.
