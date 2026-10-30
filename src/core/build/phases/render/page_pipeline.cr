@@ -234,6 +234,16 @@ module Hwaro::Core::Build::Phases::Render
     page.warned_messages.clear
   end
 
+  # The rendered body of a taxonomy term's `_index.md` (a headless section the
+  # render phase never renders), through the same content pipeline as a page
+  # body: shortcodes, Markdown, `@/` links, base_path. See
+  # Content::Taxonomies.term_metadata_path?.
+  def render_term_body(page : Models::Section, site : Models::Site, templates : Hash(String, String), global_vars : Hash(String, Crinja::Value)) : String
+    page.build_warnings.clear
+    highlight = @highlight_option && site.config.highlight.enabled
+    render_page_content(page, site, templates, highlight, site.config.markdown.safe, global_vars)[0]
+  end
+
   private def render_page(
     page : Models::Page,
     site : Models::Site,

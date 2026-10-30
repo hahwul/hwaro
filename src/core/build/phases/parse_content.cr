@@ -855,6 +855,13 @@ module Hwaro::Core::Build::Phases::ParseContent
     end
   end
 
+  # A taxonomy term's `_index.md` describes the generated term page and never
+  # writes a page of its own, whatever its front matter, a `[cascade]` or a
+  # schema default says (see Content::Taxonomies.term_metadata_path?).
+  private def term_metadata?(page : Models::Page) : Bool
+    (config = @config) ? Content::Taxonomies.term_metadata_path?(page.path, config) : false
+  end
+
   # Template lookups are keyed by extension-stripped names ("section", not
   # "section.html"), but users coming from Zola write `template = "section.html"`
   # in frontmatter. Strip the known template extensions here so both spellings
@@ -924,7 +931,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     page.toc = data[:toc]
     page.date = data[:date]
     page.updated = data[:updated]
-    page.render = data[:render]
+    page.render = data[:render] && !term_metadata?(page)
     page.slug = data[:slug]
     page.custom_path = data[:custom_path]
     page.aliases = site_relative_aliases(data[:aliases], page.path)
@@ -1164,7 +1171,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     when "image"               then extra_value.as?(String).try { |v| page.image = v }
     when "template"            then extra_value.as?(String).try { |v| page.template = normalize_template_name(v) }
     when "series"              then extra_value.as?(String).try { |v| page.series = v }
-    when "render"              then extra_value.as?(Bool).try { |b| page.render = b }
+    when "render"              then extra_value.as?(Bool).try { |b| page.render = b && !term_metadata?(page) }
     when "toc"                 then extra_value.as?(Bool).try { |b| page.toc = b }
     when "insert_anchor_links" then extra_value.as?(Bool).try { |b| page.insert_anchor_links = b }
     when "in_sitemap"          then extra_value.as?(Bool).try { |b| page.in_sitemap = b }
@@ -1234,7 +1241,7 @@ module Hwaro::Core::Build::Phases::ParseContent
       when "draft"
         value.as?(Bool).try { |b| page.draft = b }
       when "render"
-        value.as?(Bool).try { |b| page.render = b }
+        value.as?(Bool).try { |b| page.render = b && !term_metadata?(page) }
       when "toc"
         value.as?(Bool).try { |b| page.toc = b }
       when "insert_anchor_links"

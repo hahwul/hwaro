@@ -359,6 +359,10 @@ module Hwaro
         # Set from BuildOptions at every build entry point and consumed by
         # process_files_parallel's ParallelConfig. Does not affect output.
         @render_workers : Int32 = 0
+        # `--skip-highlighting` of the last full build, for content rendered
+        # outside the render phase (`render_term_body`). Serve has no such
+        # flag, so its incremental passes keep this value.
+        @highlight_option : Bool = true
         # Unified cache manager for all cache layers
         @cache_manager : CacheManager = CacheManager.new
         # The render phase's site-wide template vars, stashed so the Write
@@ -795,6 +799,7 @@ module Hwaro
         # surface the failure instead of live-reloading onto a broken site.
         def run(options : Config::Options::BuildOptions) : Bool
           @render_workers = options.workers
+          @highlight_option = options.highlight
           # Load config once and reuse throughout the build.
           # `Models::Config.load` raises `HwaroError(HWARO_E_CONFIG)` directly
           # for missing files and TOML parse failures, so callers (and
