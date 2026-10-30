@@ -52,10 +52,40 @@ module Hwaro
         # many terms.
         global_vars = builder.render_global_vars_or_build(site)
 
-        # `content/<taxonomy>/<slug>/_index.md` files, matched to the term
-        # pages below; whatever stays unmatched is reported at the end.
-        term_meta = term_metadata(site)
-        used_meta = Set(String).new
+        # Term `_index.md` files the parse phase matched to a term page
+        # (match_term_metadata), by that page's URL.
+        term_meta = site.sections.select(&.term_metadata).index_by(&.url)
+
+        # Collect every generated taxonomy index/term page (each a
+        # Models::Section) so the caller can register them into the page set
+        # the SEO generators read. Without this, taxonomy pages are written to
+        # disk but never reach the sitemap/feeds/search/llms inputs, so
+        # `taxonomy.sitemap` / `taxonomy.feed` had no effect.
+        collected = [] of Models::Section
+
+        term_spaces(config, site.pages, site.taxonomies).each do |space|
+          generate_term_space(space, site, output_dir, templates, builder, verbose, global_vars, collected, term_meta)
+        end
+
+        collected
+      end
+
+      # One taxonomy in one output space (the root, or `/<lang>/`): the terms
+      # it writes pages for and their slugs. ONE computation feeds both the
+      # generator and `match_term_metadata`, so a term `_index.md` is headless
+      # exactly when its term page is written.
+      record TermSpace,
+        taxonomy : Models::TaxonomyConfig,
+        language : String?,
+        lang_prefix : String,
+        terms_map : Hash(String, Array(Models::Page)),
+        index_terms : Array(String),
+        slug_map : Hash(String, String)
+
+      # `root_map` is the site-wide term index (`term_index`, which the
+      # generator keeps on `site.taxonomies`).
+      private def self.term_spaces(config : Models::Config, pages : Array(Models::Page), root_map : Hash(String, Hash(String, Array(Models::Page))), honor_suppressed : Bool = true) : Array(TermSpace)
+        spaces = [] of TermSpace
 
         # Generate root taxonomies. On a multilingual site the root is the
         # default language's space (its content pages live at the root), so
@@ -78,14 +108,7 @@ module Hwaro
           root_taxonomies = config.taxonomies.select { |t| default_cfg.taxonomies.includes?(t.name) }
         end
 
-        # Collect every generated taxonomy index/term page (each a
-        # Models::Section) so the caller can register them into the page set
-        # the SEO generators read. Without this, taxonomy pages are written to
-        # disk but never reach the sitemap/feeds/search/llms inputs, so
-        # `taxonomy.sitemap` / `taxonomy.feed` had no effect.
-        collected = [] of Models::Section
-
-        generate_taxonomies_for_language(root_taxonomies, site, output_dir, templates, builder, verbose, global_vars, collected, term_meta, used_meta, language: root_language, lang_prefix: "")
+        add_term_spaces(spaces, root_taxonomies, config, honor_suppressed, language: root_language, lang_prefix: "", root_map: root_map)
 
         # For multilingual sites, also generate language-prefixed taxonomy pages
         # (e.g. /en/tags/, /en/categories/) using only pages of that language.
@@ -103,73 +126,26 @@ module Hwaro
             # No early exit on an empty map: like the root, a configured
             # taxonomy writes its (empty) index so `/<lang>/tags/` links
             # never 404 on a site with no terms yet.
-            lang_taxonomies = build_language_taxonomies(site, lang_cfg.taxonomies)
+            lang_taxonomies = build_language_taxonomies(pages, config, lang_cfg.taxonomies, honor_suppressed)
 
             lang_taxonomy_configs = config.taxonomies.select { |t| lang_cfg.taxonomies.includes?(t.name) }
-            generate_taxonomies_for_language(lang_taxonomy_configs, site, output_dir, templates, builder, verbose, global_vars, collected, term_meta, used_meta,
-              language: lang_code, lang_prefix: "/#{lang_code}", lang_taxonomies: lang_taxonomies)
+            add_term_spaces(spaces, lang_taxonomy_configs, config, honor_suppressed, language: lang_code, lang_prefix: "/#{lang_code}", lang_taxonomies: lang_taxonomies)
           end
         end
 
-        term_meta.values.map(&.path).reject { |path| used_meta.includes?(path) }.sort!.each do |path|
-          Logger.warn "content/#{path} describes a taxonomy term page, but no published page in its language carries a term with that URL slug, so it is not published. Name the directory after the term's slug (the last segment of its /<taxonomy>/<slug>/ URL)."
-        end
-
-        collected
+        spaces
       end
 
-      # True for `content/<taxonomy>/<term>/_index[.<lang>].md` with
-      # `<taxonomy>` a configured taxonomy (gh#891). Such a file supplies the
-      # generated term page's title, description, `extra`, image and body
-      # (Hugo-style) instead of publishing a page of its own, which used to
-      # collide with the term page and be replaced by it. The build parses it
-      # as a headless (`render = false`) section, so it stays out of the
-      # sitemap, feeds, search index, llms.txt and listings by the same rules
-      # every headless page does. Path-only, so doctor and the tools read it
-      # without a build. `content/<taxonomy>/_index.md` (the taxonomy index)
-      # is not matched: it keeps publishing at the index URL as before.
-      def self.term_metadata_path?(relative_path : String, config : Models::Config) : Bool
-        parts = Path[relative_path].parts
-        parts.size == 3 && parts[2].starts_with?("_index.") && config.taxonomies.any? { |t| t.name == parts[0] }
-      end
-
-      # The term metadata sections, keyed {taxonomy, language, slug}: the
-      # directory name IS the term page's URL slug (NFC, like `safe_slugify`),
-      # so `/tags/rust-lang/` reads `content/tags/rust-lang/_index.md`, and a
-      # disambiguated `/tags/c-2/` reads `content/tags/c-2/_index.md`.
-      def self.term_metadata(site : Models::Site) : Hash({String, String, String}, Models::Section)
-        config = site.config
-        result = {} of {String, String, String} => Models::Section
-        return result if config.taxonomies.empty?
-        site.sections.each do |section|
-          next unless term_metadata_path?(section.path, config)
-          parts = Path[section.path].parts
-          slug = parts[1].ascii_only? ? parts[1] : parts[1].unicode_normalize(:nfc)
-          key = {parts[0], section.language || config.default_language, slug}
-          # `_index.md` beside `_index.markdown` (or an NFD twin): the path
-          # order decides, never discovery order.
-          prev = result[key]?
-          result[key] = section if prev.nil? || section.path < prev.path
-        end
-        result
-      end
-
-      # Generate taxonomy index + terms for a (possibly language-scoped) set of taxonomies.
-      private def self.generate_taxonomies_for_language(
+      private def self.add_term_spaces(
+        spaces : Array(TermSpace),
         taxonomies : Array(Models::TaxonomyConfig),
-        site : Models::Site,
-        output_dir : String,
-        templates : Hash(String, String),
-        builder : Core::Build::Builder,
-        verbose : Bool,
-        global_vars : Hash(String, Crinja::Value),
-        collected : Array(Models::Section),
-        term_meta : Hash({String, String, String}, Models::Section),
-        used_meta : Set(String),
+        config : Models::Config,
+        honor_suppressed : Bool,
         language : String?,
         lang_prefix : String,
+        root_map : Hash(String, Hash(String, Array(Models::Page)))? = nil,
         lang_taxonomies : Hash(String, Hash(String, Array(Models::Page)))? = nil,
-      )
+      ) : Nil
         taxonomies.each do |taxonomy|
           next if taxonomy.name.strip.empty?
 
@@ -188,21 +164,19 @@ module Hwaro
                         # A page the render phase refused to write stays in
                         # site.taxonomies (a later serve pass may hand its URL
                         # back) but off the term pages and feeds.
-                        (site.taxonomies[taxonomy.name]? || {} of String => Array(Models::Page))
-                          .transform_values(&.reject(&.output_suppressed)).reject! { |_, pgs| pgs.empty? }
+                        root_terms = root_map.try { |map| map[taxonomy.name]? } || {} of String => Array(Models::Page)
+                        if honor_suppressed
+                          root_terms.transform_values(&.reject(&.output_suppressed)).reject! { |_, pgs| pgs.empty? }
+                        else
+                          root_terms
+                        end
                       end
-
-          base_path = "#{lang_prefix}/#{taxonomy.name}/"
-          index_page = build_taxonomy_index_page(taxonomy, base_path)
-          if language
-            index_page.language = language
-          end
 
           # Only list terms whose term pages are actually written for this
           # language, so the index never links to a term page that the
           # language-filtered loop below skips (dead /tags/<term>/ links).
           index_terms = if language
-                          terms_map.select { |_term, pgs| pgs.any? { |p| (p.language || site.config.default_language) == language } }.keys
+                          terms_map.select { |_term, pgs| pgs.any? { |p| (p.language || config.default_language) == language } }.keys
                         else
                           terms_map.keys
                         end
@@ -219,36 +193,113 @@ module Hwaro
           # never share a directory, so a Korean-only `Zeta` must not push the
           # English `zeta` to `/tags/zeta-2/`.
           slug_map = Utils::TextUtils.disambiguated_slugs(index_terms)
+          spaces << TermSpace.new(taxonomy, language, lang_prefix, terms_map, index_terms, slug_map)
+        end
+      end
 
-          # A term too long to be a path segment is shortened (and digest-
-          # suffixed) rather than crashing the build — but that moves its
-          # published URL, so it must never be silent. This is the one place
-          # the term set is enumerated once per taxonomy per build, so the
-          # warning belongs here and not in `safe_slugify`, which runs per
-          # link.
-          index_terms.each do |term|
-            next unless Utils::TextUtils.slug_truncated?(term)
-            Logger.warn "Taxonomy term #{term.inspect} is too long for a path segment — its URL was shortened to /#{taxonomy.name}/#{slug_map[term]? || Utils::TextUtils.safe_slugify(term)}/. Shorten the term in the front matter of the pages that use it."
-          end
+      # Generate taxonomy index + terms for one output space.
+      private def self.generate_term_space(
+        space : TermSpace,
+        site : Models::Site,
+        output_dir : String,
+        templates : Hash(String, String),
+        builder : Core::Build::Builder,
+        verbose : Bool,
+        global_vars : Hash(String, Crinja::Value),
+        collected : Array(Models::Section),
+        term_meta : Hash(String, Models::Section),
+      )
+        taxonomy, language, lang_prefix = space.taxonomy, space.language, space.lang_prefix
+        terms_map, index_terms, slug_map = space.terms_map, space.index_terms, space.slug_map
 
-          render_taxonomy_index(index_page, sort_terms(taxonomy, index_terms, terms_map, language, site.config.default_language), templates, site, output_dir, builder, verbose, global_vars, slug_map)
-          collected << index_page
+        base_path = "#{lang_prefix}/#{taxonomy.name}/"
+        index_page = build_taxonomy_index_page(taxonomy, base_path)
+        if language
+          index_page.language = language
+        end
 
-          terms_map.each do |term, pages|
-            # Filter pages to the requested language when doing per-lang generation
-            filtered_pages = if language
-                               pages.select { |p| (p.language || site.config.default_language) == language }
-                             else
-                               pages
-                             end
-            next if filtered_pages.empty?
+        # A term too long to be a path segment is shortened (and digest-
+        # suffixed) rather than crashing the build — but that moves its
+        # published URL, so it must never be silent. This is the one place
+        # the term set is enumerated once per taxonomy per build, so the
+        # warning belongs here and not in `safe_slugify`, which runs per
+        # link.
+        index_terms.each do |term|
+          next unless Utils::TextUtils.slug_truncated?(term)
+          Logger.warn "Taxonomy term #{term.inspect} is too long for a path segment — its URL was shortened to /#{taxonomy.name}/#{slug_map[term]? || Utils::TextUtils.safe_slugify(term)}/. Shorten the term in the front matter of the pages that use it."
+        end
 
-            slug = slug_map[term]
-            meta = term_meta[{taxonomy.name, language || site.config.default_language, slug}]?
-            meta.try { |m| used_meta << m.path }
-            collected << render_taxonomy_term(taxonomy, term, filtered_pages, templates, site, output_dir, builder, verbose, global_vars, slug, lang_prefix: lang_prefix, language: language, meta: meta)
+        render_taxonomy_index(index_page, sort_terms(taxonomy, index_terms, terms_map, language, site.config.default_language), templates, site, output_dir, builder, verbose, global_vars, slug_map)
+        collected << index_page
+
+        terms_map.each do |term, pages|
+          # Filter pages to the requested language when doing per-lang generation
+          filtered_pages = if language
+                             pages.select { |p| (p.language || site.config.default_language) == language }
+                           else
+                             pages
+                           end
+          next if filtered_pages.empty?
+
+          slug = slug_map[term]
+          meta = term_meta.empty? ? nil : term_meta["#{lang_prefix}/#{taxonomy.name}/#{slug}/"]?
+          collected << render_taxonomy_term(taxonomy, term, filtered_pages, templates, site, output_dir, builder, verbose, global_vars, slug, lang_prefix: lang_prefix, language: language, meta: meta)
+        end
+      end
+
+      # True for `content/<taxonomy>/<dir>/_index[.<lang>].md` with
+      # `<taxonomy>` a configured taxonomy: a file that MAY describe a term
+      # page (gh#891). Only `match_term_metadata` decides whether it does;
+      # doctor, which builds nothing, uses this alone to stay quiet about
+      # such files. `content/<taxonomy>/_index.md` (the taxonomy index) is
+      # never a candidate.
+      def self.term_metadata_path?(relative_path : String, config : Models::Config) : Bool
+        parts = Path[relative_path].parts
+        parts.size == 3 && parts[2].starts_with?("_index.") && config.taxonomies.any? { |t| t.name == parts[0] }
+      end
+
+      # A term `_index.md` matched to the generated term page at `url`;
+      # `shadowed_by` is the file that won the same page (nil for the winner).
+      record TermFile, url : String, shadowed_by : String?
+
+      # The candidate files (`term_metadata_path?`) whose directory name is the
+      # URL slug (NFC) of a term page this build writes in the file's
+      # language: `content/tags/rust-lang/_index.md` for `/tags/rust-lang/`,
+      # `content/tags/c-2/_index.md` for a disambiguated `/tags/c-2/`. Keyed by
+      # section path. A matched file describes that term page instead of
+      # publishing a page of its own (Builder#mark_term_metadata); every other
+      # candidate stays an ordinary section, exactly as before. When several
+      # files match one page (`_index.md` beside `_index.markdown`, or an
+      # `_index.ko.md` on a single-language site), `_index.md` wins, else the
+      # first path; the others are reported and not published.
+      def self.match_term_metadata(pages : Array(Models::Page), sections : Array(Models::Section), config : Models::Config) : Hash(String, TermFile)
+        result = {} of String => TermFile
+        candidates = sections.select { |s| term_metadata_path?(s.path, config) }
+        return result if candidates.empty?
+
+        urls = {} of {String, String, String} => String
+        # Output-collision verdicts (`output_suppressed`) come from the render
+        # phase, after this runs on a cold build; ignoring them keeps a serve
+        # pass, which still holds the last pass's verdicts, matching the same.
+        term_spaces(config, pages, term_index(pages, config), honor_suppressed: false).each do |space|
+          code = space.language || config.default_language
+          space.index_terms.each do |term|
+            slug = space.slug_map[term]
+            urls[{space.taxonomy.name, code, slug}] = "#{space.lang_prefix}/#{space.taxonomy.name}/#{slug}/"
           end
         end
+
+        winners = {} of String => String
+        # A plain `_index.md` first, then path order.
+        candidates.sort_by { |s| {File.basename(s.path) == "_index.md" ? 0 : 1, s.path} }.each do |section|
+          parts = Path[section.path].parts
+          dir = parts[1].ascii_only? ? parts[1] : parts[1].unicode_normalize(:nfc)
+          next unless url = urls[{parts[0], section.language || config.default_language, dir}]?
+          winner = winners[url]?
+          winners[url] = section.path unless winner
+          result[section.path] = TermFile.new(url, winner)
+        end
+        result
       end
 
       # Order the index page's terms list per the taxonomy's `terms_sort_by`:
@@ -271,16 +322,16 @@ module Hwaro
 
       # Build per-language taxonomy maps from the already-aggregated site.taxonomies,
       # but only using pages that belong to the given language.
-      private def self.build_language_taxonomies(site : Models::Site, enabled_taxonomy_names : Array(String)) : Hash(String, Hash(String, Array(Models::Page)))
+      private def self.build_language_taxonomies(pages : Array(Models::Page), config : Models::Config, enabled_taxonomy_names : Array(String), honor_suppressed : Bool = true) : Hash(String, Hash(String, Array(Models::Page)))
         result = {} of String => Hash(String, Array(Models::Page))
 
-        site.pages.each do |page|
+        pages.each do |page|
           next if page.excluded_from_listings?
-          next unless site.config.versions.in_taxonomies?(page)
+          next unless config.versions.in_taxonomies?(page)
           # Set by the render phase for pages it refused to write (URL
           # traverses out of the output dir): the term page would link a
           # 404 and the term feed would advertise it.
-          next if page.output_suppressed
+          next if honor_suppressed && page.output_suppressed
 
           enabled_taxonomy_names.each do |tax_name|
             values = page.taxonomy_values(tax_name)
@@ -307,16 +358,22 @@ module Hwaro
 
         # Sort each term's pages per its taxonomy's configured order
         # (consistent with global behavior)
-        sort_taxonomy_pages(result, site.config)
+        sort_taxonomy_pages(result, config)
 
         result
       end
 
       private def self.build_taxonomy_index(site : Models::Site)
         site.taxonomies.clear
-        config = site.config
+        term_index(site.pages, site.config).each { |name, terms| site.taxonomies[name] = terms }
+      end
 
-        site.pages.each do |page|
+      # Every configured taxonomy's terms → their pages, over the pages a term
+      # page lists.
+      private def self.term_index(pages : Array(Models::Page), config : Models::Config) : Hash(String, Hash(String, Array(Models::Page)))
+        index = {} of String => Hash(String, Array(Models::Page))
+
+        pages.each do |page|
           next if page.excluded_from_listings?
           # `[versions] taxonomies = "latest"` (default): only the latest
           # version (plus unversioned content) populates term pages.
@@ -333,9 +390,9 @@ module Hwaro
             values.uniq.each do |term|
               next if term.strip.empty?
 
-              terms = site.taxonomies[name]? || begin
-                site.taxonomies[name] = {} of String => Array(Models::Page)
-                site.taxonomies[name]
+              terms = index[name]? || begin
+                index[name] = {} of String => Array(Models::Page)
+                index[name]
               end
 
               list = terms[term]? || begin
@@ -348,7 +405,8 @@ module Hwaro
           end
         end
 
-        sort_taxonomy_pages(site.taxonomies, config)
+        sort_taxonomy_pages(index, config)
+        index
       end
 
       # Sort every term's page list per its taxonomy's sort_by/reverse
@@ -420,15 +478,18 @@ module Hwaro
         if language
           index_page.language = language
         end
-        # The term's `_index.md` (see term_metadata_path?): its values win,
-        # and its rendered body is the `term_content` template variable —
-        # `content` stays the generated page list templates already print.
+        # The term's `_index.md` (see match_term_metadata): its values win,
+        # and its body — rendered by the render pass (Builder#render_term_bodies)
+        # — is the `term_content` template variable; `content` stays the
+        # generated page list templates already print. Its aliases redirect
+        # here, written and claimed like the page itself.
         if meta
           index_page.title = meta.title unless meta.untitled?
           index_page.description = meta.description
           index_page.image = meta.image
           index_page.extra = meta.extra
-          index_page.content = builder.render_term_body(meta, site, templates, global_vars)
+          index_page.content = meta.content
+          builder.write_term_aliases(meta, site, output_dir, verbose)
         end
 
         paginated_pages = paginate_taxonomy(taxonomy, pages, index_page)

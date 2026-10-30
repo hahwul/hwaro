@@ -201,7 +201,8 @@ module Hwaro::Core::Build::Phases::Render
     # serve pass re-claims the winners before building these vars.
     suppressed = site.pages.any?(&.output_suppressed)
     # A root term's `_index.md` adds its title/description to the term object.
-    term_meta = site.taxonomies.empty? ? nil : Content::Taxonomies.term_metadata(site)
+    # (Content::Taxonomies.match_term_metadata), by term page URL.
+    term_meta = site.sections.select(&.term_metadata).index_by(&.url)
     site.taxonomies.each do |name, terms|
       if suppressed
         terms = terms.transform_values(&.reject(&.output_suppressed)).reject! { |_, term_pages| term_pages.empty? }
@@ -278,7 +279,7 @@ module Hwaro::Core::Build::Phases::Render
           "pages" => Crinja::Value.new(term_pages_array),
           "count" => Crinja::Value.new(term_pages.size),
         }
-        if has_root && term_meta && (meta = term_meta[{name, default_lang, slug}]?)
+        if has_root && !term_meta.empty? && (meta = term_meta["/#{name}/#{slug}/"]?)
           term_obj["title"] = Crinja::Value.new(meta.untitled? ? term : meta.title)
           term_obj["description"] = Crinja::Value.new(meta.description || "")
         end

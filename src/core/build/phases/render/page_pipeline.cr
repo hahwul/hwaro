@@ -234,14 +234,57 @@ module Hwaro::Core::Build::Phases::Render
     page.warned_messages.clear
   end
 
-  # The rendered body of a taxonomy term's `_index.md` (a headless section the
-  # render phase never renders), through the same content pipeline as a page
-  # body: shortcodes, Markdown, `@/` links, base_path. See
-  # Content::Taxonomies.term_metadata_path?.
-  def render_term_body(page : Models::Section, site : Models::Site, templates : Hash(String, String), global_vars : Hash(String, Crinja::Value)) : String
-    page.build_warnings.clear
-    highlight = @highlight_option && site.config.highlight.enabled
-    render_page_content(page, site, templates, highlight, site.config.markdown.safe, global_vars)[0]
+  # The bodies of the term `_index.md` files (`Page#term_metadata`): headless,
+  # so no page render writes them, yet each is its term page's `term_content`.
+  # Rendered in every pass that renders pages, BEFORE its `[links]` checks, so
+  # their `@/` links and anchors are reported (or fail the build) like any
+  # page's. The taxonomy generator reads the result from `page.content`.
+  private def render_term_bodies(
+    site : Models::Site,
+    templates : Hash(String, String),
+    highlight : Bool,
+    global_vars : Hash(String, Crinja::Value),
+    parallel : Bool,
+  ) : Nil
+    pages = site.sections.select(&.term_metadata).map(&.as(Models::Page))
+    return if pages.empty?
+    safe = site.config.markdown.safe
+    render = ->(page : Models::Page, env : Crinja?, cache : Hash(UInt64, Crinja::Template)?) do
+      page.build_warnings.clear
+      render_page_content(page, site, templates, highlight, safe, global_vars,
+        crinja_env_override: env, template_cache_override: cache)
+      nil
+    end
+    if parallel && pages.size > 1
+      worker_count = render_worker_count(pages, site, templates, pages.size)
+      worker_envs = Array.new(worker_count) { create_fresh_crinja_env }
+      worker_caches = Array.new(worker_count) { {} of UInt64 => Crinja::Template }
+      ParallelHelper.each_concurrently(pages, worker_count) do |page, worker_id|
+        render.call(page, worker_envs[worker_id], worker_caches[worker_id])
+      end
+    else
+      pages.each { |page| render.call(page, nil, nil) }
+    end
+  end
+
+  # A term `_index.md`'s `aliases`: redirect stubs to its term page (the
+  # section's URL is the term page's, see ParseContent#mark_term_metadata),
+  # claimed as taxonomy outputs so a removed alias is pruned like a removed
+  # term page. An alias some page or another alias already owns is not
+  # written.
+  def write_term_aliases(page : Models::Section, site : Models::Site, output_dir : String, verbose : Bool) : Nil
+    return if page.aliases.empty?
+    if winners = @output_url_winners
+      page.aliases.each do |a|
+        norm = Utils::PathUtils.normalize_alias_url(a)
+        next unless (owner = winners[norm]?) && owner != page.path
+        Logger.warn "Duplicate alias output path '#{norm}' — alias on '#{page.path}' collides with '#{owner}' and is not written"
+      end
+    end
+    clear_page_derived_outputs(page.path)
+    generate_aliases(page, site, output_dir, verbose)
+    written = @page_derived_mutex.synchronize { @page_derived_outputs.delete(page.path) }
+    written.try(&.each { |path| claim_generated_output(path) })
   end
 
   private def render_page(

@@ -47,7 +47,7 @@ module Hwaro::Core::Build::Phases::Render
     vars["taxonomy_name"] = Crinja::Value.new(page.taxonomy_name || "")
     vars["taxonomy_term"] = Crinja::Value.new(page.taxonomy_term || "")
     # A term page's authored `_index.md` body ("" without one); see
-    # Content::Taxonomies.term_metadata_path?.
+    # Content::Taxonomies.match_term_metadata.
     vars["term_content"] = Crinja::Value.new(page.content) if page.generated && page.taxonomy_term
     default_lang = config.default_language
     page_language = page.language || default_lang

@@ -142,6 +142,7 @@ module Hwaro
           listing_sets = snapshot_listing_sets(site, templates)
           backlink_digests = snapshot_backlinks(site, templates)
           page_urls = snapshot_page_urls(site)
+          term_state = term_metadata_state(site)
 
           # Build O(1) lookup map for changed file matching
           pages_map = @pages_by_path || build_pages_by_path(site)
@@ -173,6 +174,10 @@ module Hwaro
           # term counts until the next full build.
           excluded_pages = apply_publication_exclusions!(changed_pages, options)
           return run(options) if excluded_section?(excluded_pages) || bundle_variants_move?(changed_pages, excluded_pages, page_urls)
+          unless refresh_term_metadata(site, config, changed_pages, term_state)
+            Logger.info "  Taxonomy term _index files changed role — running full rebuild."
+            return run(options)
+          end
           excluded_paths = excluded_pages.map(&.path).to_set
 
           # Date-token permalink errors deferred by the lenient parse (see
@@ -306,6 +311,7 @@ module Hwaro
           else
             process_files_sequential(renderable_list, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
           end
+          render_term_bodies(site, templates, highlight, global_vars, options.parallel)
           raise_on_broken_internal_links!(output_dir)
           regenerate_amp_mirrors(renderable_list, site, output_dir, verbose)
 
@@ -362,6 +368,7 @@ module Hwaro
           listing_sets = snapshot_listing_sets(site, @templates)
           backlink_digests = snapshot_backlinks(site, @templates)
           page_urls = snapshot_page_urls(site)
+          term_state = term_metadata_state(site)
 
           reparsed = reparse_changed_pages(changed_content_files, site, config, output_dir, pages_map)
           return run(options) unless reparsed
@@ -376,6 +383,10 @@ module Hwaro
           # applied the filters.
           excluded_pages = apply_publication_exclusions!(changed_pages, options)
           return run(options) if excluded_section?(excluded_pages) || bundle_variants_move?(changed_pages, excluded_pages, page_urls)
+          unless refresh_term_metadata(site, config, changed_pages, term_state)
+            Logger.info "  Taxonomy term _index files changed role — running full rebuild."
+            return run(options)
+          end
           excluded_paths = excluded_pages.map(&.path).to_set
 
           # Deferred permalink errors — mirrors run_incremental.
@@ -941,6 +952,38 @@ module Hwaro
         # contract as the full parse phase: the publication window is
         # re-stamped first so pages kept via --include-future /
         # --include-expired stay out of public artifacts and listings.
+        # Which sections describe a term page (ParseContent#mark_term_metadata),
+        # as {section path => {term page URL, winner?}}.
+        private def term_metadata_state(site : Models::Site) : Hash(String, {String, Bool})
+          state = {} of String => {String, Bool}
+          site.sections.each do |section|
+            url = section.term_page_url
+            state[section.path] = {url, section.term_metadata} if url
+          end
+          state
+        end
+
+        # A re-parse reset the term-metadata flags of the files it read;
+        # derive them again from the edited page set. False when the edit
+        # changed WHICH files describe a term page, or which page (a term
+        # appeared or vanished, a slug moved): a section then starts or stops
+        # publishing, which only a full build gets right. `before` is
+        # `term_metadata_state` from before the re-parse.
+        private def refresh_term_metadata(site : Models::Site, config : Models::Config, changed_pages : Array(Models::Page), before : Hash(String, {String, Bool})) : Bool
+          matches = Content::Taxonomies.match_term_metadata(site.pages, site.sections, config)
+          after = {} of String => {String, Bool}
+          matches.each { |path, file| after[path] = {file.url, file.shadowed_by.nil?} }
+          return false unless after == before
+          return true if matches.empty?
+
+          changed_sections = changed_pages.compact_map(&.as?(Models::Section))
+          return true unless changed_sections.any? { |s| matches.has_key?(s.path) }
+          mark_term_metadata(changed_sections, matches)
+          # The claims taken after the re-parse saw these files as writers.
+          @output_url_winners = compute_output_url_winners((site.pages + site.sections).as(Array(Models::Page)))
+          true
+        end
+
         private def apply_publication_exclusions!(
           changed_pages : Array(Models::Page),
           options : Config::Options::BuildOptions,
@@ -1243,6 +1286,10 @@ module Hwaro
                   else
                     process_files_sequential(pages_to_render, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
                   end
+          # A shortcode template edit reaches term bodies too; the term pages
+          # then regenerate below.
+          term_bodies = site.sections.any?(&.term_metadata)
+          render_term_bodies(site, templates, highlight, global_vars, options.parallel) if term_bodies
           raise_on_broken_internal_links!(output_dir)
           regenerate_amp_mirrors(pages_to_render, site, output_dir, verbose)
 
@@ -1263,6 +1310,7 @@ module Hwaro
                                  (force_pages && !force_pages.empty?) ||
                                  membership_changed ||
                                  feed_templates_affected ||
+                                 term_bodies ||
                                  ["taxonomy", "taxonomy_term", "page"].any? { |name| affected_templates.includes?(name) }
                                 Content::Taxonomies.generate(site, output_dir, templates, verbose, builder: self)
                               else

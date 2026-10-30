@@ -42,6 +42,7 @@ private MULTILINGUAL_CONFIG = <<-TOML
 private TEMPLATES = {
   "page.html"          => %({{ page.title }}|{% for t in get_taxonomy(kind="tags").items %}{{ t.name }}={{ t.title }}/{{ t.description }};{% endfor %}),
   "taxonomy.html"      => "{{ content }}",
+  "section.html"       => "SECTION={{ page.title }}|{{ content }}",
   "taxonomy_term.html" => "T={{ page.title }}|D={{ page.description }}|X={{ page.extra.icon }}|B={{ term_content }}|{{ og_tags }}|L={{ content }}",
 }
 
@@ -109,16 +110,153 @@ describe "taxonomy term _index.md metadata" do
     end
   end
 
-  it "warns about, and does not publish, a file no term page matches" do
+  # Only a file a generated term page takes is metadata; any other section
+  # under content/<taxonomy>/ publishes exactly as before.
+  it "keeps a section no term page takes publishing as an ordinary section" do
     log = with_captured_log do
       build_site(CONFIG,
-        content_files: {"posts/p1.md" => post("P1", ["go"]), "tags/ghost/_index.md" => "+++\ntitle = \"Ghost\"\n+++\n"},
+        content_files: {
+          "posts/p1.md"            => post("P1", ["go"]),
+          "tags/nonterm/_index.md" => "+++\ntitle = \"Not a term section\"\n+++\nSection body\n",
+          "tags/nonterm/child.md"  => post("Child", [] of String),
+          "tags/moved/_index.md"   => "+++\ntitle = \"Moved\"\npath = \"/elsewhere/\"\n+++\n",
+        },
         template_files: TEMPLATES) do |dir|
-        File.exists?(File.join(dir, "public/tags/ghost/index.html")).should be_false
-        File.read(File.join(dir, "public/sitemap.xml")).should_not contain("ghost")
+        File.read(File.join(dir, "public/tags/nonterm/index.html")).should eq("SECTION=Not a term section|<p>Section body</p>\n")
+        File.exists?(File.join(dir, "public/tags/nonterm/child/index.html")).should be_true
+        File.exists?(File.join(dir, "public/elsewhere/index.html")).should be_true
+        File.read(File.join(dir, "public/sitemap.xml")).should contain("https://ex.com/tags/nonterm/</loc>")
+        File.read(File.join(dir, "public/llms.txt")).should contain("Not a term section")
       end
     end
-    log.should contain("content/tags/ghost/_index.md describes a taxonomy term page")
+    log.should_not contain("tags/nonterm")
+  end
+
+  it "keeps a file publishing when its language does not generate the taxonomy" do
+    config = MULTILINGUAL_CONFIG.sub(%(taxonomies = ["tags"]), %(taxonomies = []))
+    build_site(config,
+      content_files: {"a.md" => post("A", ["rust"]), "a.ko.md" => post("가", ["rust"]), "tags/rust/_index.ko.md" => "+++\ntitle = \"러스트\"\n+++\n"},
+      template_files: TEMPLATES) do |dir|
+      File.read(File.join(dir, "public/ko/tags/rust/index.html")).should start_with("SECTION=러스트|")
+    end
+  end
+
+  it "keeps pages nested under a term directory publishing" do
+    build_site(CONFIG,
+      content_files: {
+        "posts/p1.md"         => post("P1", ["rust"]),
+        "tags/rust/_index.md" => "+++\ntitle = \"Rust\"\n+++\n",
+        "tags/rust/notes.md"  => post("Notes", [] of String),
+      },
+      template_files: TEMPLATES) do |dir|
+      File.read(File.join(dir, "public/tags/rust/index.html")).should start_with("T=Rust|")
+      File.read(File.join(dir, "public/tags/rust/notes/index.html")).should start_with("Notes|")
+    end
+  end
+
+  it "fails a strict build on a broken @/ link in a term body" do
+    expect_raises(Hwaro::HwaroError, /tags\/rust\/_index\.md → @\/missing\.md/) do
+      build_site(CONFIG + %(\n[links]\nbroken_internal = "error"\n),
+        content_files: {"posts/p1.md" => post("P1", ["rust"]), "tags/rust/_index.md" => "+++\ntitle = \"Rust\"\n+++\n[x](@/missing.md)\n"},
+        template_files: TEMPLATES) { }
+    end
+  end
+
+  it "warns about broken @/ links and anchors in a term body" do
+    log = with_captured_log do
+      build_site(CONFIG + %(\n[links]\nbroken_anchors = "warn"\n),
+        content_files: {
+          "posts/p1.md"         => post("P1", ["rust"]),
+          "tags/rust/_index.md" => "+++\ntitle = \"Rust\"\n+++\n[x](@/missing.md) [y](@/posts/p1.md#nope)\n",
+        },
+        template_files: TEMPLATES) { }
+    end
+    log.should contain("Internal link '@/missing.md' in 'tags/rust/_index.md' could not be resolved")
+    log.should contain("Broken anchor: tags/rust/_index.md → @/posts/p1.md#nope")
+  end
+
+  it "highlights code in a term body like any page body" do
+    body = "+++\ntitle = \"Rust\"\n+++\n```crystal\nputs 1\n```\n"
+    build_site(CONFIG, content_files: {"posts/p1.md" => post("P1", ["rust"]), "tags/rust/_index.md" => body},
+      template_files: TEMPLATES, highlight: true) do |dir|
+      File.read(File.join(dir, "public/tags/rust/index.html")).should contain("<span")
+    end
+    build_site(CONFIG, content_files: {"posts/p1.md" => post("P1", ["rust"]), "tags/rust/_index.md" => body},
+      template_files: TEMPLATES, highlight: false) do |dir|
+      File.read(File.join(dir, "public/tags/rust/index.html")).should_not contain("<span")
+    end
+  end
+
+  it "writes the file's aliases as redirects to the term page" do
+    build_site(CONFIG,
+      content_files: {"posts/p1.md" => post("P1", ["rust"]), "tags/rust/_index.md" => "+++\ntitle = \"Rust\"\naliases = [\"/old-rust/\"]\n+++\n"},
+      template_files: TEMPLATES) do |dir, builder|
+      stub = File.join(dir, "public/old-rust/index.html")
+      File.read(stub).should contain("https://ex.com/tags/rust/")
+
+      options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)
+      options.serve_mode = true
+      options.preserve_output = true
+      File.write("content/tags/rust/_index.md", "+++\ntitle = \"Rust\"\n+++\n")
+      builder.run_incremental(["content/tags/rust/_index.md"], options).should be_true
+      File.exists?(stub).should be_false
+    end
+  end
+
+  it "reports duplicate files for one term page and the ignored template key" do
+    log = with_captured_log do
+      build_site(CONFIG,
+        content_files: {
+          "posts/p1.md"               => post("P1", ["rust"]),
+          "tags/rust/_index.md"       => "+++\ntitle = \"Rust\"\ntemplate = \"custom\"\n+++\n",
+          "tags/rust/_index.markdown" => "+++\ntitle = \"Other\"\n+++\n",
+        },
+        template_files: TEMPLATES) do |dir|
+        File.read(File.join(dir, "public/tags/rust/index.html")).should start_with("T=Rust|")
+      end
+    end
+    log.should contain("content/tags/rust/_index.markdown is ignored: content/tags/rust/_index.md already describes the term page /tags/rust/")
+    log.should contain("content/tags/rust/_index.md: `template` is ignored")
+    log.should_not contain("replaces content page")
+    log.should_not contain("Duplicate output path")
+  end
+
+  it "turns a section into term metadata, and back, as serve edits add and remove the term" do
+    build_site(CONFIG,
+      content_files: {"posts/p1.md" => post("P1", ["go"]), "tags/rust/_index.md" => "+++\ntitle = \"Rust\"\n+++\nprose\n"},
+      template_files: TEMPLATES) do |dir, builder|
+      options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)
+      options.serve_mode = true
+      options.preserve_output = true
+      dest = File.join(dir, "public/tags/rust/index.html")
+      File.read(dest).should start_with("SECTION=Rust|")
+
+      File.write("content/posts/p1.md", post("P1", ["go", "rust"]))
+      builder.run_incremental(["content/posts/p1.md"], options).should be_true
+      File.read(dest).should start_with("T=Rust|D=|X=|B=<p>prose</p>")
+
+      File.write("content/posts/p1.md", post("P1", ["go"]))
+      builder.run_incremental(["content/posts/p1.md"], options).should be_true
+      File.read(dest).should start_with("SECTION=Rust|")
+    end
+  end
+
+  it "turns a section back into an ordinary page on a --cache build once its term is gone" do
+    build_site(CONFIG,
+      content_files: {"posts/p1.md" => post("P1", ["rust"]), "tags/rust/_index.md" => "+++\ntitle = \"Rust\"\n+++\nprose\n"},
+      template_files: TEMPLATES, cache: true) do |dir, builder|
+      options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false)
+      dest = File.join(dir, "public/tags/rust/index.html")
+      File.read(dest).should start_with("T=Rust|")
+
+      File.write("content/posts/p1.md", post("P1", ["go"]))
+      builder.run(options)
+      File.read(dest).should eq("SECTION=Rust|<p>prose</p>\n")
+
+      File.write("content/posts/p1.md", post("P1", ["rust"]))
+      builder.run(options)
+      File.read(dest).should start_with("T=Rust|")
+    end
   end
 
   it "keeps the taxonomy index _index.md behaving as before" do

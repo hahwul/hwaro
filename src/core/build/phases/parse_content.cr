@@ -17,6 +17,10 @@ module Hwaro::Core::Build::Phases::ParseContent
 
     # Link multilingual translations between pages/sections (for language switchers)
     if config = ctx.config
+      # First, while nothing downstream has read `render` yet: translations,
+      # navigation, listings, output claims, the cache fingerprints and every
+      # discovery surface then see a matched term `_index.md` as headless.
+      mark_term_metadata(ctx.sections, Content::Taxonomies.match_term_metadata(ctx.pages, ctx.sections, config))
       Content::Multilingual.link_translations!(ctx.all_pages, config)
       Content::Versions.link!(ctx.all_pages, config)
     end
@@ -855,11 +859,30 @@ module Hwaro::Core::Build::Phases::ParseContent
     end
   end
 
-  # A taxonomy term's `_index.md` describes the generated term page and never
-  # writes a page of its own, whatever its front matter, a `[cascade]` or a
-  # schema default says (see Content::Taxonomies.term_metadata_path?).
-  private def term_metadata?(page : Models::Page) : Bool
-    (config = @config) ? Content::Taxonomies.term_metadata_path?(page.path, config) : false
+  # Make each `content/<taxonomy>/<slug>/_index.md` that matched a generated
+  # term page (Content::Taxonomies.match_term_metadata) headless: the term
+  # page carries its values, and only the term page publishes the URL. Its
+  # URL becomes the term page's, so its aliases and `get_section` point
+  # there. A section no term page takes is left exactly as parsed.
+  protected def mark_term_metadata(sections : Array(Models::Section), matches : Hash(String, Content::Taxonomies::TermFile)) : Nil
+    return if matches.empty?
+    sections.each do |section|
+      next unless file = matches[section.path]?
+      section.render = false
+      section.term_page_url = file.url
+      if winner = file.shadowed_by
+        Logger.warn "content/#{section.path} is ignored: content/#{winner} already describes the term page #{file.url}. Remove one of them."
+        next
+      end
+      section.term_metadata = true
+      unless section.url == file.url
+        section.url = file.url
+        section.permalink = nil
+      end
+      if section.front_matter_keys.includes?("template")
+        Logger.warn "content/#{section.path}: `template` is ignored — a taxonomy term page renders with taxonomy_term.html (or taxonomy.html, page.html)."
+      end
+    end
   end
 
   # Template lookups are keyed by extension-stripped names ("section", not
@@ -931,7 +954,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     page.toc = data[:toc]
     page.date = data[:date]
     page.updated = data[:updated]
-    page.render = data[:render] && !term_metadata?(page)
+    page.render = data[:render]
     page.slug = data[:slug]
     page.custom_path = data[:custom_path]
     page.aliases = site_relative_aliases(data[:aliases], page.path)
@@ -941,6 +964,8 @@ module Hwaro::Core::Build::Phases::ParseContent
     page.front_matter_keys = data[:front_matter_keys]
     page.taxonomy_name = nil
     page.taxonomy_term = nil
+    page.term_page_url = nil
+    page.term_metadata = false
 
     # New fields assignment
     page.authors = data[:authors]
@@ -1171,7 +1196,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     when "image"               then extra_value.as?(String).try { |v| page.image = v }
     when "template"            then extra_value.as?(String).try { |v| page.template = normalize_template_name(v) }
     when "series"              then extra_value.as?(String).try { |v| page.series = v }
-    when "render"              then extra_value.as?(Bool).try { |b| page.render = b && !term_metadata?(page) }
+    when "render"              then extra_value.as?(Bool).try { |b| page.render = b }
     when "toc"                 then extra_value.as?(Bool).try { |b| page.toc = b }
     when "insert_anchor_links" then extra_value.as?(Bool).try { |b| page.insert_anchor_links = b }
     when "in_sitemap"          then extra_value.as?(Bool).try { |b| page.in_sitemap = b }
@@ -1241,7 +1266,7 @@ module Hwaro::Core::Build::Phases::ParseContent
       when "draft"
         value.as?(Bool).try { |b| page.draft = b }
       when "render"
-        value.as?(Bool).try { |b| page.render = b && !term_metadata?(page) }
+        value.as?(Bool).try { |b| page.render = b }
       when "toc"
         value.as?(Bool).try { |b| page.toc = b }
       when "insert_anchor_links"
