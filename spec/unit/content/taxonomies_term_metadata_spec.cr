@@ -511,6 +511,21 @@ describe "taxonomy term _index.md metadata" do
     log.should_not contain("Duplicate alias output path")
   end
 
+  it "warns about front-matter keys a term page does not take" do
+    log = with_captured_log do
+      build_site(CONFIG,
+        content_files: {
+          "posts/p1.md"         => post("P1", ["rust"]),
+          "tags/rust/_index.md" => "+++\ntitle = \"Rust\"\nin_sitemap = false\npaginate_by = 2\nsort_by = \"title\"\nweight = 3\n+++\n",
+        },
+        template_files: TEMPLATES) do |dir|
+        File.read(File.join(dir, "public/sitemap.xml")).should contain("https://ex.com/tags/rust/</loc>")
+      end
+    end
+    log.should contain("content/tags/rust/_index.md: `in_sitemap`, `paginate_by`, `sort_by` do not apply to a taxonomy term page")
+    log.should_not contain("`weight`")
+  end
+
   it "refuses a term-file alias onto a term's pager page" do
     log = with_captured_log do
       build_site(CONFIG.sub(%(feed = true), %(feed = true\npaginate_by = 1)),
