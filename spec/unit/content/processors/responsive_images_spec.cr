@@ -98,6 +98,17 @@ describe "Responsive content images" do
       end
     end
 
+    it "keeps an attribute value containing '>' inside the wrapped <img>" do
+      with_resize_map(SAMPLE_MAP) do
+        with_webp_map(WEBP_MAP) do
+          out = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(
+            %(<img alt="Home > Docs" src="photo.png">), bundle_page, enabled_config)
+          out.should start_with("<picture><source")
+          out.should end_with(%( alt="Home > Docs" src="photo.png"></picture>))
+        end
+      end
+    end
+
     it "wraps an image that follows a closed authored <picture>" do
       with_resize_map(SAMPLE_MAP) do
         with_webp_map(WEBP_MAP) do
@@ -172,6 +183,14 @@ describe "Responsive content images" do
       out = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(
         %(<img src="https://cdn.example.com/posto.png">), bundle_page, enabled_config)
       out.should_not contain("srcset")
+    end
+  end
+
+  it "picks up a src after an attribute value containing '>'" do
+    with_resize_map(SAMPLE_MAP) do
+      out = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(
+        %(<img alt="a > b" src="photo.png">), bundle_page, enabled_config)
+      out.should eq(%(<img srcset="/posts/foo/photo_400w.png 400w, /posts/foo/photo_800w.png 800w" sizes="100vw" alt="a > b" src="photo.png">))
     end
   end
 

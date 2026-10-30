@@ -307,8 +307,9 @@ module Hwaro
           # <picture>/<source> are not AMP elements: keep only the <img>
           # fallback (the WebP sources `formats = ["webp"]` adds, or an
           # author's own picture), which the next step turns into amp-img.
-          result = result.gsub(/<picture\b[^>]*>([\s\S]*?)<\/picture\s*>/i) do |_, m|
-            m[1].gsub(/<source\b[^>]*>/i, "")
+          # Quote-aware like the <img> scan below (`media="(width > 600px)"`).
+          result = result.gsub(/<picture\b(?:[^>"']|"[^"]*"|'[^']*')*>([\s\S]*?)<\/picture\s*>/i) do |_, m|
+            m[1].gsub(/<source\b(?:[^>"']|"[^"]*"|'[^']*')*>/i, "")
           end
 
           # Convert <img> to <amp-img>. Quote-aware attribute scan (same

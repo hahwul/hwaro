@@ -21,7 +21,10 @@ module Hwaro::Core::Build::Phases::Render
   # `<picture>` with a `<source type="image/webp">` listing the WebP copies,
   # so browsers that support WebP fetch those and the rest keep the <img>.
   # An <img> already inside an authored <picture> is left to its sources.
-  IMG_TAG_RE       = /<img\b[^>]*>/
+  #
+  # Quote-aware, like IMG_LAZY_REGEX: a `>` inside an attribute value
+  # (`alt="Home > Docs"`) is not the end of the tag.
+  IMG_TAG_RE       = /<img\b(?:[^>"']|"[^"]*"|'[^']*')*>/
   IMG_SRC_RE       = /\ssrc\s*=\s*("([^"]*)"|'([^']*)')/
   IMG_SIZE_RE      = /\s(?:width|height)\s*=/i
   IMG_SIZES_RE     = /\ssizes\s*=\s*("[^"]*"|'[^']*')/i
