@@ -16,7 +16,10 @@ fi
 PAGES_BRANCH="${PAGES_BRANCH:-gh-pages}"
 BUILD_DIR="${BUILD_DIR:-.}"
 OUT_DIR="${OUT_DIR:-public}"
+# Case-folded so `True`/`TRUE` mean build-only everywhere below; every check
+# compares against "true", so any other value deploys, consistently.
 BUILD_ONLY="${BUILD_ONLY:-false}"
+BUILD_ONLY="${BUILD_ONLY,,}"
 GITHUB_HOSTNAME="${GITHUB_HOSTNAME:-github.com}"
 
 if [[ -n "$REPOSITORY" ]]; then
@@ -37,7 +40,7 @@ DEPLOY_TOKEN="${INPUT_TOKEN:-${GITHUB_TOKEN:-}}"
 unset INPUT_TOKEN
 unset GITHUB_TOKEN
 
-if [[ -z "$DEPLOY_TOKEN" ]] && [[ "$BUILD_ONLY" == "false" ]]; then
+if [[ -z "$DEPLOY_TOKEN" ]] && [[ "$BUILD_ONLY" != "true" ]]; then
     echo "Error: a GitHub token is required for deployment."
     echo "Please set the token input or GITHUB_TOKEN environment variable."
     exit 1
