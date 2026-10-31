@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Transform values in templates with the pipe operator">
+  <title>Filters - Hwaro</title>
+  <meta property="og:title" content="Filters">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/templates/filters/">
+  <meta property="og:description" content="Transform values in templates with the pipe operator">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/templates-filters.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Filters">
+  <meta name="twitter:description" content="Transform values in templates with the pipe operator">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/templates-filters.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/templates/filters/">
+  <link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/templates/filters/">
+<link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/templates/filters/">
+<link rel="alternate" hreflang="x-default" href="https://hwaro.hahwul.com/templates/filters/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=cbccac98">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=cbccac98">
+</head>
+<body data-section="templates">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/start/">Start</a>
+    <a href="https://hwaro.hahwul.com/writing/">Writing</a>
+    <a href="https://hwaro.hahwul.com/templates/" class="active">Templates</a>
+    <a href="https://hwaro.hahwul.com/features/">Features</a>
+    <a href="https://hwaro.hahwul.com/deploy/">Deploy</a>
+    <a href="https://hwaro.hahwul.com/integrations/">Integrations</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="Search documentation">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">Search</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">Examples</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="Change language">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">EN</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/templates/filters/" lang="en" hreflang="en" class="current" aria-current="true">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/templates/filters/" lang="ko" hreflang="ko">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Start</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/installation/">Installation</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/first-site/">First Site</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/tools/">Tools & Completion</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Writing</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/pages/">Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/sections/">Sections</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/taxonomies/">Taxonomies</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/shortcodes/">Shortcodes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/archetypes/">Archetypes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/schema/">Front Matter Schema</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/obsidian/">Wikilinks & Backlinks</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Templates</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/syntax/">Syntax</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/data-model/">Data Model</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/functions/">Functions</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/filters/" class="active">Filters</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/render-hooks/">Render Hooks</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Features</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/features/">Overview</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO & Discovery</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/structured-data/">Structured Data</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/og-images/">Auto OG Images</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Content</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/search/">Search</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pagination/">Pagination</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/">Syntax Highlighting</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/">Markdown Extensions</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/series/">Series</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/related-posts/">Related Posts</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/menus/">Menus</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/output-formats/">Output Formats</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/git-info/">Git Metadata</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Build & Performance</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/incremental-build/">Incremental Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/streaming-build/">Streaming Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/build-hooks/">Build Hooks</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/asset-pipeline/">Asset Pipeline</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/cache-busting/">Cache Busting</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Files & Environment</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-variables/">Environment Variables</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-config/">Env-Specific Config</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/auto-includes/">Auto Includes</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/content-files/">Content Files</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/remote-data/">Remote Data Sources</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/content-generation/">Content Generation</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/dated-report-pages/">Dated Report Pages</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Platform</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/multilingual/">Multilingual</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/versioned-docs/">Versioned Docs</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/image-processing/">Image Processing</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/deployment/">Deployment</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/privacy/">Privacy Mode</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/csp/">Content Security Policy</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Deploy</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Integrations</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/">Home</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/templates/">Templates</a></li>
+    
+    <li aria-current="page">Filters</li>
+  </ol>
+</nav>
+    <h1>Filters</h1>
+    <p>Filters transform values in templates. Apply with the pipe <code>|</code> operator.</p>
+<p>Hwaro ships its own filters on top of the standard Crinja (Jinja2) built-ins (<code>upper</code>, <code>lower</code>, <code>join</code>, <code>map</code>, <code>select</code>, <code>batch</code>, and friends), so both kinds work anywhere below.</p>
+<p>Besides the built-ins in the tables below, these Jinja2 filters are available: <code>abs</code>, <code>attr</code>, <code>batch</code>, <code>center</code>, <code>dictsort</code>, <code>escape</code> (<code>e</code>), <code>filesizeformat</code>, <code>float</code>, <code>format</code>, <code>groupby</code>, <code>indent</code>, <code>int</code>, <code>list</code>, <code>map</code>, <code>random</code>, <code>reject</code>, <code>rejectattr</code>, <code>round</code>, <code>select</code>, <code>selectattr</code>, <code>slice</code>, <code>string</code>, <code>striptags</code>, <code>sum</code>, <code>title</code>, <code>truncate</code>, <code>urlencode</code>, <code>urlize</code>, <code>wordcount</code>, <code>wordwrap</code> and <code>xmlattr</code>.</p>
+<h2 id="syntax">Syntax</h2>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{{</span> <span class="hljs-variable">value</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">filter</span> <span class="hljs-meta">}}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-variable">value</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">filter</span><span class="hljs-operator">(</span><span class="hljs-variable">arg</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;value&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-variable">value</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">filter1</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">filter2</span> <span class="hljs-meta">}}</span>
+</code></pre>
+<h2 id="text-filters">Text Filters</h2>
+<table>
+<thead>
+<tr>
+<th>Filter</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>upper</td>
+<td>Uppercase</td>
+<td>{{ &quot;hello&quot; | upper }} → HELLO</td>
+</tr>
+<tr>
+<td>lower</td>
+<td>Lowercase</td>
+<td>{{ &quot;HELLO&quot; | lower }} → hello</td>
+</tr>
+<tr>
+<td>capitalize</td>
+<td>Capitalize first</td>
+<td>{{ &quot;hello&quot; | capitalize }} → Hello</td>
+</tr>
+<tr>
+<td>trim</td>
+<td>Remove whitespace</td>
+<td>{{ &quot;  hi  &quot; | trim }} → hi</td>
+</tr>
+<tr>
+<td>replace</td>
+<td>Replace text</td>
+<td>{{ &quot;hello&quot; | replace(&quot;l&quot;, &quot;x&quot;) }} → hexxo</td>
+</tr>
+<tr>
+<td>slugify</td>
+<td>URL slug</td>
+<td>{{ &quot;Hello World&quot; | slugify }} → hello-world</td>
+</tr>
+<tr>
+<td>truncate_words</td>
+<td>Limit words; <code>end</code> sets the suffix (default <code>...</code>)</td>
+<td>{{ text | truncate_words(20, end=&quot;…&quot;) }}</td>
+</tr>
+<tr>
+<td>regex_replace</td>
+<td>Replace every regex match (see <a href="#regular-expressions">Regular Expressions</a>)</td>
+<td>{{ &quot;a1b22&quot; | regex_replace(pattern=&quot;[0-9]+&quot;, rep=&quot;#&quot;) }} → a#b#</td>
+</tr>
+</tbody>
+</table>
+<h2 id="encoding-filters">Encoding Filters</h2>
+<table>
+<thead>
+<tr>
+<th>Filter</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>base64_encode</td>
+<td>Base64-encode the text (standard alphabet, padded)</td>
+<td>{{ &quot;hi&quot; | base64_encode }} → aGk=</td>
+</tr>
+<tr>
+<td>base64_decode</td>
+<td>Decode base64 (standard or URL-safe, padding optional)</td>
+<td>{{ &quot;aGk=&quot; | base64_decode }} → hi</td>
+</tr>
+<tr>
+<td>md5</td>
+<td>MD5 digest of the text, lowercase hex</td>
+<td>{{ &quot;abc&quot; | md5 }} → 900150983cd2…</td>
+</tr>
+<tr>
+<td>sha1</td>
+<td>SHA-1 digest, lowercase hex</td>
+<td>{{ &quot;abc&quot; | sha1 }}</td>
+</tr>
+<tr>
+<td>sha256</td>
+<td>SHA-256 digest, lowercase hex</td>
+<td>{{ &quot;abc&quot; | sha256 }}</td>
+</tr>
+<tr>
+<td>sha384</td>
+<td>SHA-384 digest, lowercase hex</td>
+<td>{{ &quot;abc&quot; | sha384 }}</td>
+</tr>
+<tr>
+<td>sha512</td>
+<td>SHA-512 digest, lowercase hex</td>
+<td>{{ &quot;abc&quot; | sha512 }}</td>
+</tr>
+</tbody>
+</table>
+<p>The hash filters digest the string's UTF-8 bytes. Pass <code>base64=true</code> to get the digest in base64 instead of hex, for example <code>sha384-{{ css | sha384(base64=true) }}</code> is a Subresource Integrity value (for a file on disk, <a href="/templates/functions/"><code>asset_integrity()</code></a> does this for you). <code>base64_decode</code> stops the build with a template error when its input is not valid base64, or when the decoded bytes are not UTF-8 text.</p>
+<h2 id="html-filters">HTML Filters</h2>
+<table>
+<thead>
+<tr>
+<th>Filter</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>safe</td>
+<td>Don&#39;t escape HTML</td>
+<td>{{ content | safe }}</td>
+</tr>
+<tr>
+<td>strip_html</td>
+<td>Remove HTML tags</td>
+<td>{{ html | strip_html }}</td>
+</tr>
+<tr>
+<td>markdownify</td>
+<td>Render Markdown</td>
+<td>{{ text | markdownify }}</td>
+</tr>
+<tr>
+<td>xml_escape</td>
+<td>XML escape</td>
+<td>{{ text | xml_escape }}</td>
+</tr>
+</tbody>
+</table>
+<p><code>markdownify</code> follows the site's <a href="/features/markdown-extensions/"><code>[markdown]</code></a>
+settings for safe mode and <code>smart_punctuation</code>, so its output matches how the
+same text renders in page bodies. The rest of the extension pipeline
+(footnotes, definition lists, containers, …) is not applied.</p>
+<h2 id="array-filters">Array Filters</h2>
+<table>
+<thead>
+<tr>
+<th>Filter</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>length</td>
+<td>Get length</td>
+<td>{{ items | length }}</td>
+</tr>
+<tr>
+<td>first</td>
+<td>First element (empty on an empty collection)</td>
+<td>{{ items | first }}</td>
+</tr>
+<tr>
+<td>last</td>
+<td>Last element (empty on an empty collection)</td>
+<td>{{ items | last }}</td>
+</tr>
+<tr>
+<td>reverse</td>
+<td>Reverse order</td>
+<td>{{ items | reverse }}</td>
+</tr>
+<tr>
+<td>sort</td>
+<td>Sort array</td>
+<td>{{ items | sort }}</td>
+</tr>
+<tr>
+<td>min</td>
+<td>Smallest item; <code>attribute=</code> compares by a field</td>
+<td>{{ posts | min(attribute=&quot;date&quot;) }}</td>
+</tr>
+<tr>
+<td>max</td>
+<td>Largest item; <code>attribute=</code> compares by a field</td>
+<td>{{ [3, 7, 5] | max }} → 7</td>
+</tr>
+<tr>
+<td>join</td>
+<td>Join elements</td>
+<td>{{ tags | join(&quot;, &quot;) }}</td>
+</tr>
+<tr>
+<td>split</td>
+<td>Split string</td>
+<td>{{ &quot;a,b,c&quot; | split(pat=&quot;,&quot;) }}</td>
+</tr>
+<tr>
+<td>where</td>
+<td>Filter objects by field value</td>
+<td>{{ posts | where(attribute=&quot;draft&quot;, value=false) }}</td>
+</tr>
+<tr>
+<td>sort_by</td>
+<td>Sort objects by field</td>
+<td>{{ posts | sort_by(attribute=&quot;date&quot;, reverse=true) }}</td>
+</tr>
+<tr>
+<td>group_by</td>
+<td>Group objects by field</td>
+<td>{{ posts | group_by(attribute=&quot;section&quot;) }}</td>
+</tr>
+</tbody>
+</table>
+<p><code>min</code> and <code>max</code> work as in Jinja2: they compare like <code>sort</code> (strings case-insensitively unless <code>case_sensitive=true</code>), <code>attribute=</code> takes a dotted path such as <code>&quot;extra.weight&quot;</code> and the whole item is returned, the first one wins a tie, a mapping compares its keys, and an empty list gives an undefined value. An undefined <code>attribute=</code> is ignored, as with <code>sort</code>. A string compared with a number compares as text, which is not a consistent order for a whole list (<code>10 &lt; &quot;1a&quot; &lt; 2 &lt; 10</code>), so a list mixing numbers and strings has no reliable <code>sort</code>, <code>min</code> or <code>max</code>: convert the items to one type first.</p>
+<h2 id="collection-filters">Collection Filters</h2>
+<table>
+<thead>
+<tr>
+<th>Filter</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>unique</td>
+<td>Remove duplicates while keeping distinct value types</td>
+<td>{{ items | unique }}</td>
+</tr>
+<tr>
+<td>flatten</td>
+<td>Flatten nested arrays one level</td>
+<td>{{ nested | flatten }}</td>
+</tr>
+<tr>
+<td>compact</td>
+<td>Remove nil/empty values</td>
+<td>{{ items | compact }}</td>
+</tr>
+</tbody>
+</table>
+<h2 id="math-filters">Math Filters</h2>
+<table>
+<thead>
+<tr>
+<th>Filter</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ceil</td>
+<td>Round up to integer</td>
+<td>{{ 3.2 | ceil }} → 4</td>
+</tr>
+<tr>
+<td>floor</td>
+<td>Round down to integer</td>
+<td>{{ 3.8 | floor }} → 3</td>
+</tr>
+<tr>
+<td>num_format</td>
+<td>Group digits in threes (see <a href="#number-formatting">Number Formatting</a>)</td>
+<td>{{ 1234567 | num_format }} → 1,234,567</td>
+</tr>
+</tbody>
+</table>
+<h2 id="i18n-filters">i18n Filters</h2>
+<table>
+<thead>
+<tr>
+<th>Filter</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>t</td>
+<td>Translate a key</td>
+<td>{{ &quot;nav.home&quot; | t }}</td>
+</tr>
+<tr>
+<td>pluralize</td>
+<td>Select singular/plural form</td>
+<td>{{ count | pluralize(singular=&quot;item&quot;, plural=&quot;items&quot;) }}</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>t</code> filter looks up translation keys from TOML files in the <code>i18n/</code> directory. It uses the current page's language and falls back to the default language, then returns the key itself if no translation is found. See <a href="/features/multilingual/">Multilingual</a> for i18n file setup.</p>
+<h2 id="debug-filters">Debug Filters</h2>
+<table>
+<thead>
+<tr>
+<th>Filter</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>inspect</td>
+<td>Debug representation</td>
+<td>{{ value | inspect }}</td>
+</tr>
+</tbody>
+</table>
+<h2 id="url-filters">URL Filters</h2>
+<table>
+<thead>
+<tr>
+<th>Filter</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>absolute_url</td>
+<td>Full URL with base</td>
+<td>{{ &quot;/about/&quot; | absolute_url }}</td>
+</tr>
+<tr>
+<td>relative_url</td>
+<td>Prefix the path part of base_url (no scheme or host)</td>
+<td>{{ &quot;/img.png&quot; | relative_url }}</td>
+</tr>
+<tr>
+<td>active_path</td>
+<td>Is this URL the current page (or an ancestor of it)?</td>
+<td>{{ item.url | active_path }}</td>
+</tr>
+</tbody>
+</table>
+<p><code>active_path</code> compares a URL (typically a <a href="/features/menus/">menu</a> entry's <code>item.url</code>) against the current page. It's an exact match by default; pass <code>ancestor=true</code> to also match descendant pages:</p>
+<pre><code class="language-jinja hljs">&lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">item.href</span> <span class="hljs-meta">}}</span>&quot;<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">item.url</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">active_path</span> <span class="hljs-meta">%}</span> aria-current=&quot;page&quot;<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">item.name</span> <span class="hljs-meta">}}</span>&lt;/a&gt;
+&lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">item.href</span> <span class="hljs-meta">}}</span>&quot;<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">item.url</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">active_path</span><span class="hljs-operator">(</span><span class="hljs-variable">ancestor</span><span class="hljs-operator">=</span><span class="hljs-keyword">true</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span> class=&quot;open&quot;<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">item.name</span> <span class="hljs-meta">}}</span>&lt;/a&gt;
+</code></pre>
+<p>Both sides are normalized to one trailing slash before comparing, so <code>/posts</code> and <code>/posts/</code> are equal. The root path (<code>/</code>) only ever matches exactly, even with <code>ancestor=true</code>. An external <code>item.url</code> (<code>http://</code>, <code>https://</code>, <code>//</code>) never matches, and neither does the empty <code>url</code> of an entry written without one (a group heading).</p>
+<h2 id="data-filters">Data Filters</h2>
+<table>
+<thead>
+<tr>
+<th>Filter</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>default</td>
+<td>Fallback for an undefined, none, or empty value (see <a href="#default-values">Default Values</a>)</td>
+<td>{{ value | default(value=&quot;N/A&quot;) }}</td>
+</tr>
+<tr>
+<td>jsonify</td>
+<td>JSON encode</td>
+<td>{{ data | jsonify }}</td>
+</tr>
+<tr>
+<td>tojson</td>
+<td>JSON encode; <code>indent</code> pretty-prints with that many spaces (0–16)</td>
+<td>{{ data | tojson(indent=2) }}</td>
+</tr>
+<tr>
+<td>date</td>
+<td>Format date (default format <code>%Y-%m-%d</code>); <code>locale</code> translates month and weekday names (see <a href="#date-formatting">Date Formatting</a>)</td>
+<td>{{ page.date | date(format=&quot;%B %-d&quot;, locale=&quot;ko&quot;) }}</td>
+</tr>
+</tbody>
+</table>
+<h2 id="examples">Examples</h2>
+<h3 id="safe-html">Safe HTML</h3>
+<p>Always use <code>safe</code> for rendered content:</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{{</span> <span class="hljs-variable">content</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-variable">og_tags</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-variable">toc</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>
+</code></pre>
+<h3 id="default-values">Default Values</h3>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{{</span> <span class="hljs-variable">page.description</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">default</span><span class="hljs-operator">(</span><span class="hljs-variable">value</span><span class="hljs-operator">=</span><span class="hljs-variable">site.description</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-variable">page.image</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">default</span><span class="hljs-operator">(</span><span class="hljs-variable">value</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;/images/default.png&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>
+</code></pre>
+<p><code>default</code> returns the fallback when the value is undefined, <code>none</code>, or an empty string. The fallback keeps its type, so <code>default(value=0)</code> still works in arithmetic; a <code>none</code> fallback (<code>default(value=none)</code>) renders as an empty string. A value that is not empty is returned as follows: an array, map, or object passes through unchanged, and any other value (a string, number, or boolean) is returned as a string, so string filters such as <code>length</code> or <code>replace</code> can follow it. Pass <code>boolean=true</code> (<code>default(value=&quot;N/A&quot;, boolean=true)</code>) to also replace any falsy value: <code>false</code>, <code>0</code>, or an empty list or map.</p>
+<h3 id="date-formatting">Date Formatting</h3>
+<pre><code class="language-jinja hljs">&lt;time&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">page.date</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">date</span><span class="hljs-operator">(</span><span class="hljs-string">&quot;%B %d, %Y&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>&lt;/time&gt;
+</code></pre>
+<p>Format codes:</p>
+<ul>
+<li><code>%Y</code> — Year (2024)</li>
+<li><code>%m</code> — Month (01-12)</li>
+<li><code>%d</code> — Day (01-31)</li>
+<li><code>%B</code> — Month name (January)</li>
+<li><code>%b</code> — Month abbr (Jan)</li>
+<li><code>%A</code> / <code>%a</code> — Weekday name / abbr (Tuesday / Tue)</li>
+<li><code>%P</code> / <code>%p</code> — AM/PM / am/pm</li>
+</ul>
+<p>Pass <code>locale</code> to translate the names. A template shared by several languages passes <code>locale=page.language</code>:</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{{</span> <span class="hljs-variable">page.date</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">date</span><span class="hljs-operator">(</span><span class="hljs-variable">format</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;%B %-d일 (%a)&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">locale</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;ko&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>   <span class="hljs-comment">{# 3월 5일 (화) #}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-variable">page.date</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">date</span><span class="hljs-operator">(</span><span class="hljs-variable">format</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;%A %-d %B %Y&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">locale</span><span class="hljs-operator">=</span><span class="hljs-variable">page.language</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>
+</code></pre>
+<p><code>locale</code> translates <code>%B</code>, <code>%b</code> (and <code>%h</code>), <code>%A</code>, <code>%a</code>, <code>%P</code>, <code>%p</code>, and the <code>%^</code> uppercase forms. Every other code, including the composite <code>%c</code> and <code>%r</code>, prints exactly as it does without a locale. Outside English, <code>%p</code> and <code>%P</code> print the same locale form (<code>오후</code>, <code>CH</code>, <code>p.m.</code>); only English has a lowercase <code>am</code>/<code>pm</code>.</p>
+<p><code>page.date</code> reaches templates as a date-only string (<code>2024-03-05</code>), so <code>%p</code>/<code>%P</code> on it always print the morning form. Use a value with a time of day (a datetime from front matter <code>extra</code> or data, or <code>now()</code>) when you need AM/PM.</p>
+<p>A string (safe strings included) is read as <code>YYYY-MM-DD</code> or an ISO 8601 / RFC 3339 datetime, with a <code>T</code> (or <code>t</code>) or a space before the time and an optional zone (<code>Z</code>, <code>z</code>, <code>+09:00</code>). A string that does not parse is printed unchanged.</p>
+<p>Built-in locales: <code>ko</code>, <code>ja</code>, <code>zh</code> (Simplified), <code>zh_TW</code> (Traditional; also used for <code>zh_Hant</code>, <code>zh_HK</code>, <code>zh_MO</code>), <code>de</code>, <code>fr</code>, <code>es</code>, <code>it</code>, <code>pt</code> (Brazilian, so <code>pt_BR</code> uses it), <code>ru</code>, <code>nl</code>, <code>pl</code>, <code>tr</code>, <code>vi</code>, <code>id</code>, and English. <code>ko</code>, <code>ko_KR</code>, <code>ko-KR</code> and <code>KO-kr</code> are the same locale, and a region without its own table falls back to its language (<code>fr_CA</code> uses <code>fr</code>). A POSIX codeset or modifier is ignored, so <code>ko.UTF-8</code>, <code>ko_KR.UTF-8</code> and <code>ko@euro</code> use <code>ko</code>.</p>
+<p>Names follow CLDR's in-date (&quot;format&quot;) forms, so Russian and Polish months are genitive (<code>5 марта</code>, <code>5 marca</code>): right next to a day number, not as a standalone month heading. An unknown locale logs one warning per build (and per <code>serve</code> rebuild) and prints English names. Without <code>locale</code>, or with an empty or blank one, output is unchanged. <code>now(format=..., locale=...)</code> takes the same argument.</p>
+<h3 id="url-handling">URL Handling</h3>
+<pre><code class="language-jinja hljs">&lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">page.url</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">absolute_url</span> <span class="hljs-meta">}}</span>&quot;&gt;Permalink&lt;/a&gt;
+&lt;img src=&quot;<span class="hljs-meta">{{</span> <span class="hljs-string">&quot;/logo.png&quot;</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">relative_url</span> <span class="hljs-meta">}}</span>&quot;&gt;
+</code></pre>
+<h3 id="strings-and-chaining">Strings and Chaining</h3>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{{</span> <span class="hljs-variable">page.title</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">lower</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">slugify</span> <span class="hljs-meta">}}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-variable">content</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">strip_html</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">truncate_words</span><span class="hljs-operator">(</span><span class="hljs-number">100</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-variable">description</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">default</span><span class="hljs-operator">(</span><span class="hljs-variable">value</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;No description&quot;</span><span class="hljs-operator">)</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">upper</span> <span class="hljs-meta">}}</span>
+
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">tags</span> <span class="hljs-operator">=</span> <span class="hljs-string">&quot;a,b,c&quot;</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">split</span><span class="hljs-operator">(</span><span class="hljs-variable">pat</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;,&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">for</span> <span class="hljs-variable">tag</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">tags</span> <span class="hljs-meta">%}</span>
+  &lt;span&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">tag</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">trim</span> <span class="hljs-meta">}}</span>&lt;/span&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endfor</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<h3 id="regular-expressions">Regular Expressions</h3>
+<p><code>regex_replace</code> takes Zola's argument names, <code>pattern</code> and <code>rep</code> (or the two positionally); <code>rep</code> defaults to <code>&quot;&quot;</code>, which deletes the matches. The pattern is PCRE2 syntax. The replacement uses the Zola and Hugo (Rust/Go regex) syntax, not Crystal's:</p>
+<ul>
+<li><code>$1</code> or <code>${1}</code> inserts a numbered group, <code>$name</code> or <code>${name}</code> a named group (<code>(?&lt;name&gt;…)</code>), <code>$$</code> a literal <code>$</code>.</li>
+<li><code>$name</code> takes the longest run of letters, digits and <code>_</code>, so <code>$1a</code> means a group called <code>1a</code>: write <code>${1}a</code> for group 1 followed by <code>a</code>.</li>
+<li>A group that doesn't exist or didn't match inserts nothing. A <code>$</code> not followed by a name stays as is, and a backslash is an ordinary character (<code>\1</code> is not a group reference).</li>
+<li>Empty matches follow Rust and Go too: one that starts right where the previous match ended is skipped, so <code>&quot;aab&quot; | regex_replace(&quot;a*&quot;, &quot;-&quot;)</code> gives <code>-b-</code>.</li>
+</ul>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{{</span> <span class="hljs-string">&quot;2024-03-05&quot;</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">regex_replace</span><span class="hljs-operator">(</span><span class="hljs-variable">pattern</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;(\d+)-(\d+)-(\d+)&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">rep</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;$3/$2/$1&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>  <span class="hljs-comment">{# 05/03/2024 #}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-string">&quot;John Smith&quot;</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">regex_replace</span><span class="hljs-operator">(</span><span class="hljs-variable">pattern</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;(?&lt;first&gt;\w+) (?&lt;last&gt;\w+)&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">rep</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;$last, $first&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-variable">page.title</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">regex_replace</span><span class="hljs-operator">(</span><span class="hljs-string">&quot;\s+&quot;</span><span class="hljs-operator">,</span> <span class="hljs-string">&quot; &quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>
+</code></pre>
+<p>An invalid pattern, or one that backtracks past PCRE2's match limit, stops the build with a template error that names the pattern.</p>
+<h3 id="number-formatting">Number Formatting</h3>
+<p><code>num_format</code> groups the integer digits of a number, or of a string holding a plain decimal number, in threes. It takes three optional arguments: <code>decimals</code> (fixed decimal places, 0–20, rounded half away from zero; by default the number keeps its own decimals, and a float prints its shortest form, so <code>1e-7</code> is <code>0.0000001</code>), <code>separator</code> (default <code>,</code>) and <code>decimal_point</code> (default <code>.</code>).</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{{</span> <span class="hljs-number">1234567</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">num_format</span> <span class="hljs-meta">}}</span>                                    <span class="hljs-comment">{# 1,234,567 #}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-number">1234.5</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">num_format</span><span class="hljs-operator">(</span><span class="hljs-variable">decimals</span><span class="hljs-operator">=</span><span class="hljs-number">2</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>                         <span class="hljs-comment">{# 1,234.50 #}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-number">1234567.5</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">num_format</span><span class="hljs-operator">(</span><span class="hljs-variable">separator</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;.&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">decimal_point</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;,&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span> <span class="hljs-comment">{# 1.234.567,5 #}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-number">1234567</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">num_format</span><span class="hljs-operator">(</span><span class="hljs-variable">separator</span><span class="hljs-operator">=</span><span class="hljs-string">&quot; &quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>                     <span class="hljs-comment">{# 1 234 567 #}</span>
+</code></pre>
+<p>A value that isn't a number (text, <code>true</code>, an undefined value, NaN) comes back unchanged, so a missing front matter field doesn't break the page. Only ASCII digits count, so <code>&quot;１２３&quot;</code> is text. <code>decimals</code> also accepts a whole number written as a string (<code>decimals=&quot;2&quot;</code>); any other value, such as <code>&quot;x&quot;</code> or <code>1.5</code>, is ignored, as if <code>decimals</code> were not given.</p>
+<h3 id="collection-querying">Collection Querying</h3>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">published</span> <span class="hljs-operator">=</span> <span class="hljs-variable">site.pages</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">where</span><span class="hljs-operator">(</span><span class="hljs-variable">attribute</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;draft&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">value</span><span class="hljs-operator">=</span><span class="hljs-keyword">false</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">newest</span> <span class="hljs-operator">=</span> <span class="hljs-variable">published</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">sort_by</span><span class="hljs-operator">(</span><span class="hljs-variable">attribute</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;date&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">reverse</span><span class="hljs-operator">=</span><span class="hljs-keyword">true</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">for</span> <span class="hljs-variable">group</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">newest</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">group_by</span><span class="hljs-operator">(</span><span class="hljs-variable">attribute</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;section&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+  &lt;h3&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">group.grouper</span> <span class="hljs-meta">}}</span>&lt;/h3&gt;
+  &lt;ul&gt;
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">for</span> <span class="hljs-variable">p</span> <span class="hljs-keyword">in</span> <span class="hljs-variable">group.list</span> <span class="hljs-meta">%}</span>
+    &lt;li&gt;&lt;a href=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">p.url</span> <span class="hljs-meta">}}</span>&quot;&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">p.title</span> <span class="hljs-meta">}}</span>&lt;/a&gt;&lt;/li&gt;
+  <span class="hljs-meta">{%</span> <span class="hljs-keyword">endfor</span> <span class="hljs-meta">%}</span>
+  &lt;/ul&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endfor</span> <span class="hljs-meta">%}</span>
+
+<span class="hljs-comment">{# Unique tags across all pages #}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">set</span> <span class="hljs-variable">all_tags</span> <span class="hljs-operator">=</span> <span class="hljs-variable">site.pages</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">map</span><span class="hljs-operator">(</span><span class="hljs-variable">attribute</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;tags&quot;</span><span class="hljs-operator">)</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">flatten</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">unique</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<h3 id="translations">Translations</h3>
+<pre><code class="language-jinja hljs"><span class="hljs-comment">{# Translate UI strings (requires i18n/*.toml files) #}</span>
+&lt;nav&gt;
+  &lt;a href=&quot;/&quot;&gt;<span class="hljs-meta">{{</span> <span class="hljs-string">&quot;nav.home&quot;</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">t</span> <span class="hljs-meta">}}</span>&lt;/a&gt;
+  &lt;a href=&quot;/blog/&quot;&gt;<span class="hljs-meta">{{</span> <span class="hljs-string">&quot;nav.blog&quot;</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">t</span> <span class="hljs-meta">}}</span>&lt;/a&gt;
+&lt;/nav&gt;
+
+<span class="hljs-comment">{# Pluralize based on count #}</span>
+&lt;p&gt;<span class="hljs-meta">{{</span> <span class="hljs-variable">post_count</span> <span class="hljs-meta">}}</span> <span class="hljs-meta">{{</span> <span class="hljs-variable">post_count</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">pluralize</span><span class="hljs-operator">(</span><span class="hljs-variable">singular</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;post&quot;</span><span class="hljs-operator">,</span> <span class="hljs-variable">plural</span><span class="hljs-operator">=</span><span class="hljs-string">&quot;posts&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">}}</span>&lt;/p&gt;
+</code></pre>
+<hr />
+<h2 id="tests">Tests</h2>
+<p>Tests evaluate conditions in <code>{% if %}</code> statements.</p>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>startswith</td>
+<td>Starts with</td>
+<td><code>{% if page.url is startswith(&quot;/blog/&quot;) %}</code></td>
+</tr>
+<tr>
+<td>endswith</td>
+<td>Ends with</td>
+<td><code>{% if page.url is endswith(&quot;/&quot;) %}</code></td>
+</tr>
+<tr>
+<td>containing</td>
+<td>Contains a substring (strings) or an element (lists)</td>
+<td><code>{% if page.url is containing(&quot;docs&quot;) %}</code></td>
+</tr>
+<tr>
+<td>matching</td>
+<td>Regex match</td>
+<td><code>{% if asset is matching(&quot;[.](jpg|png)$&quot;) %}</code></td>
+</tr>
+<tr>
+<td>empty</td>
+<td>Is empty</td>
+<td><code>{% if page.description is empty %}</code></td>
+</tr>
+<tr>
+<td>present</td>
+<td>Is not empty</td>
+<td><code>{% if page.title is present %}</code></td>
+</tr>
+<tr>
+<td>eq, ne, lt, le, gt, ge</td>
+<td>Compare with a value (also <code>==</code>, <code>!=</code>, <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code>, <code>&gt;=</code>, <code>equalto</code>, <code>lessthan</code>, <code>greaterthan</code>)</td>
+<td><code>{{ posts | selectattr(&quot;extra.year&quot;, &quot;&gt;=&quot;, 2020) | list }}</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="test-examples">Test Examples</h3>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page.url</span> <span class="hljs-keyword">is</span> <span class="hljs-title function_">startswith</span><span class="hljs-operator">(</span><span class="hljs-string">&quot;/blog/&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+&lt;span class=&quot;badge&quot;&gt;Blog&lt;/span&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page.description</span> <span class="hljs-keyword">is</span> <span class="hljs-title function_">empty</span> <span class="hljs-meta">%}</span>
+&lt;meta name=&quot;description&quot; content=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">site.description</span> <span class="hljs-meta">}}</span>&quot;&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page.image</span> <span class="hljs-keyword">is</span> <span class="hljs-title function_">present</span> <span class="hljs-meta">%}</span>
+&lt;meta property=&quot;og:image&quot; content=&quot;<span class="hljs-meta">{{</span> <span class="hljs-variable">page.image</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">absolute_url</span> <span class="hljs-meta">}}</span>&quot;&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-string">&quot;hero.jpg&quot;</span> <span class="hljs-keyword">is</span> <span class="hljs-title function_">matching</span><span class="hljs-operator">(</span><span class="hljs-string">&quot;[.](jpg|png)$&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>
+&lt;span&gt;Image file&lt;/span&gt;
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">endif</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<h3 id="built-in-tests">Built-in Tests</h3>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">value</span> <span class="hljs-keyword">is</span> <span class="hljs-title function_">defined</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">value</span> <span class="hljs-keyword">is</span> <span class="hljs-title function_">none</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">value</span> <span class="hljs-keyword">is</span> <span class="hljs-title function_">number</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">value</span> <span class="hljs-keyword">is</span> <span class="hljs-title function_">string</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">value</span> <span class="hljs-keyword">is</span> <span class="hljs-title function_">iterable</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">value</span> <span class="hljs-keyword">is</span> <span class="hljs-title function_">even</span> <span class="hljs-meta">%}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">value</span> <span class="hljs-keyword">is</span> <span class="hljs-title function_">odd</span> <span class="hljs-meta">%}</span>
+</code></pre>
+<hr />
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="/templates/data-model/">Data Model</a> — Available variables</li>
+<li><a href="/templates/functions/">Functions</a> — Template functions</li>
+<li><a href="/templates/syntax/">Syntax</a> — Template basics</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/templates/functions/" rel="prev">
+    <span class="pn-label">Previous</span>
+    <span class="pn-title">Functions</span>
+    <span class="pn-desc">Built-in functions for data retrieval and URL generation</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/templates/render-hooks/" rel="next">
+    <span class="pn-label">Next</span>
+    <span class="pn-title">Render Hooks</span>
+    <span class="pn-desc">Override how Markdown elements render with Hugo/Zola-style template hooks</span>
+  </a>
+  
+</nav>
+
+    
+<footer class="site-footer">
+  <p class="footer-meta">
+    <a class="footer-sig" href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul, Built with Love">
+      <span class="hahwul-img" aria-hidden="true"></span>
+      <span class="footer-love">Built with Love</span>
+    </a>
+    <span aria-hidden="true">·</span>
+    <span>MIT · © HAHWUL</span>
+  </p>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#syntax">Syntax</a></li><li><a href="#text-filters">Text Filters</a></li><li><a href="#encoding-filters">Encoding Filters</a></li><li><a href="#html-filters">HTML Filters</a></li><li><a href="#array-filters">Array Filters</a></li><li><a href="#collection-filters">Collection Filters</a></li><li><a href="#math-filters">Math Filters</a></li><li><a href="#i18n-filters">i18n Filters</a></li><li><a href="#debug-filters">Debug Filters</a></li><li><a href="#url-filters">URL Filters</a></li><li><a href="#data-filters">Data Filters</a></li><li><a href="#examples">Examples</a><ul><li><a href="#safe-html">Safe HTML</a></li><li><a href="#default-values">Default Values</a></li><li><a href="#date-formatting">Date Formatting</a></li><li><a href="#url-handling">URL Handling</a></li><li><a href="#strings-and-chaining">Strings and Chaining</a></li><li><a href="#regular-expressions">Regular Expressions</a></li><li><a href="#number-formatting">Number Formatting</a></li><li><a href="#collection-querying">Collection Querying</a></li><li><a href="#translations">Translations</a></li></ul></li><li><a href="#tests">Tests</a><ul><li><a href="#test-examples">Test Examples</a></li><li><a href="#built-in-tests">Built-in Tests</a></li></ul></li><li><a href="#see-also">See Also</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=cbccac98"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=cbccac98"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=cbccac98"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=cbccac98"></script>
+</body>
+</html>
