@@ -88,6 +88,10 @@ If your Hwaro site is in a subdirectory (e.g., `docs/`), set `build_dir`:
     token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
+### Pinning a Version
+
+`@main` follows the latest development build. To pin, use a release tag (`hahwul/hwaro@v0.22.0`) or the full commit SHA of a release tag (`hahwul/hwaro@534398a0749d5c9e68a04bfbc8834769f8385455 # v0.22.0`). The action runs the Docker image published for that release; a SHA that is not a release commit fails with an error, because only releases have an image.
+
 ### OG Image Caching
 
 The action automatically caches OG images between deploys. Before each build, it restores previously generated images from the `gh-pages` branch and enables `--cache` mode. Only pages with changed content (title, description, URL) or updated OG config will have their images regenerated. This significantly speeds up builds for large sites.

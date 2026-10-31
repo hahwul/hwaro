@@ -46,10 +46,28 @@ runs:
     - name: Resolve Hwaro image tag
       id: resolve
       shell: bash
+      env:
+        REF: ${{ github.action_ref }}
       run: |
-        REF="${{ github.action_ref }}"
+        if [[ "$(tr '[:upper:]' '[:lower:]' <<<"$REF")" =~ ^[0-9a-f]{40}$ ]]; then
+          REF=$(tr '[:upper:]' '[:lower:]' <<<"$REF")
+          # A SHA pin has no image of its own (per-commit tags are not
+          # published), so map it to the release tag that points at it.
+          # Annotated tags list the commit on their peeled `^{}` line,
+          # lightweight tags on the tag line itself; match either. No early
+          # `exit` in awk: under pipefail a SIGPIPE'd git would fail the step.
+          TAG=$(git ls-remote --tags https://github.com/hahwul/hwaro.git 'v*' |
+            awk -v sha="$REF" '!found && $1 == sha { sub("^refs/tags/", "", $2); sub("\\^\\{\\}$", "", $2); print $2; found = 1 }')
+          if [[ -z "$TAG" ]]; then
+            echo "::error::hahwul/hwaro@${REF} is not a release commit. Pin the SHA of a release tag (vX.Y.Z); only releases have a Hwaro image."
+            exit 1
+          fi
+          echo "SHA-pinned ref ${REF:0:12} is release ${TAG}"
+        else
+          TAG="$REF"
+        fi
         # Strip leading 'v' prefix (v0.1.0 -> 0.1.0, main -> main)
-        TAG="${REF#v}"
+        TAG="${TAG#v}"
         # Fallback to 'latest' if the ref is empty
         TAG="${TAG:-latest}"
         echo "image=ghcr.io/hahwul/hwaro:${TAG}" >> "$GITHUB_OUTPUT"
@@ -63,6 +81,7 @@ runs:
         INPUT_TOKEN: ${{ inputs.token }}
         WORKFLOW_TOKEN: ${{ github.token }}
       run: |
+        BUILD_ONLY=$(tr "[:upper:]" "[:lower:]" <<<"$BUILD_ONLY")
         # Only fall back to the workflow token when actually deploying.
         # build_only runs receive no token by default so the value cannot
         # be exfiltrated by user-controlled build hooks. See issue #550.
@@ -73,24 +92,42 @@ runs:
         else
           TOKEN=""
         fi
-        echo "::add-mask::$TOKEN"
+        [[ -n "$TOKEN" ]] && echo "::add-mask::$TOKEN"
         echo "value=$TOKEN" >> "$GITHUB_OUTPUT"
 
     - name: Run Hwaro
       shell: bash
+      # Inputs reach the container through the environment (`-e NAME` copies
+      # the variable from this step), never interpolated into the script: a
+      # quote or `$(...)` in an input would otherwise be parsed by the runner's
+      # shell, and the token would sit in the docker command line.
+      env:
+        # The context value, not $GITHUB_WORKSPACE: in a container job the
+        # latter is the in-container path, but `-v` is resolved by the host
+        # daemon and needs the host path.
+        WORKSPACE: ${{ github.workspace }}
+        IMAGE: ${{ steps.resolve.outputs.image }}
+        PAGES_BRANCH: ${{ inputs.pages_branch }}
+        BUILD_DIR: ${{ inputs.build_dir }}
+        OUT_DIR: ${{ inputs.output_dir }}
+        BUILD_FLAGS: ${{ inputs.build_flags }}
+        BUILD_ONLY: ${{ inputs.build_only }}
+        REPOSITORY: ${{ inputs.repository }}
+        GITHUB_HOSTNAME: ${{ inputs.github_hostname }}
+        INPUT_TOKEN: ${{ steps.token.outputs.value }}
       run: |
         docker run --rm \
-          -v "${{ github.workspace }}":"/github/workspace" \
+          -v "$WORKSPACE":"/github/workspace" \
           -w /github/workspace \
           -e GITHUB_ACTIONS=true \
-          -e GITHUB_REPOSITORY="${{ github.repository }}" \
-          -e GITHUB_ACTOR="${{ github.actor }}" \
-          -e PAGES_BRANCH="${{ inputs.pages_branch }}" \
-          -e BUILD_DIR="${{ inputs.build_dir }}" \
-          -e OUT_DIR="${{ inputs.output_dir }}" \
-          -e BUILD_FLAGS="${{ inputs.build_flags }}" \
-          -e BUILD_ONLY="${{ inputs.build_only }}" \
-          -e REPOSITORY="${{ inputs.repository }}" \
-          -e GITHUB_HOSTNAME="${{ inputs.github_hostname }}" \
-          -e INPUT_TOKEN="${{ steps.token.outputs.value }}" \
-          "${{ steps.resolve.outputs.image }}"
+          -e GITHUB_REPOSITORY \
+          -e GITHUB_ACTOR \
+          -e PAGES_BRANCH \
+          -e BUILD_DIR \
+          -e OUT_DIR \
+          -e BUILD_FLAGS \
+          -e BUILD_ONLY \
+          -e REPOSITORY \
+          -e GITHUB_HOSTNAME \
+          -e INPUT_TOKEN \
+          "$IMAGE"

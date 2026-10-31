@@ -161,12 +161,14 @@ jobs:
 
           # 3. With GITHUB_ACTIONS set, run the real action path end to end.
           #    OUT_DIR is deliberately not the default, so this also covers the
-          #    build writing where the deploy step will look for it.
+          #    build writing where the deploy step will look for it, and
+          #    BUILD_ONLY is capitalised: un-normalised, `True` fell through to
+          #    the tokenless deploy and failed on `git push`.
           docker run --rm -v "$PWD/smoke":/github/workspace -w /github/workspace \
             -e GITHUB_ACTIONS=true \
             -e GITHUB_REPOSITORY="$REPO" \
             -e GITHUB_ACTOR="$ACTOR" \
-            -e BUILD_ONLY=true \
+            -e BUILD_ONLY=True \
             -e OUT_DIR=dist \
             hwaro:ci
 
