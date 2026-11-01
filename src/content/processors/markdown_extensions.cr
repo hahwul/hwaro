@@ -315,7 +315,9 @@ module Hwaro
               pos = close.byte_begin(0)
             elsif m[0] == "<!--"
               # No `-->` after one `<!--` means none after any later one.
-              close = Utils::ByteScan.byte_index(html, "-->", m.byte_end(0)) if comments_close
+              # From the `<!--`'s own dashes: `<!-->` and `<!--->` are whole
+              # (empty) comments.
+              close = Utils::ByteScan.byte_index(html, "-->", m.byte_begin(0) + 2) if comments_close
               comments_close = !close.nil?
               spans << (m.byte_begin(0)...close + 3) if close && comments
               pos = close ? close + 3 : m.byte_end(0)

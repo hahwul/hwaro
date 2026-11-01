@@ -2459,6 +2459,14 @@ describe "Hwaro::Content::Processors::MarkdownExtensions raw-text bodies" do
       .should eq(["d"])
   end
 
+  # Regression: `<!-->` and `<!--->` are whole (empty) comments to a browser;
+  # the scan ran them on to the next `-->`, past the script between.
+  it "ends an abruptly closed comment at its own `>`" do
+    bodies.call(%(<!--><script>a</script><!---><script>b</script><!----><script>c</script><!-- x -->)).should eq(["a", "b", "c"])
+    html = Hwaro::Processor::Markdown.render(%(<!-->\n\n<script>var s = "<img src=x>";</script>\n\n<!-- n -->\n), lazy_loading: true)[0]
+    html.should contain(%(var s = "<img src=x>";))
+  end
+
   it "does not close a body at a longer tag name" do
     bodies.call(%(<style>a</styles>b</style>)).should eq(["a</styles>b"])
   end
