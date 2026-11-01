@@ -268,14 +268,20 @@ module Hwaro
           # accumulator (the full build renders summaries post-filter too),
           # and after the relinks above, which a summary shortcode printing
           # `page.translations` or `page.lower` reads.
-          render_page_summaries(changed_pages + linkers, site, templates, highlight, link_targets: all_pages)
+          # A page whose relationship moved re-renders its summary too when
+          # a shortcode in it can print the relationship.
+          moved = relationship_moved_pages(site, pages_map, reparsed, changed_pages,
+            relinked_counterparts, renav_pages, affected_series, related_pages_updated, excluded_paths)
+          summarized = (changed_pages + linkers).map(&.path).to_set
+          summary_pages = changed_pages + linkers
+          moved.each { |p| summary_pages << p if summary_shortcodes?(p) && summarized.add?(p.path) }
+          render_page_summaries(summary_pages, site, templates, highlight, link_targets: all_pages)
           # `site.authors` embeds each page's title and summary (Transform
           # builds it once per full build).
           aggregate_site_authors(site)
 
           # --- 3. Determine the full set of pages that need re-rendering ---
-          pages_to_render = relationship_render_set(site, pages_map, reparsed, changed_pages,
-            relinked_counterparts, renav_pages, affected_series, related_pages_updated, excluded_paths)
+          pages_to_render = relationship_render_set(site, reparsed, changed_pages, moved, excluded_paths)
           backlinks_moved_pages(site, templates, backlink_digests).each { |p| pages_to_render << p }
           linkers.each { |p| pages_to_render << p }
 
@@ -290,16 +296,14 @@ module Hwaro
           fanout.each { |p| pages_to_render << p }
           regained.each { |p| pages_to_render << p }
 
-          # A re-rendered page's summary prints what its shortcodes read (a
-          # `get_page` title, `page.translations`, `page.lower`), and only
-          # the changed pages and linkers got theirs recomputed above. Redo
-          # every other page in the render set whose summary source can hold
+          # A fan-out page's summary prints what its shortcodes read (a
+          # `get_page` title), and only the pages above got theirs
+          # recomputed. Redo the fan-out pages whose summary source can hold
           # a shortcode — before the globals below embed the summaries — and
-          # the author lists that embed them too.
-          summarized = (changed_pages + linkers).map(&.path).to_set
-          resummarize = pages_to_render.select do |p|
-            !summarized.includes?(p.path) && content_may_contain_shortcodes?(p.summary || p.raw_content)
-          end
+          # the author lists that embed them too. Not every page of the
+          # render set: a section edit re-renders its whole subtree, whose
+          # summaries it moved nothing in.
+          resummarize = fanout.select { |p| summary_shortcodes?(p) && summarized.add?(p.path) }
           unless resummarize.empty?
             render_page_summaries(resummarize, site, templates, highlight, link_targets: all_pages)
             aggregate_site_authors(site)
@@ -450,8 +454,9 @@ module Hwaro
           # bare mtime touch). Flips INTO the set escalate to a full rebuild
           # via the pages_map miss above, so exclusions are the only
           # membership change this path can see.
-          force_pages = relationship_render_set(site, pages_map, reparsed, changed_pages,
+          moved = relationship_moved_pages(site, pages_map, reparsed, changed_pages,
             relinked_counterparts, renav_pages, affected_series, related_pages_updated, excluded_paths)
+          force_pages = relationship_render_set(site, reparsed, changed_pages, moved, excluded_paths)
           backlinks_moved_pages(site, @templates, backlink_digests).each { |p| force_pages << p }
           linkers_of_moved_pages(site, page_urls).each { |p| force_pages << p }
           run_rerender(options, force_pages: force_pages.to_a, membership_changed: !excluded_pages.empty?,
@@ -469,18 +474,12 @@ module Hwaro
         # a slug edit) for the rest of the session.
         private def relationship_render_set(
           site : Models::Site,
-          pages_map : Hash(String, Models::Page),
           reparsed : ReparsedPages,
           changed_pages : Array(Models::Page),
-          relinked_counterparts : Array(Models::Page),
-          renav_pages : Enumerable(Models::Page),
-          affected_series : Set(String),
-          related_pages_updated : Enumerable(String),
+          moved : Set(Models::Page),
           excluded_paths : Set(String),
         ) : Set(Models::Page)
           pages_to_render = Set(Models::Page).new(changed_pages)
-          # Translations / other versions whose switcher (or canonical) moved.
-          relinked_counterparts.each { |p| pages_to_render << p }
 
           # Section index pages whose content lists include the changed pages.
           # Include every language variant of the section (multilingual sites
@@ -514,6 +513,36 @@ module Hwaro
               pages_to_render << s if s.section.empty?
             end
           end
+
+          moved.each { |p| pages_to_render << p }
+          # A page this pass just drafted / expired / future-dated is already
+          # pruned and out of site.pages, but the OLD neighbours captured
+          # before the re-parse still reference it — rendering it would write
+          # the file straight back.
+          pages_to_render.reject! { |p| excluded_paths.includes?(p.path) } unless excluded_paths.empty?
+          pages_to_render
+        end
+
+        # The pages other than the changed ones whose relationship to them
+        # moved: their translations/versions, their old and new reading-order
+        # neighbours, the pages of a language whose homepage flipped, every
+        # member of a series they joined or left, and every page whose related
+        # posts were recomputed. These are also the pages whose summary
+        # shortcodes (`page.translations`, `page.lower`, …) can print
+        # something new.
+        private def relationship_moved_pages(
+          site : Models::Site,
+          pages_map : Hash(String, Models::Page),
+          reparsed : ReparsedPages,
+          changed_pages : Array(Models::Page),
+          relinked_counterparts : Array(Models::Page),
+          renav_pages : Enumerable(Models::Page),
+          affected_series : Set(String),
+          related_pages_updated : Enumerable(String),
+          excluded_paths : Set(String),
+        ) : Set(Models::Page)
+          # Translations / other versions whose switcher (or canonical) moved.
+          pages_to_render = Set(Models::Page).new(relinked_counterparts)
 
           # Previous / next pages. `renav_pages` is every page whose lower/higher
           # pointer changed in the global re-link (covers block reorders from a
