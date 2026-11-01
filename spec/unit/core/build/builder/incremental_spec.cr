@@ -770,6 +770,7 @@ describe "Builder#render_deferred" do
         listing = "{% for p in site.pages %}[{{ p.title }}={{ p.image }}]{% endfor %}"
         File.write("templates/index.html", listing)
         File.write("templates/page.html", listing)
+        File.write("templates/404.html", listing)
 
         builder = Hwaro::Core::Build::Builder.new
         Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
@@ -786,6 +787,7 @@ describe "Builder#render_deferred" do
         File.read("public/index.html").should eq(expected)
         File.read("public/new/index.html").should eq(expected)
         File.read("public/old/index.html").should eq(expected)
+        File.read("public/404.html").should eq(expected)
       end
     end
   end

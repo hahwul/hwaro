@@ -1554,6 +1554,8 @@ module Hwaro
           # notify_build_error; the server keeps running.
           raise_on_broken_internal_links!(output_dir)
           regenerate_amp_mirrors(renderable, site, output_dir, verbose)
+          # The cold pass wrote the 404 page from the same pre-hook values.
+          generate_404_page(site, templates, output_dir, minify, verbose, global_vars)
 
           # Refresh feeds / sitemap / search now that every page has rendered
           # content. Without this, feed descriptions and the search index
