@@ -388,6 +388,12 @@ module Hwaro
         # (auto OG `image`, resized-image summaries), so the background pass
         # renders them again.
         @priority_pages : Array(Models::Page) = [] of Models::Page
+        # The `--cache` keys a fast-start cold pass computed but could not
+        # persist while pages were still deferred: the page/section-set
+        # fingerprints, the render-globals digest, the render-input values
+        # and whether the pass rendered every page. render_deferred records
+        # them once every page is on disk.
+        @deferred_cache_keys : {String, String, String, Hash(String, String), Bool}? = nil
         # Deterministic owner (page.path) of every claimed output URL — page
         # URLs and alias destinations. A page that is not the recorded winner
         # for a URL must not write it; under parallel render the colliding

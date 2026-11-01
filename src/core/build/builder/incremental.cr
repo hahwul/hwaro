@@ -1573,6 +1573,15 @@ module Hwaro
           # before any watch rebuild loses the deferred pages' cache entries
           # and the next `--cache` cold start has to re-render them.
           sweep_stale_derived_outputs(output_dir)
+          # Only now does the output match the keys the cold pass computed;
+          # left unrecorded, a later `--cache` start compared against an
+          # older session's and skipped pages this session had changed.
+          if options.cache && (keys = @deferred_cache_keys)
+            page_set_fp, section_set_fp, render_globals, render_input_values, rendered_every_page = keys
+            cache.record_set_fingerprints(page_set_fp, section_set_fp)
+            record_render_reads(cache, render_globals, render_input_values, rendered_every_page)
+          end
+          @deferred_cache_keys = nil
           cache.save if options.cache
           write_html_stats(complete: false)
 

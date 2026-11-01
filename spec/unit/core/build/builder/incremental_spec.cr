@@ -789,4 +789,60 @@ describe "Builder#render_deferred" do
       end
     end
   end
+
+  # A fast-start `--cache` session must leave the cache describing what it
+  # wrote. It never recorded the page-set fingerprint or the render-input
+  # digest, so a later session whose inputs were back at an OLDER session's
+  # values matched those stale keys and kept this session's pages.
+  it "records the --cache keys once the deferred pages are written" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        write_post = ->(name : String, title : String, date : String) do
+          File.write("content/#{name}.md", "+++\ntitle = \"#{title}\"\ndate = #{date}\n+++\n")
+        end
+        write_post.call("a", "A", "2020-01-01")
+        write_post.call("b", "B", "2020-01-02")
+        write_post.call("c", "C", "2020-01-03")
+        File.write("templates/index.html", %({% for p in site.pages %}[{{ p.title }}]{% endfor %}{{ env("HWARO_SPEC_RENDER_INPUT", default="unset") }}))
+        File.write("templates/page.html", "{{ page.title }}")
+
+        session = ->(fast_start : Bool) do
+          builder = Hwaro::Core::Build::Builder.new
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, fast_start: fast_start, fast_start_count: 1)
+          options.serve_mode = true
+          builder.run(options).should be_true
+          if fast_start
+            builder.has_deferred_pages?.should be_true
+            deferred = options.dup
+            deferred.fast_start = false
+            deferred.preserve_output = true
+            builder.render_deferred(deferred)
+          end
+        end
+
+        ENV["HWARO_SPEC_RENDER_INPUT"] = "one"
+        session.call(false)
+        File.read("public/index.html").should eq("[A][B][C]one")
+
+        # Two edited posts: the newer one is the priority page, A is deferred.
+        write_post.call("a", "A2", "2020-01-01")
+        write_post.call("b", "B2", "2020-01-02")
+        ENV["HWARO_SPEC_RENDER_INPUT"] = "two"
+        session.call(true)
+        File.read("public/index.html").should eq("[A2][B2][C]two")
+
+        write_post.call("a", "A", "2020-01-01")
+        write_post.call("b", "B", "2020-01-02")
+        ENV["HWARO_SPEC_RENDER_INPUT"] = "one"
+        session.call(false)
+        File.read("public/index.html").should eq("[A][B][C]one")
+      ensure
+        ENV.delete("HWARO_SPEC_RENDER_INPUT")
+      end
+    end
+  end
 end
