@@ -61,7 +61,7 @@ module Hwaro::Core::Build::Phases::Render
       "language"          => Crinja::Value.new(p.language || default_language),
       "translations"      => Crinja::Value.new(translations),
       "weight"            => Crinja::Value.new(p.weight),
-      "summary"           => Crinja::Value.new(p.summary_html || p.effective_summary || ""),
+      "summary"           => Crinja::Value.new(p.template_summary),
       "summary_truncated" => Crinja::Value.new(p.summary_truncated),
       "word_count"        => Crinja::Value.new(p.word_count),
       "reading_time"      => Crinja::Value.new(p.reading_time),

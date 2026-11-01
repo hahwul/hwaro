@@ -151,7 +151,7 @@ module Hwaro::Core::Build::Phases::Render
       "taxonomies"        => cached_raw["taxonomies"].as(Crinja::Value),
       "assets"            => assets_crinja,
       "extra"             => extra_crinja,
-      "summary"           => Crinja::Value.new(page.summary_html || page.effective_summary || ""),
+      "summary"           => Crinja::Value.new(page.template_summary),
       "summary_truncated" => Crinja::Value.new(page.summary_truncated),
       "word_count"        => Crinja::Value.new(page.word_count),
       "reading_time"      => Crinja::Value.new(page.reading_time),
@@ -243,7 +243,7 @@ module Hwaro::Core::Build::Phases::Render
     vars["__page_path__"] = Crinja::Value.new(page.path)
 
     # Flat variables for new properties
-    vars["page_summary"] = Crinja::Value.new(page.summary_html || page.effective_summary || "")
+    vars["page_summary"] = Crinja::Value.new(page.template_summary)
     vars["page_word_count"] = Crinja::Value.new(page.word_count)
     vars["page_reading_time"] = Crinja::Value.new(page.reading_time)
     vars["page_permalink"] = Crinja::Value.new(page.permalink || "")

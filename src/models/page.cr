@@ -628,6 +628,15 @@ module Hwaro
         @summary || @description || auto_summary_html
       end
 
+      # `page.summary` as templates see it: the rendered summary, else the
+      # description or excerpt. Never the raw `<!-- more -->` chunk — its
+      # shortcodes and Markdown unrendered — which is all a page has before
+      # the summary pass renders it (and what a summary shortcode reading
+      # that page would otherwise publish).
+      def template_summary : String
+        summary_html || (@summary ? nil : effective_summary) || ""
+      end
+
       # The automatic excerpt as HTML: text is escaped (it was decoded from
       # the rendered body, so `<`/`&` are literal characters) and wrapped in
       # one paragraph. Nil when there is no automatic summary.

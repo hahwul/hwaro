@@ -214,6 +214,36 @@ describe "Builder#run_incremental summary shortcodes" do
       end
     end
   end
+
+  # C's summary prints A's, which prints B's title: both are recomputed in
+  # one pass, and C must read A's NEW summary, as a cold build does.
+  it "refreshes a summary that prints another recomputed summary" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates/shortcodes")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("templates/section.html", "{% for p in section.pages %}[{{ p.title }}::{{ p.summary | safe }}]{% endfor %}")
+        File.write("templates/shortcodes/t.html", "{% set q = get_page(path=path) %}({{ q.title }})")
+        File.write("templates/shortcodes/s.html", "{% set q = get_page(path=path) %}<<{{ q.summary }}>>")
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/a.md", "+++\ntitle = \"A\"\n+++\nSee {{ t(path=\"b.md\") }} now.\n\n<!-- more -->\n\nRest.\n")
+        File.write("content/c.md", "+++\ntitle = \"C\"\n+++\nReads {{ s(path=\"a.md\") }} end.\n\n<!-- more -->\n\nRest.\n")
+        File.write("content/b.md", "+++\ntitle = \"B1\"\n+++\nb\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/b.md"], options)
+
+        File.write("content/b.md", "+++\ntitle = \"B2\"\n+++\nb\n")
+        builder.run_incremental(["content/b.md"], options).should be_true
+        File.read("public/index.html").should contain("[C::<p>Reads <<<p>See (B2) now.</p>\n>> end.</p>")
+      end
+    end
+  end
 end
 
 describe "Builder#run_incremental version roots" do

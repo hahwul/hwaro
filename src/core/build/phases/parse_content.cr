@@ -123,6 +123,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     global_vars : Hash(String, Crinja::Value)? = nil,
     images_ready : Bool = true,
     rerender : Bool = false,
+    readers_pass : Bool = false,
   )
     md_config = site.config.markdown
     pages_by_path : Hash(String, Models::Page)? = nil
@@ -147,6 +148,9 @@ module Hwaro::Core::Build::Phases::ParseContent
       memo = globals_memo
       memo ? memo : (globals_memo = build_global_vars(site))
     end
+    # Taken before anything below is assigned, so a summary shortcode reads
+    # the same snapshot of the other summaries whatever the page order.
+    globals.call if global_vars.nil? && pages.any? { |p| summary_shortcodes?(p) }
 
     # The excerpt is a second markdown render of every page, so it is only
     # computed when something can print it. When that answer changed since
@@ -230,6 +234,32 @@ module Hwaro::Core::Build::Phases::ParseContent
         @section_pages_url_index_cache.clear
       end
     end
+
+    # A summary shortcode printing ANOTHER page's summary (or word count)
+    # read the snapshot taken before this pass, where a summary recomputed
+    # here was still empty. Redo those once against the summaries just
+    # assigned — one level deep: a chain of such summaries is not resolved.
+    return if readers_pass
+    readers = pages.select { |p| summary_reads_page_summaries?(p, templates) }
+    unless readers.empty?
+      render_page_summaries(readers, site, templates, use_highlight, link_targets: link_targets,
+        images_ready: images_ready, rerender: true, readers_pass: true)
+    end
+  end
+
+  # The summary source (`<!-- more -->` chunk, else the body an excerpt is
+  # cut from) may call a shortcode.
+  private def summary_shortcodes?(page : Models::Page) : Bool
+    content_may_contain_shortcodes?(page.summary || page.raw_content)
+  end
+
+  # The shortcodes in a page's summary source read a content-derived field
+  # (`summary`, `word_count`, …) off another page — see relation_page_fields.
+  private def summary_reads_page_summaries?(page : Models::Page, templates : Hash(String, String)) : Bool
+    return false unless summary_shortcodes?(page)
+    names = page_shortcode_templates(page)
+    return false if names.empty? && @template_deps
+    relation_page_fields(closure_blob(names, templates)).content_derived
   end
 
   # Redo the ParseContent summaries the BeforeRender image hooks change:

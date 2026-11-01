@@ -249,3 +249,30 @@ describe "summary shortcodes and later page fields" do
     end
   end
 end
+
+# C's summary prints A's summary through a shortcode. While the summary pass
+# runs, A's page value held its raw `<!-- more -->` chunk, so C published
+# A's unrendered `{{ t(...) }}` source.
+describe "summary shortcodes reading another page's summary" do
+  it "prints the other page's rendered summary" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "_index.md" => "+++\ntitle = \"Home\"\n+++\n",
+        "a.md"      => "+++\ntitle = \"A\"\n+++\nSee {{ t(path=\"b.md\") }} now.\n\n<!-- more -->\n\nRest.\n",
+        "b.md"      => "+++\ntitle = \"Bee\"\n+++\nB body\n",
+        "c.md"      => "+++\ntitle = \"C\"\n+++\nReads {{ s(path=\"a.md\") }} end.\n\n<!-- more -->\n\nRest.\n",
+      },
+      template_files: {
+        "page.html"         => "{{ content }}",
+        "section.html"      => "{% for p in section.pages %}[{{ p.title }}::{{ p.summary | safe }}]{% endfor %}",
+        "shortcodes/t.html" => "{% set q = get_page(path=path) %}({{ q.title }})",
+        "shortcodes/s.html" => "{% set q = get_page(path=path) %}<<{{ q.summary }}>>",
+      },
+    ) do |dir|
+      html = File.read(File.join(dir, "public", "index.html"))
+      html.should_not contain("{{")
+      html.should contain("[C::<p>Reads <<<p>See (Bee) now.</p>\n>> end.</p>")
+    end
+  end
+end
