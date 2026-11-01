@@ -285,8 +285,11 @@ module Hwaro
           # cdn.ampproject.org). Use [\s\S]*? instead of .*? to match across
           # newlines. An `async` attribute is NOT an exemption: it let every
           # third-party async script (analytics, the tweet shortcode's
-          # widgets.js) through, and AMP forbids all of them.
-          result = result.gsub(/<script(?![^>]*type=["']application\/ld\+json["'])(?![^>]*src=["']https:\/\/cdn\.ampproject\.org)[^>]*>[\s\S]*?<\/script>/mi, "")
+          # widgets.js) through, and AMP forbids all of them. A script ends at
+          # its end tag in any form (`</script >`) — an exact `</script>` ran
+          # on through the page to the next one — and `<script-loader>` is
+          # not one.
+          result = result.gsub(/<script(?=[\s\/>])(?![^>]*type=["']application\/ld\+json["'])(?![^>]*src=["']https:\/\/cdn\.ampproject\.org)[^>]*>[\s\S]*?<\/script(?:[\s\/][^>]*)?>/mi, "")
 
           # Remove disallowed external stylesheets. AMP forbids
           # `<link rel="stylesheet">` except from allowlisted font providers;

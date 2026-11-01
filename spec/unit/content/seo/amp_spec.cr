@@ -382,6 +382,24 @@ describe Hwaro::Content::Seo::Amp do
       result.should_not contain("alert(1)")
     end
 
+    # Regression: the removal ended a script only at an exact `</script>`, so
+    # one closed by `</script >` ran on to the next script's end and took the
+    # page content between with it; `<script-loader>` opened one too.
+    it "removes a script closed with whitespace, and only that script" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+
+      html = %(<html><head></head><body><script>a()</script ><p>Keep one</p><SCRIPT>b()</SCRIPT\n>) +
+             %(<script-loader>w</script-loader><p>Keep two</p><script>c()</script></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should contain("<p>Keep one</p>")
+      result.should contain("<script-loader>w</script-loader><p>Keep two</p>")
+      result.should_not contain("a()")
+      result.should_not contain("b()")
+      result.should_not contain("c()")
+    end
+
     it "removes multiline script tags" do
       page = Hwaro::Models::Page.new("test.md")
       page.url = "/test/"
