@@ -252,6 +252,51 @@ describe "serve watch parity: [[content.generate]] body templates" do
     end
   end
 
+  # A non-literal include leaves the template graph `dynamic?`: it cannot
+  # say which partial the spec reaches, so any template edit must count.
+  it "regenerates the pages when a spec's include is dynamic" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_generate_site
+        config = File.read("config.toml").sub(%(body_template = "gen/product.md"),
+          %(description = "{% include 'partials/' ~ 'spec.html' %}"))
+        File.write("config.toml", config)
+        File.write("templates/page.html", "<html><body>{{ page.description }}</body></html>")
+        server = Hwaro::Services::Server.new
+        options = watch_parity_options
+        server.watch_parity_builder.run(options).should be_true
+        File.read("public/products/w1/index.html").should contain("spec-v1")
+
+        File.write("templates/partials/spec.html", "spec-v2")
+        changeset = watch_parity_changeset(templates: ["templates/partials/spec.html"])
+        server.watch_parity_effective_strategy(changeset, "public").should eq(:full)
+        server.watch_parity_apply_changeset(changeset, options)
+
+        File.read("public/products/w1/index.html").should contain("spec-v2")
+      end
+    end
+  end
+
+  it "regenerates the pages when the body template's include is dynamic" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_generate_site
+        File.write("templates/gen/product.md", "Body {% include 'partials/' ~ 'spec.html' %}")
+        server = Hwaro::Services::Server.new
+        options = watch_parity_options
+        server.watch_parity_builder.run(options).should be_true
+        File.read("public/products/w1/index.html").should contain("spec-v1")
+
+        File.write("templates/partials/spec.html", "spec-v2")
+        changeset = watch_parity_changeset(templates: ["templates/partials/spec.html"])
+        server.watch_parity_effective_strategy(changeset, "public").should eq(:full)
+        server.watch_parity_apply_changeset(changeset, options)
+
+        File.read("public/products/w1/index.html").should contain("spec-v2")
+      end
+    end
+  end
+
   it "keeps the cheap strategy for a template the body never reads" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do

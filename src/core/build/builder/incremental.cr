@@ -1476,7 +1476,7 @@ module Hwaro
             next false unless File.file?(body_file)
             key = name.sub(TEMPLATE_EXTENSION_REGEX, "")
             graph = TemplateDeps.new(snapshot.merge({key => File.read(body_file)}))
-            !(graph.closure(key) & changed_names).empty?
+            reaches?(graph, key, changed_names)
           end
           return true if body_changed
           return false if inline_specs.empty?
@@ -1485,7 +1485,14 @@ module Hwaro
           # can never name a real template.
           key = "\0content.generate"
           graph = TemplateDeps.new(snapshot.merge({key => inline_specs.join('\n')}))
-          !(graph.closure(key) & changed_names).empty?
+          reaches?(graph, key, changed_names)
+        end
+
+        # A dynamic graph (`{% include 'partials/' ~ name %}` anywhere) cannot
+        # say what `key` reaches, so any template edit counts (TemplateDeps).
+        private def reaches?(graph : TemplateDeps, key : String, changed_names : Set(String)) : Bool
+          return false if changed_names.empty?
+          graph.dynamic? || !(graph.closure(key) & changed_names).empty?
         end
 
         # Are there any pages stashed by `--fast-start` waiting to render?
