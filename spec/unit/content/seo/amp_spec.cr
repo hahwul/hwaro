@@ -457,6 +457,22 @@ describe Hwaro::Content::Seo::Amp do
       custom.should_not contain("@layer")
     end
 
+    # Regression: a theme <style> ended only at an exact `</style>`, so one
+    # closed by `</style >` was folded into amp-custom together with the page
+    # up to the next one; `<style-x>` opened one too.
+    it "folds a theme style closed with whitespace, and only that style" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      html = "<html><head><style>a{color:red}</style ></head><body><p>Keep me</p><style>b{}</style>" \
+             "<style-x>c</style-x><p>Keep two</p></body></html>"
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, Hwaro::Models::Config.new)
+      custom = result[/<style amp-custom>([\s\S]*?)<\/style>/, 1]
+      custom.should contain("a{color:red}")
+      custom.should contain("b{}")
+      custom.should_not contain("Keep")
+      result.should contain("<body><p>Keep me</p><style-x>c</style-x><p>Keep two</p></body>")
+    end
+
     # Regression: the codepen shortcode / CodePen embed snippet (height only,
     # allowfullscreen="true", frameborder="no") became an invalid amp-iframe.
     it "converts a height-only embed iframe into a valid amp-iframe" do

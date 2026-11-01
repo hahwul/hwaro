@@ -439,9 +439,10 @@ module Hwaro
             # blocks, and fold it into the single amp-custom injected below.
             # Done only on this path so the CSS is never stripped without being
             # re-injected (a theme that already ships its own boilerplate keeps
-            # its <style> blocks untouched).
+            # its <style> blocks untouched). A block ends at its end tag in any
+            # form (`</style >`), and `<style-x>` is not one.
             theme_css = [] of String
-            result = result.gsub(/<style(?![^>]*amp-boilerplate)(?![^>]*amp-custom)[^>]*>([\s\S]*?)<\/style>/mi) do
+            result = result.gsub(/<style(?=[\s\/>])(?![^>]*amp-boilerplate)(?![^>]*amp-custom)[^>]*>([\s\S]*?)<\/style#{AMP_END_TAG_TAIL}/mi) do
               theme_css << $1
               ""
             end
