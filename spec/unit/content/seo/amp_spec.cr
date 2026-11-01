@@ -163,6 +163,19 @@ describe Hwaro::Content::Seo::Amp do
         result.should contain(%(src="/posts/b1/cover.png"))
         result.should contain(%(href="/posts/b2/"))
       end
+
+      it "resolves single-quoted and unquoted values too" do
+        page = Hwaro::Models::Page.new("posts/b1/index.md")
+        page.url = "/posts/b1/"
+        config = Hwaro::Models::Config.new
+        config.base_url = "https://example.com"
+
+        sq = %(<html><head></head><body><img src='cover.png' width="1" height="1"> <img src=cover.png width="1" height="1"> <a href='../b2/'>o</a></body></html>)
+        result = Hwaro::Content::Seo::Amp.convert_to_amp(sq, page, config)
+        result.should contain(%(src='https://example.com/posts/b1/cover.png'))
+        result.should contain(%(src=https://example.com/posts/b1/cover.png ))
+        result.should contain(%(href='https://example.com/posts/b2/'))
+      end
     end
 
     it "converts img to amp-img with fill layout when no dimensions" do
