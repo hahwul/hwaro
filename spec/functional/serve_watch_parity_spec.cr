@@ -930,6 +930,45 @@ describe "serve watch parity: --cache keys across sessions" do
       end
     end
   end
+
+  # Every build renders the 404 page, the taxonomy pages and feed templates
+  # again, and the cold build does not record what they read. A watch pass
+  # did, so their reads looked new and the next start rendered every page.
+  {"content", "content+template"}.each do |strategy|
+    it "keeps the cache when only 404, taxonomy and feed templates read an input (#{strategy})" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = "https://example.com"\n[[taxonomies]]\nname = "tags"\n[feeds]\nenabled = true\n))
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("templates")
+          File.write("templates/page.html", "{{ page.title }}")
+          File.write("templates/taxonomy_term.html", %({{ page.title }}{{ env(name="HWARO_SPEC_TERM", default="u") }}))
+          File.write("templates/404.html", %({{ env(name="HWARO_SPEC_404", default="u") }}))
+          File.write("templates/rss.xml", %(<rss>{{ env(name="HWARO_SPEC_FEED", default="u") }}</rss>))
+          File.write("content/a.md", "+++\ntitle = \"A\"\ntags = [\"x\"]\n+++\na")
+          File.write("content/b.md", "+++\ntitle = \"B\"\ntags = [\"y\"]\n+++\nb")
+          options = watch_parity_options
+          options.cache = true
+
+          builder = Hwaro::Services::Server.new.watch_parity_builder
+          builder.run(options).should be_true
+          File.write("content/a.md", "+++\ntitle = \"A\"\ntags = [\"x\"]\n+++\na2")
+          if strategy == "content"
+            builder.run_incremental(["content/a.md"], options).should be_true
+          else
+            File.write("templates/unrelated.html", "<p>unused</p>")
+            builder.run_incremental_then_rerender(["content/a.md"], options).should be_true
+          end
+          # The next pass takes what the last one rendered after recording.
+          File.write("content/b.md", "+++\ntitle = \"B\"\ntags = [\"y\"]\n+++\nb2")
+          builder.run_incremental(["content/b.md"], options).should be_true
+
+          log = with_captured_log { Hwaro::Services::Server.new.watch_parity_builder.run(options).should be_true }
+          log.should_not contain("invalidating all entries")
+        end
+      end
+    end
+  end
 end
 
 describe "serve watch parity: a page turning headless under auto OG images" do

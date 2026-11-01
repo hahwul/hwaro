@@ -584,7 +584,29 @@ module Hwaro
         end
 
         def self.record_render_read(key : String) : Nil
-          @@render_reads_mutex.synchronize { @@render_reads << key }
+          @@render_reads_mutex.synchronize { @@render_reads << key if @@render_reads_paused == 0 }
+        end
+
+        # Nesting depth of `without_render_reads`.
+        @@render_reads_paused = 0
+
+        # Run the block without recording its reads. For outputs every build
+        # renders again, cached or not (the 404 page, taxonomy pages, user
+        # feed templates): their reads key no cached page, and the cold build
+        # records the reads before it renders them. A serve pass recording
+        # them read as "moved during serve" (record_serve_cache_keys), so the
+        # next `serve --cache` start rendered every page. Nothing else
+        # renders while these run.
+        def self.without_render_reads(&)
+          @@render_reads_mutex.synchronize { @@render_reads_paused += 1 }
+          yield
+        ensure
+          # A memo handed out while paused (image_hooks' variant paths) went
+          # unrecorded: hand it out again.
+          @@render_reads_mutex.synchronize do
+            @@render_reads_paused -= 1
+            @@render_reads_generation &+= 1
+          end
         end
 
         # Record a file read by its project-relative path (the cache outlives
