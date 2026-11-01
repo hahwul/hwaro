@@ -5,6 +5,7 @@ require "../../../../src/models/site"
 require "../../../../src/models/page"
 require "../../../../src/core/lifecycle"
 require "../../../../src/config/options/build_options"
+require "../../../support/build_helper"
 
 describe Hwaro::Content::Hooks::OgImageHooks do
   describe "#register_hooks" do
@@ -157,6 +158,26 @@ describe Hwaro::Content::Hooks::OgImageHooks do
 
         result = manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
         result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
+      end
+    end
+  end
+
+  # A `static/` file at an auto OG image's path: a cold build copies it and
+  # then generates over it. A warm `--cache` build's static copy wrote it
+  # over the generated image (the bytes differ) and the generator then
+  # counted a manifest hit, publishing the user's file.
+  describe "static file at an OG image path" do
+    it "keeps the generated image on warm --cache builds" do
+      config = %(title = "T"\nbase_url = "http://localhost"\n\n[og.auto_image]\nenabled = true\nformat = "svg"\n)
+      build_site(config, content_files: {"about.md" => %(+++\ntitle = "About"\n+++\nbody)},
+        static_files: {"og-images/about.svg" => "AUTHORED"}, cache: true) do |_dir, _builder|
+        File.read("public/og-images/about.svg").should start_with("<?xml")
+        2.times do
+          builder = Hwaro::Core::Build::Builder.new
+          Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+          builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true)).should be_true
+          File.read("public/og-images/about.svg").should start_with("<?xml")
+        end
       end
     end
   end

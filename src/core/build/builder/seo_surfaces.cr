@@ -90,7 +90,9 @@ module Hwaro
             ai = site.config.og.auto_image
             if ai.enabled && !opts.skip_og_image && !(ai.lazy_generate && opts.serve_mode)
               begin
-                Content::Seo::OgImage.generate(pages, site.config, output_dir, verbose, parallel: false)
+                cwd = Dir.current
+                Content::Seo::OgImage.generate(pages, site.config, output_dir, verbose, parallel: false,
+                  static_copied: ->(path : String) { static_copied_output?(path, cwd) })
               rescue ex
                 # Same warn-and-continue contract as the surface pool below —
                 # a transient OG failure must not skip cache.save / reload.
