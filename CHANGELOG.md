@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.22.1
+
+### Fixed
+- GitHub Action: SHA-pinned refs resolve to their release image, `build_only` is case-insensitive, and inputs no longer interpolate into the run script; docs cover pinning to a tag or SHA (#911)
+- HTML passes find `<script>`/`<style>`/`<textarea>` bodies and comments as a browser does: heading ids/TOC, responsive images, lazy loading, content links and AMP conversion no longer rewrite inside raw-text bodies or lose content after `</script >`, `</iframe >`, `</style >` or `<!-->` (#912, #913)
+- Content links rewrite single-quoted, unquoted and uppercase `href`/`src` (#912)
+- Auto OG images: lazy images are served during a full rebuild and no longer regenerate on every request; generated images win over static files at their path (#912, #913)
+- `hwaro serve`: summaries, term `_index` bodies, breadcrumbs and listings refresh when a shortcode or relationship they read changes; `--fast-start` re-renders priority pages and 404 after the background pass, streams under `--stream`, and records `--cache` keys (#912, #913)
+- `[[content.generate]]`: regenerated in serve when an included partial changes; authored twins (`<slug>.<lang>.md`, subsection `_index.md`) win only the URL they publish; `tool list`/`stats`/`doctor` resolve `{% include %}` in title/description templates (#913)
+- A page that loses a duplicate output URL stays out of prev/next, series, related posts and backlinks (#913)
+- `--cache`: listings refresh when a translation becomes a redirect stub; serve sessions no longer serve an edit reverted between sessions (#913)
+
 ## v0.22.0
 
 ### Added
