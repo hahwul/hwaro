@@ -108,6 +108,9 @@ module Hwaro
         TEMPLATE_EXTENSION_REGEX = /\.(html|j2|jinja2|jinja|ecr)$/
 
         @site : Models::Site?
+        # The last successfully built site, held during a serve-mode full
+        # rebuild (see #previous_site).
+        @previous_site : Models::Site?
         @templates : Hash(String, String)?
         # Template name → source file path (e.g. "page" => "templates/page.html").
         # Lets compiled templates carry their filename so Crinja errors report
@@ -751,6 +754,15 @@ module Hwaro
           @site
         end
 
+        # The site the build before the current one produced (serve mode
+        # only). A full rebuild replaces `site` with a fresh one whose pages
+        # learn their lazy og:image URLs only in BeforeRender; until then the
+        # lazy OG handler answers from these pages instead of 404ing.
+        # Held only while a rebuild runs, and only with lazy OG images on.
+        def previous_site : Models::Site?
+          @previous_site
+        end
+
         # Register all cache layers with the unified manager
         private def setup_cache_manager
           @cache_manager.register("compiled_templates", "Compiled Crinja template ASTs", runtime: true) do
@@ -861,6 +873,11 @@ module Hwaro
           # prune the files those wrote.
           current_outputs = @site ? owned_output_paths(options.output_dir, previous_config) : Set(String).new
           @previous_page_outputs = @carry_prune_baselines ? @previous_page_outputs | current_outputs : current_outputs
+          # `||=`: a rebuild that failed left a partial @site and kept the last
+          # good one here; the successful end of #run releases it.
+          if options.serve_mode && config.og.auto_image.enabled && config.og.auto_image.lazy_generate
+            @previous_site ||= @site
+          end
           @site = nil
           @templates = nil
           @cache_manager.clear_runtime
@@ -958,6 +975,7 @@ module Hwaro
             end
           end
 
+          @previous_site = nil
           true
         end
 

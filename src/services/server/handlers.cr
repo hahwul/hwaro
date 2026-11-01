@@ -566,12 +566,17 @@ module Hwaro
         @mutex = Mutex.new
       end
 
+      private def image_owner(site : Models::Site, url_path : String) : Models::Page?
+        site.pages.find { |p| p.image == url_path } || site.sections.find { |s| s.image == url_path }
+      end
+
       def call(context)
         method = context.request.method
         return call_next(context) unless method == "GET" || method == "HEAD"
 
         config = @builder.config
-        site = @builder.site
+        # Early in a full rebuild `site` is nil (reset, then Initialize).
+        site = @builder.site || @builder.previous_site
         return call_next(context) unless config && site
         ai = config.og.auto_image
         return call_next(context) unless ai.enabled && ai.lazy_generate
@@ -582,8 +587,7 @@ module Hwaro
         return call_next(context) unless sanitized.ends_with?(".png") || sanitized.ends_with?(".svg")
 
         url_path = "/#{sanitized}"
-        page = site.pages.find { |p| p.image == url_path } ||
-               site.sections.find { |s| s.image == url_path }
+        page = image_owner(site, url_path) || @builder.previous_site.try { |prev| image_owner(prev, url_path) }
         return call_next(context) unless page
 
         # Serialize generation: the og:image and twitter:image fetches of one

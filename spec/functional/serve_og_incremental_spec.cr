@@ -64,6 +64,23 @@ private class OgSpecTerminal
   end
 end
 
+private class MidBuildOgProbe
+  include Hwaro::Core::Lifecycle::Hookable
+
+  property handler : Hwaro::Services::OgLazyImageHandler? = nil
+  property generated : Bool = false
+
+  def register_hooks(manager : Hwaro::Core::Lifecycle::Manager)
+    manager.on(Hwaro::Core::Lifecycle::HookPoint::AfterParseContent, name: "spec:mid-build-og-probe") do |_ctx|
+      if handler = @handler
+        og_request(handler, "/og-images/posts-hello.svg")
+        @generated = File.exists?("public/og-images/posts-hello.svg")
+      end
+      Hwaro::Core::Lifecycle::HookResult::Continue
+    end
+  end
+end
+
 private def og_request(handler : HTTP::Handler, path : String) : {HTTP::Server::Context, OgSpecTerminal}
   terminal = OgSpecTerminal.new
   handler.next = terminal
@@ -159,6 +176,27 @@ describe "serve lazy OG generation (A9)" do
         File.touch("public/og-images/posts-hello.svg", stamp)
         og_request(handler, "/og-images/posts-hello.svg")
         File.info("public/og-images/posts-hello.svg").modification_time.should be_close(stamp, 2.seconds)
+      end
+    end
+  end
+
+  it "still generates on request while a full rebuild has not assigned URLs yet" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_og_site(lazy: true)
+        builder = og_builder
+        probe = MidBuildOgProbe.new
+        builder.register(probe)
+        builder.run(og_options).should be_true
+
+        # A full rebuild swaps in a fresh site whose pages get their lazy
+        # og:image URLs only in BeforeRender; a preview fetch landing before
+        # that must still be answered from the previous build's pages.
+        probe.handler = Hwaro::Services::OgLazyImageHandler.new(builder, "public")
+        builder.run(og_options).should be_true
+        probe.generated.should be_true
+        # Released once the rebuild succeeds.
+        builder.previous_site.should be_nil
       end
     end
   end
