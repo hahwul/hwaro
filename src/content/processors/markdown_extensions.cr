@@ -293,8 +293,10 @@ module Hwaro
         # Byte ranges of raw-text element bodies, from the end of the opening
         # tag up to the close tag, so the opener's own attributes stay markup.
         # An unterminated element ends the scan and an unterminated comment is
-        # no comment; neither runs to the end.
-        def raw_text_spans(html : String) : Array(Range(Int32, Int32))
+        # no comment; neither runs to the end. `comments: true` also lists
+        # each comment (`<!--` through `-->`): only the ones outside the
+        # bodies, as a browser parses them (`"<!--"` in a script opens none).
+        def raw_text_spans(html : String, comments : Bool = false) : Array(Range(Int32, Int32))
           spans = [] of Range(Int32, Int32)
           pos = 0
           comments_close = true
@@ -315,6 +317,7 @@ module Hwaro
               # No `-->` after one `<!--` means none after any later one.
               close = Utils::ByteScan.byte_index(html, "-->", m.byte_end(0)) if comments_close
               comments_close = !close.nil?
+              spans << (m.byte_begin(0)...close + 3) if close && comments
               pos = close ? close + 3 : m.byte_end(0)
             else
               # A tag that never ends would be rescanned from every later
