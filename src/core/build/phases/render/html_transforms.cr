@@ -105,7 +105,7 @@ module Hwaro::Core::Build::Phases::Render
           # printed from it follow the image's bytes, so a cached page or a
           # serve session must re-render when it is replaced; an image that
           # does not exist yet is watched at its static/ location.
-          Content::Hooks::ImageHooks.watch_render_source(key).try { |source| Content::Processors::TemplateEngine.record_file_read(source) }
+          Content::Hooks::ImageHooks.watch_render_source(key).each { |source| Content::Processors::TemplateEngine.record_file_read(source) }
         end
         if widths && !widths.empty? && !has_srcset
           additions = %( srcset="#{srcset_for.call(widths)}")

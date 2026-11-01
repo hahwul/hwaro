@@ -60,6 +60,8 @@ module Hwaro
         # re-read, so a serve pass that re-renders after an image swap prints
         # the new size.
         @@intrinsic_sizes = {} of String => {Time, Int64, {Int32, Int32}?}
+        # Original URL => `authored_variant_paths`, for this build.
+        @@authored_variant_paths = {} of String => Array(String)
         # Every image whose size or bytes a render printed, for the serve
         # watcher: a copy-only change to one of them must re-render (see
         # `render_image_source_changed?`). Kept for the whole process — a
@@ -144,6 +146,7 @@ module Hwaro
             @@lookup_config = ctx.config
             @@bundle_sources = nil
             @@intrinsic_sizes.clear
+            @@authored_variant_paths.clear
             @@op_variants.clear
             config = ctx.config
             @@op_output_dir = ctx.options.skip_image_processing || config.nil? ? nil : ctx.output_dir
@@ -167,13 +170,46 @@ module Hwaro
         # image-derived data from (a srcset, an LQIP, a dominant colour): the
         # resize job's source, else the `static/` location an image that does
         # not exist yet would appear at. Also registers it with the serve
-        # watcher (see `render_image_source_changed?`). The caller records it
-        # as a `--cache` render input.
-        def self.watch_render_source(url : String) : String?
-          return if url.includes?('\0')
-          source = source_path_for(url) || File.join("static", url)
+        # watcher (see `render_image_source_changed?`). The caller records
+        # every returned path as a `--cache` render input: the source, then
+        # the files that would publish under one of its variant names
+        # (`authored_variant_paths`).
+        def self.watch_render_source(url : String) : Array(String)
+          return [] of String if url.includes?('\0')
+          job_source = source_path_for(url)
+          source = job_source || File.join("static", url)
           @@lookup_mutex.synchronize { @@render_image_sources << Path.posix(source).normalize.to_s }
-          source
+          return [source] unless job_source
+          [source] + authored_variant_paths(url, job_source)
+        end
+
+        # Where a file the site publishes itself under one of `url`'s variant
+        # names (`hero_200w.webp`) would live: beside the source and under
+        # static/. Such a file suppresses that variant (see `authored_for` in
+        # process_images), so its appearing or vanishing changes the printed
+        # srcset: recorded as reads, an absent path digests as "<absent>".
+        # Memoized per build.
+        private def self.authored_variant_paths(url : String, source : String) : Array(String)
+          config = @@lookup_mutex.synchronize do
+            if memo = @@authored_variant_paths[url]?
+              return memo
+            end
+            @@lookup_config
+          end
+          return [] of String unless config
+          ip = config.image_processing
+          widths = ip.widths.dup
+          # A width over the source's is clamped to it (either side: the
+          # header may predate an EXIF rotation).
+          intrinsic_size(source).try { |size| widths << size[0] << size[1] }
+          ext = File.extname(source)
+          stem = File.basename(source, ext)
+          exts = [ext.downcase] + ip.formats.map { |format| ".#{format}" }
+          dirs = [File.dirname(source), File.join("static", File.dirname(url))].uniq!
+          paths = widths.uniq!.flat_map do |width|
+            exts.flat_map { |variant_ext| dirs.map { |dir| File.join(dir, "#{stem}_#{width}w#{variant_ext}") } }
+          end
+          @@lookup_mutex.synchronize { @@authored_variant_paths[url] = paths }
         end
 
         # Source file published at the site-absolute, decoded `url` (no
