@@ -108,6 +108,8 @@ module Hwaro::Core::Build::Phases::Render
     if ctx.options.fast_start
       priority, deferred = split_priority_pages(pages_to_build, ctx.options.fast_start_count)
       @deferred_pages = deferred
+      # Held for render_deferred only, which never runs with nothing deferred.
+      @priority_pages = deferred.empty? ? [] of Models::Page : priority
       if !deferred.empty?
         Logger.info "  Fast-start: rendering #{priority.size} priority page(s) up front, deferring #{deferred.size} for background render."
         # NOTE — both `priority_pages` and `partial_render` are consumed
@@ -124,6 +126,7 @@ module Hwaro::Core::Build::Phases::Render
       pages_to_build = priority
     else
       @deferred_pages = nil
+      @priority_pages = [] of Models::Page
       ctx.priority_pages = nil
       ctx.partial_render = false
     end
@@ -160,7 +163,7 @@ module Hwaro::Core::Build::Phases::Render
         # `count` is already the number of pages that wrote a file (see
         # process_files_*); the refusals are surfaced separately.
         ctx.stats.pages_rendered = count
-        clear_filter_relations_hashes
+        clear_filter_relations_hashes(keep: @deferred_pages)
         ctx.stats.pages_unpublished = @unpublished_pages.get
         # Pages the cache skipped still feed the Generate phase (search index,
         # feeds read `page.content`), so give them the content a real render
@@ -201,17 +204,27 @@ module Hwaro::Core::Build::Phases::Render
     end
     # Persist this build's reads. When every page rendered they ARE the
     # site's reads; otherwise the cached pages still depend on the last
-    # build's, so keep those too. Skipped under fast-start for the same
-    # reason as the set fingerprints: deferred pages render later.
-    if cache_enabled && !ctx.options.fast_start
-      reads = Content::Processors::TemplateEngine.take_render_reads
-      reads.concat(build_cache.render_input_keys) unless rendered_every_page
-      keys = reads.to_a.sort!
-      digest = render_inputs_digest(render_globals, keys, render_input_values)
-      build_cache.record_render_inputs(digest, stamped_render_input_keys(keys, render_input_values))
+    # build's, so keep those too. Deferred under fast-start, like the set
+    # fingerprints: render_deferred records both once its pages are written.
+    if cache_enabled
+      @deferred_cache_keys = nil
+      if ctx.options.fast_start && has_deferred_pages?
+        @deferred_cache_keys = {page_set_fp, section_set_fp, render_globals, render_input_values, rendered_every_page}
+      else
+        build_cache.record_set_fingerprints(page_set_fp, section_set_fp) if ctx.options.fast_start
+        record_render_reads(build_cache, render_globals, render_input_values, rendered_every_page)
+      end
     end
     profiler.end_phase
     result
+  end
+
+  private def record_render_reads(build_cache : Cache, render_globals : String, render_input_values : Hash(String, String), rendered_every_page : Bool) : Nil
+    reads = Content::Processors::TemplateEngine.take_render_reads
+    reads.concat(build_cache.render_input_keys) unless rendered_every_page
+    keys = reads.to_a.sort!
+    digest = render_inputs_digest(render_globals, keys, render_input_values)
+    build_cache.record_render_inputs(digest, stamped_render_input_keys(keys, render_input_values))
   end
 
   # Pick a "priority" subset of pages for fast-start: the homepage and

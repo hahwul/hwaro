@@ -48,6 +48,9 @@ module Hwaro::Core::Build::Phases::ParseContent
       site.pages = ctx.pages
       site.sections = ctx.sections
       site.build_lookup_index
+      # Pages linking to each page (`[content] backlinks`), which a summary
+      # shortcode can print, as serve's re-rendered summaries do.
+      compute_backlinks(site) if site.config.backlinks
       # The image hooks have not run yet: rerender_image_summaries redoes
       # the summaries they change once the resize map is filled.
       render_page_summaries(ctx.all_pages, site, templates, ctx.options.highlight && site.config.highlight.enabled, images_ready: false)
@@ -1039,7 +1042,9 @@ module Hwaro::Core::Build::Phases::ParseContent
     page.title = data[:title]
     page.description = data[:description]
     page.image = data[:image]
-    if data[:image].nil? && (prev = previous_image)
+    # A page just set `render = false` gets none: a full build never
+    # generates one for it, and no file would answer the URL.
+    if data[:image].nil? && data[:render] && (prev = previous_image)
       if (cfg = @config) && cfg.og.auto_image.enabled && Content::Seo::OgImage.auto_assigned?(prev, cfg.og.auto_image)
         page.image = prev
       end

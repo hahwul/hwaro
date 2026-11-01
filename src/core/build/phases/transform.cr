@@ -27,8 +27,7 @@ module Hwaro::Core::Build::Phases::Transform
     # Compute related posts based on taxonomy similarity
     compute_related_posts(site) if site.config.related.enabled
 
-    # Pages linking to each page (`[content] backlinks`)
-    compute_backlinks(site) if site.config.backlinks
+    # `page.backlinks` were filled in ParseContent, before the summaries.
 
     # Build optimized lookup indices
     site.build_lookup_index
@@ -70,13 +69,24 @@ module Hwaro::Core::Build::Phases::Transform
   ) : Array(Array(Models::Page))
     sections_by_lang = sections.group_by { |s| {s.language || default_lang, s.version.try(&.name)} }
     pages_by_lang = pages.group_by { |p| {p.language || default_lang, p.version.try(&.name)} }
+    losers = output_losers((pages + sections).as(Array(Models::Page)))
 
     (sections_by_lang.keys | pages_by_lang.keys).map do |key|
-      build_language_reading_order(
+      order = build_language_reading_order(
         sections_by_lang[key]? || [] of Models::Section,
         pages_by_lang[key]? || [] of Models::Page,
         key[0], default_lang)
+      losers.empty? ? order : order.reject { |p| losers.includes?(p.path) }
     end
+  end
+
+  # Paths of the pages that lose their output URL to another page and so
+  # publish nothing: no one's prev/next, series neighbour, related post or
+  # backlink. A dry run of the render phase's claims, which run after these
+  # relationships are linked — the stored `output_suppressed` is unset on a
+  # cold build and the last pass's in serve.
+  private def site_output_losers(site : Models::Site) : Set(String)
+    output_losers((site.pages + site.sections).as(Array(Models::Page)))
   end
 
   private def build_language_reading_order(
@@ -587,8 +597,9 @@ module Hwaro::Core::Build::Phases::Transform
     # Rebuild groups only for affected series
     default_lang = site.config.default_language
     groups = {} of {String, String, String} => Array(Models::Page)
+    losers = site_output_losers(site)
     site.pages.each do |page|
-      next if page.draft || page.unpublished || !page.render
+      next if page.draft || page.unpublished || !page.render || losers.includes?(page.path)
       if (key = series_group_key(page, default_lang)) && affected_series.includes?(key[0])
         (groups[key] ||= [] of Models::Page) << page
       end
@@ -626,7 +637,8 @@ module Hwaro::Core::Build::Phases::Transform
 
     taxonomy_names = config.taxonomies
     limit = config.limit
-    all_pages = site.pages.select { |p| related_candidate?(p) }
+    losers = site_output_losers(site)
+    all_pages = site.pages.select { |p| related_candidate?(p) && !losers.includes?(p.path) }
 
     # Build inverted index first (needed for both candidate discovery and scoring)
     inverted, index_of = build_related_index(all_pages, taxonomy_names)
@@ -841,9 +853,10 @@ module Hwaro::Core::Build::Phases::Transform
   private def compute_series(site : Models::Site)
     default_lang = site.config.default_language
     groups = {} of {String, String, String} => Array(Models::Page)
+    losers = site_output_losers(site)
 
     site.pages.each do |page|
-      next if page.draft || page.unpublished || !page.render
+      next if page.draft || page.unpublished || !page.render || losers.includes?(page.path)
       if key = series_group_key(page, default_lang)
         (groups[key] ||= [] of Models::Page) << page
       end
@@ -946,7 +959,8 @@ module Hwaro::Core::Build::Phases::Transform
     taxonomy_names = config.taxonomies
     limit = config.limit
     return if limit <= 0
-    pages = site.pages.select { |p| related_candidate?(p) }
+    losers = site_output_losers(site)
+    pages = site.pages.select { |p| related_candidate?(p) && !losers.includes?(p.path) }
 
     inverted, _ = build_related_index(pages, taxonomy_names)
     scores = Array(Int32).new(pages.size, 0)
@@ -1010,11 +1024,13 @@ module Hwaro::Core::Build::Phases::Transform
   private def compute_backlinks(site : Models::Site) : Nil
     pages = (site.pages + site.sections).as(Array(Models::Page))
     pages_by_path = build_pages_by_path(site)
+    losers = site_output_losers(site)
+    # A URL is the page that publishes it, not a collision loser that sorts first.
     by_url = {} of String => Models::Page
-    pages.each { |p| by_url[p.url] ||= p }
+    pages.each { |p| by_url[p.url] ||= p unless losers.includes?(p.path) }
     incoming = {} of String => Array(Models::Page)
     pages.each do |source|
-      next unless source.render
+      next if !source.render || losers.includes?(source.path)
       outbound_link_targets(source, pages_by_path, by_url, site.config.base_path).each do |target|
         next if target.same?(source) || target.language != source.language
         (incoming[target.path] ||= [] of Models::Page) << source

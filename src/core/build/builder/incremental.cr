@@ -189,18 +189,10 @@ module Hwaro
           # rebuild through @rebuild_failed.
           raise_on_permalink_errors!(changed_pages)
 
-          # Re-render <!-- more --> summaries for the re-parsed pages with the
-          # body pipeline (parse_single_page reset summary_html to nil); the
-          # listing pages re-rendered below read it. Runs AFTER the exclusion
-          # pass so a page just flipped to draft can't feed its summary's
-          # broken @/ links into the strict-mode accumulator (the full build
-          # renders summaries post-filter too).
           # The excluded pages leave site.pages only at
           # drop_excluded_and_orphaned_outputs below; keep them out of the
           # index now, or the summaries and renders here still link to them.
           refresh_wikilink_index((site.pages + site.sections).reject { |p| excluded_paths.includes?(p.path) }, site)
-          render_page_summaries(changed_pages, site, templates, highlight,
-            link_targets: (site.pages + site.sections).as(Array(Models::Page)))
 
           # Run taxonomy update on ALL re-parsed pages (including the excluded
           # ones — their OLD entries must be removed; excluded_paths keeps
@@ -228,27 +220,24 @@ module Hwaro
           # Pages linking to a page this edit moved. Their `<!-- more -->`
           # summary prints the link too, in every listing and feed.
           linkers = linkers_of_moved_pages(site, page_urls)
-          render_page_summaries(linkers, site, templates, highlight, link_targets: all_pages) unless linkers.empty?
 
           # Re-link the global reading order; `renav_pages` is every page whose
           # prev/next pointer actually changed (a section weight/sort/reverse edit
           # reorders a whole block, not just the edited page's neighbors).
           renav_pages = relink_navigation_for_sections(site, affected_sections)
+          related_changed = changed_pages + publish_flips(site, previously_suppressed)
 
           # Recompute series for affected series (if enabled), including old memberships
           affected_series = if site.config.series.enabled
-                              recompute_series_for_pages(site, changed_pages, old_series_names)
+                              recompute_series_for_pages(site, related_changed, old_series_names)
                             else
                               Set(String).new
                             end
 
           # Recompute related posts selectively (if enabled). Pass the excluded
           # pages' paths so pages that listed a now-removed page as related drop it.
-          related_pages_updated = recompute_related_posts_for_pages(site, changed_pages, excluded_paths)
+          related_pages_updated = recompute_related_posts_for_pages(site, related_changed, excluded_paths)
           compute_backlinks(site) if site.config.backlinks
-          # `site.authors` embeds each page's title and summary (Transform
-          # builds it once per full build).
-          aggregate_site_authors(site)
 
           # Invalidate Crinja caches for affected pages/sections
           invalidate_caches_for_pages(changed_pages, affected_sections)
@@ -271,9 +260,28 @@ module Hwaro
             end
           end
 
-          # --- 3. Determine the full set of pages that need re-rendering ---
-          pages_to_render = relationship_render_set(site, pages_map, reparsed, changed_pages,
+          # Re-render <!-- more --> summaries for the re-parsed pages
+          # (parse_single_page reset summary_html to nil) and the linkers with
+          # the body pipeline; the listing pages re-rendered below read them.
+          # Runs AFTER the exclusion pass so a page just flipped to draft
+          # can't feed its summary's broken @/ links into the strict-mode
+          # accumulator (the full build renders summaries post-filter too),
+          # and after the relinks above, which a summary shortcode printing
+          # `page.translations` or `page.lower` reads.
+          # A page whose relationship moved re-renders its summary too when
+          # a shortcode in it can print the relationship.
+          moved = relationship_moved_pages(site, pages_map, reparsed, changed_pages,
             relinked_counterparts, renav_pages, affected_series, related_pages_updated, excluded_paths)
+          summarized = (changed_pages + linkers).map(&.path).to_set
+          summary_pages = changed_pages + linkers
+          moved.each { |p| summary_pages << p if summary_shortcodes?(p) && summarized.add?(p.path) }
+          render_page_summaries(summary_pages, site, templates, highlight, link_targets: all_pages)
+          # `site.authors` embeds each page's title and summary (Transform
+          # builds it once per full build).
+          aggregate_site_authors(site)
+
+          # --- 3. Determine the full set of pages that need re-rendering ---
+          pages_to_render = relationship_render_set(site, reparsed, changed_pages, moved, excluded_paths)
           backlinks_moved_pages(site, templates, backlink_digests).each { |p| pages_to_render << p }
           linkers.each { |p| pages_to_render << p }
 
@@ -289,14 +297,13 @@ module Hwaro
           regained.each { |p| pages_to_render << p }
 
           # A fan-out page's summary prints what its shortcodes read (a
-          # `get_page` title), and only the changed pages and linkers got
-          # theirs recomputed above. Redo the fan-out pages whose summary
-          # source can hold a shortcode — before the globals below embed the
-          # summaries — and the author lists that embed them too.
-          summarized = (changed_pages + linkers).map(&.path).to_set
-          resummarize = fanout.select do |p|
-            !summarized.includes?(p.path) && content_may_contain_shortcodes?(p.summary || p.raw_content)
-          end
+          # `get_page` title), and only the pages above got theirs
+          # recomputed. Redo the fan-out pages whose summary source can hold
+          # a shortcode — before the globals below embed the summaries — and
+          # the author lists that embed them too. Not every page of the
+          # render set: a section edit re-renders its whole subtree, whose
+          # summaries it moved nothing in.
+          resummarize = fanout.select { |p| summary_shortcodes?(p) && summarized.add?(p.path) }
           unless resummarize.empty?
             render_page_summaries(resummarize, site, templates, highlight, link_targets: all_pages)
             aggregate_site_authors(site)
@@ -334,6 +341,7 @@ module Hwaro
           regenerate_amp_mirrors(renderable_list, site, output_dir, verbose)
 
           sweep_stale_derived_outputs(output_dir)
+          record_serve_cache_keys(site, templates, cache, options)
           cache.save if options.cache
 
           # The 404 page renders site-wide listings too (a docs sidebar, the
@@ -347,6 +355,8 @@ module Hwaro
           # rebuilds too (mirrors the lifecycle taxonomy hook). `all_pages` is
           # left intact for the rebuild summary below.
           taxonomy_sections = Content::Taxonomies.generate(site, output_dir, templates, verbose, builder: self)
+          # The term pages it wrote are on the generated-output record now.
+          cache.save if options.cache
           seo_pages = taxonomy_sections.empty? ? all_pages : all_pages + taxonomy_sections
 
           # --- 6. Regenerate lightweight SEO / search files in parallel ---
@@ -422,12 +432,14 @@ module Hwaro
 
           site.build_lookup_index
           renav_pages = relink_navigation_for_sections(site, affected_sections)
+          # run_rerender claims the URLs; the flags are still the last pass's.
+          related_changed = changed_pages + publish_flips(site, site.pages.select(&.output_suppressed))
           affected_series = if site.config.series.enabled
-                              recompute_series_for_pages(site, changed_pages, reparsed.old_series_names)
+                              recompute_series_for_pages(site, related_changed, reparsed.old_series_names)
                             else
                               Set(String).new
                             end
-          related_pages_updated = recompute_related_posts_for_pages(site, changed_pages, excluded_paths)
+          related_pages_updated = recompute_related_posts_for_pages(site, related_changed, excluded_paths)
           refresh_wikilink_index((site.pages + site.sections).as(Array(Models::Page)), site)
           compute_backlinks(site) if site.config.backlinks
 
@@ -445,8 +457,9 @@ module Hwaro
           # bare mtime touch). Flips INTO the set escalate to a full rebuild
           # via the pages_map miss above, so exclusions are the only
           # membership change this path can see.
-          force_pages = relationship_render_set(site, pages_map, reparsed, changed_pages,
+          moved = relationship_moved_pages(site, pages_map, reparsed, changed_pages,
             relinked_counterparts, renav_pages, affected_series, related_pages_updated, excluded_paths)
+          force_pages = relationship_render_set(site, reparsed, changed_pages, moved, excluded_paths)
           backlinks_moved_pages(site, @templates, backlink_digests).each { |p| force_pages << p }
           linkers_of_moved_pages(site, page_urls).each { |p| force_pages << p }
           run_rerender(options, force_pages: force_pages.to_a, membership_changed: !excluded_pages.empty?,
@@ -464,18 +477,12 @@ module Hwaro
         # a slug edit) for the rest of the session.
         private def relationship_render_set(
           site : Models::Site,
-          pages_map : Hash(String, Models::Page),
           reparsed : ReparsedPages,
           changed_pages : Array(Models::Page),
-          relinked_counterparts : Array(Models::Page),
-          renav_pages : Enumerable(Models::Page),
-          affected_series : Set(String),
-          related_pages_updated : Enumerable(String),
+          moved : Set(Models::Page),
           excluded_paths : Set(String),
         ) : Set(Models::Page)
           pages_to_render = Set(Models::Page).new(changed_pages)
-          # Translations / other versions whose switcher (or canonical) moved.
-          relinked_counterparts.each { |p| pages_to_render << p }
 
           # Section index pages whose content lists include the changed pages.
           # Include every language variant of the section (multilingual sites
@@ -510,6 +517,36 @@ module Hwaro
             end
           end
 
+          moved.each { |p| pages_to_render << p }
+          # A page this pass just drafted / expired / future-dated is already
+          # pruned and out of site.pages, but the OLD neighbours captured
+          # before the re-parse still reference it — rendering it would write
+          # the file straight back.
+          pages_to_render.reject! { |p| excluded_paths.includes?(p.path) } unless excluded_paths.empty?
+          pages_to_render
+        end
+
+        # The pages other than the changed ones whose relationship to them
+        # moved: their translations/versions, their old and new reading-order
+        # neighbours, the pages of a language whose homepage flipped, every
+        # member of a series they joined or left, and every page whose related
+        # posts were recomputed. These are also the pages whose summary
+        # shortcodes (`page.translations`, `page.lower`, …) can print
+        # something new.
+        private def relationship_moved_pages(
+          site : Models::Site,
+          pages_map : Hash(String, Models::Page),
+          reparsed : ReparsedPages,
+          changed_pages : Array(Models::Page),
+          relinked_counterparts : Array(Models::Page),
+          renav_pages : Enumerable(Models::Page),
+          affected_series : Set(String),
+          related_pages_updated : Enumerable(String),
+          excluded_paths : Set(String),
+        ) : Set(Models::Page)
+          # Translations / other versions whose switcher (or canonical) moved.
+          pages_to_render = Set(Models::Page).new(relinked_counterparts)
+
           # Previous / next pages. `renav_pages` is every page whose lower/higher
           # pointer changed in the global re-link (covers block reorders from a
           # section weight/sort/reverse edit); the explicit old/new neighbors of
@@ -524,6 +561,17 @@ module Hwaro
             if old = reparsed.old_neighbors[page.path]?
               old[0].try { |l| pages_to_render << l }
               old[1].try { |h| pages_to_render << h }
+            end
+          end
+
+          # A language whose homepage started or stopped being written
+          # (`render = false`, a drafted `index.ko.md`): every page of that
+          # language moves its JSON-LD Home crumb between `/<lang>/` and the
+          # site root.
+          flipped = reparsed.old_home_languages ^ home_languages(site)
+          unless flipped.empty?
+            (site.pages + site.sections).each do |p|
+              pages_to_render << p if p.language.try { |l| flipped.includes?(l) }
             end
           end
 
@@ -546,6 +594,11 @@ module Hwaro
           # the file straight back.
           pages_to_render.reject! { |p| excluded_paths.includes?(p.path) } unless excluded_paths.empty?
           pages_to_render
+        end
+
+        # The non-default languages whose homepage is written now.
+        private def home_languages(site : Models::Site) : Set(String)
+          site.config.languages.keys.select { |code| site.home_language?(code) }.to_set
         end
 
         # Re-run the counterpart linkers — `Multilingual.link_translations!`
@@ -847,7 +900,8 @@ module Hwaro
           old_taxonomies_snapshot : Hash(String, Hash(String, Array(String))),
           old_series_names : Hash(String, String?),
           old_output_paths : Hash(String, Array(String)),
-          old_neighbors : Hash(String, {Models::Page?, Models::Page?})
+          old_neighbors : Hash(String, {Models::Page?, Models::Page?}),
+          old_home_languages : Set(String)
 
         # Re-parse the changed content files in place (front matter, URL,
         # cascade defaults) and snapshot their pre-edit state. Shared by the
@@ -878,6 +932,10 @@ module Hwaro
 
           # Snapshot old neighbors before re-linking (for render set)
           old_neighbors = {} of String => {Models::Page?, Models::Page?}
+          # The languages whose homepage is written: a non-default page's
+          # JSON-LD Home crumb links it only while it is (see
+          # relationship_render_set).
+          old_home_languages = home_languages(site)
 
           # Cascade context for re-applying section defaults to re-parsed pages
           # (parse_single_page resets fields from front matter only). Prefer
@@ -944,7 +1002,7 @@ module Hwaro
             page.ancestors.each { |ancestor| affected_sections << ancestor.section }
           end
 
-          ReparsedPages.new(changed_pages, affected_sections, old_taxonomies_snapshot, old_series_names, old_output_paths, old_neighbors)
+          ReparsedPages.new(changed_pages, affected_sections, old_taxonomies_snapshot, old_series_names, old_output_paths, old_neighbors, old_home_languages)
         end
 
         # A section leaving the build (drafted, expired) is still its
@@ -1087,6 +1145,16 @@ module Hwaro
           process_assets(changed_pages, output_dir, false) unless relocated.empty?
           prune_unclaimed_outputs(relocated, output_dir) unless relocated.empty?
           settle_page_outputs(output_dir, except: old_output_paths.values.flatten)
+        end
+
+        # The pages whose output-URL verdict this pass flips against
+        # `previously_suppressed` (the last pass's losers): they join or leave
+        # the series and related posts a loser is kept out of, which only
+        # recompute around the pages they are told changed.
+        private def publish_flips(site : Models::Site, previously_suppressed : Array(Models::Page)) : Array(Models::Page)
+          losers = site_output_losers(site)
+          was = previously_suppressed.map(&.path).to_set
+          site.pages.select { |p| losers.includes?(p.path) != was.includes?(p.path) }
         end
 
         # Pages that lost an output-path collision before this pass and own
@@ -1396,6 +1464,7 @@ module Hwaro
           end
 
           sweep_stale_derived_outputs(output_dir)
+          record_serve_cache_keys(site, templates, cache, options)
           cache.save if options.cache
           write_html_stats(complete: false)
 
@@ -1412,12 +1481,19 @@ module Hwaro
         # re-render strategies re-render pages from the bodies they already
         # hold, and the body file (often `.md`) is not even in the template
         # snapshot, so the edit read as "contents are identical".
+        # Inline template specs (`body = "{% include 'partials/x.html' %}"`,
+        # a templated `description`, …) render at that same point, so a
+        # partial THEY include counts too.
         # `changed_paths` are watcher paths (`templates/gen/product.md`).
         def generate_body_template_changed?(changed_paths : Array(String)) : Bool
           config = @config
           return false unless config
           body_names = config.content_generate.compact_map(&.body_template)
-          return false if body_names.empty? || changed_paths.empty?
+          inline_specs = config.content_generate.flat_map do |rule|
+            ([rule.slug, rule.title, rule.body, rule.date, rule.description] + rule.taxonomies.values)
+              .compact.select { |spec| ContentGenerate.template_spec?(spec) }
+          end
+          return false if (body_names.empty? && inline_specs.empty?) || changed_paths.empty?
 
           changed_files = changed_paths.map { |path| Path[path].normalize.to_s }.to_set
           changed_names = changed_paths.compact_map do |path|
@@ -1426,7 +1502,7 @@ module Hwaro
           end.to_set
           snapshot = @templates || {} of String => String
 
-          body_names.any? do |name|
+          body_changed = body_names.any? do |name|
             # The body loads through the filesystem fallback, i.e. the
             # literal file under templates/.
             body_file = Path["templates", name].normalize.to_s
@@ -1434,8 +1510,52 @@ module Hwaro
             next false unless File.file?(body_file)
             key = name.sub(TEMPLATE_EXTENSION_REGEX, "")
             graph = TemplateDeps.new(snapshot.merge({key => File.read(body_file)}))
-            !(graph.closure(key) & changed_names).empty?
+            reaches?(graph, key, changed_names)
           end
+          return true if body_changed
+          return false if inline_specs.empty?
+
+          # One synthetic graph node holding every inline spec; the NUL key
+          # can never name a real template.
+          key = "\0content.generate"
+          graph = TemplateDeps.new(snapshot.merge({key => inline_specs.join('\n')}))
+          reaches?(graph, key, changed_names)
+        end
+
+        # A computed include (`{% include 'partials/' ~ name %}`) in `key`'s
+        # closure leaves what it reaches unknown, so any template edit counts
+        # (TemplateDeps#reaches_dynamic?).
+        private def reaches?(graph : TemplateDeps, key : String, changed_names : Set(String)) : Bool
+          return false if changed_names.empty?
+          graph.reaches_dynamic?(key) || !(graph.closure(key) & changed_names).empty?
+        end
+
+        # Leave the `--cache` keys describing the tree this serve pass wrote,
+        # as the cold build does for its own. Left at the session's first
+        # build, an edit made in serve and reverted offline matched them on
+        # the next start, which then kept every listing this session had
+        # re-rendered with the edit. The pass re-rendered every listing the
+        # edit moved, so the current page/section-set fingerprints describe
+        # the tree (an auto OG `image` is left out of both, see fp_image).
+        # The render inputs (`env()`, `load_data()`, image sources,
+        # asset names) are not what serve decides re-renders by, so when they
+        # moved during the session the stored digest is spoiled instead: the
+        # next start then renders every page. Skipped while a fast-start
+        # background pass is pending — render_deferred records then.
+        private def record_serve_cache_keys(site : Models::Site, templates : Hash(String, String), cache : Cache, options : Config::Options::BuildOptions) : Nil
+          return unless options.cache && @deferred_cache_keys.nil?
+          cache.record_set_fingerprints(
+            compute_page_set_fingerprint(site.pages + site.sections, listing_page_fields(templates)),
+            compute_section_set_fingerprint(site.sections, !site.config.menus_auto_sections.nil?))
+
+          stored = cache.render_inputs_hash
+          return if stored.empty?
+          known = cache.render_input_keys
+          reads = Content::Processors::TemplateEngine.take_render_reads
+          values = {} of String => String
+          return if reads.all? { |key| known.includes?(key) } &&
+                    render_inputs_digest(render_globals_digest(site.config, options.cache_busting), known, values) == stored
+          cache.record_render_inputs("moved during serve", (known + reads.to_a).uniq.sort!)
         end
 
         # Are there any pages stashed by `--fast-start` waiting to render?
@@ -1507,6 +1627,10 @@ module Hwaro
           # Trigger BeforeRender hooks directly — we're not re-running the
           # Render phase, just the prep work it would have done.
           @lifecycle.trigger(Lifecycle::HookPoint::BeforeRender, deferred_ctx)
+          # The page values the cold pass cached predate the fields those
+          # hooks just filled for the deferred pages (`image`, summaries).
+          @cache_manager.clear("page_crinja_value", "section_pages_crinja", "section_assets_crinja",
+            "series_crinja", "ancestors_crinja", "related_posts_crinja", reset_stats: false)
 
           global_vars = build_global_vars(site, options.cache_busting)
           if rerender_image_summaries((site.pages + site.sections).as(Array(Models::Page)), site, templates, highlight, global_vars)
@@ -1515,9 +1639,15 @@ module Hwaro
           # Keep the 404/taxonomy stash in sync (see run_incremental).
           @render_global_vars = global_vars
           @pages_by_path = build_pages_by_path(site)
-          renderable = pages.select(&.render)
+          # The priority pages too: they listed the deferred pages without
+          # those fields. A small set (homepage, top sections, N recent).
+          renderable = (@priority_pages + pages).select(&.render)
 
-          count = if options.parallel && renderable.size > 1
+          # Most of the site renders here, so `--stream` batches it like the
+          # cold pass's Render phase.
+          count = if options.streaming?
+                    render_streaming(renderable, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, options.error_overlay, options.parallel, options.batch_size, !generated_outputs_read_content?(site))
+                  elsif options.parallel && renderable.size > 1
                     process_files_parallel(renderable, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: options.error_overlay, profiler: active_profiler)
                   else
                     process_files_sequential(renderable, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: options.error_overlay, profiler: active_profiler)
@@ -1533,6 +1663,8 @@ module Hwaro
           # notify_build_error; the server keeps running.
           raise_on_broken_internal_links!(output_dir)
           regenerate_amp_mirrors(renderable, site, output_dir, verbose)
+          # The cold pass wrote the 404 page from the same pre-hook values.
+          generate_404_page(site, templates, output_dir, minify, verbose, global_vars)
 
           # Refresh feeds / sitemap / search now that every page has rendered
           # content. Without this, feed descriptions and the search index
@@ -1552,6 +1684,15 @@ module Hwaro
           # before any watch rebuild loses the deferred pages' cache entries
           # and the next `--cache` cold start has to re-render them.
           sweep_stale_derived_outputs(output_dir)
+          # Only now does the output match the keys the cold pass computed;
+          # left unrecorded, a later `--cache` start compared against an
+          # older session's and skipped pages this session had changed.
+          if options.cache && (keys = @deferred_cache_keys)
+            page_set_fp, section_set_fp, render_globals, render_input_values, rendered_every_page = keys
+            cache.record_set_fingerprints(page_set_fp, section_set_fp)
+            record_render_reads(cache, render_globals, render_input_values, rendered_every_page)
+          end
+          @deferred_cache_keys = nil
           cache.save if options.cache
           write_html_stats(complete: false)
 
@@ -1560,8 +1701,12 @@ module Hwaro
           @deferred_pages = nil
 
           elapsed = Time.instant - start_time
-          Logger.outcome("rendered", "#{count} deferred #{count == 1 ? "page" : "pages"}", :result, elapsed.total_milliseconds)
+          Logger.outcome("rendered", "#{count} #{count == 1 ? "page" : "pages"} (#{pages.size} deferred)", :result, elapsed.total_milliseconds)
           count
+        ensure
+          # Also when the pass raises: nothing renders them again.
+          @priority_pages = [] of Models::Page
+          clear_filter_relations_hashes
         end
       end
     end

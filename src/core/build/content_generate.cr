@@ -33,6 +33,8 @@ require "../../utils/frontmatter_writer"
 require "../../utils/errors"
 require "../../utils/logger"
 require "../../utils/nesting"
+require "../../utils/date_utils"
+require "../../utils/permalink_resolver"
 
 module Hwaro
   module Core
@@ -402,26 +404,71 @@ module Hwaro
         #
         # A source `[content] ignore` hides (`ignore`, the site's
         # content_files) claims nothing: the build never reads it.
-        def authored_twin_exists?(path : String, content_root : String = "content", ignore : Models::ContentFilesConfig? = nil) : Bool
+        #
+        # `default_language` (a multilingual site's default code) adds the
+        # spelled-out default suffix (`<stem>.en.md`), which publishes the
+        # same URL as `<stem>.md`. A subsection index `<stem>/_index.md`
+        # owns that URL too — unless `config` and `page_url` (the generated
+        # page's resolved URL, `plan_url`) show the two publish at different
+        # URLs: section indexes skip pattern rules, so
+        # `products = "/shop/:slug/"` puts generated `red` at /shop/red/
+        # while `products/red/_index.md` keeps /products/red/ — unless its
+        # front matter `path`/`slug` moves it (see section_url).
+        def authored_twin_exists?(path : String, content_root : String = "content", ignore : Models::ContentFilesConfig? = nil,
+                                  default_language : String? = nil, config : Models::Config? = nil,
+                                  page_url : String? = nil) : Bool
           parent = File.dirname(path)
           dir = File.join(content_root, parent)
           stem = File.basename(path, ".md")
           entries = dir_children(dir)
           return false if entries.empty?
           visible = ->(rel : String) { !ignore.try(&.ignored?(File.join(parent, rel))) }
+          suffixes = default_language ? {"", ".#{default_language}"} : {""}
 
           Phases::ReadContent::PAGE_EXTENSIONS.each do |ext|
-            return true if entries.includes?("#{stem}#{ext}") && visible.call("#{stem}#{ext}")
+            suffixes.each do |suffix|
+              name = "#{stem}#{suffix}#{ext}"
+              return true if entries.includes?(name) && visible.call(name)
+            end
           end
 
           if entries.includes?(stem)
             bundle_entries = dir_children(File.join(dir, stem))
             Phases::ReadContent::PAGE_EXTENSIONS.each do |ext|
-              return true if bundle_entries.includes?("index#{ext}") && visible.call("#{stem}/index#{ext}")
+              suffixes.each do |suffix|
+                {"index", "_index"}.each do |index|
+                  name = "#{index}#{suffix}#{ext}"
+                  next unless bundle_entries.includes?(name) && visible.call("#{stem}/#{name}")
+                  next if index == "_index" && config && page_url && section_url(File.join(parent, stem, name), File.join(dir, stem, name), config) != page_url
+                  return true
+                end
+              end
             end
           end
 
           false
+        end
+
+        # The URL a plan's page publishes at: its path plus the front matter
+        # the synthetic markdown carries (title, date; never slug or path).
+        def plan_url(plan : Plan, config : Models::Config) : String
+          url_for(plan.path, config, plan.title, plan.date_raw.try { |raw| Utils::DateUtils.parse_content_date(raw) })
+        end
+
+        private def url_for(path : String, config : Models::Config, title : String = "", date : Time? = nil,
+                            slug : String? = nil, custom_path : String? = nil) : String
+          Utils::PermalinkResolver.resolve_url_lenient(path, config, slug: slug, custom_path: custom_path, language: nil,
+            date: date, title: title, version: config.versions.for_path(path))[0]
+        end
+
+        # A subsection index's URL, front matter `slug`/`path` included
+        # (`path = "shop/red"` moves it onto the generated page's URL).
+        private def section_url(path : String, file : String, config : Models::Config) : String
+          data = Processor::Markdown.parse(File.read(file), file)
+          url_for(path, config, data[:title], data[:date], data[:slug], data[:custom_path])
+        rescue File::Error | IO::Error | Hwaro::HwaroError
+          # Unreadable or malformed: the parse phase reports it.
+          url_for(path, config)
         end
 
         private def dir_children(dir : String) : Array(String)

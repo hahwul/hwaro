@@ -2,6 +2,12 @@ require "../../../../spec_helper"
 require "../../../../../src/core/build/builder"
 require "../../../../../src/content/hooks"
 
+class Hwaro::Core::Build::Builder
+  def test_priority_pages : Array(Hwaro::Models::Page)
+    @priority_pages
+  end
+end
+
 describe "Builder#run_incremental output collisions" do
   it "republishes a bundle's assets once the collision that suppressed it is gone" do
     Dir.mktmpdir do |dir|
@@ -746,6 +752,223 @@ describe "Builder#run_incremental translation_key collisions" do
         # An unrelated edit keeps the collision: no second warning.
         File.write("content/about.md", "+++\ntitle = \"About!\"\ntranslation_key = \"about\"\n+++\n")
         with_captured_log { builder.run_incremental(["content/about.md"], options) }.should_not contain("translation_key")
+      end
+    end
+  end
+end
+
+describe "Builder#render_deferred" do
+  # `--fast-start`: the cold pass runs the BeforeRender hooks (auto OG
+  # images, image resize) for the priority pages only, so every listing it
+  # renders sees the deferred pages without the fields those hooks fill.
+  # Once the background pass has filled them, the served tree must match a
+  # full build's: the priority pages re-render, and nothing reads the page
+  # values cached before the hooks ran.
+  it "renders every page against the fields the deferred hooks filled" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[og.auto_image]\nenabled = true\nformat = "svg"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/new.md", "+++\ntitle = \"New\"\ndate = 2026-06-01\n+++\n")
+        File.write("content/old.md", "+++\ntitle = \"Old\"\ndate = 2020-01-01\n+++\n")
+        listing = "{% for p in site.pages %}[{{ p.title }}={{ p.image }}]{% endfor %}"
+        File.write("templates/index.html", listing)
+        File.write("templates/page.html", listing)
+        File.write("templates/404.html", listing)
+
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, fast_start: true, fast_start_count: 1)
+        options.serve_mode = true
+        builder.run(options).should be_true
+        builder.has_deferred_pages?.should be_true
+        deferred = options.dup
+        deferred.fast_start = false
+        deferred.preserve_output = true
+        builder.render_deferred(deferred)
+
+        expected = "[New=/og-images/new.svg][Old=/og-images/old.svg]"
+        File.read("public/index.html").should eq(expected)
+        File.read("public/new/index.html").should eq(expected)
+        File.read("public/old/index.html").should eq(expected)
+        File.read("public/404.html").should eq(expected)
+      end
+    end
+  end
+
+  # `serve --fast-start --stream`: the background pass renders most of the
+  # site, so it must batch and release rendered bodies like the cold pass
+  # does, or `--stream`/`--memory-limit` bounded only the priority pages.
+  it "streams the background pass under --stream" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/new.md", "+++\ntitle = \"New\"\ndate = 2026-06-01\n+++\nnew body\n")
+        File.write("content/old.md", "+++\ntitle = \"Old\"\ndate = 2020-01-01\n+++\nold body\n")
+        File.write("templates/index.html", "{{ content }}")
+        File.write("templates/page.html", "{{ content }}")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, stream: true, fast_start: true, fast_start_count: 1)
+        options.serve_mode = true
+        builder.run(options).should be_true
+        deferred = options.dup
+        deferred.fast_start = false
+        deferred.preserve_output = true
+        builder.render_deferred(deferred)
+
+        File.read("public/old/index.html").should contain("old body")
+        old = builder.site.not_nil!.pages.find! { |page| page.path == "old.md" }
+        old.content.should eq("")
+      end
+    end
+  end
+
+  # The cold pass stashed its priority pages for the background pass even
+  # when nothing was deferred (or the build was not fast-start at all), and
+  # only render_deferred let go of them: the serve session kept the whole
+  # first build's page set alive.
+  it "holds no priority pages it will not render" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/new.md", "+++\ntitle = \"New\"\ndate = 2026-06-01\n+++\n")
+        File.write("content/old.md", "+++\ntitle = \"Old\"\ndate = 2020-01-01\n+++\n")
+        File.write("templates/page.html", "{{ page.title }}")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, fast_start: true, fast_start_count: 10)
+        options.serve_mode = true
+        builder.run(options).should be_true
+        builder.has_deferred_pages?.should be_false
+        builder.test_priority_pages.should be_empty
+
+        options.fast_start_count = 1
+        builder.run(options).should be_true
+        builder.has_deferred_pages?.should be_true
+        builder.test_priority_pages.should_not be_empty
+        # A watch rebuild runs a full, non-fast-start build.
+        options.fast_start = false
+        builder.run(options).should be_true
+        builder.test_priority_pages.should be_empty
+
+        # A background pass that raises still lets go of them: the deferred
+        # page's broken anchor fails it under broken_anchors = "error".
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[links]\nbroken_anchors = "error"\n))
+        File.write("content/old.md", "+++\ntitle = \"Old\"\ndate = 2020-01-01\n+++\n[x](@/new.md#nope)\n")
+        options.fast_start = true
+        builder.run(options).should be_true
+        builder.test_priority_pages.should_not be_empty
+        deferred = options.dup
+        deferred.fast_start = false
+        deferred.preserve_output = true
+        expect_raises(Exception) { builder.render_deferred(deferred) }
+        builder.test_priority_pages.should be_empty
+      end
+    end
+  end
+
+  # The cache entry of a deferred page stored the relations hash as of the
+  # background pass, after the hooks filled every auto OG `image` — never
+  # what the next start compares (taken before them), so under `--cache`
+  # every deferred page re-rendered on every start.
+  it "keeps a deferred page cached on the next --cache start" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[og.auto_image]\nenabled = true\nformat = "svg"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/new.md", "+++\ntitle = \"New\"\ndate = 2026-06-01\n+++\n")
+        File.write("content/mid.md", "+++\ntitle = \"Mid\"\ndate = 2024-01-01\n+++\n")
+        File.write("content/old.md", "+++\ntitle = \"Old\"\ndate = 2020-01-01\n+++\n")
+        File.write("templates/index.html", "home")
+        # The neighbour's image is a relation the page's cache entry hashes.
+        File.write("templates/page.html", "{% if page.lower %}{{ page.lower.image }}{% endif %}")
+
+        session = -> do
+          builder = Hwaro::Core::Build::Builder.new
+          Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, fast_start: true, fast_start_count: 1)
+          options.serve_mode = true
+          builder.run(options).should be_true
+          if builder.has_deferred_pages?
+            deferred = options.dup
+            deferred.fast_start = false
+            deferred.preserve_output = true
+            builder.render_deferred(deferred)
+          end
+        end
+
+        session.call
+        File.read("public/old/index.html").should eq("/og-images/mid.svg")
+        File.write("public/old/index.html", "untouched")
+        session.call
+        File.read("public/old/index.html").should eq("untouched")
+      end
+    end
+  end
+
+  # A fast-start `--cache` session must leave the cache describing what it
+  # wrote. It never recorded the page-set fingerprint or the render-input
+  # digest, so a later session whose inputs were back at an OLDER session's
+  # values matched those stale keys and kept this session's pages.
+  it "records the --cache keys once the deferred pages are written" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        write_post = ->(name : String, title : String, date : String) do
+          File.write("content/#{name}.md", "+++\ntitle = \"#{title}\"\ndate = #{date}\n+++\n")
+        end
+        write_post.call("a", "A", "2020-01-01")
+        write_post.call("b", "B", "2020-01-02")
+        write_post.call("c", "C", "2020-01-03")
+        File.write("templates/index.html", %({% for p in site.pages %}[{{ p.title }}]{% endfor %}{{ env("HWARO_SPEC_RENDER_INPUT", default="unset") }}))
+        File.write("templates/page.html", "{{ page.title }}")
+
+        session = ->(fast_start : Bool) do
+          builder = Hwaro::Core::Build::Builder.new
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, fast_start: fast_start, fast_start_count: 1)
+          options.serve_mode = true
+          builder.run(options).should be_true
+          if fast_start
+            builder.has_deferred_pages?.should be_true
+            deferred = options.dup
+            deferred.fast_start = false
+            deferred.preserve_output = true
+            builder.render_deferred(deferred)
+          end
+        end
+
+        ENV["HWARO_SPEC_RENDER_INPUT"] = "one"
+        session.call(false)
+        File.read("public/index.html").should eq("[A][B][C]one")
+
+        # Two edited posts: the newer one is the priority page, A is deferred.
+        write_post.call("a", "A2", "2020-01-01")
+        write_post.call("b", "B2", "2020-01-02")
+        ENV["HWARO_SPEC_RENDER_INPUT"] = "two"
+        session.call(true)
+        File.read("public/index.html").should eq("[A2][B2][C]two")
+
+        write_post.call("a", "A", "2020-01-01")
+        write_post.call("b", "B", "2020-01-02")
+        ENV["HWARO_SPEC_RENDER_INPUT"] = "one"
+        session.call(false)
+        File.read("public/index.html").should eq("[A][B][C]one")
+      ensure
+        ENV.delete("HWARO_SPEC_RENDER_INPUT")
       end
     end
   end

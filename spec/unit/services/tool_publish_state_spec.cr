@@ -290,6 +290,42 @@ describe "tool publication-state parity" do
   end
 
   describe Hwaro::Services::GeneratedContent do
+    it "lists a generated row a permalink pattern moves off a subsection index's URL" do
+      Dir.mktmpdir do |dir|
+        FileUtils.cd(dir) do
+          FileUtils.mkdir_p("content/products/red")
+          FileUtils.mkdir_p("data")
+          File.write("config.toml", <<-TOML
+            title = "S"
+            base_url = "https://example.com"
+
+            [permalinks]
+            products = "/shop/:slug/"
+
+            [[content.generate]]
+            source = "products"
+            section = "products"
+            slug = "id"
+            title = "name"
+            TOML
+          )
+          File.write("data/products.json", %([{"id": "red", "name": "Red"}]))
+          File.write("content/products/red/_index.md", "+++\ntitle = \"Red\"\n+++\n")
+
+          Hwaro::Services::GeneratedContent.infos("content").map(&.path).should eq(["products/red.md"])
+
+          # Front matter `path` moves the subsection index onto /shop/red/.
+          File.write("content/products/red/_index.md", "+++\ntitle = \"Red\"\npath = \"shop/red\"\n+++\n")
+          Hwaro::Services::GeneratedContent.infos("content").should be_empty
+          File.write("content/products/red/_index.md", "+++\ntitle = \"Red\"\n+++\n")
+
+          # Without the pattern the subsection index owns /products/red/.
+          File.write("config.toml", File.read("config.toml").sub(%(products = "/shop/:slug/"), ""))
+          Hwaro::Services::GeneratedContent.infos("content").should be_empty
+        end
+      end
+    end
+
     # A record missing the rule's `body` field fails every build; planning
     # without bodies listed its rows (and the rule's healthy ones) as
     # publishable with no hint that the build cannot run.
@@ -347,6 +383,38 @@ describe "tool publication-state parity" do
           infos = [] of Hwaro::Services::ContentInfo
           log = with_captured_log { infos = Hwaro::Services::GeneratedContent.infos("content") }
           infos.map(&.title).sort!.should eq(["A", "B"])
+          log.should_not contain("Skipping")
+        end
+      end
+    end
+
+    # Title/slug/description templates ARE rendered while planning, and the
+    # build resolves their includes from templates/ — the planner did not,
+    # so list/stats/doctor dropped every row of the rule.
+    it "lists rows of a rule whose templated title or description includes a partial" do
+      Dir.mktmpdir do |dir|
+        FileUtils.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("data")
+          FileUtils.mkdir_p("templates/partials")
+          File.write("templates/partials/brand.html", "Acme")
+          File.write("config.toml", <<-TOML
+            title = "S"
+            base_url = "https://example.com"
+
+            [[content.generate]]
+            source = "products"
+            section = "products"
+            slug = "id"
+            title = "{% include 'partials/brand.html' %} {{ item.name }}"
+            description = "{% include 'partials/brand.html' %}"
+            TOML
+          )
+          File.write("data/products.json", %([{"id": "a", "name": "A"}, {"id": "b", "name": "B"}]))
+
+          infos = [] of Hwaro::Services::ContentInfo
+          log = with_captured_log { infos = Hwaro::Services::GeneratedContent.infos("content") }
+          infos.map(&.title).sort!.should eq(["Acme A", "Acme B"])
           log.should_not contain("Skipping")
         end
       end

@@ -498,6 +498,19 @@ module Hwaro::Core::Build::Phases::Render
     digest.final.hexstring
   end
 
+  # A page's `image` as the cold build fingerprints it: before the hooks
+  # assign an auto OG image. A serve pass sees the assigned URL (the hooks
+  # ran, the re-parse keeps it), so what it recorded never matched the next
+  # start's value, and every listing it had re-rendered rendered again. The
+  # URL follows the page URL, which is folded already. (ponytail: a front
+  # matter `image` pointing into the auto-OG directory is ignored too.)
+  private def fp_image(p : Models::Page) : String
+    image = p.image
+    return "" unless image
+    ai = @config.try(&.og.auto_image)
+    ai && ai.enabled && Content::Seo::OgImage.auto_assigned?(image, ai) ? "" : image
+  end
+
   # One page's contribution to the page-set fingerprint — also how the
   # relations hash folds each page another page renders a piece of.
   private def fp_page(digest : ::Digest, p : Models::Page, fields : Builder::ListingPageFields) : Nil
@@ -522,7 +535,7 @@ module Hwaro::Core::Build::Phases::Render
     fp_value(digest, p.in_sitemap ? "1" : "0")
     fp_value(digest, p.in_search_index ? "1" : "0")
     fp_value(digest, p.section)
-    fp_value(digest, p.image || "")
+    fp_value(digest, fp_image(p))
     fp_value(digest, p.series || "")
     fp_list(digest, p.authors)
     fp_list(digest, p.tags)
@@ -546,6 +559,14 @@ module Hwaro::Core::Build::Phases::Render
     end
     # Listings can read `p.translation_key`; folded only when set.
     p.translation_key.try { |key| fp_value(digest, "k:#{key}") }
+    # And `p.translations`, derived from the counterparts: one turning into
+    # a `redirect_to` stub leaves the switcher with no field above moving.
+    # Folded only when set, so single-language sites keep their digest.
+    p.translations.each do |t|
+      fp_value(digest, "tr:#{t.code}")
+      fp_value(digest, t.url)
+      fp_value(digest, t.title)
+    end
     # A transparent subsection lists its pages in the parent's
     # `section.pages` instead of itself, so flipping it changes what every
     # page of the parent section lists. Folded only when set, so sites
@@ -797,9 +818,15 @@ module Hwaro::Core::Build::Phases::Render
   end
 
   # Drop the hashes of pages the render skipped, so a later serve rebuild
-  # of one cannot record a value from this earlier pass.
-  private def clear_filter_relations_hashes : Nil
-    @page_template_hash_mutex.synchronize { @filter_relations_hashes.clear }
+  # of one cannot record a value from this earlier pass. Fast-start's
+  # deferred pages (`keep`) hold theirs for render_deferred: recomputed after
+  # the background hooks filled an auto OG `image`, the recorded value never
+  # matched the next start's comparison and every one re-rendered.
+  private def clear_filter_relations_hashes(keep : Array(Models::Page)? = nil) : Nil
+    paths = keep.try(&.map(&.path).to_set)
+    @page_template_hash_mutex.synchronize do
+      paths ? @filter_relations_hashes.select! { |path, _| paths.includes?(path) } : @filter_relations_hashes.clear
+    end
   end
 
   # Fingerprint of what this page renders from OTHER pages (see

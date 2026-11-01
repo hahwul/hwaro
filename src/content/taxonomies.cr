@@ -23,10 +23,13 @@ module Hwaro
         # A caller-supplied builder may have run an earlier pass into this
         # same output directory (the serve session's builder); it removes
         # what that pass wrote and this one no longer does. See
-        # `Builder#track_taxonomy_outputs`.
-        return generate_untracked(site, output_dir, templates, verbose, builder) unless builder
-        builder.track_taxonomy_outputs(output_dir) do
-          generate_untracked(site, output_dir, templates, verbose, builder)
+        # `Builder#track_taxonomy_outputs`. Every build renders these pages
+        # again, so their reads key nothing (TemplateEngine.without_render_reads).
+        Processors::TemplateEngine.without_render_reads do
+          next generate_untracked(site, output_dir, templates, verbose, builder) unless builder
+          builder.track_taxonomy_outputs(output_dir) do
+            generate_untracked(site, output_dir, templates, verbose, builder)
+          end
         end
       end
 

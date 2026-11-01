@@ -430,7 +430,17 @@ module Hwaro
             return
           end
           @last_taxonomy_outputs = relative
-          prune_stale_taxonomy_outputs(previous - relative, output_dir) if previous
+          return unless previous
+          prune_stale_taxonomy_outputs(previous - relative, output_dir)
+          # A serve pass: put what it wrote on the `--cache` record of
+          # generated outputs, so the next start prunes a term the session
+          # added and an offline edit removed (Finalize's stale list). The
+          # Finalize of the next full build rewrites the record.
+          @cache.try do |cache|
+            recorded = cache.previous_generated_outputs
+            added = relative - recorded.to_set
+            cache.record_generated_outputs((recorded + added.to_a).sort!) unless added.empty?
+          end
         end
 
         private def prune_stale_taxonomy_outputs(stale : Set(String), output_dir : String) : Nil

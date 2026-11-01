@@ -182,8 +182,15 @@ module Hwaro
         # Quote-aware tag scans: `media="(width >= 600px)"` or
         # `title="a > b"` does not end the tag.
         AMP_LINK_TAG_RE = /<link\b#{Utils::TextUtils::HTML_TAG_ATTRS_QUOTED_VALUES}>/i
-        AMP_VIDEO_RE    = /<video(#{Utils::TextUtils::HTML_TAG_ATTRS_QUOTED_VALUES})>(.*?)<\/video>/mi
-        AMP_IFRAME_RE   = /<iframe(#{Utils::TextUtils::HTML_TAG_ATTRS_QUOTED_VALUES})>(.*?)<\/iframe>/mi
+        # What follows an end tag's name, through its `>`, in any form
+        # (`</iframe >`, `</iframe x="a>b">`): an exact one ran on to the next
+        # element's. A quote opens a value only after `=`, as in a start tag.
+        # Neither runs past a `<`: every `</iframe` before an unclosed tail
+        # rescanned to the end of the page (quadratic).
+        AMP_END_TAG_TAIL = %q((?:[\s\/](?:[^<>=]++|=\s*+"[^"<]*+"|=\s*+'[^'<]*+'|=)*+)?>)
+        AMP_VIDEO_RE     = /<video(#{Utils::TextUtils::HTML_TAG_ATTRS_QUOTED_VALUES})>(.*?)<\/video#{AMP_END_TAG_TAIL}/mi
+        AMP_IFRAME_RE    = /<iframe(#{Utils::TextUtils::HTML_TAG_ATTRS_QUOTED_VALUES})>(.*?)<\/iframe#{AMP_END_TAG_TAIL}/mi
+        AMP_SCRIPT_RE    = /<script(?=[\s\/>])(?![^>]*type=["']application\/ld\+json["'])(?![^>]*src=["']https:\/\/cdn\.ampproject\.org)[^>]*>[\s\S]*?<\/script#{AMP_END_TAG_TAIL}/mi
 
         private def self.strip_non_amp_attributes(attrs : String) : String
           attrs.gsub(AMP_DISALLOWED_ATTR_RE, "")
@@ -285,8 +292,11 @@ module Hwaro
           # cdn.ampproject.org). Use [\s\S]*? instead of .*? to match across
           # newlines. An `async` attribute is NOT an exemption: it let every
           # third-party async script (analytics, the tweet shortcode's
-          # widgets.js) through, and AMP forbids all of them.
-          result = result.gsub(/<script(?![^>]*type=["']application\/ld\+json["'])(?![^>]*src=["']https:\/\/cdn\.ampproject\.org)[^>]*>[\s\S]*?<\/script>/mi, "")
+          # widgets.js) through, and AMP forbids all of them. A script ends at
+          # its end tag in any form (`</script >`) — an exact `</script>` ran
+          # on through the page to the next one — and `<script-loader>` is
+          # not one.
+          result = result.gsub(AMP_SCRIPT_RE, "")
 
           # Remove disallowed external stylesheets. AMP forbids
           # `<link rel="stylesheet">` except from allowlisted font providers;
@@ -429,9 +439,10 @@ module Hwaro
             # blocks, and fold it into the single amp-custom injected below.
             # Done only on this path so the CSS is never stripped without being
             # re-injected (a theme that already ships its own boilerplate keeps
-            # its <style> blocks untouched).
+            # its <style> blocks untouched). A block ends at its end tag in any
+            # form (`</style >`), and `<style-x>` is not one.
             theme_css = [] of String
-            result = result.gsub(/<style(?![^>]*amp-boilerplate)(?![^>]*amp-custom)[^>]*>([\s\S]*?)<\/style>/mi) do
+            result = result.gsub(/<style(?=[\s\/>])(?![^>]*amp-boilerplate)(?![^>]*amp-custom)[^>]*>([\s\S]*?)<\/style#{AMP_END_TAG_TAIL}/mi) do
               theme_css << $1
               ""
             end

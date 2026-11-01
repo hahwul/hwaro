@@ -290,6 +290,27 @@ describe "ContentGenerate.authored_twin_exists?" do
       end
     end
   end
+
+  it "detects the default-language spelling and a subsection index" do
+    Dir.mktmpdir do |dir|
+      FileUtils.cd(dir) do
+        FileUtils.mkdir_p("content/products/sub")
+        FileUtils.mkdir_p("content/products/bundle")
+        File.write("content/products/red.en.md", "x")
+        File.write("content/products/ko-only.ko.md", "x")
+        File.write("content/products/sub/_index.md", "x")
+        File.write("content/products/bundle/index.en.md", "x")
+
+        ContentGenerate.authored_twin_exists?("products/red.md", default_language: "en").should be_true
+        ContentGenerate.authored_twin_exists?("products/bundle.md", default_language: "en").should be_true
+        ContentGenerate.authored_twin_exists?("products/sub.md").should be_true
+        # A translation is another language's page, not this URL's owner.
+        ContentGenerate.authored_twin_exists?("products/ko-only.md", default_language: "en").should be_false
+        # Without a multilingual site `.en` is just part of the file name.
+        ContentGenerate.authored_twin_exists?("products/red.md").should be_false
+      end
+    end
+  end
 end
 
 describe "ContentLister with generated entries" do

@@ -21,7 +21,8 @@ module Hwaro
 
           ->(source : String, context : Hash(String, Crinja::Value)) do
             env = create_fresh_crinja_env
-            env.from_string(source).render(context)
+            # Rendered by every build, so its reads key nothing.
+            Content::Processors::TemplateEngine.without_render_reads { env.from_string(source).render(context) }
           end
         end
 

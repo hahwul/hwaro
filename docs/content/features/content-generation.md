@@ -73,11 +73,11 @@ Templates see the full source record as `page.extra.item`, so there is no need t
 
 ## Collisions
 
-An authored file always wins a contested path: if `content/products/red-widget.md` exists, a generated page for the same slug is dropped with a warning, never the other way around. Two records producing the same slug fail the build, naming both records.
+An authored file always wins a contested path: if `content/products/red-widget.md` exists (or a draft of it, its leaf bundle `red-widget/index.md`, a subsection `red-widget/_index.md` that publishes the same URL, or on a multilingual site the default-language spelling `red-widget.en.md`), a generated page for the same slug is dropped with a warning, never the other way around. A dropped page is no one's prev/next (`page.lower`/`page.higher`), series member, related post or backlink, and stays out of listings, the sitemap, feeds and search. Two records producing the same slug fail the build, naming both records.
 
 ## Rebuilds and Caching
 
-Generated content moves with its data. Editing a `data/` file (or a changed `[[data.remote]]` payload) invalidates cached pages the same way a config edit does, and `hwaro serve` triggers a rebuild on data edits. Under `build --cache`, generated pages are always re-rendered (they have no source file to fingerprint), while authored pages keep their cache behavior.
+Generated content moves with its data. Editing a `data/` file (or a changed `[[data.remote]]` payload) invalidates cached pages the same way a config edit does, and `hwaro serve` triggers a rebuild on data edits, and on edits to a `body_template` or to a partial that it or an inline template spec includes. Under `build --cache`, generated pages are always re-rendered (they have no source file to fingerprint), while authored pages keep their cache behavior.
 
 If a record disappears from the data, its page is gone from the next build's page set, and its previously written file is removed from the output directory, under `build --cache` and `hwaro serve` alike, as for a deleted authored file.
 

@@ -63,7 +63,10 @@ module Hwaro::Core::Build::Phases::Write
     section_list = ""
     toc = ""
 
-    final_html = apply_template(template, content, page, site, section_list, toc, templates, template_name: "404", global_vars: global_vars)
+    # Rendered by every build, so its reads key nothing.
+    final_html = Content::Processors::TemplateEngine.without_render_reads do
+      apply_template(template, content, page, site, section_list, toc, templates, template_name: "404", global_vars: global_vars)
+    end
 
     final_html = Utils::HtmlMinifier.minify(final_html) if minify
     final_html = privacy_rewrite(final_html)

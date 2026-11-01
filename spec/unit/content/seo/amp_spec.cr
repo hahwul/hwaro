@@ -382,6 +382,24 @@ describe Hwaro::Content::Seo::Amp do
       result.should_not contain("alert(1)")
     end
 
+    # Regression: the removal ended a script only at an exact `</script>`, so
+    # one closed by `</script >` ran on to the next script's end and took the
+    # page content between with it; `<script-loader>` opened one too.
+    it "removes a script closed with whitespace, and only that script" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+
+      html = %(<html><head></head><body><script>a()</script ><p>Keep one</p><SCRIPT>b()</SCRIPT\n>) +
+             %(<script-loader>w</script-loader><p>Keep two</p><script>c()</script></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should contain("<p>Keep one</p>")
+      result.should contain("<script-loader>w</script-loader><p>Keep two</p>")
+      result.should_not contain("a()")
+      result.should_not contain("b()")
+      result.should_not contain("c()")
+    end
+
     it "removes multiline script tags" do
       page = Hwaro::Models::Page.new("test.md")
       page.url = "/test/"
@@ -439,6 +457,22 @@ describe Hwaro::Content::Seo::Amp do
       custom.should_not contain("@layer")
     end
 
+    # Regression: a theme <style> ended only at an exact `</style>`, so one
+    # closed by `</style >` was folded into amp-custom together with the page
+    # up to the next one; `<style-x>` opened one too.
+    it "folds a theme style closed with whitespace, and only that style" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      html = "<html><head><style>a{color:red}</style ></head><body><p>Keep me</p><style>b{}</style>" \
+             "<style-x>c</style-x><p>Keep two</p></body></html>"
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, Hwaro::Models::Config.new)
+      custom = result[/<style amp-custom>([\s\S]*?)<\/style>/, 1]
+      custom.should contain("a{color:red}")
+      custom.should contain("b{}")
+      custom.should_not contain("Keep")
+      result.should contain("<body><p>Keep me</p><style-x>c</style-x><p>Keep two</p></body>")
+    end
+
     # Regression: the codepen shortcode / CodePen embed snippet (height only,
     # allowfullscreen="true", frameborder="no") became an invalid amp-iframe.
     it "converts a height-only embed iframe into a valid amp-iframe" do
@@ -494,6 +528,52 @@ describe Hwaro::Content::Seo::Amp do
       result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
       result.should contain("<amp-iframe")
       result.should_not contain("<iframe")
+    end
+
+    # Regression: only an exact `</iframe>` / `</video>` ended the element, so
+    # one closed by `</iframe >` swallowed the content up to the next one.
+    it "converts an iframe or video closed with whitespace, and only that element" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+
+      html = %(<html><head></head><body><iframe src="https://a.com/x"></iframe ><p>One</p>) +
+             %(<iframe src="https://b.com/y"></iframe><video src="/a.mp4"></VIDEO\n><p>Two</p><video src="/b.mp4"></video></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should contain("</amp-iframe><p>One</p><amp-iframe")
+      result.should contain("</amp-video><p>Two</p><amp-video")
+      result.should_not contain("<iframe")
+      result.should_not contain("<video")
+    end
+
+    # Regression: the end tag's tail ended at its first `>`, even one inside
+    # a quoted value.
+    it "ends an end tag at its own `>`, past a quoted value" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+
+      html = %(<html><head></head><body><iframe src="https://a.com/x"></iframe foo="a>b"><p>One</p>) +
+             %(<script>a()</script x='c>d'><p>Two</p></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should contain(%(</amp-iframe><p>One</p>))
+      result.should contain("<p>Two</p>")
+      result.should_not contain(%(b">))
+      result.should_not contain(%(d'>))
+    end
+
+    # Regression: every candidate end tag with no `>` rescanned to the end of
+    # the page.
+    it "scans candidate end tags in linear time" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+      # No `>` after the script opener: a real page always has one, which
+      # hid the cost (and let the old tail run on to it).
+      noise = "<html><head></head><body><script>" + "</script a=\"" * 40_000
+      started = Time.instant
+      Hwaro::Content::Seo::Amp.convert_to_amp(noise, page, config)
+      (Time.instant - started).should be < 1.second
     end
 
     it "adds a sandbox attribute and amp-iframe extension script" do
