@@ -351,6 +351,38 @@ describe "tool publication-state parity" do
         end
       end
     end
+
+    # Title/slug/description templates ARE rendered while planning, and the
+    # build resolves their includes from templates/ — the planner did not,
+    # so list/stats/doctor dropped every row of the rule.
+    it "lists rows of a rule whose templated title or description includes a partial" do
+      Dir.mktmpdir do |dir|
+        FileUtils.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("data")
+          FileUtils.mkdir_p("templates/partials")
+          File.write("templates/partials/brand.html", "Acme")
+          File.write("config.toml", <<-TOML
+            title = "S"
+            base_url = "https://example.com"
+
+            [[content.generate]]
+            source = "products"
+            section = "products"
+            slug = "id"
+            title = "{% include 'partials/brand.html' %} {{ item.name }}"
+            description = "{% include 'partials/brand.html' %}"
+            TOML
+          )
+          File.write("data/products.json", %([{"id": "a", "name": "A"}, {"id": "b", "name": "B"}]))
+
+          infos = [] of Hwaro::Services::ContentInfo
+          log = with_captured_log { infos = Hwaro::Services::GeneratedContent.infos("content") }
+          infos.map(&.title).sort!.should eq(["Acme A", "Acme B"])
+          log.should_not contain("Skipping")
+        end
+      end
+    end
   end
 
   describe Hwaro::Services::ContentValidator do

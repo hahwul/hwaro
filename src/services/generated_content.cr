@@ -52,6 +52,10 @@ module Hwaro
         disk_data = Core::Build::DataDisk.load_hash
         remote_keys = config.data_remote.map(&.key.downcase)
         env = Content::Processors::TemplateEngine.new.env
+        # A templated title/slug/description may `{% include %}` a partial,
+        # which the build resolves from templates/ — so must the planner, or
+        # every row of that rule is skipped as a failure.
+        env.loader = Crinja::Loader::FileSystemLoader.new("templates/") if Dir.exists?("templates")
         now = Time.utc
 
         infos = [] of ContentInfo
@@ -74,10 +78,8 @@ module Hwaro
           # A plain `body` FIELD spec is evaluated too: a record missing that
           # field fails every build ("missing field 'body'"), and skipping
           # bodies listed those rows as publishable. A templated body (`{{ …
-          # }}` / `{% … %}`) and `body_template` stay unevaluated — they may
-          # `{% include %}` from templates/, and this planner's environment
-          # has no template loader, so rendering them here failed rules the
-          # build renders fine.
+          # }}` / `{% … %}`) and `body_template` stay unevaluated: rows need
+          # identities only, and rendering markdown bodies is the build's job.
           plan_bodies = rule.body_template.nil? &&
                         (body = rule.body) && !Core::Build::ContentGenerate.template_spec?(body)
           plans = begin
