@@ -308,6 +308,7 @@ module Hwaro
           partial : Bool = false,
           parallel : Bool = true,
           forced_slug : String? = nil,
+          static_copied : Proc(String, Bool)? = nil,
         )
           ai = config.og.auto_image
           return {generated: 0, skipped: 0} unless ai.enabled
@@ -449,7 +450,12 @@ module Hwaro
             expected_png = File.join(img_dir, "#{slug}.png")
             expected_svg = File.join(img_dir, "#{slug}.svg")
 
-            if !config_changed && old_entries[slug]? == page_hash
+            # `static_copied` answers whether this build's static copy just
+            # wrote a file (`static/og-images/<slug>.svg`) over the image.
+            # A cold build regenerates on top of it; counting the manifest
+            # hit published the user's bytes on every warm `--cache` build.
+            expected = ext == "png" ? expected_png : expected_svg
+            if !config_changed && old_entries[slug]? == page_hash && !static_copied.try(&.call(expected))
               if ext == "png" && File.exists?(expected_png)
                 page.image = "/#{ai.output_dir}/#{slug}.png"
                 skipped += 1

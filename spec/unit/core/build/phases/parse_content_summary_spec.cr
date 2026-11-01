@@ -198,3 +198,81 @@ describe "marker summary on a page object that had an excerpt" do
     page.summary_truncated.should be_false
   end
 end
+
+# A summary shortcode reads the site's pages like the body's does. The full
+# build renders summaries before Transform publishes `site.pages`, so
+# `get_page` found nothing there and listings printed an empty `<b></b>`
+# (serve, rendering summaries post-Transform, printed the title).
+describe "summary shortcodes reading the page set" do
+  it "resolves get_page in marker and automatic summaries" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "_index.md" => "+++\ntitle = \"Home\"\n+++\n",
+        "a.md"      => "+++\ntitle = \"A\"\n+++\nA mentions {{ btitle() }} here.\n",
+        "c.md"      => "+++\ntitle = \"C\"\n+++\nC {{ btitle() }} first\n<!-- more -->\nrest\n",
+        "b.md"      => "+++\ntitle = \"Bee\"\n+++\nB body\n",
+      },
+      template_files: {
+        "page.html"              => "{{ content }}",
+        "section.html"           => "{% for p in section.pages %}[{{ p.title }}::{{ p.summary | safe }}]{% endfor %}",
+        "shortcodes/btitle.html" => %(<b>{{ get_page(path="b.md").title }}</b>),
+      },
+    ) do |dir|
+      html = File.read(File.join(dir, "public", "index.html"))
+      html.should contain("[A::<p>A mentions Bee here.</p>")
+      html.should contain("[C::<p>C <b>Bee</b> first</p>")
+    end
+  end
+end
+
+# The summary pass builds shortcode contexts — page values for every page
+# and each page's neighbours — before og:auto_image sets `page.image`. Render
+# reused those cached values, so listings printed no image for pages whose
+# summary that pass did not recompute (a description, no marker) and for
+# the neighbours of a page with a summary shortcode.
+describe "summary shortcodes and later page fields" do
+  it "lists og:auto_image images of every page" do
+    config = BASIC_CONFIG + %(\n[og.auto_image]\nenabled = true\nformat = "svg"\n)
+    content = {
+      "posts/_index.md" => "+++\ntitle = \"Posts\"\n+++\n",
+      "posts/a.md"      => "+++\ntitle = \"A\"\n+++\nHello {{ hi() }}.\n\n<!-- more -->\n\nRest.\n",
+    }
+    %w[b c d].each { |n| content["posts/#{n}.md"] = "+++\ntitle = \"#{n.upcase}\"\ndescription = \"#{n} desc\"\n+++\nBody.\n" }
+    build_site(config, content_files: content, template_files: {
+      "page.html"          => "{{ content }}",
+      "section.html"       => "{% for p in section.pages %}[{{ p.title }}={{ p.image }}]{% endfor %}",
+      "shortcodes/hi.html" => "HI",
+    }) do |dir|
+      html = File.read(File.join(dir, "public", "posts", "index.html"))
+      %w[a b c d].each { |n| html.should contain("[#{n.upcase}=/og-images/posts-#{n}.svg]") }
+    end
+  end
+end
+
+# C's summary prints A's summary through a shortcode. While the summary pass
+# runs, A's page value held its raw `<!-- more -->` chunk, so C published
+# A's unrendered `{{ t(...) }}` source.
+describe "summary shortcodes reading another page's summary" do
+  it "prints the other page's rendered summary" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "_index.md" => "+++\ntitle = \"Home\"\n+++\n",
+        "a.md"      => "+++\ntitle = \"A\"\n+++\nSee {{ t(path=\"b.md\") }} now.\n\n<!-- more -->\n\nRest.\n",
+        "b.md"      => "+++\ntitle = \"Bee\"\n+++\nB body\n",
+        "c.md"      => "+++\ntitle = \"C\"\n+++\nReads {{ s(path=\"a.md\") }} end.\n\n<!-- more -->\n\nRest.\n",
+      },
+      template_files: {
+        "page.html"         => "{{ content }}",
+        "section.html"      => "{% for p in section.pages %}[{{ p.title }}::{{ p.summary | safe }}]{% endfor %}",
+        "shortcodes/t.html" => "{% set q = get_page(path=path) %}({{ q.title }})",
+        "shortcodes/s.html" => "{% set q = get_page(path=path) %}<<{{ q.summary }}>>",
+      },
+    ) do |dir|
+      html = File.read(File.join(dir, "public", "index.html"))
+      html.should_not contain("{{")
+      html.should contain("[C::<p>Reads <<<p>See (Bee) now.</p>\n>> end.</p>")
+    end
+  end
+end

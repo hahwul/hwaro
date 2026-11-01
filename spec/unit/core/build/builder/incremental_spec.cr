@@ -139,6 +139,152 @@ describe "Builder#run_incremental listing fan-out" do
   end
 end
 
+describe "Builder#run_incremental term body shortcodes" do
+  # A term `_index.md` is headless: only its body (`term_content`) renders,
+  # and a shortcode in it reads other pages like one in any page body does.
+  it "refreshes a term body that reads an edited page through a shortcode" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[[taxonomies]]\nname = "tags"\n))
+        FileUtils.mkdir_p("content/tags/t")
+        FileUtils.mkdir_p("templates/shortcodes")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("templates/section.html", "{{ content }}")
+        File.write("templates/taxonomy.html", "{{ content }}")
+        File.write("templates/taxonomy_term.html", %(<div class="tc">{{ term_content }}</div>))
+        File.write("templates/shortcodes/ptitle.html", "<b>{{ get_page(path=path).title }}</b>")
+        File.write("templates/shortcodes/plist.html", %({% for p in get_section(path="_index.md").pages %}<i>{{ p.title }}</i>{% endfor %}))
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/a.md", "+++\ntitle = \"A\"\ntags = [\"t\"]\n+++\na\n")
+        File.write("content/b.md", "+++\ntitle = \"B1\"\n+++\nb\n")
+        File.write("content/tags/t/_index.md", %(+++\ntitle = "T"\n+++\nSee {{ ptitle(path="b.md") }} {{ plist() }}\n))
+
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/b.md"], options)
+        term = "public/tags/t/index.html"
+        File.read(term).should contain("<b>B1</b> <i>A</i><i>B1</i>")
+
+        File.write("content/b.md", "+++\ntitle = \"B2\"\n+++\nb\n")
+        builder.run_incremental(["content/b.md"], options).should be_true
+        File.read(term).should contain("<b>B2</b> <i>A</i><i>B2</i>")
+
+        # The same through a combined content + template pass.
+        File.write("templates/page.html", "<main>{{ content }}</main>")
+        File.write("content/b.md", "+++\ntitle = \"B3\"\n+++\nb\n")
+        builder.run_incremental_then_rerender(["content/b.md"], options).should be_true
+        File.read(term).should contain("<b>B3</b> <i>A</i><i>B3</i>")
+      end
+    end
+  end
+
+  # A term body's entry template (`section.html`) never renders it, so its
+  # listing markers must not select a body without shortcodes.
+  it "leaves term bodies without shortcodes alone" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[[taxonomies]]\nname = "tags"\n))
+        FileUtils.mkdir_p("templates/shortcodes")
+        File.write("templates/page.html", "{{ content }}")
+        FileUtils.mkdir_p("content")
+        File.write("templates/section.html", "{% for p in section.pages %}{{ p.title }}{% endfor %}{{ content }}")
+        File.write("templates/taxonomy.html", "{{ content }}")
+        File.write("templates/taxonomy_term.html", "{{ term_content }}")
+        File.write("templates/shortcodes/ptitle.html", "<b>{{ get_page(path=path).title }}</b>")
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/b.md", "+++\ntitle = \"B1\"\n+++\nb\n")
+        %w[t u v w].each do |t|
+          FileUtils.mkdir_p("content/tags/#{t}")
+          File.write("content/#{t}.md", "+++\ntitle = \"#{t}\"\ntags = [\"#{t}\"]\n+++\nx\n")
+          File.write("content/tags/#{t}/_index.md", "+++\ntitle = \"#{t}\"\n+++\nplain\n")
+        end
+        File.write("content/tags/t/_index.md", %(+++\ntitle = "t"\n+++\nSee {{ ptitle(path="b.md") }}\n))
+
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/b.md"], options)
+
+        File.write("content/b.md", "+++\ntitle = \"B2\"\n+++\nb\n")
+        log = with_captured_log { builder.run_incremental(["content/b.md"], options).should be_true }
+        File.read("public/tags/t/index.html").should contain("<b>B2</b>")
+        # b, its reading-order neighbour, the home listing and the one body
+        # with a shortcode — not the u/v/w bodies.
+        log.should contain("rebuilt: 4/")
+      end
+    end
+  end
+end
+
+describe "Builder#run_incremental summary shortcodes" do
+  # A and C never change, but their summaries print B's title through a
+  # shortcode, and the listing prints those summaries.
+  it "refreshes the summaries of pages whose shortcodes read an edited page" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates/shortcodes")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("templates/section.html", "{% for p in section.pages %}[{{ p.title }}::{{ p.summary | safe }}]{% endfor %}")
+        File.write("templates/shortcodes/btitle.html", %(<b>{{ get_page(path="b.md").title }}</b>))
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/a.md", "+++\ntitle = \"A\"\n+++\nA mentions {{ btitle() }} here.\n")
+        File.write("content/c.md", "+++\ntitle = \"C\"\n+++\nC {{ btitle() }} first\n<!-- more -->\nrest\n")
+        File.write("content/b.md", "+++\ntitle = \"B1\"\n+++\nb\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/b.md"], options)
+        File.read("public/index.html").should contain("[A::<p>A mentions B1 here.</p>")
+
+        File.write("content/b.md", "+++\ntitle = \"B2\"\n+++\nb\n")
+        builder.run_incremental(["content/b.md"], options).should be_true
+        html = File.read("public/index.html")
+        html.should contain("[A::<p>A mentions B2 here.</p>")
+        html.should contain("[C::<p>C <b>B2</b> first</p>")
+      end
+    end
+  end
+
+  # C's summary prints A's, which prints B's title: both are recomputed in
+  # one pass, and C must read A's NEW summary, as a cold build does.
+  it "refreshes a summary that prints another recomputed summary" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates/shortcodes")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("templates/section.html", "{% for p in section.pages %}[{{ p.title }}::{{ p.summary | safe }}]{% endfor %}")
+        File.write("templates/shortcodes/t.html", "{% set q = get_page(path=path) %}({{ q.title }})")
+        File.write("templates/shortcodes/s.html", "{% set q = get_page(path=path) %}<<{{ q.summary }}>>")
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/a.md", "+++\ntitle = \"A\"\n+++\nSee {{ t(path=\"b.md\") }} now.\n\n<!-- more -->\n\nRest.\n")
+        File.write("content/c.md", "+++\ntitle = \"C\"\n+++\nReads {{ s(path=\"a.md\") }} end.\n\n<!-- more -->\n\nRest.\n")
+        File.write("content/b.md", "+++\ntitle = \"B1\"\n+++\nb\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/b.md"], options)
+
+        File.write("content/b.md", "+++\ntitle = \"B2\"\n+++\nb\n")
+        builder.run_incremental(["content/b.md"], options).should be_true
+        File.read("public/index.html").should contain("[C::<p>Reads <<<p>See (B2) now.</p>\n>> end.</p>")
+      end
+    end
+  end
+end
+
 describe "Builder#run_incremental version roots" do
   it "refreshes page.version.url when a translated version root stops rendering" do
     Dir.mktmpdir do |dir|

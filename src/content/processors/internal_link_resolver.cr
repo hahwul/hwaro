@@ -1,6 +1,7 @@
 require "html"
 require "uri"
 require "../../utils/text_utils"
+require "./markdown_extensions"
 
 # Internal Link Resolver
 #
@@ -69,16 +70,27 @@ module Hwaro
           ids.includes?(raw) || ids.includes?(id) || id.compare("top", case_insensitive: true) == 0
         end
 
-        # Matches a plain root-relative href/src value (e.g. href="/posts/").
-        # `\/[^\/"]` excludes protocol-relative `//host` URLs; the alternation
-        # also allows a bare `/` (the homepage link).
-        ROOT_RELATIVE_ATTR_REGEX = /\b(href|src)="(\/(?:[^\/"][^"]*)?)"/
+        # An opening tag carrying at least one `href`/`src`/`srcset` outside
+        # its quoted values (any case). As in HTML, a quote opens a value only
+        # right after `=` (a stray one, `alt=don't`, is text); quoted values
+        # are skipped whole. The unquoted run stops only at an `h`/`s` to test
+        # for a link name, so every other tag fails without a match being
+        # built. A `<` ends an unquoted run, so a stray `<` in text cannot
+        # drag a scan to the next `>`. Possessive, so nothing backtracks.
+        LINK_TAG_REGEX = /<[a-zA-Z][^\s\/<>]*+(?:[^<>=hs]++|=\s*+"[^"]*+"|=\s*+'[^']*+'|=|(?!\b(?:srcset|href|src)=)[hs])*+\b(?:srcset|href|src)=(?:"[^"]*+"|'[^']*+')?+(?:[^<>=]++|=\s*+"[^"]*+"|=\s*+'[^']*+'|=)*+>/i
 
-        # Matches any href/src attribute value (relative or absolute).
-        ANY_LINK_ATTR_REGEX = /\b(href|src)="([^"]*)"/
+        # One `href`/`src`/`srcset` attribute inside a LINK_TAG_REGEX match, in
+        # any case and quote style: `$1` = `name=`, `$2` = name, `$3` = the
+        # quote (empty when unquoted), `$4` = value. An unquoted value ends at
+        # whitespace or `>`, and never starts with `\`: `href=\"/x/\"` is a
+        # JS-escaped quote in a script string, not a value. The first two
+        # alternatives step over every other quoted value whole, so
+        # `title="href='/x'"` is not a link; `\b` keeps `data-src=` (lazy
+        # loaders) in.
+        LINK_ATTR_REGEX = /=\s*+"[^"]*+"|=\s*+'[^']*+'|\b((srcset|href|src)=)(?|(")([^"]*+)"|(')([^']*+)'|()([^\s"'`>\\][^\s>]*+))/i
 
-        # A `srcset` attribute: comma-separated `url [descriptor]` candidates.
-        SRCSET_ATTR_REGEX = /\bsrcset="([^"]*)"/
+        # Cheap any-case probe for a link attribute, behind the byte probes.
+        LINK_ATTR_PROBE = /(?:href|src|srcset)=/i
 
         # A URI scheme prefix (e.g. `https:`, `mailto:`, `tel:`, `data:`).
         SCHEME_PREFIX_REGEX = /\A[a-zA-Z][a-zA-Z0-9+.\-]*:/
@@ -255,7 +267,8 @@ module Hwaro
         # the same value by construction).
         def prefix_root_relative_links(html : String, base_url : String, base_path : String? = nil) : String
           return html if base_url.empty?
-          return html unless Utils::ByteScan.includes?(html, "=\"/")
+          return html unless Utils::ByteScan.includes?(html, "=\"/") || Utils::ByteScan.includes?(html, "='/") ||
+                             Utils::ByteScan.includes?(html, "=/")
 
           base_path ||= URI.parse(base_url).path.rstrip("/")
           return html if base_path.empty?
@@ -268,22 +281,20 @@ module Hwaro
 
           # Leave values that already carry the base_path (e.g. links the
           # InternalLinkResolver pass above already resolved) untouched.
-          result = html.gsub(ROOT_RELATIVE_ATTR_REGEX) do |match|
-            needs_prefix.call($2) ? "#{$1}=\"#{base_path}#{$2}\"" : match
-          end
-          return result unless Utils::ByteScan.includes?(result, "srcset=\"")
-
           # An author's `<img srcset>` / `<picture><source srcset>` names one
           # URL per candidate; the browser prefers them over `src`, so every
           # root-relative candidate needs the prefix too.
-          result.gsub(SRCSET_ATTR_REGEX) do |match|
-            value = $1
-            prefixed = value
-            Utils::TextUtils.srcset_url_spans(value).reverse_each do |(start, stop)|
-              next unless needs_prefix.call(value[start...stop])
-              prefixed = prefixed[0, start] + base_path + prefixed[start..]
+          rewrite_link_attrs(html) do |srcset, value|
+            if srcset
+              prefixed = value
+              Utils::TextUtils.srcset_url_spans(value).reverse_each do |(start, stop)|
+                next unless needs_prefix.call(value[start...stop])
+                prefixed = prefixed[0, start] + base_path + prefixed[start..]
+              end
+              prefixed
+            elsif needs_prefix.call(value)
+              "#{base_path}#{value}"
             end
-            prefixed == value ? match : %(srcset="#{prefixed}")
           end
         rescue URI::Error
           html
@@ -312,44 +323,67 @@ module Hwaro
         # host-less `page_url` ("/posts/b1/") yields root-relative results.
         def absolutize_links(html : String, page_url : String, document_relative_only : Bool = false) : String
           return html if page_url.empty?
-          return html unless Utils::ByteScan.includes?(html, "href=\"") || Utils::ByteScan.includes?(html, "src=\"") ||
-                             Utils::ByteScan.includes?(html, "srcset=\"")
+          return html unless Utils::ByteScan.includes?(html, "href=") || Utils::ByteScan.includes?(html, "src=") ||
+                             html.matches?(LINK_ATTR_PROBE)
 
           base = URI.parse(page_url)
           return html if base.host.nil? && !document_relative_only
 
-          html.gsub(ANY_LINK_ATTR_REGEX) do |match|
-            attr = $1
-            value = $2
-            if value.empty? || absolute_or_anchor?(value) || (document_relative_only && value.starts_with?('/'))
-              match
-            else
+          skip = ->(url : String) do
+            url.empty? || absolute_or_anchor?(url) || (document_relative_only && url.starts_with?('/'))
+          end
+
+          rewrite_link_attrs(html) do |srcset, value|
+            if srcset
+              result = value
+              Utils::TextUtils.srcset_url_spans(value).reverse_each do |(start, stop)|
+                url = value[start...stop]
+                next if skip.call(url)
+                begin
+                  result = result[0, start] + base.resolve(url).to_s + result[stop..]
+                rescue URI::Error
+                  next
+                end
+              end
+              result
+            elsif !skip.call(value)
               begin
                 # `value` came from already-rendered HTML, so its entities
                 # (e.g. `&amp;` in a query) are escaped; URI#resolve preserves
                 # them literally, so re-escaping here would double-encode.
-                "#{attr}=\"#{base.resolve(value)}\""
+                base.resolve(value).to_s
               rescue URI::Error
-                match
+                nil
               end
             end
-          end.gsub(SRCSET_ATTR_REGEX) do |match|
-            value = $1
-            spans = Utils::TextUtils.srcset_url_spans(value)
-            result = value
-            spans.reverse_each do |(start, stop)|
-              url = value[start...stop]
-              next if absolute_or_anchor?(url) || (document_relative_only && url.starts_with?('/'))
-              begin
-                result = result[0, start] + base.resolve(url).to_s + result[stop..]
-              rescue URI::Error
-                next
-              end
-            end
-            result == value ? match : %(srcset="#{result}")
           end
         rescue URI::Error
           html
+        end
+
+        # Rewrites every href/src/srcset value in the opening tags of `html`
+        # (any case; double-, single- or unquoted, the quote kept). The block
+        # gets `(srcset?, value)` and returns the new value; nil or `value`
+        # keeps the attribute's bytes.
+        #
+        # `<style>`/`<textarea>` bodies are text, not markup: a textarea's
+        # sample HTML is visible and stays as written. A `<script>` body is
+        # rewritten: a tag in it is HTML the script inserts
+        # (`el.innerHTML = '<a href="/x/">'`), which needs the same prefix.
+        # Each body is scanned on its own, so a quote opened in one never
+        # swallows the markup after it.
+        private def rewrite_link_attrs(html : String, & : Bool, String -> String?) : String
+          MarkdownExtensions.outside_raw_text(html, scripts: true) do |chunk|
+            chunk.gsub(LINK_TAG_REGEX) do |tag|
+              tag.gsub(LINK_ATTR_REGEX) do |attr, am|
+                next attr unless name = am[2]?
+                value = am[4]
+                new_value = yield name.size == 6, value # 6: srcset
+                next attr if new_value.nil? || new_value == value
+                "#{am[1]}#{am[3]}#{new_value}#{am[3]}"
+              end
+            end
+          end
         end
 
         # True for href/src values that must NOT be resolved against the page

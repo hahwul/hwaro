@@ -284,9 +284,23 @@ module Hwaro
           # reach them, and their on-disk HTML kept showing the pre-edit title
           # (or kept listing a page just flipped to draft) until something
           # unrelated happened to re-render them.
-          listing_fanout_pages(site, templates, all_pages, listing_sets)
-            .each { |p| pages_to_render << p }
+          fanout = listing_fanout_pages(site, templates, all_pages, listing_sets)
+          fanout.each { |p| pages_to_render << p }
           regained.each { |p| pages_to_render << p }
+
+          # A fan-out page's summary prints what its shortcodes read (a
+          # `get_page` title), and only the changed pages and linkers got
+          # theirs recomputed above. Redo the fan-out pages whose summary
+          # source can hold a shortcode — before the globals below embed the
+          # summaries — and the author lists that embed them too.
+          summarized = (changed_pages + linkers).map(&.path).to_set
+          resummarize = fanout.select do |p|
+            !summarized.includes?(p.path) && content_may_contain_shortcodes?(p.summary || p.raw_content)
+          end
+          unless resummarize.empty?
+            render_page_summaries(resummarize, site, templates, highlight, link_targets: all_pages)
+            aggregate_site_authors(site)
+          end
 
           render_list = pages_to_render.to_a
 
@@ -313,8 +327,9 @@ module Hwaro
             process_files_sequential(renderable_list, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: error_overlay, profiler: active_profiler)
           end
           # Only the bodies this edit can have changed: an edited term file,
-          # or one linking to a page the edit moved.
-          render_term_bodies((changed_pages + linkers).compact_map(&.as?(Models::Section)), site, templates, highlight, global_vars, options.parallel)
+          # one linking to a page the edit moved, or one whose shortcodes read
+          # a projection the edit moved (listing_fanout_pages keeps those).
+          render_term_bodies(render_list.compact_map(&.as?(Models::Section)), site, templates, highlight, global_vars, options.parallel)
           raise_on_broken_internal_links!(output_dir)
           regenerate_amp_mirrors(renderable_list, site, output_dir, verbose)
 
@@ -790,16 +805,29 @@ module Hwaro
           return [] of Models::Page unless page_changed || section_changed || menu_changed || taxonomy_changed || lookup_changed || asset_urls_changed
 
           all_pages.select do |page|
-            next false unless page.render
+            # A headless term `_index.md` renders only its body (the term
+            # page's `term_content`, see render_term_bodies), whose shortcodes
+            # read listings like any page's content does — so it is selected
+            # here too, and callers hand it to render_term_bodies.
+            next false unless page.render || page.term_metadata
             # The page's whole render closure: entry template, the shortcodes
             # its content calls (`{{ recent() }}` looping a section's pages
             # is a listing too, and its output lives in the page CONTENT,
             # which a re-render rebuilds) and its output-format templates.
-            deps = page_template_scan(page, templates, site).listing
+            # A term body renders only its content, so only its shortcodes
+            # count: its entry template (`section.html`) never renders it.
+            deps = if page.render
+                     page_template_scan(page, templates, site).listing
+                   else
+                     shortcodes = page_shortcode_templates(page)
+                     next false if shortcodes.empty? && @template_deps
+                     listing_set_deps_for(closure_blob(shortcodes, templates))
+                   end
             # Mirrors filter_changed_pages: a section index renders its
             # section's page list even via `{{ section.list }}`, which leaves
-            # no marker in the template source to scan for.
-            page_dep = deps.page || page.is_a?(Models::Section)
+            # no marker in the template source to scan for. A term body
+            # renders no page list of its own.
+            page_dep = deps.page || (page.is_a?(Models::Section) && page.render)
             (page_dep && page_changed) ||
               (deps.section && section_changed) ||
               (deps.menu && menu_changed) ||
@@ -1209,6 +1237,9 @@ module Hwaro
             Logger.info "Template change detected. Re-rendering all pages..." if options.verbose
           end
 
+          # Term bodies (headless) the listing fan-out selected — rendered by
+          # render_term_bodies below, never by the page pass.
+          fanout_term_bodies = [] of Models::Page
           pages_to_render = if affected_templates && deps
                               selected = renderable_pages.select do |page|
                                 entry = determine_template(page, templates, site)
@@ -1223,8 +1254,10 @@ module Hwaro
                                 end
                               end
                               if sets = listing_sets
-                                listing_fanout_pages(site, templates, all_pages, sets)
-                                  .each { |page| selected << page if seen.add?(page.path) }
+                                listing_fanout_pages(site, templates, all_pages, sets).each do |page|
+                                  next unless seen.add?(page.path)
+                                  page.render ? (selected << page) : (fanout_term_bodies << page)
+                                end
                               end
                               selected
                             else
@@ -1308,10 +1341,11 @@ module Hwaro
           # Term bodies change only with content semantics: a template set the
           # selective path can't scope (shortcode/hook edits land here), or a
           # forced page (run_incremental_then_rerender: the re-parsed term file,
-          # or one linking to a page the edit moved). A layout edit leaves them
-          # — and their link checks — alone. Every case that renders one also
-          # regenerates the taxonomy pages below.
-          render_term_bodies(affected_templates.nil? ? site.sections : forced.compact_map(&.as?(Models::Section)), site, templates, highlight, global_vars, options.parallel)
+          # or one linking to a page the edit moved), or a body whose
+          # shortcodes read a projection the forced edit moved (the fan-out).
+          # A layout edit leaves them — and their link checks — alone. Every
+          # case that renders one also regenerates the taxonomy pages below.
+          render_term_bodies(affected_templates.nil? ? site.sections : (forced | fanout_term_bodies).compact_map(&.as?(Models::Section)), site, templates, highlight, global_vars, options.parallel)
           raise_on_broken_internal_links!(output_dir)
           regenerate_amp_mirrors(pages_to_render, site, output_dir, verbose)
 

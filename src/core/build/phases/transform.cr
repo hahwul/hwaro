@@ -782,7 +782,7 @@ module Hwaro::Core::Build::Phases::Transform
           "date"              => Crinja::Value.new(p.date.try(&.to_s("%Y-%m-%d")) || ""),
           "description"       => Crinja::Value.new(p.description || ""),
           "image"             => Crinja::Value.new(p.image || ""),
-          "summary"           => Crinja::Value.new(p.summary_html || p.effective_summary || ""),
+          "summary"           => Crinja::Value.new(p.template_summary),
           "summary_truncated" => Crinja::Value.new(p.summary_truncated),
           "tags"              => Crinja::Value.new(p.tags.map { |t| Crinja::Value.new(t) }),
           "reading_time"      => Crinja::Value.new(p.reading_time),

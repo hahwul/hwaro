@@ -277,6 +277,53 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
         html, "https://example.com/a/b"
       ).should eq %(<a href="/a/b/guide/intro/">Intro</a>)
     end
+    it "prefixes single-quoted, unquoted and uppercase href/src, keeping the quote style" do
+      html = %(<a href='/a/'>s</a> <a href=/a/>u</a> <A HREF="/a/">c</A> <IMG SRC='/i.png'> <img src="/i.png" data-src=/lazy.png srcset='/x.png 1x, /y.png 2x'>)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(
+        html, "https://user.github.io/repo"
+      ).should eq %(<a href='/repo/a/'>s</a> <a href=/repo/a/>u</a> <A HREF="/repo/a/">c</A> <IMG SRC='/repo/i.png'> <img src="/repo/i.png" data-src=/repo/lazy.png srcset='/repo/x.png 1x, /repo/y.png 2x'>)
+    end
+
+    it "rewrites only attributes of a tag: not another attribute's value, not text" do
+      html = %(<span title="see href='/x' or href=/y">t</span> <code>&lt;a href=/z&gt;</code> <p>set href='/w' here</p>)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(
+        html, "https://user.github.io/repo"
+      ).should eq html
+    end
+
+    it "prefixes HTML a script inserts but leaves style/textarea bodies alone" do
+      html = %(<script src="/app.js">el.innerHTML = '<a href="/x">';</script><style>a[href="/x"]{}</style><textarea><a href="/x"></textarea><a href="/x">)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(
+        html, "https://user.github.io/repo"
+      ).should eq %(<script src="/repo/app.js">el.innerHTML = '<a href="/repo/x">';</script><style>a[href="/x"]{}</style><textarea><a href="/x"></textarea><a href="/repo/x">)
+    end
+
+    it "prefixes links between upper-case raw-text elements and after an opener-looking attribute" do
+      upper = %(<SCRIPT>var a=1;</SCRIPT><p><a href="/mid/">mid</a></p><TEXTAREA>t</TEXTAREA><a href="/end/">e</a>)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(upper, "https://ex.io/repo", "/repo")
+        .should eq %(<SCRIPT>var a=1;</SCRIPT><p><a href="/repo/mid/">mid</a></p><TEXTAREA>t</TEXTAREA><a href="/repo/end/">e</a>)
+      attr = %(<a title="<textarea>" href="/x/">x</a><p>mid <a href="/mid/">m</a></p><textarea>t</textarea><a href="/end/">e</a>)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(attr, "https://ex.io/repo", "/repo")
+        .should eq %(<a title="<textarea>" href="/repo/x/">x</a><p>mid <a href="/repo/mid/">m</a></p><textarea>t</textarea><a href="/repo/end/">e</a>)
+    end
+
+    it "prefixes a tag whose unquoted value holds a stray quote" do
+      html = %(<img src="/a.png" alt=don't> <a title=it's href="/b/" alt='x'>b</a> <img alt=5" src=/c.png>)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, "https://ex.io/repo", "/repo")
+        .should eq %(<img src="/repo/a.png" alt=don't> <a title=it's href="/repo/b/" alt='x'>b</a> <img alt=5" src=/repo/c.png>)
+    end
+
+    it "leaves a JS-escaped attribute in a script string alone" do
+      html = %(<script>el.innerHTML = "<a href=\\"/x/\\">";</script>)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, "https://ex.io/repo", "/repo").should eq html
+      Hwaro::Content::Processors::InternalLinkResolver.absolutize_links(html, "https://ex.io/p/").should eq html
+    end
+
+    it "does not let a quote opened in a script body swallow the links after it" do
+      html = %(<script>s = "<img alt='";</script><a href="/x/">x</a><script>t = "' src='/y.png'>";</script>)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, "https://ex.io/repo", "/repo")
+        .should eq %(<script>s = "<img alt='";</script><a href="/repo/x/">x</a><script>t = "' src='/y.png'>";</script>)
+    end
   end
 
   describe ".absolutize_links" do
@@ -327,6 +374,23 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
       result = Hwaro::Content::Processors::InternalLinkResolver.absolutize_links(html, "https://h.com/p/")
       result.should contain(%(href="https://h.com/p/sub/?a=1&amp;b=2"))
       result.should_not contain("&amp;amp;")
+    end
+
+    it "absolutizes single-quoted, unquoted and uppercase href/src/srcset, keeping the quote style" do
+      html = %(<a href='../q/'>s</a> <a href=sub/>u</a> <A HREF="/r/">c</A> <img SRC='a.png' srcset='b.png 2x'>)
+      Hwaro::Content::Processors::InternalLinkResolver.absolutize_links(html, "https://h.com/p/")
+        .should eq(%(<a href='https://h.com/q/'>s</a> <a href=https://h.com/p/sub/>u</a> <A HREF="https://h.com/r/">c</A> <img SRC='https://h.com/p/a.png' srcset='https://h.com/p/b.png 2x'>))
+    end
+
+    it "resolves single-quoted and unquoted document-relative values in document_relative_only mode" do
+      html = %(<img src='cover.png'> <img src=cover.png> <a href='../other/'>o</a> <a href='/root/'>r</a>)
+      Hwaro::Content::Processors::InternalLinkResolver.absolutize_links(html, "/posts/b/", document_relative_only: true)
+        .should eq(%(<img src='/posts/b/cover.png'> <img src=/posts/b/cover.png> <a href='/posts/other/'>o</a> <a href='/root/'>r</a>))
+    end
+
+    it "leaves a textarea's sample HTML alone" do
+      html = %(<textarea><img src="a.png"></textarea>)
+      Hwaro::Content::Processors::InternalLinkResolver.absolutize_links(html, "https://h.com/p/").should eq(html)
     end
   end
 

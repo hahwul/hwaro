@@ -133,6 +133,26 @@ describe "image processing formats" do
     end
   end
 
+  # The render recorded only the source image as an input, so a warm
+  # `--cache` build kept a page whose srcset the new (or deleted) authored
+  # file changes. 48w is the clamped width: the 64 ask is over the source.
+  it "re-renders cached pages when a file at a variant's name appears or goes" do
+    {"photo_16w.webp", "photo_48w.webp", "photo_16w.png"}.each do |authored|
+      with_webp_site do
+        File.write("templates/page.html", %({{ resize_image(path="/photo.png", width=16, format="webp").url }}|{{ content | safe }}))
+        webp_build
+        expected = File.read("public/posts/a/index.html")
+        File.write("static/#{authored}", "authored")
+        webp_build
+        with_authored = File.read("public/posts/a/index.html")
+        with_authored.should_not contain("/#{authored} ")
+        File.delete("static/#{authored}")
+        webp_build
+        File.read("public/posts/a/index.html").should eq(expected)
+      end
+    end
+  end
+
   it "resize_image(format=\"webp\") returns the WebP variant, and writes fill/crop as WebP" do
     with_webp_site do
       File.write("templates/page.html",

@@ -21,6 +21,13 @@ describe Hwaro::Content::Processors::Markdown do
       html.should contain(%(<img loading="lazy" src="a.png"))
     end
 
+    it "see headings and images between upper-case raw-text elements" do
+      content = "<SCRIPT>a();</SCRIPT>\n\n## Mid\n\n![pic](a.png)\n\n<script>b();</script>\n"
+      html, toc = Hwaro::Processor::Markdown.render(content, lazy_loading: true)
+      toc.map(&.id).should eq(["mid"])
+      html.should contain(%(<img loading="lazy" src="a.png"))
+    end
+
     it "find raw-text elements in time linear in their count" do
       t = Time.instant
       spans = Hwaro::Content::Processors::MarkdownExtensions.raw_text_spans("<!-- c --><script>x</script>" * 40_000)

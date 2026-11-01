@@ -64,6 +64,23 @@ private class OgSpecTerminal
   end
 end
 
+private class MidBuildOgProbe
+  include Hwaro::Core::Lifecycle::Hookable
+
+  property handler : Hwaro::Services::OgLazyImageHandler? = nil
+  property generated : Bool = false
+
+  def register_hooks(manager : Hwaro::Core::Lifecycle::Manager)
+    manager.on(Hwaro::Core::Lifecycle::HookPoint::AfterParseContent, name: "spec:mid-build-og-probe") do |_ctx|
+      if handler = @handler
+        og_request(handler, "/og-images/posts-hello.svg")
+        @generated = File.exists?("public/og-images/posts-hello.svg")
+      end
+      Hwaro::Core::Lifecycle::HookResult::Continue
+    end
+  end
+end
+
 private def og_request(handler : HTTP::Handler, path : String) : {HTTP::Server::Context, OgSpecTerminal}
   terminal = OgSpecTerminal.new
   handler.next = terminal
@@ -163,6 +180,27 @@ describe "serve lazy OG generation (A9)" do
     end
   end
 
+  it "still generates on request while a full rebuild has not assigned URLs yet" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_og_site(lazy: true)
+        builder = og_builder
+        probe = MidBuildOgProbe.new
+        builder.register(probe)
+        builder.run(og_options).should be_true
+
+        # A full rebuild swaps in a fresh site whose pages get their lazy
+        # og:image URLs only in BeforeRender; a preview fetch landing before
+        # that must still be answered from the previous build's pages.
+        probe.handler = Hwaro::Services::OgLazyImageHandler.new(builder, "public")
+        builder.run(og_options).should be_true
+        probe.generated.should be_true
+        # Released once the rebuild succeeds.
+        builder.previous_site.should be_nil
+      end
+    end
+  end
+
   it "keeps slug-colliding pages on their own advertised files (review item 1)" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do
@@ -201,6 +239,36 @@ describe "serve lazy OG generation (A9)" do
         og_request(handler, flat_url)
         File.info(nested_file).modification_time.should be_close(stamp, 2.seconds)
         File.info(flat_file).modification_time.should be_close(stamp, 2.seconds)
+      end
+    end
+  end
+
+  # Lazy mode never claims the OG paths, so the static lane copied a saved
+  # `static/og-images/<slug>.svg` onto the image and the request's manifest
+  # hit served the user's bytes.
+  it "regenerates over a static file the watcher copied onto the image" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_og_site(lazy: true)
+        FileUtils.mkdir_p("static/og-images")
+        File.write("static/og-images/posts-hello.svg", "USER BYTES v1")
+        builder = og_builder
+        builder.run(og_options).should be_true
+        handler = Hwaro::Services::OgLazyImageHandler.new(builder, "public")
+        og_request(handler, "/og-images/posts-hello.svg")
+        File.read("public/og-images/posts-hello.svg").should contain("First Title")
+
+        File.write("static/og-images/posts-hello.svg", "USER BYTES v2")
+        builder.copy_changed_static(["static/og-images/posts-hello.svg"], "public")
+        og_request(handler, "/og-images/posts-hello.svg")
+        File.read("public/og-images/posts-hello.svg").should contain("First Title")
+
+        # Generated over it once; the next request is a cache hit, not a
+        # re-render (backdated so a rewrite would show).
+        stamp = Time.utc - 5.minutes
+        File.touch("public/og-images/posts-hello.svg", stamp)
+        og_request(handler, "/og-images/posts-hello.svg")
+        File.info("public/og-images/posts-hello.svg").modification_time.should be_close(stamp, 2.seconds)
       end
     end
   end

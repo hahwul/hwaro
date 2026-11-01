@@ -2436,3 +2436,51 @@ describe "safe mode extension markup" do
     render_safe(content).should eq(unsafe)
   end
 end
+
+describe "Hwaro::Content::Processors::MarkdownExtensions raw-text bodies" do
+  bodies = ->(html : String) do
+    Hwaro::Content::Processors::MarkdownExtensions.raw_text_spans(html).map { |r| html.byte_slice(r.begin, r.end - r.begin) }
+  end
+
+  it "closes a body at its end tag in any case" do
+    bodies.call(%(<SCRIPT>a</SCRIPT><p>m</p><Style>b</STYLE ><script>c</script\n>)).should eq(["a", "b", "c"])
+  end
+
+  it "opens no body at an opener inside another tag's quoted value" do
+    bodies.call(%(<a title="<textarea>" data-t='<script>'>x</a><p>m</p><textarea>t</textarea>)).should eq(["t"])
+  end
+
+  it "keeps the opening tag's own attributes out of the body" do
+    bodies.call(%(<script src="/a.js" data-x="1>2">b</script>)).should eq(["b"])
+  end
+
+  it "opens no body at a custom element named script-*, style-* or textarea-*" do
+    bodies.call(%(<style-guide>a</style-guide><script-loader x="1">b</script-loader><textarea-autosize>c</textarea-autosize><script>d</script>))
+      .should eq(["d"])
+  end
+
+  it "does not close a body at a longer tag name" do
+    bodies.call(%(<style>a</styles>b</style>)).should eq(["a</styles>b"])
+  end
+
+  it "yields script bodies on their own when asked" do
+    html = %(<p>a</p><script>b</script><textarea>c</textarea>)
+    Hwaro::Content::Processors::MarkdownExtensions.outside_raw_text(html, scripts: true, &.upcase)
+      .should eq(%(<P>A</P><SCRIPT>B</SCRIPT><TEXTAREA>c</TEXTAREA>))
+  end
+
+  it "applies the external-link policy between upper-case raw-text elements" do
+    cfg = make_config
+    cfg.external_links_target_blank = true
+    html = Hwaro::Content::Processors::MarkdownExtensions.postprocess_external_links(
+      %(<SCRIPT>a</SCRIPT><a href="https://e.com">x</a><script>b</script>), cfg
+    )
+    html.should contain(%(href="https://e.com" target="_blank"))
+  end
+
+  it "stays linear on tags whose quoted value holds a `<` and never ends" do
+    t = Time.instant
+    Hwaro::Content::Processors::MarkdownExtensions.raw_text_spans(%(<a x="<" ) * 40_000 + "<script>").should be_empty
+    (Time.instant - t).should be < 5.seconds
+  end
+end

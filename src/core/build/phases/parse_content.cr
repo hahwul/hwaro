@@ -40,9 +40,23 @@ module Hwaro::Core::Build::Phases::ParseContent
       # A full build reports each ambiguous wikilink again; serve rebuilds don't.
       @wikilink_warnings.clear
       refresh_wikilink_index(ctx.all_pages, site)
+      # A summary shortcode reads the site's pages (`get_page`,
+      # `get_section(...).pages`) like the body's does, and Transform
+      # publishes them only after this pass: publish them now, or the cold
+      # build's summaries print what serve's (post-Transform) ones don't.
+      # Transform reassigns the same arrays.
+      site.pages = ctx.pages
+      site.sections = ctx.sections
+      site.build_lookup_index
       # The image hooks have not run yet: rerender_image_summaries redoes
       # the summaries they change once the resize map is filled.
       render_page_summaries(ctx.all_pages, site, templates, ctx.options.highlight && site.config.highlight.enabled, images_ready: false)
+      # The shortcode contexts above cached page values (every page, through
+      # the globals, and each page's neighbours) as they stand now — before
+      # Transform and the BeforeRender hooks fill fields such as `image`
+      # (og:auto_image). Render must build its own.
+      @cache_manager.clear("page_crinja_value", "section_pages_crinja", "section_assets_crinja",
+        "series_crinja", "ancestors_crinja", "related_posts_crinja", reset_stats: false)
     end
 
     Lifecycle::HookResult::Continue
@@ -76,13 +90,11 @@ module Hwaro::Core::Build::Phases::ParseContent
   # `link_targets` is the page set internal `@/` links may point at —
   # defaults to `pages`, which is correct for the full build (all pages) but
   # must be passed explicitly by incremental callers that re-render only a
-  # subset. It can't come from `site.pages`: Transform populates that AFTER
-  # this runs in the full build (`site.pages = ctx.pages`, transform.cr).
+  # subset.
   #
-  # `global_vars` is a compute-once optimization for post-Transform callers
-  # (run_rerender). When nil, build_template_variables self-heals by building
-  # globals per shortcode-bearing page — cheap during the full-build call
-  # (site.pages is still empty pre-Transform) but O(site) per page after.
+  # `global_vars` is a compute-once optimization for callers that already
+  # hold them (run_rerender). When nil, they are built from `site` once, on
+  # the first summary shortcode that needs them.
   #
   # `images_ready` is false only before the BeforeRender `image:resize`
   # hook has filled the resize map: `<img>` then get no srcset/dimensions
@@ -111,6 +123,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     global_vars : Hash(String, Crinja::Value)? = nil,
     images_ready : Bool = true,
     rerender : Bool = false,
+    readers_pass : Bool = false,
   )
     md_config = site.config.markdown
     pages_by_path : Hash(String, Models::Page)? = nil
@@ -130,6 +143,14 @@ module Hwaro::Core::Build::Phases::ParseContent
     # render that poisoned nil-summary value (the raw markdown chunk) for
     # the rest of the build.
     recomputed_paths = [] of String
+    globals_memo = global_vars
+    globals = -> do
+      memo = globals_memo
+      memo ? memo : (globals_memo = build_global_vars(site))
+    end
+    # Taken before anything below is assigned, so a summary shortcode reads
+    # the same snapshot of the other summaries whatever the page order.
+    globals.call if global_vars.nil? && pages.any? { |p| summary_shortcodes?(p) }
 
     # The excerpt is a second markdown render of every page, so it is only
     # computed when something can print it. When that answer changed since
@@ -140,11 +161,9 @@ module Hwaro::Core::Build::Phases::ParseContent
     auto_read = auto_summary_read?(site, link_targets)
     if !(previous = @auto_summary_read).nil? && previous != auto_read
       covered = pages.map(&.path).to_set
-      # Built once here: each shortcode page would otherwise build its own.
-      flip_globals = global_vars || build_global_vars(site)
       link_targets.each do |page|
         next if covered.includes?(page.path) || page.summary || page.extract_summary
-        recomputed_paths << page.path if assign_auto_summary(page, site, templates, flip_globals, auto_read)
+        recomputed_paths << page.path if assign_auto_summary(page, site, templates, globals, auto_read)
       end
     end
     @auto_summary_read = auto_read
@@ -162,7 +181,7 @@ module Hwaro::Core::Build::Phases::ParseContent
           # No marker: the automatic body excerpt, unless a description
           # already provides the summary (precedence: marker > description >
           # excerpt). Recorded in recomputed_paths for the same cache reason.
-          recomputed_paths << page.path if assign_auto_summary(page, site, templates, global_vars, auto_read)
+          recomputed_paths << page.path if assign_auto_summary(page, site, templates, globals, auto_read)
           next
         end
         # The marker wins: drop an excerpt a serve rerender left on this
@@ -174,7 +193,7 @@ module Hwaro::Core::Build::Phases::ParseContent
         summary_md = complete_summary_chunk(summary_md, page.raw_content, md_config.footnotes)
         summary_md = expand_includes(summary_md, page, site)
         processed = if content_may_contain_shortcodes?(summary_md)
-                      context = build_template_variables(page, site, "", "", "", global_vars: global_vars)
+                      context = build_template_variables(page, site, "", "", "", global_vars: globals.call)
                       process_shortcodes_jinja(summary_md, templates, context, shortcode_results)
                     else
                       summary_md
@@ -215,6 +234,32 @@ module Hwaro::Core::Build::Phases::ParseContent
         @section_pages_url_index_cache.clear
       end
     end
+
+    # A summary shortcode printing ANOTHER page's summary (or word count)
+    # read the snapshot taken before this pass, where a summary recomputed
+    # here was still empty. Redo those once against the summaries just
+    # assigned — one level deep: a chain of such summaries is not resolved.
+    return if readers_pass
+    readers = pages.select { |p| summary_reads_page_summaries?(p, templates) }
+    unless readers.empty?
+      render_page_summaries(readers, site, templates, use_highlight, link_targets: link_targets,
+        images_ready: images_ready, rerender: true, readers_pass: true)
+    end
+  end
+
+  # The summary source (`<!-- more -->` chunk, else the body an excerpt is
+  # cut from) may call a shortcode.
+  private def summary_shortcodes?(page : Models::Page) : Bool
+    content_may_contain_shortcodes?(page.summary || page.raw_content)
+  end
+
+  # The shortcodes in a page's summary source read a content-derived field
+  # (`summary`, `word_count`, …) off another page — see relation_page_fields.
+  private def summary_reads_page_summaries?(page : Models::Page, templates : Hash(String, String)) : Bool
+    return false unless summary_shortcodes?(page)
+    names = page_shortcode_templates(page)
+    return false if names.empty? && @template_deps
+    relation_page_fields(closure_blob(names, templates)).content_derived
   end
 
   # Redo the ParseContent summaries the BeforeRender image hooks change:
@@ -305,7 +350,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     page : Models::Page,
     site : Models::Site,
     templates : Hash(String, String),
-    global_vars : Hash(String, Crinja::Value)?,
+    globals : Proc(Hash(String, Crinja::Value)),
     read : Bool,
   ) : Bool
     # `had` — a page object recomputed in place (serve rerender) whose
@@ -329,7 +374,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     md_config = site.config.markdown
     shortcode_results = {} of String => String
     processed = if content_may_contain_shortcodes?(raw)
-                  context = build_template_variables(page, site, "", "", "", global_vars: global_vars)
+                  context = build_template_variables(page, site, "", "", "", global_vars: globals.call)
                   process_shortcodes_jinja(raw, templates, context, shortcode_results)
                 else
                   raw

@@ -129,6 +129,17 @@ describe "Responsive content images" do
       end
     end
 
+    it "measures authored <picture> spans per chunk around a <script>" do
+      with_resize_map(SAMPLE_MAP) do
+        with_webp_map(WEBP_MAP) do
+          html = %(<script>var s = "<img>";</script><picture><img src="photo.png"></picture><img src="photo.png">)
+          out = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(html, bundle_page, enabled_config)
+          out.scan(%(<source type="image/webp")).size.should eq(1)
+          out.should contain(%(</picture><picture><source type="image/webp"))
+        end
+      end
+    end
+
     it "ignores <picture> tags inside comments, and an unclosed <picture>" do
       with_resize_map(SAMPLE_MAP) do
         with_webp_map(WEBP_MAP) do
@@ -293,6 +304,24 @@ describe "Content image dimensions" do
       out = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(
         %(<p><img src="/img/a.png" alt="A"></p>), bundle_page, dimensions_config)
       out.should eq(%(<p><img width="6" height="3" src="/img/a.png" alt="A"></p>))
+    end
+  end
+
+  it "leaves an <img> inside <script>, <style> or <textarea> alone" do
+    with_image_project do
+      html = %(<script>var t = "<img src='/img/a.png'>";</script><textarea><img src="/img/a.png"></textarea>) +
+             %(<style>/* <img src="/img/a.png"> */</style><img src="/img/a.png">)
+      out = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(html, bundle_page, dimensions_config)
+      out.should eq(%(<script>var t = "<img src='/img/a.png'>";</script><textarea><img src="/img/a.png"></textarea>) +
+                    %(<style>/* <img src="/img/a.png"> */</style><img width="6" height="3" src="/img/a.png">))
+    end
+  end
+
+  it "still sizes images after an uppercase or attribute-quoted raw-text opener" do
+    with_image_project do
+      html = %(<TEXTAREA>x</TEXTAREA><a title="<textarea>">t</a><img src="/img/a.png"><textarea>y</textarea>)
+      out = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(html, bundle_page, dimensions_config)
+      out.should contain(%(<img width="6" height="3" src="/img/a.png">))
     end
   end
 

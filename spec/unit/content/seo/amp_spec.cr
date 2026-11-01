@@ -163,6 +163,38 @@ describe Hwaro::Content::Seo::Amp do
         result.should contain(%(src="/posts/b1/cover.png"))
         result.should contain(%(href="/posts/b2/"))
       end
+
+      it "resolves single-quoted and unquoted values too" do
+        page = Hwaro::Models::Page.new("posts/b1/index.md")
+        page.url = "/posts/b1/"
+        config = Hwaro::Models::Config.new
+        config.base_url = "https://example.com"
+
+        sq = %(<html><head></head><body><img src='cover.png' width="1" height="1"> <img src=cover.png width="1" height="1"> <a href='../b2/'>o</a></body></html>)
+        result = Hwaro::Content::Seo::Amp.convert_to_amp(sq, page, config)
+        result.should contain(%(src='https://example.com/posts/b1/cover.png'))
+        result.should contain(%(src=https://example.com/posts/b1/cover.png ))
+        result.should contain(%(href='https://example.com/posts/b2/'))
+      end
+    end
+
+    it "converts an <img> between upper-case raw-text elements" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      html = %(<html><head></head><body><TEXTAREA>x</TEXTAREA><img src="/b.png" width="4" height="3"><textarea>y</textarea></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, Hwaro::Models::Config.new)
+      result.should contain(%(<amp-img src="/b.png"))
+      result.should_not contain("<img")
+    end
+
+    it "leaves an <img> inside a textarea or script as text" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      html = %(<html><head><script type="application/ld+json">{"x":"<img src=\\"a.png\\">"}</script></head><body><textarea><img src="a.png"></textarea><img src="b.png"></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, Hwaro::Models::Config.new)
+      result.should contain(%(<textarea><img src="a.png"></textarea>))
+      result.should contain(%({"x":"<img src=\\"a.png\\">"}))
+      result.should contain(%(<amp-img src="/test/b.png"))
     end
 
     it "converts img to amp-img with fill layout when no dimensions" do

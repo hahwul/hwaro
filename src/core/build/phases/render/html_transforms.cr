@@ -52,7 +52,6 @@ module Hwaro::Core::Build::Phases::Render
     resize_map = config.image_processing.enabled ? Content::Hooks::ImageHooks.resize_map_readonly : {} of String => Hash(Int32, String)
     return html if resize_map.empty? && !dimensions
     webp_map = Content::Hooks::ImageHooks.format_map_readonly("webp") if config.image_processing.enabled
-    pictures = picture_spans(html) if webp_map
     srcset_for = ->(variants : Hash(Int32, String)) do
       # Prefix each candidate with the subpath (base_path) so responsive
       # images resolve on subpath deployments; the resize map stores bare
@@ -60,67 +59,74 @@ module Hwaro::Core::Build::Phases::Render
       variants.to_a.sort_by { |(w, _)| w }.map { |(w, url)| "#{URI.encode_path(config.with_base_path(url))} #{w}w" }.join(", ")
     end
 
-    html.gsub(IMG_TAG_RE) do |tag, match|
-      has_srcset = tag.matches?(IMG_SRCSET_RE)
-      next tag if has_srcset && !dimensions
-      m = tag.match(IMG_SRC_RE)
-      next tag unless m
-      # The lookup key is the FILE the attribute names: entities decoded as a
-      # browser would, and the `?query` / `#fragment` cut off before the
-      # percent-decode (a literal `?` in a filename arrives as `%3F`).
-      src = HTML.unescape(m[2]? || m[3]? || "")
-      src = src[0, src.index(/[?#]/) || src.size]
-      next tag if src.empty? || src.includes?('\0')
-      next tag if src.starts_with?("http://") || src.starts_with?("https://") ||
-                  src.starts_with?("//") || src.starts_with?("data:")
+    # An `<img>` inside <script>/<style>/<textarea> is text, not an image:
+    # rewriting it splices double-quoted attributes into JS strings and
+    # changes visible textarea text. The lazy-loading pass skips them too.
+    Content::Processors::MarkdownExtensions.outside_raw_text(html) do |chunk|
+      # Per chunk: the `match.begin` checked against these is a chunk offset.
+      pictures = picture_spans(chunk) if webp_map
+      chunk.gsub(IMG_TAG_RE) do |tag, match|
+        has_srcset = tag.matches?(IMG_SRCSET_RE)
+        next tag if has_srcset && !dimensions
+        m = tag.match(IMG_SRC_RE)
+        next tag unless m
+        # The lookup key is the FILE the attribute names: entities decoded as a
+        # browser would, and the `?query` / `#fragment` cut off before the
+        # percent-decode (a literal `?` in a filename arrives as `%3F`).
+        src = HTML.unescape(m[2]? || m[3]? || "")
+        src = src[0, src.index(/[?#]/) || src.size]
+        next tag if src.empty? || src.includes?('\0')
+        next tag if src.starts_with?("http://") || src.starts_with?("https://") ||
+                    src.starts_with?("//") || src.starts_with?("data:")
 
-      key = if src.starts_with?("/")
-              src
-            else
-              base = page.url.ends_with?("/") ? page.url : "#{page.url}/"
-              # normalize: `./hero.png` and `../other/x.png` name the same
-              # files the map keys by their plain path.
-              Path.posix("#{base}#{src}".gsub("//", "/")).normalize.to_s
-            end
-      # Markdown emits percent-encoded URLs (spaces/unicode), but the resize map
-      # is keyed by the decoded filesystem path — decode before the lookup.
-      key = URI.decode(key)
-      next tag if key.includes?('\0') # a `%00`: not a file, never measurable
-      # prefix_root_relative_links runs before this pass and may already have
-      # rewritten a root-relative src with the subpath, but the resize map is
-      # keyed by bare root-relative paths — strip the base_path back off so the
-      # lookup hits (then with_base_path re-adds it to the emitted candidates).
-      bp = config.base_path
-      key = key[bp.size..] if !bp.empty? && key.starts_with?("#{bp}/")
+        key = if src.starts_with?("/")
+                src
+              else
+                base = page.url.ends_with?("/") ? page.url : "#{page.url}/"
+                # normalize: `./hero.png` and `../other/x.png` name the same
+                # files the map keys by their plain path.
+                Path.posix("#{base}#{src}".gsub("//", "/")).normalize.to_s
+              end
+        # Markdown emits percent-encoded URLs (spaces/unicode), but the resize map
+        # is keyed by the decoded filesystem path — decode before the lookup.
+        key = URI.decode(key)
+        next tag if key.includes?('\0') # a `%00`: not a file, never measurable
+        # prefix_root_relative_links runs before this pass and may already have
+        # rewritten a root-relative src with the subpath, but the resize map is
+        # keyed by bare root-relative paths — strip the base_path back off so the
+        # lookup hits (then with_base_path re-adds it to the emitted candidates).
+        bp = config.base_path
+        key = key[bp.size..] if !bp.empty? && key.starts_with?("#{bp}/")
 
-      additions = ""
-      widths = resize_map[key]?
-      if Content::Hooks::ImageHooks.processing_active?
-        # The variant set (clamped to the source's width) and the srcset
-        # printed from it follow the image's bytes, so a cached page or a
-        # serve session must re-render when it is replaced; an image that
-        # does not exist yet is watched at its static/ location.
-        Content::Hooks::ImageHooks.watch_render_source(key).try { |source| Content::Processors::TemplateEngine.record_file_read(source) }
-      end
-      if widths && !widths.empty? && !has_srcset
-        additions = %( srcset="#{srcset_for.call(widths)}")
-        additions += %( sizes="100vw") unless tag =~ /\ssizes\s*=/
-      end
-      webp = webp_map.try(&.[key]?) unless has_srcset
-      webp = nil if webp && (webp.empty? || webp.keys.max < (widths.try(&.keys.max?) || 0) ||
-                    pictures.try(&.any?(&.includes?(match.begin(0)))))
-      if dimensions && !tag.matches?(IMG_SIZE_RE) && (source = Content::Hooks::ImageHooks.resolve_source(key, config))
-        # The bytes decide the size, so a cached page must re-render when
-        # they change.
-        Content::Processors::TemplateEngine.record_file_read(source)
-        if size = Content::Hooks::ImageHooks.intrinsic_size(source)
-          additions += %( width="#{size[0]}" height="#{size[1]}")
+        additions = ""
+        widths = resize_map[key]?
+        if Content::Hooks::ImageHooks.processing_active?
+          # The variant set (clamped to the source's width) and the srcset
+          # printed from it follow the image's bytes, so a cached page or a
+          # serve session must re-render when it is replaced; an image that
+          # does not exist yet is watched at its static/ location.
+          Content::Hooks::ImageHooks.watch_render_source(key) { |source| Content::Processors::TemplateEngine.record_file_read(source) }
         end
+        if widths && !widths.empty? && !has_srcset
+          additions = %( srcset="#{srcset_for.call(widths)}")
+          additions += %( sizes="100vw") unless tag =~ /\ssizes\s*=/
+        end
+        webp = webp_map.try(&.[key]?) unless has_srcset
+        webp = nil if webp && (webp.empty? || webp.keys.max < (widths.try(&.keys.max?) || 0) ||
+                      pictures.try(&.any?(&.includes?(match.begin(0)))))
+        if dimensions && !tag.matches?(IMG_SIZE_RE) && (source = Content::Hooks::ImageHooks.resolve_source(key, config))
+          # The bytes decide the size, so a cached page must re-render when
+          # they change.
+          Content::Processors::TemplateEngine.record_file_read(source)
+          if size = Content::Hooks::ImageHooks.intrinsic_size(source)
+            additions += %( width="#{size[0]}" height="#{size[1]}")
+          end
+        end
+        img = additions.empty? ? tag : tag.sub("<img", "<img#{additions}")
+        next img unless webp
+        sizes = tag.match(IMG_SIZES_RE).try(&.[1]) || %("100vw")
+        %(<picture><source type="image/webp" srcset="#{srcset_for.call(webp)}" sizes=#{sizes}>#{img}</picture>)
       end
-      img = additions.empty? ? tag : tag.sub("<img", "<img#{additions}")
-      next img unless webp
-      sizes = tag.match(IMG_SIZES_RE).try(&.[1]) || %("100vw")
-      %(<picture><source type="image/webp" srcset="#{srcset_for.call(webp)}" sizes=#{sizes}>#{img}</picture>)
     end
   end
 

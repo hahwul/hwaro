@@ -304,6 +304,29 @@ describe "serve watch parity: static edits over generated outputs" do
     end
   end
 
+  # The lane used to copy the file before escalating, so the full rebuild's
+  # own static copy found the destination up to date, recorded nothing, and
+  # the OG generator counted its manifest hit on the user's bytes.
+  it "regenerates an auto OG image a static save lands on" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_shadow_site
+        File.write("config.toml", File.read("config.toml") + %(\n[og.auto_image]\nenabled = true\nformat = "svg"\n))
+        FileUtils.mkdir_p("static/og-images")
+        File.write("static/og-images/about.svg", "USER BYTES v1")
+        File.write("content/about.md", %(+++\ntitle = "About"\n+++\nabout))
+        server = Hwaro::Services::Server.new
+        options = watch_parity_options
+        server.watch_parity_builder.run(options).should be_true
+        File.read("public/og-images/about.svg").should start_with("<?xml")
+
+        File.write("static/og-images/about.svg", "USER BYTES v2")
+        server.watch_parity_apply_changeset(watch_parity_changeset(static: ["static/og-images/about.svg"]), options)
+        File.read("public/og-images/about.svg").should start_with("<?xml")
+      end
+    end
+  end
+
   it "still copies an ordinary static file without a rebuild" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do

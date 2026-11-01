@@ -49,6 +49,9 @@ module Hwaro
           # eats ~20s on a 1k-page site and is what made fast-start
           # indistinguishable from a normal cold start.
           pages = ctx.priority_pages || ctx.all_pages
+          builder = ctx.builder
+          cwd = Dir.current
+          static_copied = builder ? ->(path : String) { builder.static_copied_output?(path, cwd) } : nil
 
           start = ctx.profiler ? Time.instant : nil
           stats = Content::Seo::OgImage.generate(
@@ -58,6 +61,7 @@ module Hwaro
             ctx.options.verbose,
             partial: ctx.partial_render,
             parallel: ctx.options.parallel,
+            static_copied: static_copied,
           )
           if (p = ctx.profiler) && start
             elapsed = (Time.instant - start).total_milliseconds
@@ -67,7 +71,7 @@ module Hwaro
           # No cache entry covers these files; claiming them is what lets the
           # Finalize prune remove them from a kept output directory once auto
           # images are switched off or skipped (see OgImage.published_outputs).
-          if builder = ctx.builder
+          if builder
             Content::Seo::OgImage.published_outputs(site.config, ctx.output_dir).each { |path| builder.claim_generated_output(path) }
           end
         end

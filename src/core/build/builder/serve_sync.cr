@@ -11,14 +11,15 @@ module Hwaro
         # Copy only the specified static files to the output directory.
         # Used by serve mode when only static files have changed.
         #
-        # Returns true when one of the copies landed on a file a PAGE owns
+        # Returns true when one of the copies would land on a file a PAGE owns
         # (`static/about/index.html` beside a page whose url is `/about/`) or
         # a generator writes (`static/robots.txt`, `static/404.html`, a
         # taxonomy page, an alias stub — see `generated_output_paths`). The
         # static-only rebuild strategy re-renders nothing, so the static
         # bytes would sit on that URL for the rest of the session; the caller
         # escalates to a full rebuild, where the render and the generators
-        # run after the copy and win — exactly the cold-build outcome.
+        # run after the copy and win — exactly the cold-build outcome. Such a
+        # file is not copied here; the full rebuild's static copy publishes it.
         def copy_changed_static(changed_files : Array(String), output_dir : String, verbose : Bool = false) : Bool
           static_config = static_publish_config
           config = @config
@@ -61,14 +62,23 @@ module Hwaro
               next
             end
 
+            canonical_dest = File.expand_path(dest_path, cwd)
+            # Left to the full rebuild the caller escalates to: copying here
+            # made that build's own static copy see an up-to-date destination
+            # and skip it, so it never recorded the copy (note_static_copy is
+            # reset per build) and a generator with its own cache — the auto
+            # OG images' manifest — kept the static bytes as a cache hit.
+            if build_outputs.includes?(canonical_dest)
+              shadowed = true
+              next
+            end
+
             Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
             Hwaro::Utils::FileSafe.atomic_copy(src_path, dest_path)
             # Recorded for the same reason the full build records its copies
             # (see Builder#note_static_copy): a later `--cache`-filtered
             # render must not skip the page whose output this just replaced.
-            canonical_dest = File.expand_path(dest_path, cwd)
             note_static_copy(canonical_dest)
-            shadowed ||= build_outputs.includes?(canonical_dest)
             copied += 1
           end
           Logger.outcome("copied", "#{copied} static #{copied == 1 ? "file" : "files"}") if copied > 0
