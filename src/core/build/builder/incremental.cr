@@ -284,9 +284,23 @@ module Hwaro
           # reach them, and their on-disk HTML kept showing the pre-edit title
           # (or kept listing a page just flipped to draft) until something
           # unrelated happened to re-render them.
-          listing_fanout_pages(site, templates, all_pages, listing_sets)
-            .each { |p| pages_to_render << p }
+          fanout = listing_fanout_pages(site, templates, all_pages, listing_sets)
+          fanout.each { |p| pages_to_render << p }
           regained.each { |p| pages_to_render << p }
+
+          # A fan-out page's summary prints what its shortcodes read (a
+          # `get_page` title), and only the changed pages and linkers got
+          # theirs recomputed above. Redo the fan-out pages whose summary
+          # source can hold a shortcode — before the globals below embed the
+          # summaries — and the author lists that embed them too.
+          summarized = (changed_pages + linkers).map(&.path).to_set
+          resummarize = fanout.select do |p|
+            !summarized.includes?(p.path) && content_may_contain_shortcodes?(p.summary || p.raw_content)
+          end
+          unless resummarize.empty?
+            render_page_summaries(resummarize, site, templates, highlight, link_targets: all_pages)
+            aggregate_site_authors(site)
+          end
 
           render_list = pages_to_render.to_a
 

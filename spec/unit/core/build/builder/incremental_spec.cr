@@ -182,6 +182,40 @@ describe "Builder#run_incremental term body shortcodes" do
   end
 end
 
+describe "Builder#run_incremental summary shortcodes" do
+  # A and C never change, but their summaries print B's title through a
+  # shortcode, and the listing prints those summaries.
+  it "refreshes the summaries of pages whose shortcodes read an edited page" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates/shortcodes")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("templates/section.html", "{% for p in section.pages %}[{{ p.title }}::{{ p.summary | safe }}]{% endfor %}")
+        File.write("templates/shortcodes/btitle.html", %(<b>{{ get_page(path="b.md").title }}</b>))
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/a.md", "+++\ntitle = \"A\"\n+++\nA mentions {{ btitle() }} here.\n")
+        File.write("content/c.md", "+++\ntitle = \"C\"\n+++\nC {{ btitle() }} first\n<!-- more -->\nrest\n")
+        File.write("content/b.md", "+++\ntitle = \"B1\"\n+++\nb\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/b.md"], options)
+        File.read("public/index.html").should contain("[A::<p>A mentions B1 here.</p>")
+
+        File.write("content/b.md", "+++\ntitle = \"B2\"\n+++\nb\n")
+        builder.run_incremental(["content/b.md"], options).should be_true
+        html = File.read("public/index.html")
+        html.should contain("[A::<p>A mentions B2 here.</p>")
+        html.should contain("[C::<p>C <b>B2</b> first</p>")
+      end
+    end
+  end
+end
+
 describe "Builder#run_incremental version roots" do
   it "refreshes page.version.url when a translated version root stops rendering" do
     Dir.mktmpdir do |dir|
