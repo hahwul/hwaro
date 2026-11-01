@@ -273,14 +273,14 @@ module Hwaro
         # `<script>`/`<style>`/`<textarea>` bodies are text, not markup: the
         # HTML passes must not rewrite an `"<img …>"` or `"<a href=…>"` JS
         # string (their double-quoted attributes would end it).
-        RAW_TEXT_OPEN_RE = /<(script|style|textarea)\b/i
+        RAW_TEXT_OPEN_RE = /<(script|style|textarea)(?=[\s\/>])/i
         # `$1` = a raw-text opener's name. `<!--` alternates so the scan steps
         # over comments (a commented-out `<!-- <script src="old.js"> -->`
         # opens nothing), and so does a tag one of whose quoted values holds a
         # `<` (`title="<textarea>"`): the last branch stops at that value's
         # `=` and the scan resumes past the whole tag. Every other tag fails
         # that branch at its `>` without a match being built.
-        RAW_TEXT_SCAN_RE = /<(?:!--|(script|style|textarea)\b|[a-zA-Z][^\s\/<>]*+(?:[^<>=]++|=\s*+"[^"<]*+"|=\s*+'[^'<]*+'|=(?!\s*+["']))*+=\s*+["'])/i
+        RAW_TEXT_SCAN_RE = /<(?:!--|(script|style|textarea)(?=[\s\/>])|[a-zA-Z][^\s\/<>]*+(?:[^<>=]++|=\s*+"[^"<]*+"|=\s*+'[^'<]*+'|=(?!\s*+["']))*+=\s*+["'])/i
         # A whole opening tag; a quote opens a value only right after `=`.
         RAW_TEXT_TAG_RE = /<[a-zA-Z][^\s\/<>]*+#{Utils::TextUtils::HTML_TAG_ATTRS_QUOTED_VALUES}>/
         # The end tag that closes a raw-text body, in any case (`</SCRIPT >`).

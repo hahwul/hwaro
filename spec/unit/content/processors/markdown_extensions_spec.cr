@@ -2454,6 +2454,11 @@ describe "Hwaro::Content::Processors::MarkdownExtensions raw-text bodies" do
     bodies.call(%(<script src="/a.js" data-x="1>2">b</script>)).should eq(["b"])
   end
 
+  it "opens no body at a custom element named script-*, style-* or textarea-*" do
+    bodies.call(%(<style-guide>a</style-guide><script-loader x="1">b</script-loader><textarea-autosize>c</textarea-autosize><script>d</script>))
+      .should eq(["d"])
+  end
+
   it "does not close a body at a longer tag name" do
     bodies.call(%(<style>a</styles>b</style>)).should eq(["a</styles>b"])
   end
