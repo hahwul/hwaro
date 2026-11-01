@@ -341,6 +341,7 @@ module Hwaro
           regenerate_amp_mirrors(renderable_list, site, output_dir, verbose)
 
           sweep_stale_derived_outputs(output_dir)
+          record_serve_cache_keys(site, templates, cache, options)
           cache.save if options.cache
 
           # The 404 page renders site-wide listings too (a docs sidebar, the
@@ -1461,6 +1462,7 @@ module Hwaro
           end
 
           sweep_stale_derived_outputs(output_dir)
+          record_serve_cache_keys(site, templates, cache, options)
           cache.save if options.cache
           write_html_stats(complete: false)
 
@@ -1523,6 +1525,36 @@ module Hwaro
         private def reaches?(graph : TemplateDeps, key : String, changed_names : Set(String)) : Bool
           return false if changed_names.empty?
           graph.dynamic? || !(graph.closure(key) & changed_names).empty?
+        end
+
+        # Leave the `--cache` keys describing the tree this serve pass wrote,
+        # as the cold build does for its own. Left at the session's first
+        # build, an edit made in serve and reverted offline matched them on
+        # the next start, which then kept every listing this session had
+        # re-rendered with the edit. The pass re-rendered every listing the
+        # edit moved, so the current page/section-set fingerprints describe
+        # the tree. (The cold build's fingerprint is taken before the hooks
+        # fill an auto OG `image`, so on such a site it never matches this one
+        # and the next start re-renders the listings — the safe direction.)
+        # The render inputs (`env()`, `load_data()`, image sources,
+        # asset names) are not what serve decides re-renders by, so when they
+        # moved during the session the stored digest is spoiled instead: the
+        # next start then renders every page. Skipped while a fast-start
+        # background pass is pending — render_deferred records then.
+        private def record_serve_cache_keys(site : Models::Site, templates : Hash(String, String), cache : Cache, options : Config::Options::BuildOptions) : Nil
+          return unless options.cache && @deferred_cache_keys.nil?
+          cache.record_set_fingerprints(
+            compute_page_set_fingerprint(site.pages + site.sections, listing_page_fields(templates)),
+            compute_section_set_fingerprint(site.sections, !site.config.menus_auto_sections.nil?))
+
+          stored = cache.render_inputs_hash
+          return if stored.empty?
+          known = cache.render_input_keys
+          reads = Content::Processors::TemplateEngine.take_render_reads
+          values = {} of String => String
+          return if reads.all? { |key| known.includes?(key) } &&
+                    render_inputs_digest(render_globals_digest(site.config, options.cache_busting), known, values) == stored
+          cache.record_render_inputs("moved during serve", (known + reads.to_a).uniq.sort!)
         end
 
         # Are there any pages stashed by `--fast-start` waiting to render?

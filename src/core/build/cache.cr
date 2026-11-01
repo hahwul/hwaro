@@ -392,6 +392,11 @@ module Hwaro
           @mutex.synchronize { @metadata.render_input_keys.dup }
         end
 
+        # The render-inputs digest the last build recorded.
+        def render_inputs_hash : String
+          @mutex.synchronize { @metadata.render_inputs_hash }
+        end
+
         # Compare the current render-inputs digest (computed over
         # `render_input_keys`) with the last build's. A change invalidates
         # every entry, like a config edit: the reads are global, and a cached

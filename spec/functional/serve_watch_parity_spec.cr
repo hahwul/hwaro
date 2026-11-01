@@ -860,3 +860,74 @@ describe "serve watch parity: a page losing its URL to another" do
     end
   end
 end
+
+describe "serve watch parity: --cache keys across sessions" do
+  # A `serve --cache` session's watch passes saved the pages they wrote but
+  # not the page-set fingerprint, so after an edit reverted between two
+  # sessions the next start matched the first session's fingerprint and
+  # kept the listings this session had re-rendered with the edit.
+  {"content", "content+template"}.each do |strategy|
+    it "re-renders the listings when an edit made in serve is reverted offline (#{strategy})" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = "https://example.com"\n))
+          FileUtils.mkdir_p("content/posts")
+          FileUtils.mkdir_p("templates")
+          File.write("templates/index.html", "{% for p in site.pages %}[{{ p.title }}]{% endfor %}")
+          File.write("templates/page.html", "{{ page.title }}")
+          File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+          File.write("content/posts/a.md", "+++\ntitle = \"A\"\n+++\na")
+          File.write("content/posts/b.md", "+++\ntitle = \"B\"\n+++\nb")
+          options = watch_parity_options
+          options.cache = true
+
+          builder = Hwaro::Services::Server.new.watch_parity_builder
+          builder.run(options).should be_true
+          File.write("content/posts/a.md", "+++\ntitle = \"A2\"\n+++\na")
+          if strategy == "content"
+            builder.run_incremental(["content/posts/a.md"], options).should be_true
+          else
+            File.write("templates/unrelated.html", "<p>unused</p>")
+            builder.run_incremental_then_rerender(["content/posts/a.md"], options).should be_true
+          end
+          File.read("public/index.html").should contain("[A2]")
+
+          File.write("content/posts/a.md", "+++\ntitle = \"A\"\n+++\na")
+          Hwaro::Services::Server.new.watch_parity_builder.run(options).should be_true
+          File.read("public/index.html").should contain("[A]")
+        end
+      end
+    end
+  end
+
+  # Same for what templates read outside the tracked files: a page the
+  # session re-rendered against a moved `env()` value kept it once the value
+  # went back, because the stored digest still described the old one.
+  it "re-renders the pages when a render input that moved in serve is back" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "https://example.com"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", %({{ page.content }}{{ env("HWARO_SPEC_SERVE_INPUT", default="unset") }}))
+        File.write("content/a.md", "+++\ntitle = \"A\"\n+++\na")
+        options = watch_parity_options
+        options.cache = true
+
+        ENV["HWARO_SPEC_SERVE_INPUT"] = "one"
+        builder = Hwaro::Services::Server.new.watch_parity_builder
+        builder.run(options).should be_true
+        ENV["HWARO_SPEC_SERVE_INPUT"] = "two"
+        File.write("content/a.md", "+++\ntitle = \"A\"\n+++\na2")
+        builder.run_incremental(["content/a.md"], options).should be_true
+        File.read("public/a/index.html").should contain("two")
+
+        ENV["HWARO_SPEC_SERVE_INPUT"] = "one"
+        Hwaro::Services::Server.new.watch_parity_builder.run(options).should be_true
+        File.read("public/a/index.html").should contain("one")
+      ensure
+        ENV.delete("HWARO_SPEC_SERVE_INPUT")
+      end
+    end
+  end
+end
