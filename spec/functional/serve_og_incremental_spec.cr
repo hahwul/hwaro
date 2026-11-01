@@ -243,6 +243,29 @@ describe "serve lazy OG generation (A9)" do
     end
   end
 
+  # Lazy mode never claims the OG paths, so the static lane copied a saved
+  # `static/og-images/<slug>.svg` onto the image and the request's manifest
+  # hit served the user's bytes.
+  it "regenerates over a static file the watcher copied onto the image" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_og_site(lazy: true)
+        FileUtils.mkdir_p("static/og-images")
+        File.write("static/og-images/posts-hello.svg", "USER BYTES v1")
+        builder = og_builder
+        builder.run(og_options).should be_true
+        handler = Hwaro::Services::OgLazyImageHandler.new(builder, "public")
+        og_request(handler, "/og-images/posts-hello.svg")
+        File.read("public/og-images/posts-hello.svg").should contain("First Title")
+
+        File.write("static/og-images/posts-hello.svg", "USER BYTES v2")
+        builder.copy_changed_static(["static/og-images/posts-hello.svg"], "public")
+        og_request(handler, "/og-images/posts-hello.svg")
+        File.read("public/og-images/posts-hello.svg").should contain("First Title")
+      end
+    end
+  end
+
   it "passes unrelated requests through untouched" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do

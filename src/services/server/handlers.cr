@@ -603,8 +603,13 @@ module Hwaro
         # the slug with fresh collision state and collapse colliding pages
         # (/posts/foo/ vs /posts-foo/) onto the same unsuffixed file.
         slug = File.basename(sanitized, File.extname(sanitized))
+        # A `static/` file the build or the watcher copied onto this path is
+        # not the image (a cold build generates over it), whatever the
+        # manifest says.
+        cwd = Dir.current
+        static_copied = ->(path : String) { @builder.static_copied_output?(path, cwd) }
         @mutex.synchronize do
-          Content::Seo::OgImage.generate([page], config, @output_dir, partial: true, parallel: false, forced_slug: slug)
+          Content::Seo::OgImage.generate([page], config, @output_dir, partial: true, parallel: false, forced_slug: slug, static_copied: static_copied)
         rescue ex
           Logger.warn "On-demand OG image generation failed for #{url_path}: #{ex.message}"
         end
