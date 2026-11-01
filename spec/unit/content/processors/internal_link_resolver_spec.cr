@@ -291,11 +291,11 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
       ).should eq html
     end
 
-    it "leaves script/style/textarea bodies alone but prefixes their opening tag" do
+    it "prefixes HTML a script inserts but leaves style/textarea bodies alone" do
       html = %(<script src="/app.js">el.innerHTML = '<a href="/x">';</script><style>a[href="/x"]{}</style><textarea><a href="/x"></textarea><a href="/x">)
       Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(
         html, "https://user.github.io/repo"
-      ).should eq %(<script src="/repo/app.js">el.innerHTML = '<a href="/x">';</script><style>a[href="/x"]{}</style><textarea><a href="/x"></textarea><a href="/repo/x">)
+      ).should eq %(<script src="/repo/app.js">el.innerHTML = '<a href="/repo/x">';</script><style>a[href="/x"]{}</style><textarea><a href="/x"></textarea><a href="/repo/x">)
     end
 
     it "prefixes links between upper-case raw-text elements and after an opener-looking attribute" do
@@ -305,6 +305,18 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
       attr = %(<a title="<textarea>" href="/x/">x</a><p>mid <a href="/mid/">m</a></p><textarea>t</textarea><a href="/end/">e</a>)
       Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(attr, "https://ex.io/repo", "/repo")
         .should eq %(<a title="<textarea>" href="/repo/x/">x</a><p>mid <a href="/repo/mid/">m</a></p><textarea>t</textarea><a href="/repo/end/">e</a>)
+    end
+
+    it "prefixes a tag whose unquoted value holds a stray quote" do
+      html = %(<img src="/a.png" alt=don't> <a title=it's href="/b/" alt='x'>b</a> <img alt=5" src=/c.png>)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, "https://ex.io/repo", "/repo")
+        .should eq %(<img src="/repo/a.png" alt=don't> <a title=it's href="/repo/b/" alt='x'>b</a> <img alt=5" src=/repo/c.png>)
+    end
+
+    it "leaves a JS-escaped attribute in a script string alone" do
+      html = %(<script>el.innerHTML = "<a href=\\"/x/\\">";</script>)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, "https://ex.io/repo", "/repo").should eq html
+      Hwaro::Content::Processors::InternalLinkResolver.absolutize_links(html, "https://ex.io/p/").should eq html
     end
 
     it "does not let a quote opened in a script body swallow the links after it" do

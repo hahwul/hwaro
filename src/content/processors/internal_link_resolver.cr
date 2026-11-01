@@ -71,20 +71,23 @@ module Hwaro
         end
 
         # An opening tag carrying at least one `href`/`src`/`srcset` outside
-        # its quoted values (any case). Quoted values are skipped whole; the
-        # unquoted run stops only at an `h`/`s` to test for a link name, so
-        # every other tag fails without a match being built. A `<` ends an
-        # unquoted run, so a stray `<` in text cannot drag a scan to the
-        # next `>`. Possessive, so nothing backtracks.
-        LINK_TAG_REGEX = /<[a-zA-Z][^\s\/<>]*+(?:"[^"]*+"|'[^']*+'|[^<>"'hs]++|(?!\b(?:srcset|href|src)=)[hs])*+\b(?:srcset|href|src)=(?:"[^"]*+"|'[^']*+'|[^<>"']++)*+>/i
+        # its quoted values (any case). As in HTML, a quote opens a value only
+        # right after `=` (a stray one, `alt=don't`, is text); quoted values
+        # are skipped whole. The unquoted run stops only at an `h`/`s` to test
+        # for a link name, so every other tag fails without a match being
+        # built. A `<` ends an unquoted run, so a stray `<` in text cannot
+        # drag a scan to the next `>`. Possessive, so nothing backtracks.
+        LINK_TAG_REGEX = /<[a-zA-Z][^\s\/<>]*+(?:[^<>=hs]++|=\s*+"[^"]*+"|=\s*+'[^']*+'|=|(?!\b(?:srcset|href|src)=)[hs])*+\b(?:srcset|href|src)=(?:"[^"]*+"|'[^']*+')?+(?:[^<>=]++|=\s*+"[^"]*+"|=\s*+'[^']*+'|=)*+>/i
 
         # One `href`/`src`/`srcset` attribute inside a LINK_TAG_REGEX match, in
         # any case and quote style: `$1` = `name=`, `$2` = name, `$3` = the
         # quote (empty when unquoted), `$4` = value. An unquoted value ends at
-        # whitespace or `>`. The first two alternatives step over every other
-        # quoted value whole, so `title="href='/x'"` is not a link; `\b`
-        # keeps `data-src=` (lazy loaders) in.
-        LINK_ATTR_REGEX = /"[^"]*+"|'[^']*+'|\b((srcset|href|src)=)(?|(")([^"]*+)"|(')([^']*+)'|()([^\s"'`>][^\s>]*+))/i
+        # whitespace or `>`, and never starts with `\`: `href=\"/x/\"` is a
+        # JS-escaped quote in a script string, not a value. The first two
+        # alternatives step over every other quoted value whole, so
+        # `title="href='/x'"` is not a link; `\b` keeps `data-src=` (lazy
+        # loaders) in.
+        LINK_ATTR_REGEX = /=\s*+"[^"]*+"|=\s*+'[^']*+'|\b((srcset|href|src)=)(?|(")([^"]*+)"|(')([^']*+)'|()([^\s"'`>\\][^\s>]*+))/i
 
         # Cheap any-case probe for a link attribute, behind the byte probes.
         LINK_ATTR_PROBE = /(?:href|src|srcset)=/i
@@ -363,14 +366,14 @@ module Hwaro
         # gets `(srcset?, value)` and returns the new value; nil or `value`
         # keeps the attribute's bytes.
         #
-        # `<script>`/`<style>`/`<textarea>` bodies are text, not markup: a JS
-        # `'<a href="/x">'` string or a textarea's sample HTML is left alone,
-        # like the lazy/responsive/external-link passes leave it. Their opening
-        # tag (`<script src="/app.js">`) is markup and is rewritten. The scan
-        # runs per stretch between bodies, so a quote opened in a body never
+        # `<style>`/`<textarea>` bodies are text, not markup: a textarea's
+        # sample HTML is visible and stays as written. A `<script>` body is
+        # rewritten: a tag in it is HTML the script inserts
+        # (`el.innerHTML = '<a href="/x/">'`), which needs the same prefix.
+        # Each body is scanned on its own, so a quote opened in one never
         # swallows the markup after it.
         private def rewrite_link_attrs(html : String, & : Bool, String -> String?) : String
-          MarkdownExtensions.outside_raw_text(html) do |chunk|
+          MarkdownExtensions.outside_raw_text(html, scripts: true) do |chunk|
             chunk.gsub(LINK_TAG_REGEX) do |tag|
               tag.gsub(LINK_ATTR_REGEX) do |attr, am|
                 next attr unless name = am[2]?
