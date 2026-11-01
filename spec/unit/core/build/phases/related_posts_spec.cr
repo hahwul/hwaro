@@ -351,13 +351,16 @@ describe "Related posts candidates" do
 
     flat = Hwaro::Models::Page.new("blog/flat.md")
     flat.title = "Flat"
+    flat.url = "/blog/flat/"
     flat.tags = ["x"]
     bundle = Hwaro::Models::Page.new("blog/bundle/index.md")
     bundle.title = "Bundle"
+    bundle.url = "/blog/bundle/"
     bundle.is_index = true
     bundle.tags = ["x"]
     home = Hwaro::Models::Page.new("index.md")
     home.title = "Home"
+    home.url = "/"
     home.is_index = true
     home.tags = ["x"]
     site.pages = [flat, bundle, home]
@@ -377,12 +380,15 @@ describe "Related posts candidates" do
 
     me = Hwaro::Models::Page.new("me.md")
     me.title = "Me"
+    me.url = "/me/"
     me.tags = ["x", "y"]
     dup = Hwaro::Models::Page.new("dup.md")
     dup.title = "Dup"
+    dup.url = "/dup/"
     dup.tags = ["x", "x", "x"]
     both = Hwaro::Models::Page.new("both.md")
     both.title = "Both"
+    both.url = "/both/"
     both.tags = ["x", "y"]
     site.pages = [me, dup, both]
 
@@ -404,6 +410,7 @@ describe "Related posts candidates" do
     pages = (0...3000).map do |i|
       page = Hwaro::Models::Page.new("posts/p#{i}.md")
       page.title = "P#{i}"
+      page.url = "/posts/p#{i}/"
       page.tags = ["blog", "t#{i % 7}"]
       page
     end

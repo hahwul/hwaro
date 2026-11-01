@@ -1,5 +1,6 @@
 require "../../../../spec_helper"
 require "../../../../../src/core/build/builder"
+require "../../../../support/build_helper"
 
 # Reopen Builder to expose private Transform helpers for testing.
 module Hwaro::Core::Build
@@ -58,15 +59,19 @@ module Hwaro::Core::Build
   end
 end
 
+# Each fixture gets a URL of its own (the parse phase's job): pages sharing
+# one collide, and a collision loser is no one's neighbour.
 private def make_section(path : String, name : String) : Hwaro::Models::Section
   s = Hwaro::Models::Section.new(path)
   s.section = name
+  s.url = "/#{path}/"
   s
 end
 
 private def make_page(path : String, section : String = "") : Hwaro::Models::Page
   p = Hwaro::Models::Page.new(path)
   p.section = section
+  p.url = "/#{path}/"
   p
 end
 
@@ -947,5 +952,59 @@ describe Hwaro::Core::Build::Phases::Transform do
       result.should eq(Hwaro::Core::Lifecycle::HookResult::Continue)
       site.pages.size.should eq(1)
     end
+  end
+end
+
+describe "Transform: output-URL collision losers" do
+  # `b.md` takes slug "red" and wins /posts/red/ (it sorts first); `red.md`
+  # loses the URL and writes nothing, so no page may link it as a
+  # neighbour, series member, related post or backlink.
+  it "keeps a page that loses its URL out of prev/next, series, related and backlinks" do
+    config = <<-TOML
+      title = "T"
+      base_url = "http://localhost"
+
+      [[taxonomies]]
+      name = "tags"
+
+      [related]
+      enabled = true
+      taxonomies = ["tags"]
+
+      [series]
+      enabled = true
+
+      [content]
+      backlinks = true
+      TOML
+    front = ->(title : String, weight : Int32, extra : String) {
+      "+++\ntitle = \"#{title}\"\nweight = #{weight}\ntags = [\"x\"]\nseries = \"s\"\n#{extra}+++\n"
+    }
+    content = {
+      "posts/_index.md" => "+++\ntitle = \"Posts\"\nsort_by = \"weight\"\n+++\n",
+      "posts/a.md"      => front.call("A", 1, ""),
+      "posts/b.md"      => front.call("B", 2, "slug = \"red\"\n"),
+      "posts/c.md"      => front.call("C", 4, ""),
+      "posts/red.md"    => front.call("Red", 3, "") + "[a](/posts/a/)\n",
+    }
+    templates = {
+      "page.html" => "{{ page.title }}|L={{ page.lower.title }}|H={{ page.higher.title }}" \
+                     "|S={% for s in page.series_pages %}{{ s.title }},{% endfor %}" \
+                     "|R={% for r in page.related_posts %}{{ r.title }},{% endfor %}" \
+                     "|B={% for b in page.backlinks %}{{ b.title }},{% endfor %}",
+      "section.html" => "{{ section.title }}",
+    }
+    log = with_captured_log do
+      build_site(config, content_files: content, template_files: templates) do
+        File.read("public/posts/red/index.html").should start_with("B|L=A|H=C|")
+        File.read("public/posts/c/index.html").should start_with("C|L=B|")
+        {"a", "red", "c"}.each do |slug|
+          html = File.read("public/posts/#{slug}/index.html")
+          html.should contain("|S=A,B,C,|")
+          html.should_not contain("Red")
+        end
+      end
+    end
+    log.should contain("Duplicate output path '/posts/red/' — 'posts/red.md' collides with 'posts/b.md' and is not written")
   end
 end

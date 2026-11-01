@@ -722,3 +722,55 @@ describe "serve watch parity: summaries printing a page's neighbours" do
     end
   end
 end
+
+# The post pages a cold build of the current source writes, by path.
+private def watch_parity_cold_posts : Hash(String, String)
+  options = watch_parity_options
+  options.output_dir = "cold"
+  Hwaro::Services::Server.new.watch_parity_builder.run(options).should be_true
+  Dir.glob("cold/posts/**/*.html").sort!.to_h { |path| {path.lchop("cold/"), File.read(path)} }
+ensure
+  FileUtils.rm_rf("cold")
+end
+
+describe "serve watch parity: a page losing its URL to another" do
+  # Bravo (`b.md`) loses its URL and writes nothing: it takes slug "a" and
+  # `a.md`, which sorts first, keeps /posts/a/ — or a page that sorts before
+  # it takes slug "b" from it: its series sibling `a.md`, or `a0.md`, which
+  # shares nothing with it. Bravo must drop out of the neighbours and the
+  # series, and come back once the slug goes, exactly as a cold build has it.
+  zero = %(title = "Zero"\ndate = "2023-12-31"\ntags = ["z"]\n)
+  {
+    {"b", %(title = "Bravo"\ndate = "2024-01-02"\ntags = ["y"]\nseries = "s"\n), %(slug = "a"\n)},
+    {"a", %(title = "Alpha"\ndate = "2024-01-01"\ntags = ["x"]\nseries = "s"\n), %(slug = "b"\n)},
+    {"a0", zero, %(slug = "b"\n)},
+  }.each do |name, front, slug_line|
+    {"content", "content+template"}.each do |strategy|
+      it "relinks neighbours and series around the loser (#{name}.md edit, #{strategy})" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            write_relations_site
+            File.write("content/posts/a0.md", "+++\n#{zero}+++\nz")
+            builder = Hwaro::Services::Server.new.watch_parity_builder
+            options = watch_parity_options
+            builder.run(options).should be_true
+
+            [slug_line, ""].each_with_index do |slug, round|
+              File.write("content/posts/#{name}.md", "+++\n#{slug}#{front}+++\n#{name}")
+              if strategy == "content"
+                builder.run_incremental(["content/posts/#{name}.md"], options).should be_true
+              else
+                File.write("templates/unrelated.html", "<p>unused v#{round}</p>")
+                builder.run_incremental_then_rerender(["content/posts/#{name}.md"], options).should be_true
+              end
+
+              cold = watch_parity_cold_posts
+              cold.values.any?(&.includes?("Bravo")).should eq(round == 1)
+              cold.each { |path, html| {path, File.read(File.join("public", path))}.should eq({path, html}) }
+            end
+          end
+        end
+      end
+    end
+  end
+end

@@ -103,13 +103,16 @@ describe "Series support" do
 
     undated = Hwaro::Models::Page.new("posts/a.md")
     undated.title = "A"
+    undated.url = "/posts/a/"
     undated.series = "S"
     old = Hwaro::Models::Page.new("posts/b.md")
     old.title = "B"
+    old.url = "/posts/b/"
     old.series = "S"
     old.date = Time.utc(1969, 7, 20)
     recent = Hwaro::Models::Page.new("posts/c.md")
     recent.title = "C"
+    recent.url = "/posts/c/"
     recent.series = "S"
     recent.date = Time.utc(2025, 1, 1)
 
@@ -223,6 +226,7 @@ describe "Series language scoping" do
     make = ->(path : String, weight : Int32, lang : String?) do
       pg = Hwaro::Models::Page.new(path)
       pg.title = path
+      pg.url = "/#{path}/"
       pg.series = "Intro"
       pg.series_weight = weight
       pg.language = lang

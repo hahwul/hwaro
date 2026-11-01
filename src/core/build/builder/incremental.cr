@@ -234,17 +234,18 @@ module Hwaro
           # prev/next pointer actually changed (a section weight/sort/reverse edit
           # reorders a whole block, not just the edited page's neighbors).
           renav_pages = relink_navigation_for_sections(site, affected_sections)
+          related_changed = changed_pages + publish_flips(site, previously_suppressed)
 
           # Recompute series for affected series (if enabled), including old memberships
           affected_series = if site.config.series.enabled
-                              recompute_series_for_pages(site, changed_pages, old_series_names)
+                              recompute_series_for_pages(site, related_changed, old_series_names)
                             else
                               Set(String).new
                             end
 
           # Recompute related posts selectively (if enabled). Pass the excluded
           # pages' paths so pages that listed a now-removed page as related drop it.
-          related_pages_updated = recompute_related_posts_for_pages(site, changed_pages, excluded_paths)
+          related_pages_updated = recompute_related_posts_for_pages(site, related_changed, excluded_paths)
           compute_backlinks(site) if site.config.backlinks
           # `site.authors` embeds each page's title and summary (Transform
           # builds it once per full build).
@@ -423,12 +424,14 @@ module Hwaro
 
           site.build_lookup_index
           renav_pages = relink_navigation_for_sections(site, affected_sections)
+          # run_rerender claims the URLs; the flags are still the last pass's.
+          related_changed = changed_pages + publish_flips(site, site.pages.select(&.output_suppressed))
           affected_series = if site.config.series.enabled
-                              recompute_series_for_pages(site, changed_pages, reparsed.old_series_names)
+                              recompute_series_for_pages(site, related_changed, reparsed.old_series_names)
                             else
                               Set(String).new
                             end
-          related_pages_updated = recompute_related_posts_for_pages(site, changed_pages, excluded_paths)
+          related_pages_updated = recompute_related_posts_for_pages(site, related_changed, excluded_paths)
           refresh_wikilink_index((site.pages + site.sections).as(Array(Models::Page)), site)
           compute_backlinks(site) if site.config.backlinks
 
@@ -1109,6 +1112,16 @@ module Hwaro
           process_assets(changed_pages, output_dir, false) unless relocated.empty?
           prune_unclaimed_outputs(relocated, output_dir) unless relocated.empty?
           settle_page_outputs(output_dir, except: old_output_paths.values.flatten)
+        end
+
+        # The pages whose output-URL verdict this pass flips against
+        # `previously_suppressed` (the last pass's losers): they join or leave
+        # the series and related posts a loser is kept out of, which only
+        # recompute around the pages they are told changed.
+        private def publish_flips(site : Models::Site, previously_suppressed : Array(Models::Page)) : Array(Models::Page)
+          losers = site_output_losers(site)
+          was = previously_suppressed.map(&.path).to_set
+          site.pages.select { |p| losers.includes?(p.path) != was.includes?(p.path) }
         end
 
         # Pages that lost an output-path collision before this pass and own
