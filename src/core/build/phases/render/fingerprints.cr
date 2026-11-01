@@ -498,6 +498,19 @@ module Hwaro::Core::Build::Phases::Render
     digest.final.hexstring
   end
 
+  # A page's `image` as the cold build fingerprints it: before the hooks
+  # assign an auto OG image. A serve pass sees the assigned URL (the hooks
+  # ran, the re-parse keeps it), so what it recorded never matched the next
+  # start's value, and every listing it had re-rendered rendered again. The
+  # URL follows the page URL, which is folded already. (ponytail: a front
+  # matter `image` pointing into the auto-OG directory is ignored too.)
+  private def fp_image(p : Models::Page) : String
+    image = p.image
+    return "" unless image
+    ai = @config.try(&.og.auto_image)
+    ai && ai.enabled && Content::Seo::OgImage.auto_assigned?(image, ai) ? "" : image
+  end
+
   # One page's contribution to the page-set fingerprint — also how the
   # relations hash folds each page another page renders a piece of.
   private def fp_page(digest : ::Digest, p : Models::Page, fields : Builder::ListingPageFields) : Nil
@@ -522,7 +535,7 @@ module Hwaro::Core::Build::Phases::Render
     fp_value(digest, p.in_sitemap ? "1" : "0")
     fp_value(digest, p.in_search_index ? "1" : "0")
     fp_value(digest, p.section)
-    fp_value(digest, p.image || "")
+    fp_value(digest, fp_image(p))
     fp_value(digest, p.series || "")
     fp_list(digest, p.authors)
     fp_list(digest, p.tags)

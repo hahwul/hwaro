@@ -1533,9 +1533,7 @@ module Hwaro
         # the next start, which then kept every listing this session had
         # re-rendered with the edit. The pass re-rendered every listing the
         # edit moved, so the current page/section-set fingerprints describe
-        # the tree. (The cold build's fingerprint is taken before the hooks
-        # fill an auto OG `image`, so on such a site it never matches this one
-        # and the next start re-renders the listings — the safe direction.)
+        # the tree (an auto OG `image` is left out of both, see fp_image).
         # The render inputs (`env()`, `load_data()`, image sources,
         # asset names) are not what serve decides re-renders by, so when they
         # moved during the session the stored digest is spoiled instead: the

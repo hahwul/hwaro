@@ -969,6 +969,36 @@ describe "serve watch parity: --cache keys across sessions" do
       end
     end
   end
+
+  # The cold build fingerprints the page set before the hooks assign auto
+  # OG images; a watch pass fingerprinted it after, so the next start
+  # re-rendered every listing and neighbour the session had re-rendered.
+  it "keeps the listings cached across a session under auto OG images" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "https://example.com"\n[og.auto_image]\nenabled = true\nformat = "svg"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/index.html", "{% for p in site.pages %}[{{ p.title }}={{ p.image }}]{% endfor %}")
+        File.write("templates/page.html", "{{ page.content }}{% if page.lower %}{{ page.lower.image }}{% endif %}")
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/a.md", "+++\ntitle = \"A\"\nweight = 1\n+++\na")
+        File.write("content/b.md", "+++\ntitle = \"B\"\nweight = 2\n+++\nb")
+        options = watch_parity_options
+        options.cache = true
+
+        builder = Hwaro::Services::Server.new.watch_parity_builder
+        builder.run(options).should be_true
+        File.write("content/a.md", "+++\ntitle = \"A2\"\nweight = 1\n+++\na")
+        builder.run_incremental(["content/a.md"], options).should be_true
+        File.read("public/index.html").should contain("[A2=/og-images/a.svg]")
+
+        log = with_captured_log { Hwaro::Services::Server.new.watch_parity_builder.run(options).should be_true }
+        log.should contain("render: 0 pages")
+        File.read("public/index.html").should contain("[A2=/og-images/a.svg]")
+      end
+    end
+  end
 end
 
 describe "serve watch parity: a page turning headless under auto OG images" do
