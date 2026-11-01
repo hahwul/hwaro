@@ -768,6 +768,47 @@ describe "serve watch parity: summaries printing a page's neighbours" do
   end
 end
 
+describe "serve watch parity: an edited page's own relationship summary" do
+  # The edited page's summary was rendered before its translations and
+  # neighbours were relinked, so a shortcode printing them kept the pre-edit
+  # titles: its own title in the switcher, the neighbour a date move brought.
+  {
+    {"retitled", %(title = "Ay"\ndate = "2024-01-01"\n), "lead Ay;가;|B|"},
+    {"moved past its neighbour", %(title = "A"\ndate = "2024-01-05"\n), "lead A;가;||"},
+  }.each do |label, front, expected|
+    {"content", "content+template"}.each do |strategy|
+      it "recomputes the summary of a page #{label} (#{strategy})" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            write_translation_listing_site
+            File.write("config.toml", File.read("config.toml") + "\n[feeds]\nenabled = true\n")
+            FileUtils.mkdir_p("templates/shortcodes")
+            File.write("templates/shortcodes/rel.html",
+              "{% for t in page.translations %}{{ t.title }};{% endfor %}|{% if page.lower %}{{ page.lower.title }}{% endif %}|")
+            File.write("content/posts/b.md", "+++\ntitle = \"B\"\ndate = \"2024-01-02\"\n+++\nb")
+            File.write("content/posts/c.md", "+++\ntitle = \"C\"\ndate = \"2024-01-03\"\n+++\nc")
+            File.write("content/posts/a.md", "+++\ntitle = \"A\"\ndate = \"2024-01-01\"\n+++\nlead {{ rel() }}\n\n<!-- more -->\n\nrest")
+            builder = Hwaro::Services::Server.new.watch_parity_builder
+            options = watch_parity_options
+            builder.run(options).should be_true
+            File.read("public/rss.xml").should contain("<description>lead A;가;|B|</description>")
+
+            File.write("content/posts/a.md", "+++\n#{front}+++\nlead {{ rel() }}\n\n<!-- more -->\n\nrest")
+            if strategy == "content"
+              builder.run_incremental(["content/posts/a.md"], options).should be_true
+            else
+              File.write("templates/unrelated.html", "<p>unused</p>")
+              builder.run_incremental_then_rerender(["content/posts/a.md"], options).should be_true
+            end
+
+            File.read("public/rss.xml").should contain("<description>#{expected}</description>")
+          end
+        end
+      end
+    end
+  end
+end
+
 # The post pages a cold build of the current source writes, by path.
 private def watch_parity_cold_posts : Hash(String, String)
   options = watch_parity_options

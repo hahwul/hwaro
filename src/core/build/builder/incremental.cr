@@ -189,18 +189,10 @@ module Hwaro
           # rebuild through @rebuild_failed.
           raise_on_permalink_errors!(changed_pages)
 
-          # Re-render <!-- more --> summaries for the re-parsed pages with the
-          # body pipeline (parse_single_page reset summary_html to nil); the
-          # listing pages re-rendered below read it. Runs AFTER the exclusion
-          # pass so a page just flipped to draft can't feed its summary's
-          # broken @/ links into the strict-mode accumulator (the full build
-          # renders summaries post-filter too).
           # The excluded pages leave site.pages only at
           # drop_excluded_and_orphaned_outputs below; keep them out of the
           # index now, or the summaries and renders here still link to them.
           refresh_wikilink_index((site.pages + site.sections).reject { |p| excluded_paths.includes?(p.path) }, site)
-          render_page_summaries(changed_pages, site, templates, highlight,
-            link_targets: (site.pages + site.sections).as(Array(Models::Page)))
 
           # Run taxonomy update on ALL re-parsed pages (including the excluded
           # ones — their OLD entries must be removed; excluded_paths keeps
@@ -228,7 +220,6 @@ module Hwaro
           # Pages linking to a page this edit moved. Their `<!-- more -->`
           # summary prints the link too, in every listing and feed.
           linkers = linkers_of_moved_pages(site, page_urls)
-          render_page_summaries(linkers, site, templates, highlight, link_targets: all_pages) unless linkers.empty?
 
           # Re-link the global reading order; `renav_pages` is every page whose
           # prev/next pointer actually changed (a section weight/sort/reverse edit
@@ -247,9 +238,6 @@ module Hwaro
           # pages' paths so pages that listed a now-removed page as related drop it.
           related_pages_updated = recompute_related_posts_for_pages(site, related_changed, excluded_paths)
           compute_backlinks(site) if site.config.backlinks
-          # `site.authors` embeds each page's title and summary (Transform
-          # builds it once per full build).
-          aggregate_site_authors(site)
 
           # Invalidate Crinja caches for affected pages/sections
           invalidate_caches_for_pages(changed_pages, affected_sections)
@@ -271,6 +259,19 @@ module Hwaro
               @ancestors_crinja_cache.reject! { |k, _| k[0] == sec || k[0].starts_with?("#{sec}/") }
             end
           end
+
+          # Re-render <!-- more --> summaries for the re-parsed pages
+          # (parse_single_page reset summary_html to nil) and the linkers with
+          # the body pipeline; the listing pages re-rendered below read them.
+          # Runs AFTER the exclusion pass so a page just flipped to draft
+          # can't feed its summary's broken @/ links into the strict-mode
+          # accumulator (the full build renders summaries post-filter too),
+          # and after the relinks above, which a summary shortcode printing
+          # `page.translations` or `page.lower` reads.
+          render_page_summaries(changed_pages + linkers, site, templates, highlight, link_targets: all_pages)
+          # `site.authors` embeds each page's title and summary (Transform
+          # builds it once per full build).
+          aggregate_site_authors(site)
 
           # --- 3. Determine the full set of pages that need re-rendering ---
           pages_to_render = relationship_render_set(site, pages_map, reparsed, changed_pages,
