@@ -1039,7 +1039,9 @@ module Hwaro::Core::Build::Phases::ParseContent
     page.title = data[:title]
     page.description = data[:description]
     page.image = data[:image]
-    if data[:image].nil? && (prev = previous_image)
+    # A page just set `render = false` gets none: a full build never
+    # generates one for it, and no file would answer the URL.
+    if data[:image].nil? && data[:render] && (prev = previous_image)
       if (cfg = @config) && cfg.og.auto_image.enabled && Content::Seo::OgImage.auto_assigned?(prev, cfg.og.auto_image)
         page.image = prev
       end

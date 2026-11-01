@@ -931,3 +931,33 @@ describe "serve watch parity: --cache keys across sessions" do
     end
   end
 end
+
+describe "serve watch parity: a page turning headless under auto OG images" do
+  # The re-parse keeps an auto-assigned OG `image` the front matter cannot
+  # restore — also for a page just set `render = false`, which a full build
+  # never gives one, so listings printing `p.image` kept a URL no file
+  # answers.
+  it "drops the auto OG image of a page set to render = false" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "https://example.com"\n[og.auto_image]\nenabled = true\nformat = "svg"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/index.html", "{% for p in site.pages %}[{{ p.title }}={{ p.image }}]{% endfor %}")
+        File.write("templates/page.html", "{{ page.title }}")
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/a.md", "+++\ntitle = \"A\"\n+++\na")
+        File.write("content/b.md", "+++\ntitle = \"B\"\n+++\nb")
+        builder = Hwaro::Services::Server.new.watch_parity_builder
+        options = watch_parity_options
+        builder.run(options).should be_true
+        File.read("public/index.html").should contain("[B=/og-images/b.svg]")
+
+        File.write("content/b.md", "+++\ntitle = \"B\"\nrender = false\n+++\nb")
+        builder.run_incremental(["content/b.md"], options).should be_true
+
+        File.read("public/index.html").should contain("[B=]")
+      end
+    end
+  end
+end
