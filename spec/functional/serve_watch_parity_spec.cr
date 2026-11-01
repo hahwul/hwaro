@@ -228,6 +228,30 @@ describe "serve watch parity: [[content.generate]] body templates" do
     end
   end
 
+  it "regenerates the pages when a partial an inline template spec includes changes" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_generate_site
+        config = File.read("config.toml").sub(%(body_template = "gen/product.md"),
+          %(body = "{% include 'partials/spec.html' %} body"\ndescription = "{% include 'partials/other.html' %}"))
+        File.write("config.toml", config)
+        File.write("templates/page.html", "<html><body>{{ page.description }} {{ content }}</body></html>")
+        server = Hwaro::Services::Server.new
+        options = watch_parity_options
+        server.watch_parity_builder.run(options).should be_true
+        File.read("public/products/w1/index.html").should contain("other <p>spec-v1 body</p>")
+
+        File.write("templates/partials/spec.html", "spec-v2")
+        File.write("templates/partials/other.html", "other-v2")
+        changeset = watch_parity_changeset(templates: ["templates/partials/spec.html", "templates/partials/other.html"])
+        server.watch_parity_effective_strategy(changeset, "public").should eq(:full)
+        server.watch_parity_apply_changeset(changeset, options)
+
+        File.read("public/products/w1/index.html").should contain("other-v2 <p>spec-v2 body</p>")
+      end
+    end
+  end
+
   it "keeps the cheap strategy for a template the body never reads" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do

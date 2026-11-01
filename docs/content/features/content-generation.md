@@ -77,7 +77,7 @@ An authored file always wins a contested path: if `content/products/red-widget.m
 
 ## Rebuilds and Caching
 
-Generated content moves with its data. Editing a `data/` file (or a changed `[[data.remote]]` payload) invalidates cached pages the same way a config edit does, and `hwaro serve` triggers a rebuild on data edits. Under `build --cache`, generated pages are always re-rendered (they have no source file to fingerprint), while authored pages keep their cache behavior.
+Generated content moves with its data. Editing a `data/` file (or a changed `[[data.remote]]` payload) invalidates cached pages the same way a config edit does, and `hwaro serve` triggers a rebuild on data edits, and on edits to a `body_template` or to a partial that it or an inline template spec includes. Under `build --cache`, generated pages are always re-rendered (they have no source file to fingerprint), while authored pages keep their cache behavior.
 
 If a record disappears from the data, its page is gone from the next build's page set, and its previously written file is removed from the output directory, under `build --cache` and `hwaro serve` alike, as for a deleted authored file.
 

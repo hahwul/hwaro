@@ -1412,12 +1412,19 @@ module Hwaro
         # re-render strategies re-render pages from the bodies they already
         # hold, and the body file (often `.md`) is not even in the template
         # snapshot, so the edit read as "contents are identical".
+        # Inline template specs (`body = "{% include 'partials/x.html' %}"`,
+        # a templated `description`, …) render at that same point, so a
+        # partial THEY include counts too.
         # `changed_paths` are watcher paths (`templates/gen/product.md`).
         def generate_body_template_changed?(changed_paths : Array(String)) : Bool
           config = @config
           return false unless config
           body_names = config.content_generate.compact_map(&.body_template)
-          return false if body_names.empty? || changed_paths.empty?
+          inline_specs = config.content_generate.flat_map do |rule|
+            ([rule.slug, rule.title, rule.body, rule.date, rule.description] + rule.taxonomies.values)
+              .compact.select { |spec| ContentGenerate.template_spec?(spec) }
+          end
+          return false if (body_names.empty? && inline_specs.empty?) || changed_paths.empty?
 
           changed_files = changed_paths.map { |path| Path[path].normalize.to_s }.to_set
           changed_names = changed_paths.compact_map do |path|
@@ -1426,7 +1433,7 @@ module Hwaro
           end.to_set
           snapshot = @templates || {} of String => String
 
-          body_names.any? do |name|
+          body_changed = body_names.any? do |name|
             # The body loads through the filesystem fallback, i.e. the
             # literal file under templates/.
             body_file = Path["templates", name].normalize.to_s
@@ -1436,6 +1443,14 @@ module Hwaro
             graph = TemplateDeps.new(snapshot.merge({key => File.read(body_file)}))
             !(graph.closure(key) & changed_names).empty?
           end
+          return true if body_changed
+          return false if inline_specs.empty?
+
+          # One synthetic graph node holding every inline spec; the NUL key
+          # can never name a real template.
+          key = "\0content.generate"
+          graph = TemplateDeps.new(snapshot.merge({key => inline_specs.join('\n')}))
+          !(graph.closure(key) & changed_names).empty?
         end
 
         # Are there any pages stashed by `--fast-start` waiting to render?
