@@ -51,6 +51,12 @@ module Hwaro::Core::Build::Phases::ParseContent
       # The image hooks have not run yet: rerender_image_summaries redoes
       # the summaries they change once the resize map is filled.
       render_page_summaries(ctx.all_pages, site, templates, ctx.options.highlight && site.config.highlight.enabled, images_ready: false)
+      # The shortcode contexts above cached page values (every page, through
+      # the globals, and each page's neighbours) as they stand now — before
+      # Transform and the BeforeRender hooks fill fields such as `image`
+      # (og:auto_image). Render must build its own.
+      @cache_manager.clear("page_crinja_value", "section_pages_crinja", "section_assets_crinja",
+        "series_crinja", "ancestors_crinja", "related_posts_crinja", reset_stats: false)
     end
 
     Lifecycle::HookResult::Continue

@@ -225,3 +225,27 @@ describe "summary shortcodes reading the page set" do
     end
   end
 end
+
+# The summary pass builds shortcode contexts — page values for every page
+# and each page's neighbours — before og:auto_image sets `page.image`. Render
+# reused those cached values, so listings printed no image for pages whose
+# summary that pass did not recompute (a description, no marker) and for
+# the neighbours of a page with a summary shortcode.
+describe "summary shortcodes and later page fields" do
+  it "lists og:auto_image images of every page" do
+    config = BASIC_CONFIG + %(\n[og.auto_image]\nenabled = true\nformat = "svg"\n)
+    content = {
+      "posts/_index.md" => "+++\ntitle = \"Posts\"\n+++\n",
+      "posts/a.md"      => "+++\ntitle = \"A\"\n+++\nHello {{ hi() }}.\n\n<!-- more -->\n\nRest.\n",
+    }
+    %w[b c d].each { |n| content["posts/#{n}.md"] = "+++\ntitle = \"#{n.upcase}\"\ndescription = \"#{n} desc\"\n+++\nBody.\n" }
+    build_site(config, content_files: content, template_files: {
+      "page.html"          => "{{ content }}",
+      "section.html"       => "{% for p in section.pages %}[{{ p.title }}={{ p.image }}]{% endfor %}",
+      "shortcodes/hi.html" => "HI",
+    }) do |dir|
+      html = File.read(File.join(dir, "public", "posts", "index.html"))
+      %w[a b c d].each { |n| html.should contain("[#{n.upcase}=/og-images/posts-#{n}.svg]") }
+    end
+  end
+end
