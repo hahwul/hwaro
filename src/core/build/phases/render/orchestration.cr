@@ -108,6 +108,7 @@ module Hwaro::Core::Build::Phases::Render
     if ctx.options.fast_start
       priority, deferred = split_priority_pages(pages_to_build, ctx.options.fast_start_count)
       @deferred_pages = deferred
+      @priority_pages = priority
       if !deferred.empty?
         Logger.info "  Fast-start: rendering #{priority.size} priority page(s) up front, deferring #{deferred.size} for background render."
         # NOTE — both `priority_pages` and `partial_render` are consumed

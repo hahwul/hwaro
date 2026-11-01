@@ -1522,6 +1522,10 @@ module Hwaro
           # Trigger BeforeRender hooks directly — we're not re-running the
           # Render phase, just the prep work it would have done.
           @lifecycle.trigger(Lifecycle::HookPoint::BeforeRender, deferred_ctx)
+          # The page values the cold pass cached predate the fields those
+          # hooks just filled for the deferred pages (`image`, summaries).
+          @cache_manager.clear("page_crinja_value", "section_pages_crinja", "section_assets_crinja",
+            "series_crinja", "ancestors_crinja", "related_posts_crinja", reset_stats: false)
 
           global_vars = build_global_vars(site, options.cache_busting)
           if rerender_image_summaries((site.pages + site.sections).as(Array(Models::Page)), site, templates, highlight, global_vars)
@@ -1530,7 +1534,9 @@ module Hwaro
           # Keep the 404/taxonomy stash in sync (see run_incremental).
           @render_global_vars = global_vars
           @pages_by_path = build_pages_by_path(site)
-          renderable = pages.select(&.render)
+          # The priority pages too: they listed the deferred pages without
+          # those fields. A small set (homepage, top sections, N recent).
+          renderable = (@priority_pages + pages).select(&.render)
 
           count = if options.parallel && renderable.size > 1
                     process_files_parallel(renderable, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: options.error_overlay, profiler: active_profiler)
@@ -1573,9 +1579,10 @@ module Hwaro
           # Clear the stash so a second call is a no-op and subsequent
           # watch-triggered full rebuilds start clean.
           @deferred_pages = nil
+          @priority_pages = [] of Models::Page
 
           elapsed = Time.instant - start_time
-          Logger.outcome("rendered", "#{count} deferred #{count == 1 ? "page" : "pages"}", :result, elapsed.total_milliseconds)
+          Logger.outcome("rendered", "#{count} #{count == 1 ? "page" : "pages"} (#{pages.size} deferred)", :result, elapsed.total_milliseconds)
           count
         end
       end

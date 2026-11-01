@@ -750,3 +750,43 @@ describe "Builder#run_incremental translation_key collisions" do
     end
   end
 end
+
+describe "Builder#render_deferred" do
+  # `--fast-start`: the cold pass runs the BeforeRender hooks (auto OG
+  # images, image resize) for the priority pages only, so every listing it
+  # renders sees the deferred pages without the fields those hooks fill.
+  # Once the background pass has filled them, the served tree must match a
+  # full build's: the priority pages re-render, and nothing reads the page
+  # values cached before the hooks ran.
+  it "renders every page against the fields the deferred hooks filled" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[og.auto_image]\nenabled = true\nformat = "svg"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/new.md", "+++\ntitle = \"New\"\ndate = 2026-06-01\n+++\n")
+        File.write("content/old.md", "+++\ntitle = \"Old\"\ndate = 2020-01-01\n+++\n")
+        listing = "{% for p in site.pages %}[{{ p.title }}={{ p.image }}]{% endfor %}"
+        File.write("templates/index.html", listing)
+        File.write("templates/page.html", listing)
+
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, fast_start: true, fast_start_count: 1)
+        options.serve_mode = true
+        builder.run(options).should be_true
+        builder.has_deferred_pages?.should be_true
+        deferred = options.dup
+        deferred.fast_start = false
+        deferred.preserve_output = true
+        builder.render_deferred(deferred)
+
+        expected = "[New=/og-images/new.svg][Old=/og-images/old.svg]"
+        File.read("public/index.html").should eq(expected)
+        File.read("public/new/index.html").should eq(expected)
+        File.read("public/old/index.html").should eq(expected)
+      end
+    end
+  end
+end

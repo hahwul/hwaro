@@ -383,6 +383,11 @@ module Hwaro
         # dev server can render them in a background fiber after the
         # "ready" signal has been emitted. Nil outside of fast-start mode.
         @deferred_pages : Array(Models::Page)? = nil
+        # The pages that fast-start's cold pass did render. They listed the
+        # deferred pages before the deferred hooks filled their fields
+        # (auto OG `image`, resized-image summaries), so the background pass
+        # renders them again.
+        @priority_pages : Array(Models::Page) = [] of Models::Page
         # Deterministic owner (page.path) of every claimed output URL — page
         # URLs and alias destinations. A page that is not the recorded winner
         # for a URL must not write it; under parallel render the colliding
