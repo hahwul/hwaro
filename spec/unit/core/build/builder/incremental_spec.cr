@@ -876,6 +876,47 @@ describe "Builder#render_deferred" do
     end
   end
 
+  # The cache entry of a deferred page stored the relations hash as of the
+  # background pass, after the hooks filled every auto OG `image` — never
+  # what the next start compares (taken before them), so under `--cache`
+  # every deferred page re-rendered on every start.
+  it "keeps a deferred page cached on the next --cache start" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[og.auto_image]\nenabled = true\nformat = "svg"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/new.md", "+++\ntitle = \"New\"\ndate = 2026-06-01\n+++\n")
+        File.write("content/mid.md", "+++\ntitle = \"Mid\"\ndate = 2024-01-01\n+++\n")
+        File.write("content/old.md", "+++\ntitle = \"Old\"\ndate = 2020-01-01\n+++\n")
+        File.write("templates/index.html", "home")
+        # The neighbour's image is a relation the page's cache entry hashes.
+        File.write("templates/page.html", "{% if page.lower %}{{ page.lower.image }}{% endif %}")
+
+        session = -> do
+          builder = Hwaro::Core::Build::Builder.new
+          Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, fast_start: true, fast_start_count: 1)
+          options.serve_mode = true
+          builder.run(options).should be_true
+          if builder.has_deferred_pages?
+            deferred = options.dup
+            deferred.fast_start = false
+            deferred.preserve_output = true
+            builder.render_deferred(deferred)
+          end
+        end
+
+        session.call
+        File.read("public/old/index.html").should eq("/og-images/mid.svg")
+        File.write("public/old/index.html", "untouched")
+        session.call
+        File.read("public/old/index.html").should eq("untouched")
+      end
+    end
+  end
+
   # A fast-start `--cache` session must leave the cache describing what it
   # wrote. It never recorded the page-set fingerprint or the render-input
   # digest, so a later session whose inputs were back at an OLDER session's

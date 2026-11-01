@@ -805,9 +805,15 @@ module Hwaro::Core::Build::Phases::Render
   end
 
   # Drop the hashes of pages the render skipped, so a later serve rebuild
-  # of one cannot record a value from this earlier pass.
-  private def clear_filter_relations_hashes : Nil
-    @page_template_hash_mutex.synchronize { @filter_relations_hashes.clear }
+  # of one cannot record a value from this earlier pass. Fast-start's
+  # deferred pages (`keep`) hold theirs for render_deferred: recomputed after
+  # the background hooks filled an auto OG `image`, the recorded value never
+  # matched the next start's comparison and every one re-rendered.
+  private def clear_filter_relations_hashes(keep : Array(Models::Page)? = nil) : Nil
+    paths = keep.try(&.map(&.path).to_set)
+    @page_template_hash_mutex.synchronize do
+      paths ? @filter_relations_hashes.select! { |path, _| paths.includes?(path) } : @filter_relations_hashes.clear
+    end
   end
 
   # Fingerprint of what this page renders from OTHER pages (see

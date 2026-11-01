@@ -1705,6 +1705,7 @@ module Hwaro
         ensure
           # Also when the pass raises: nothing renders them again.
           @priority_pages = [] of Models::Page
+          clear_filter_relations_hashes
         end
       end
     end
