@@ -317,6 +317,14 @@ describe "Content image dimensions" do
     end
   end
 
+  it "still sizes images after an uppercase or attribute-quoted raw-text opener" do
+    with_image_project do
+      html = %(<TEXTAREA>x</TEXTAREA><a title="<textarea>">t</a><img src="/img/a.png"><textarea>y</textarea>)
+      out = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(html, bundle_page, dimensions_config)
+      out.should contain(%(<img width="6" height="3" src="/img/a.png">))
+    end
+  end
+
   it "leaves a tag alone when the author set width or height" do
     with_image_project do
       builder = Hwaro::Core::Build::Builder.new
