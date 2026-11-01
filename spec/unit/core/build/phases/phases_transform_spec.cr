@@ -1007,4 +1007,25 @@ describe "Transform: output-URL collision losers" do
     end
     log.should contain("Duplicate output path '/posts/red/' — 'posts/red.md' collides with 'posts/b.md' and is not written")
   end
+
+  # `<!-- more -->` summaries render before Transform; a summary shortcode
+  # reading `page.backlinks` printed none in a cold build, and the right
+  # count once serve re-rendered it.
+  it "fills backlinks before the summaries render" do
+    config = %(title = "T"\nbase_url = "http://localhost"\n[content]\nbacklinks = true\n)
+    content = {
+      "_index.md" => "+++\ntitle = \"Home\"\n+++\n",
+      "a.md"      => "+++\ntitle = \"A\"\n+++\n{{ bl() }}\n<!-- more -->\nrest",
+      "b.md"      => "+++\ntitle = \"B\"\n+++\n[a](@/a.md)",
+    }
+    templates = {
+      "index.html"         => "{% for p in site.pages %}[{{ p.title }}:{{ p.summary }}]{% endfor %}",
+      "page.html"          => "{{ content }}",
+      "shortcodes/bl.html" => "BL={{ page.backlinks | length }}",
+    }
+    build_site(config, content_files: content, template_files: templates) do
+      File.read("public/a/index.html").should contain("BL=1")
+      File.read("public/index.html").should contain("[A:BL=1")
+    end
+  end
 end

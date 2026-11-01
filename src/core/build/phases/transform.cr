@@ -27,8 +27,7 @@ module Hwaro::Core::Build::Phases::Transform
     # Compute related posts based on taxonomy similarity
     compute_related_posts(site) if site.config.related.enabled
 
-    # Pages linking to each page (`[content] backlinks`)
-    compute_backlinks(site) if site.config.backlinks
+    # `page.backlinks` were filled in ParseContent, before the summaries.
 
     # Build optimized lookup indices
     site.build_lookup_index
