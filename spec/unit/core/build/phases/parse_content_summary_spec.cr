@@ -198,3 +198,30 @@ describe "marker summary on a page object that had an excerpt" do
     page.summary_truncated.should be_false
   end
 end
+
+# A summary shortcode reads the site's pages like the body's does. The full
+# build renders summaries before Transform publishes `site.pages`, so
+# `get_page` found nothing there and listings printed an empty `<b></b>`
+# (serve, rendering summaries post-Transform, printed the title).
+describe "summary shortcodes reading the page set" do
+  it "resolves get_page in marker and automatic summaries" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "_index.md" => "+++\ntitle = \"Home\"\n+++\n",
+        "a.md"      => "+++\ntitle = \"A\"\n+++\nA mentions {{ btitle() }} here.\n",
+        "c.md"      => "+++\ntitle = \"C\"\n+++\nC {{ btitle() }} first\n<!-- more -->\nrest\n",
+        "b.md"      => "+++\ntitle = \"Bee\"\n+++\nB body\n",
+      },
+      template_files: {
+        "page.html"              => "{{ content }}",
+        "section.html"           => "{% for p in section.pages %}[{{ p.title }}::{{ p.summary | safe }}]{% endfor %}",
+        "shortcodes/btitle.html" => %(<b>{{ get_page(path="b.md").title }}</b>),
+      },
+    ) do |dir|
+      html = File.read(File.join(dir, "public", "index.html"))
+      html.should contain("[A::<p>A mentions Bee here.</p>")
+      html.should contain("[C::<p>C <b>Bee</b> first</p>")
+    end
+  end
+end
