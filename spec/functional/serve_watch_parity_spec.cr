@@ -310,6 +310,27 @@ describe "serve watch parity: [[content.generate]] body templates" do
       end
     end
   end
+
+  # A computed include elsewhere (here only the homepage's) leaves the
+  # graph `dynamic?`, but not the closure of a spec that includes nothing:
+  # every template save used to regenerate the site.
+  it "keeps the cheap strategy when only an unrelated template's include is dynamic" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_generate_site
+        config = File.read("config.toml").sub(%(body_template = "gen/product.md"), "").sub(%(slug = "sku"), %(slug = "{{ item.sku | slugify }}"))
+        File.write("config.toml", config)
+        File.write("templates/index.html", "<html><body>{% include 'partials/' ~ 'other.html' %}</body></html>")
+        server = Hwaro::Services::Server.new
+        options = watch_parity_options
+        server.watch_parity_builder.run(options).should be_true
+        File.exists?("public/products/w1/index.html").should be_true
+
+        changeset = watch_parity_changeset(templates: ["templates/page.html"])
+        server.watch_parity_effective_strategy(changeset, "public").should eq(:templates)
+      end
+    end
+  end
 end
 
 # Static files sitting where the build writes something that is not a page's

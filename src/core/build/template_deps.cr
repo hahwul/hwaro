@@ -27,7 +27,7 @@ module Hwaro
         #
         # `\b\s*` (not `\s+`) after the keyword: Crinja happily parses
         # `{% include"x.html" %}` with no space, and a tag this regex fails
-        # to see entirely never reaches the safe `@dynamic = true` fallback —
+        # to see entirely never reaches the safe `dynamic?` fallback —
         # it just silently drops the dependency edge and the included
         # template's edits stop re-rendering its dependents during serve.
         REFERENCE_TAG_RE = /\{%-?\s*(extends|include|import|from)\b\s*(.+?)\s*-?%\}/m
@@ -43,7 +43,12 @@ module Hwaro
         # True when any reference could not be resolved statically — the
         # graph is incomplete and callers must treat every template change
         # as affecting every page.
-        getter? dynamic : Bool
+        def dynamic? : Bool
+          !@dynamic_templates.empty?
+        end
+
+        # The templates holding such a reference (see `reaches_dynamic?`).
+        @dynamic_templates : Set(String)
 
         # Bare names of user shortcode templates (templates/shortcodes/*).
         getter shortcode_names : Array(String)
@@ -85,7 +90,7 @@ module Hwaro
           @closures = {} of String => Set(String)
           @closure_hashes = {} of String => String
           @lazy_mutex = Mutex.new
-          @dynamic = false
+          @dynamic_templates = Set(String).new
           @snapshot_escaping_refs = Set(String).new
 
           @shortcode_names = templates.keys
@@ -122,11 +127,11 @@ module Hwaro
                   # The reference resolves through the loader's DISK
                   # fallback, whose content this graph cannot hash — degrade
                   # to whole-site invalidation (correctness over cleverness).
-                  @dynamic = true
+                  @dynamic_templates << name
                   @snapshot_escaping_refs << reference
                 end
               else
-                @dynamic = true
+                @dynamic_templates << name
               end
             end
             # Templates can invoke shortcodes too (process_shortcodes_in_text
@@ -145,6 +150,14 @@ module Hwaro
             used << "shortcodes/#{name}" if text.matches?(@shortcode_usage_patterns[name])
           end
           used
+        end
+
+        # True when `name`'s closure holds a reference the scanner could not
+        # resolve, so what `name` reaches is unknown. Narrower than `dynamic?`:
+        # a computed include in a template `name` never pulls in leaves its
+        # closure complete.
+        def reaches_dynamic?(name : String) : Bool
+          closure(name).any? { |template| @dynamic_templates.includes?(template) }
         end
 
         # Transitive dependency set of a template, including itself.

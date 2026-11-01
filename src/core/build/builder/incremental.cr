@@ -1520,11 +1520,12 @@ module Hwaro
           reaches?(graph, key, changed_names)
         end
 
-        # A dynamic graph (`{% include 'partials/' ~ name %}` anywhere) cannot
-        # say what `key` reaches, so any template edit counts (TemplateDeps).
+        # A computed include (`{% include 'partials/' ~ name %}`) in `key`'s
+        # closure leaves what it reaches unknown, so any template edit counts
+        # (TemplateDeps#reaches_dynamic?).
         private def reaches?(graph : TemplateDeps, key : String, changed_names : Set(String)) : Bool
           return false if changed_names.empty?
-          graph.dynamic? || !(graph.closure(key) & changed_names).empty?
+          graph.reaches_dynamic?(key) || !(graph.closure(key) & changed_names).empty?
         end
 
         # Leave the `--cache` keys describing the tree this serve pass wrote,
