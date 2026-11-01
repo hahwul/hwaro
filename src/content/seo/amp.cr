@@ -182,10 +182,15 @@ module Hwaro
         # Quote-aware tag scans: `media="(width >= 600px)"` or
         # `title="a > b"` does not end the tag.
         AMP_LINK_TAG_RE = /<link\b#{Utils::TextUtils::HTML_TAG_ATTRS_QUOTED_VALUES}>/i
-        # The end tag in any form (`</iframe >`): an exact one ran on to the
-        # next element's.
-        AMP_VIDEO_RE  = /<video(#{Utils::TextUtils::HTML_TAG_ATTRS_QUOTED_VALUES})>(.*?)<\/video(?:[\s\/][^>]*)?>/mi
-        AMP_IFRAME_RE = /<iframe(#{Utils::TextUtils::HTML_TAG_ATTRS_QUOTED_VALUES})>(.*?)<\/iframe(?:[\s\/][^>]*)?>/mi
+        # What follows an end tag's name, through its `>`, in any form
+        # (`</iframe >`, `</iframe x="a>b">`): an exact one ran on to the next
+        # element's. A quote opens a value only after `=`, as in a start tag.
+        # Neither runs past a `<`: every `</iframe` before an unclosed tail
+        # rescanned to the end of the page (quadratic).
+        AMP_END_TAG_TAIL = %q((?:[\s\/](?:[^<>=]++|=\s*+"[^"<]*+"|=\s*+'[^'<]*+'|=)*+)?>)
+        AMP_VIDEO_RE     = /<video(#{Utils::TextUtils::HTML_TAG_ATTRS_QUOTED_VALUES})>(.*?)<\/video#{AMP_END_TAG_TAIL}/mi
+        AMP_IFRAME_RE    = /<iframe(#{Utils::TextUtils::HTML_TAG_ATTRS_QUOTED_VALUES})>(.*?)<\/iframe#{AMP_END_TAG_TAIL}/mi
+        AMP_SCRIPT_RE    = /<script(?=[\s\/>])(?![^>]*type=["']application\/ld\+json["'])(?![^>]*src=["']https:\/\/cdn\.ampproject\.org)[^>]*>[\s\S]*?<\/script#{AMP_END_TAG_TAIL}/mi
 
         private def self.strip_non_amp_attributes(attrs : String) : String
           attrs.gsub(AMP_DISALLOWED_ATTR_RE, "")
@@ -291,7 +296,7 @@ module Hwaro
           # its end tag in any form (`</script >`) — an exact `</script>` ran
           # on through the page to the next one — and `<script-loader>` is
           # not one.
-          result = result.gsub(/<script(?=[\s\/>])(?![^>]*type=["']application\/ld\+json["'])(?![^>]*src=["']https:\/\/cdn\.ampproject\.org)[^>]*>[\s\S]*?<\/script(?:[\s\/][^>]*)?>/mi, "")
+          result = result.gsub(AMP_SCRIPT_RE, "")
 
           # Remove disallowed external stylesheets. AMP forbids
           # `<link rel="stylesheet">` except from allowlisted font providers;

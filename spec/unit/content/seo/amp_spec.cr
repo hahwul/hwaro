@@ -530,6 +530,36 @@ describe Hwaro::Content::Seo::Amp do
       result.should_not contain("<video")
     end
 
+    # Regression: the end tag's tail ended at its first `>`, even one inside
+    # a quoted value.
+    it "ends an end tag at its own `>`, past a quoted value" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+
+      html = %(<html><head></head><body><iframe src="https://a.com/x"></iframe foo="a>b"><p>One</p>) +
+             %(<script>a()</script x='c>d'><p>Two</p></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should contain(%(</amp-iframe><p>One</p>))
+      result.should contain("<p>Two</p>")
+      result.should_not contain(%(b">))
+      result.should_not contain(%(d'>))
+    end
+
+    # Regression: every candidate end tag with no `>` rescanned to the end of
+    # the page.
+    it "scans candidate end tags in linear time" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+      # No `>` after the script opener: a real page always has one, which
+      # hid the cost (and let the old tail run on to it).
+      noise = "<html><head></head><body><script>" + "</script a=\"" * 40_000
+      started = Time.instant
+      Hwaro::Content::Seo::Amp.convert_to_amp(noise, page, config)
+      (Time.instant - started).should be < 1.second
+    end
+
     it "adds a sandbox attribute and amp-iframe extension script" do
       page = Hwaro::Models::Page.new("test.md")
       page.url = "/test/"
