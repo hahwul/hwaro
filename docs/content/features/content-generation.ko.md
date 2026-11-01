@@ -73,7 +73,7 @@ taxonomies = { tags = "categories" }                    # 선택
 
 ## 충돌
 
-경로가 겹치면 항상 작성한 파일이 이깁니다. `content/products/red-widget.md`(또는 그 초안, 리프 번들 `red-widget/index.md`, 하위 섹션 `red-widget/_index.md`, 다국어 사이트의 기본 언어 표기 `red-widget.en.md`)가 있으면 같은 슬러그의 생성 페이지는 경고와 함께 버려지며, 반대 방향은 없습니다. 버려진 페이지는 어느 페이지의 이전/다음(`page.lower`/`page.higher`), 시리즈, 관련 글, 백링크에도 나오지 않고 목록, 사이트맵, 피드, 검색에서도 빠집니다. 두 레코드가 같은 슬러그를 만들면 두 레코드를 지목하며 빌드가 실패합니다.
+경로가 겹치면 항상 작성한 파일이 이깁니다. `content/products/red-widget.md`(또는 그 초안, 리프 번들 `red-widget/index.md`, 같은 URL로 게시되는 하위 섹션 `red-widget/_index.md`, 다국어 사이트의 기본 언어 표기 `red-widget.en.md`)가 있으면 같은 슬러그의 생성 페이지는 경고와 함께 버려지며, 반대 방향은 없습니다. 버려진 페이지는 어느 페이지의 이전/다음(`page.lower`/`page.higher`), 시리즈, 관련 글, 백링크에도 나오지 않고 목록, 사이트맵, 피드, 검색에서도 빠집니다. 두 레코드가 같은 슬러그를 만들면 두 레코드를 지목하며 빌드가 실패합니다.
 
 ## 리빌드와 캐시
 

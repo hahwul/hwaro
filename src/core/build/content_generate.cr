@@ -33,6 +33,8 @@ require "../../utils/frontmatter_writer"
 require "../../utils/errors"
 require "../../utils/logger"
 require "../../utils/nesting"
+require "../../utils/date_utils"
+require "../../utils/permalink_resolver"
 
 module Hwaro
   module Core
@@ -406,9 +408,14 @@ module Hwaro
         # `default_language` (a multilingual site's default code) adds the
         # spelled-out default suffix (`<stem>.en.md`), which publishes the
         # same URL as `<stem>.md`. A subsection index `<stem>/_index.md`
-        # owns that URL too.
+        # owns that URL too — unless `config` and `page_url` (the generated
+        # page's resolved URL, `plan_url`) show a `[permalinks]` pattern
+        # moved the page off it: section indexes skip pattern rules, so
+        # `products = "/shop/:slug/"` puts generated `red` at /shop/red/
+        # while `products/red/_index.md` keeps /products/red/.
         def authored_twin_exists?(path : String, content_root : String = "content", ignore : Models::ContentFilesConfig? = nil,
-                                  default_language : String? = nil) : Bool
+                                  default_language : String? = nil, config : Models::Config? = nil,
+                                  page_url : String? = nil) : Bool
           parent = File.dirname(path)
           dir = File.join(content_root, parent)
           stem = File.basename(path, ".md")
@@ -430,13 +437,26 @@ module Hwaro
               suffixes.each do |suffix|
                 {"index", "_index"}.each do |index|
                   name = "#{index}#{suffix}#{ext}"
-                  return true if bundle_entries.includes?(name) && visible.call("#{stem}/#{name}")
+                  next unless bundle_entries.includes?(name) && visible.call("#{stem}/#{name}")
+                  next if index == "_index" && config && page_url && url_for(File.join(parent, stem, name), config) != page_url
+                  return true
                 end
               end
             end
           end
 
           false
+        end
+
+        # The URL a plan's page publishes at: its path plus the front matter
+        # the synthetic markdown carries (title, date; never slug or path).
+        def plan_url(plan : Plan, config : Models::Config) : String
+          url_for(plan.path, config, plan.title, plan.date_raw.try { |raw| Utils::DateUtils.parse_content_date(raw) })
+        end
+
+        private def url_for(path : String, config : Models::Config, title : String = "", date : Time? = nil) : String
+          Utils::PermalinkResolver.resolve_url_lenient(path, config, slug: nil, custom_path: nil, language: nil,
+            date: date, title: title, version: config.versions.for_path(path))[0]
         end
 
         private def dir_children(dir : String) : Array(String)

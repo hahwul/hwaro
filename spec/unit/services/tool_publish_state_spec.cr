@@ -290,6 +290,37 @@ describe "tool publication-state parity" do
   end
 
   describe Hwaro::Services::GeneratedContent do
+    it "lists a generated row a permalink pattern moves off a subsection index's URL" do
+      Dir.mktmpdir do |dir|
+        FileUtils.cd(dir) do
+          FileUtils.mkdir_p("content/products/red")
+          FileUtils.mkdir_p("data")
+          File.write("config.toml", <<-TOML
+            title = "S"
+            base_url = "https://example.com"
+
+            [permalinks]
+            products = "/shop/:slug/"
+
+            [[content.generate]]
+            source = "products"
+            section = "products"
+            slug = "id"
+            title = "name"
+            TOML
+          )
+          File.write("data/products.json", %([{"id": "red", "name": "Red"}]))
+          File.write("content/products/red/_index.md", "+++\ntitle = \"Red\"\n+++\n")
+
+          Hwaro::Services::GeneratedContent.infos("content").map(&.path).should eq(["products/red.md"])
+
+          # Without the pattern the subsection index owns /products/red/.
+          File.write("config.toml", File.read("config.toml").sub(%(products = "/shop/:slug/"), ""))
+          Hwaro::Services::GeneratedContent.infos("content").should be_empty
+        end
+      end
+    end
+
     # A record missing the rule's `body` field fails every build; planning
     # without bodies listed its rows (and the rule's healthy ones) as
     # publishable with no hint that the build cannot run.

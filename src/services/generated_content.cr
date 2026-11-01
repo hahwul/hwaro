@@ -93,7 +93,8 @@ module Hwaro
             # Authored-wins, exactly like the build: a contested path lists
             # the authored file only, never a duplicate generated row.
             next if Core::Build::ContentGenerate.authored_twin_exists?(plan.path, ignore: ignore || config.content_files,
-                      default_language: config.multilingual? ? config.default_language : nil)
+                      default_language: config.multilingual? ? config.default_language : nil,
+                      config: config, page_url: Core::Build::ContentGenerate.plan_url(plan, config))
 
             date = plan.date_raw.try { |raw| Utils::DateUtils.parse_content_date(raw) }
             state = date && date > now ? PublishState::Future : PublishState::Published

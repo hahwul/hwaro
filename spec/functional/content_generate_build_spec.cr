@@ -142,6 +142,19 @@ describe "[[content.generate]] build integration" do
     end
   end
 
+  # Section indexes skip `[permalinks]` pattern rules, so a pattern that
+  # moves the section's pages leaves `products/red-widget/_index.md` at
+  # /products/red-widget/ and the generated page at /shop/red-widget/: no
+  # URL is contested and both publish.
+  it "publishes a generated page a permalink pattern moves off a subsection index's URL" do
+    config = CONFIG + %(\n[permalinks]\nproducts = "/shop/:slug/"\n)
+    files = CONTENT_FILES.merge({"products/red-widget/_index.md" => "+++\ntitle = 'Red Section'\n+++\n"})
+    build_site(config, content_files: files, template_files: TEMPLATE_FILES, data_files: DATA_FILES) do
+      File.read("public/products/red-widget/index.html").should contain("<h1>Red Section</h1>")
+      File.read("public/shop/red-widget/index.html").should contain("<h1>Red Widget</h1>")
+    end
+  end
+
   it "applies [permalinks] patterns to generated pages" do
     config = CONFIG + "\n[permalinks]\nproducts = \"/shop/:slug/\"\n"
     build_site(config, content_files: CONTENT_FILES, template_files: TEMPLATE_FILES, data_files: DATA_FILES) do
