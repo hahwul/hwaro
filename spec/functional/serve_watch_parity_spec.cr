@@ -670,3 +670,55 @@ describe "serve watch parity: a language's homepage going headless" do
     end
   end
 end
+
+describe "serve watch parity: summaries printing a page's translations" do
+  # A shortcode in the `<!-- more -->` summary reads `page.translations`;
+  # retitling the Korean counterpart re-rendered the English page's body
+  # but kept its summary, which the feed prints.
+  it "recomputes a counterpart's summary when its translation is retitled" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_translation_listing_site
+        File.write("config.toml", File.read("config.toml") + "\n[feeds]\nenabled = true\n")
+        FileUtils.mkdir_p("templates/shortcodes")
+        File.write("templates/shortcodes/sw.html", "{% for t in page.translations %}{{ t.title }};{% endfor %}")
+        File.write("content/posts/a.md", "+++\ntitle = \"A\"\ndate = \"2024-01-01\"\n+++\nlead {{ sw() }}\n\n<!-- more -->\n\nrest")
+        builder = Hwaro::Services::Server.new.watch_parity_builder
+        options = watch_parity_options
+        builder.run(options).should be_true
+        File.read("public/rss.xml").should contain("<description>lead A;가;</description>")
+
+        File.write("content/posts/a.ko.md", "+++\ntitle = \"가나\"\n+++\na")
+        builder.run_incremental(["content/posts/a.ko.md"], options).should be_true
+
+        File.read("public/rss.xml").should contain("<description>lead A;가나;</description>")
+      end
+    end
+  end
+end
+
+describe "serve watch parity: summaries printing a page's neighbours" do
+  # Same as the translations case above, through `page.lower`: the
+  # neighbour re-rendered, its summary did not.
+  it "recomputes a neighbour's summary when the page next to it is retitled" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_translation_listing_site
+        File.write("config.toml", File.read("config.toml") + "\n[feeds]\nenabled = true\n")
+        FileUtils.mkdir_p("templates/shortcodes")
+        File.write("templates/shortcodes/nb.html", "{% if page.lower %}{{ page.lower.title }}{% endif %}|{% if page.higher %}{{ page.higher.title }}{% endif %}")
+        File.write("content/posts/a.md", "+++\ntitle = \"A\"\ndate = \"2024-01-01\"\n+++\nlead {{ nb() }}\n\n<!-- more -->\n\nrest")
+        File.write("content/posts/b.md", "+++\ntitle = \"B\"\ndate = \"2024-01-02\"\n+++\nb")
+        builder = Hwaro::Services::Server.new.watch_parity_builder
+        options = watch_parity_options
+        builder.run(options).should be_true
+        File.read("public/rss.xml").should contain("<description>lead B|</description>")
+
+        File.write("content/posts/b.md", "+++\ntitle = \"Bee\"\ndate = \"2024-01-02\"\n+++\nb")
+        builder.run_incremental(["content/posts/b.md"], options).should be_true
+
+        File.read("public/rss.xml").should contain("<description>lead Bee|</description>")
+      end
+    end
+  end
+end

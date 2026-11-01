@@ -288,13 +288,14 @@ module Hwaro
           fanout.each { |p| pages_to_render << p }
           regained.each { |p| pages_to_render << p }
 
-          # A fan-out page's summary prints what its shortcodes read (a
-          # `get_page` title), and only the changed pages and linkers got
-          # theirs recomputed above. Redo the fan-out pages whose summary
-          # source can hold a shortcode — before the globals below embed the
-          # summaries — and the author lists that embed them too.
+          # A re-rendered page's summary prints what its shortcodes read (a
+          # `get_page` title, `page.translations`, `page.lower`), and only
+          # the changed pages and linkers got theirs recomputed above. Redo
+          # every other page in the render set whose summary source can hold
+          # a shortcode — before the globals below embed the summaries — and
+          # the author lists that embed them too.
           summarized = (changed_pages + linkers).map(&.path).to_set
-          resummarize = fanout.select do |p|
+          resummarize = pages_to_render.select do |p|
             !summarized.includes?(p.path) && content_may_contain_shortcodes?(p.summary || p.raw_content)
           end
           unless resummarize.empty?
