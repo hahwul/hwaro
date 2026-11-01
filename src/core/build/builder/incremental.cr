@@ -1666,11 +1666,13 @@ module Hwaro
           # Clear the stash so a second call is a no-op and subsequent
           # watch-triggered full rebuilds start clean.
           @deferred_pages = nil
-          @priority_pages = [] of Models::Page
 
           elapsed = Time.instant - start_time
           Logger.outcome("rendered", "#{count} #{count == 1 ? "page" : "pages"} (#{pages.size} deferred)", :result, elapsed.total_milliseconds)
           count
+        ensure
+          # Also when the pass raises: nothing renders them again.
+          @priority_pages = [] of Models::Page
         end
       end
     end

@@ -2,6 +2,12 @@ require "../../../../spec_helper"
 require "../../../../../src/core/build/builder"
 require "../../../../../src/content/hooks"
 
+class Hwaro::Core::Build::Builder
+  def test_priority_pages : Array(Hwaro::Models::Page)
+    @priority_pages
+  end
+end
+
 describe "Builder#run_incremental output collisions" do
   it "republishes a bundle's assets once the collision that suppressed it is gone" do
     Dir.mktmpdir do |dir|
@@ -819,6 +825,53 @@ describe "Builder#render_deferred" do
         File.read("public/old/index.html").should contain("old body")
         old = builder.site.not_nil!.pages.find! { |page| page.path == "old.md" }
         old.content.should eq("")
+      end
+    end
+  end
+
+  # The cold pass stashed its priority pages for the background pass even
+  # when nothing was deferred (or the build was not fast-start at all), and
+  # only render_deferred let go of them: the serve session kept the whole
+  # first build's page set alive.
+  it "holds no priority pages it will not render" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/new.md", "+++\ntitle = \"New\"\ndate = 2026-06-01\n+++\n")
+        File.write("content/old.md", "+++\ntitle = \"Old\"\ndate = 2020-01-01\n+++\n")
+        File.write("templates/page.html", "{{ page.title }}")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, fast_start: true, fast_start_count: 10)
+        options.serve_mode = true
+        builder.run(options).should be_true
+        builder.has_deferred_pages?.should be_false
+        builder.test_priority_pages.should be_empty
+
+        options.fast_start_count = 1
+        builder.run(options).should be_true
+        builder.has_deferred_pages?.should be_true
+        builder.test_priority_pages.should_not be_empty
+        # A watch rebuild runs a full, non-fast-start build.
+        options.fast_start = false
+        builder.run(options).should be_true
+        builder.test_priority_pages.should be_empty
+
+        # A background pass that raises still lets go of them: the deferred
+        # page's broken anchor fails it under broken_anchors = "error".
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[links]\nbroken_anchors = "error"\n))
+        File.write("content/old.md", "+++\ntitle = \"Old\"\ndate = 2020-01-01\n+++\n[x](@/new.md#nope)\n")
+        options.fast_start = true
+        builder.run(options).should be_true
+        builder.test_priority_pages.should_not be_empty
+        deferred = options.dup
+        deferred.fast_start = false
+        deferred.preserve_output = true
+        expect_raises(Exception) { builder.render_deferred(deferred) }
+        builder.test_priority_pages.should be_empty
       end
     end
   end
