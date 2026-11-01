@@ -643,3 +643,30 @@ describe "serve watch parity: translation switchers in listings" do
     end
   end
 end
+
+describe "serve watch parity: a language's homepage going headless" do
+  # The JSON-LD breadcrumb's Home crumb is the page language's homepage
+  # only while one is written; `render = false` on `_index.ko.md` moves it
+  # to the site root on every Korean page, none of which the edit touched.
+  it "re-renders the language's pages so their Home crumb leaves the unwritten homepage" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_translation_listing_site
+        File.write("templates/page.html", "<html><body>{{ jsonld_breadcrumb | safe }}</body></html>")
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/_index.ko.md", "+++\ntitle = \"홈\"\n+++\n")
+        builder = Hwaro::Services::Server.new.watch_parity_builder
+        options = watch_parity_options
+        builder.run(options).should be_true
+        File.read("public/ko/posts/a/index.html").should contain(%("item":"https://example.com/ko/"))
+
+        File.write("content/_index.ko.md", "+++\ntitle = \"홈\"\nrender = false\n+++\n")
+        builder.run_incremental(["content/_index.ko.md"], options).should be_true
+
+        html = File.read("public/ko/posts/a/index.html")
+        html.should_not contain(%("item":"https://example.com/ko/"))
+        html.should contain(%("item":"https://example.com/"}))
+      end
+    end
+  end
+end

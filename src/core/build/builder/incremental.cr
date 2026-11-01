@@ -527,6 +527,17 @@ module Hwaro
             end
           end
 
+          # A language whose homepage started or stopped being written
+          # (`render = false`, a drafted `index.ko.md`): every page of that
+          # language moves its JSON-LD Home crumb between `/<lang>/` and the
+          # site root.
+          flipped = reparsed.old_home_languages ^ home_languages(site)
+          unless flipped.empty?
+            (site.pages + site.sections).each do |p|
+              pages_to_render << p if p.language.try { |l| flipped.includes?(l) }
+            end
+          end
+
           # Pages in affected series (their series_index may have changed)
           unless affected_series.empty?
             site.pages.each do |p|
@@ -546,6 +557,11 @@ module Hwaro
           # the file straight back.
           pages_to_render.reject! { |p| excluded_paths.includes?(p.path) } unless excluded_paths.empty?
           pages_to_render
+        end
+
+        # The non-default languages whose homepage is written now.
+        private def home_languages(site : Models::Site) : Set(String)
+          site.config.languages.keys.select { |code| site.home_language?(code) }.to_set
         end
 
         # Re-run the counterpart linkers — `Multilingual.link_translations!`
@@ -847,7 +863,8 @@ module Hwaro
           old_taxonomies_snapshot : Hash(String, Hash(String, Array(String))),
           old_series_names : Hash(String, String?),
           old_output_paths : Hash(String, Array(String)),
-          old_neighbors : Hash(String, {Models::Page?, Models::Page?})
+          old_neighbors : Hash(String, {Models::Page?, Models::Page?}),
+          old_home_languages : Set(String)
 
         # Re-parse the changed content files in place (front matter, URL,
         # cascade defaults) and snapshot their pre-edit state. Shared by the
@@ -878,6 +895,10 @@ module Hwaro
 
           # Snapshot old neighbors before re-linking (for render set)
           old_neighbors = {} of String => {Models::Page?, Models::Page?}
+          # The languages whose homepage is written: a non-default page's
+          # JSON-LD Home crumb links it only while it is (see
+          # relationship_render_set).
+          old_home_languages = home_languages(site)
 
           # Cascade context for re-applying section defaults to re-parsed pages
           # (parse_single_page resets fields from front matter only). Prefer
@@ -944,7 +965,7 @@ module Hwaro
             page.ancestors.each { |ancestor| affected_sections << ancestor.section }
           end
 
-          ReparsedPages.new(changed_pages, affected_sections, old_taxonomies_snapshot, old_series_names, old_output_paths, old_neighbors)
+          ReparsedPages.new(changed_pages, affected_sections, old_taxonomies_snapshot, old_series_names, old_output_paths, old_neighbors, old_home_languages)
         end
 
         # A section leaving the build (drafted, expired) is still its
