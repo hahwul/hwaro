@@ -594,3 +594,52 @@ describe "serve watch parity: image sizes read while rendering" do
     end
   end
 end
+
+# A listing page (not a section index, so no section relationship reaches
+# it) printing each entry's language switcher. A counterpart turning into a
+# `redirect_to` stub drops out of its translations' switchers, which the
+# listing prints too.
+private def write_translation_listing_site
+  File.write("config.toml", <<-TOML
+    title = "Langs"
+    base_url = "https://example.com"
+    default_language = "en"
+
+    [languages.en]
+    weight = 1
+
+    [languages.ko]
+    weight = 2
+    TOML
+  )
+  FileUtils.mkdir_p("content/posts")
+  FileUtils.mkdir_p("templates")
+  File.write("templates/page.html", "<html><body>{{ page.title }}</body></html>")
+  File.write("templates/section.html", "<html><body>{{ section.title }}</body></html>")
+  File.write("templates/list.html",
+    "<html><body>{% for p in site.pages %}<a href=\"{{ p.url }}\">{{ p.title }}</a>{% for t in p.translations %}[{{ t.code }}]{% endfor %}{% endfor %}</body></html>")
+  File.write("content/list.ko.md", "+++\ntitle = \"목록\"\ntemplate = \"list\"\n+++\n")
+  File.write("content/posts/a.md", "+++\ntitle = \"A\"\n+++\na")
+  File.write("content/posts/a.ko.md", "+++\ntitle = \"가\"\n+++\na")
+end
+
+describe "serve watch parity: translation switchers in listings" do
+  it "re-renders a listing when a counterpart becomes a redirect stub" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_translation_listing_site
+        builder = Hwaro::Services::Server.new.watch_parity_builder
+        options = watch_parity_options
+        builder.run(options).should be_true
+        File.read("public/ko/list/index.html").should contain(%(가</a>[en][ko]))
+
+        File.write("content/posts/a.md", "+++\ntitle = \"A\"\nredirect_to = \"https://other.example/\"\n+++\na")
+        builder.run_incremental(["content/posts/a.md"], options).should be_true
+
+        html = File.read("public/ko/list/index.html")
+        html.should_not contain(%(가</a>[en][ko]))
+        html.should contain(%(가</a><a))
+      end
+    end
+  end
+end

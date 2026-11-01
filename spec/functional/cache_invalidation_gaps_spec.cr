@@ -162,6 +162,32 @@ describe "cache: page-set fingerprint covers what listings read" do
     end
   end
 
+  # A page's `translations` are derived from its counterparts: one turning
+  # into a `redirect_to` stub leaves every switcher it was in, so listings
+  # printing them must re-render.
+  it "re-renders listings when a translation becomes a redirect stub" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        listing_project("[{{ p.title }}{% for t in p.translations %}:{{ t.code }}{% endfor %}]")
+        File.write("config.toml", CACHE_CONFIG + "\ndefault_language = \"en\"\n\n[languages.en]\nweight = 1\n\n[languages.ko]\nweight = 2\n")
+        File.write("content/posts/a.md", "---\ntitle: A\n---\na\n")
+        File.write("content/posts/a.ko.md", "---\ntitle: Ka\n---\na\n")
+
+        cached_build
+        File.read("public/index.html").should contain("[Ka:en:ko]")
+
+        sleep 1.1.seconds
+        File.write("content/posts/a.md", "---\ntitle: A\nredirect_to: https://other.example/\n---\na\n")
+        cached_build
+        warm = File.read("public/index.html")
+
+        clean_build
+        warm.should eq(File.read("public/index.html"))
+        warm.should contain("[Ka]")
+      end
+    end
+  end
+
   it "leaves listings cached when no listing template reads those fields" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do

@@ -546,6 +546,14 @@ module Hwaro::Core::Build::Phases::Render
     end
     # Listings can read `p.translation_key`; folded only when set.
     p.translation_key.try { |key| fp_value(digest, "k:#{key}") }
+    # And `p.translations`, derived from the counterparts: one turning into
+    # a `redirect_to` stub leaves the switcher with no field above moving.
+    # Folded only when set, so single-language sites keep their digest.
+    p.translations.each do |t|
+      fp_value(digest, "tr:#{t.code}")
+      fp_value(digest, t.url)
+      fp_value(digest, t.title)
+    end
     # A transparent subsection lists its pages in the parent's
     # `section.pages` instead of itself, so flipping it changes what every
     # page of the parent section lists. Folded only when set, so sites
