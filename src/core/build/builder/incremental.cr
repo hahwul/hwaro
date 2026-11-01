@@ -355,6 +355,8 @@ module Hwaro
           # rebuilds too (mirrors the lifecycle taxonomy hook). `all_pages` is
           # left intact for the rebuild summary below.
           taxonomy_sections = Content::Taxonomies.generate(site, output_dir, templates, verbose, builder: self)
+          # The term pages it wrote are on the generated-output record now.
+          cache.save if options.cache
           seo_pages = taxonomy_sections.empty? ? all_pages : all_pages + taxonomy_sections
 
           # --- 6. Regenerate lightweight SEO / search files in parallel ---

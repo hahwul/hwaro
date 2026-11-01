@@ -991,6 +991,41 @@ describe "serve watch parity: --cache keys across sessions" do
     end
   end
 
+  # The next start prunes the generated outputs the last build recorded and
+  # no longer writes; a watch pass did not record the term pages it added.
+  {"content", "content+template"}.each do |strategy|
+    it "prunes a term a session added once an offline edit removed it (#{strategy})" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "T"\nbase_url = "https://example.com"\n[[taxonomies]]\nname = "tags"\n))
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("templates")
+          File.write("templates/page.html", "{{ page.title }}")
+          File.write("templates/taxonomy_term.html", "{{ page.title }}")
+          File.write("content/a.md", "+++\ntitle = \"A\"\ntags = [\"x\"]\n+++\na")
+          options = watch_parity_options
+          options.cache = true
+
+          builder = Hwaro::Services::Server.new.watch_parity_builder
+          builder.run(options).should be_true
+          File.write("content/a.md", "+++\ntitle = \"A\"\ntags = [\"x\", \"zz\"]\n+++\na")
+          if strategy == "content"
+            builder.run_incremental(["content/a.md"], options).should be_true
+          else
+            File.write("templates/unrelated.html", "<p>unused</p>")
+            builder.run_incremental_then_rerender(["content/a.md"], options).should be_true
+          end
+          File.exists?("public/tags/zz/index.html").should be_true
+
+          File.write("content/a.md", "+++\ntitle = \"A\"\ntags = [\"x\"]\n+++\na")
+          Hwaro::Services::Server.new.watch_parity_builder.run(options).should be_true
+          File.exists?("public/tags/zz/index.html").should be_false
+          File.exists?("public/tags/x/index.html").should be_true
+        end
+      end
+    end
+  end
+
   # The cold build fingerprints the page set before the hooks assign auto
   # OG images; a watch pass fingerprinted it after, so the next start
   # re-rendered every listing and neighbour the session had re-rendered.
