@@ -178,6 +178,16 @@ describe Hwaro::Content::Seo::Amp do
       end
     end
 
+    it "leaves an <img> inside a textarea or script as text" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      html = %(<html><head><script type="application/ld+json">{"x":"<img src=\\"a.png\\">"}</script></head><body><textarea><img src="a.png"></textarea><img src="b.png"></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, Hwaro::Models::Config.new)
+      result.should contain(%(<textarea><img src="a.png"></textarea>))
+      result.should contain(%({"x":"<img src=\\"a.png\\">"}))
+      result.should contain(%(<amp-img src="/test/b.png"))
+    end
+
     it "converts img to amp-img with fill layout when no dimensions" do
       page = Hwaro::Models::Page.new("test.md")
       page.url = "/test/"
