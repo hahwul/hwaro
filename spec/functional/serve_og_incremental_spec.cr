@@ -262,6 +262,13 @@ describe "serve lazy OG generation (A9)" do
         builder.copy_changed_static(["static/og-images/posts-hello.svg"], "public")
         og_request(handler, "/og-images/posts-hello.svg")
         File.read("public/og-images/posts-hello.svg").should contain("First Title")
+
+        # Generated over it once; the next request is a cache hit, not a
+        # re-render (backdated so a rewrite would show).
+        stamp = Time.utc - 5.minutes
+        File.touch("public/og-images/posts-hello.svg", stamp)
+        og_request(handler, "/og-images/posts-hello.svg")
+        File.info("public/og-images/posts-hello.svg").modification_time.should be_close(stamp, 2.seconds)
       end
     end
   end

@@ -610,6 +610,9 @@ module Hwaro
         static_copied = ->(path : String) { @builder.static_copied_output?(path, cwd) }
         @mutex.synchronize do
           Content::Seo::OgImage.generate([page], config, @output_dir, partial: true, parallel: false, forced_slug: slug, static_copied: static_copied)
+          # Generated now: later requests are manifest cache hits again
+          # instead of a re-render each.
+          @builder.forget_static_copy(File.join(@output_dir, sanitized), cwd)
         rescue ex
           Logger.warn "On-demand OG image generation failed for #{url_path}: #{ex.message}"
         end

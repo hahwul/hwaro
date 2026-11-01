@@ -625,6 +625,12 @@ module Hwaro
           end
         end
 
+        # Once something generated over a copied path, it no longer holds the
+        # static file's bytes (the serve lazy OG handler).
+        def forget_static_copy(path : String, cwd : String) : Nil
+          @static_copied_mutex.synchronize { @static_copied_outputs.delete(File.expand_path(path, cwd)) }
+        end
+
         def reset_static_copied_outputs : Nil
           @static_copied_mutex.synchronize { @static_copied_outputs.clear }
         end
