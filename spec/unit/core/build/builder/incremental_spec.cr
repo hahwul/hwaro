@@ -180,6 +180,45 @@ describe "Builder#run_incremental term body shortcodes" do
       end
     end
   end
+
+  # A term body's entry template (`section.html`) never renders it, so its
+  # listing markers must not select a body without shortcodes.
+  it "leaves term bodies without shortcodes alone" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[[taxonomies]]\nname = "tags"\n))
+        FileUtils.mkdir_p("templates/shortcodes")
+        File.write("templates/page.html", "{{ content }}")
+        FileUtils.mkdir_p("content")
+        File.write("templates/section.html", "{% for p in section.pages %}{{ p.title }}{% endfor %}{{ content }}")
+        File.write("templates/taxonomy.html", "{{ content }}")
+        File.write("templates/taxonomy_term.html", "{{ term_content }}")
+        File.write("templates/shortcodes/ptitle.html", "<b>{{ get_page(path=path).title }}</b>")
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/b.md", "+++\ntitle = \"B1\"\n+++\nb\n")
+        %w[t u v w].each do |t|
+          FileUtils.mkdir_p("content/tags/#{t}")
+          File.write("content/#{t}.md", "+++\ntitle = \"#{t}\"\ntags = [\"#{t}\"]\n+++\nx\n")
+          File.write("content/tags/#{t}/_index.md", "+++\ntitle = \"#{t}\"\n+++\nplain\n")
+        end
+        File.write("content/tags/t/_index.md", %(+++\ntitle = "t"\n+++\nSee {{ ptitle(path="b.md") }}\n))
+
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/b.md"], options)
+
+        File.write("content/b.md", "+++\ntitle = \"B2\"\n+++\nb\n")
+        log = with_captured_log { builder.run_incremental(["content/b.md"], options).should be_true }
+        File.read("public/tags/t/index.html").should contain("<b>B2</b>")
+        # b, its reading-order neighbour, the home listing and the one body
+        # with a shortcode — not the u/v/w bodies.
+        log.should contain("rebuilt: 4/")
+      end
+    end
+  end
 end
 
 describe "Builder#run_incremental summary shortcodes" do

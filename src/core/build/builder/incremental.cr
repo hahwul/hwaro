@@ -814,7 +814,15 @@ module Hwaro
             # its content calls (`{{ recent() }}` looping a section's pages
             # is a listing too, and its output lives in the page CONTENT,
             # which a re-render rebuilds) and its output-format templates.
-            deps = page_template_scan(page, templates, site).listing
+            # A term body renders only its content, so only its shortcodes
+            # count: its entry template (`section.html`) never renders it.
+            deps = if page.render
+                     page_template_scan(page, templates, site).listing
+                   else
+                     shortcodes = page_shortcode_templates(page)
+                     next false if shortcodes.empty? && @template_deps
+                     listing_set_deps_for(closure_blob(shortcodes, templates))
+                   end
             # Mirrors filter_changed_pages: a section index renders its
             # section's page list even via `{{ section.list }}`, which leaves
             # no marker in the template source to scan for. A term body
