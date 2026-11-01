@@ -274,45 +274,75 @@ module Hwaro
         # HTML passes must not rewrite an `"<img …>"` or `"<a href=…>"` JS
         # string (their double-quoted attributes would end it).
         RAW_TEXT_OPEN_RE = /<(script|style|textarea)\b/i
-        # `<!--` alternates with the openers so the scan steps over comments:
-        # a commented-out `<!-- <script src="old.js"> -->` opens nothing.
-        RAW_TEXT_SCAN_RE = /<(?:!--|(script|style|textarea)\b)/i
+        # `$1` = a raw-text opener's name. `<!--` alternates so the scan steps
+        # over comments (a commented-out `<!-- <script src="old.js"> -->`
+        # opens nothing), and so does a tag one of whose quoted values holds a
+        # `<` (`title="<textarea>"`): the last branch stops at that value's
+        # `=` and the scan resumes past the whole tag. Every other tag fails
+        # that branch at its `>` without a match being built.
+        RAW_TEXT_SCAN_RE = /<(?:!--|(script|style|textarea)\b|[a-zA-Z][^\s\/<>]*+(?:[^<>=]++|=\s*+"[^"<]*+"|=\s*+'[^'<]*+'|=(?!\s*+["']))*+=\s*+["'])/i
+        # A whole opening tag; a quote opens a value only right after `=`.
+        RAW_TEXT_TAG_RE = /<[a-zA-Z][^\s\/<>]*+#{Utils::TextUtils::HTML_TAG_ATTRS_QUOTED_VALUES}>/
+        # The end tag that closes a raw-text body, in any case (`</SCRIPT >`).
+        RAW_TEXT_CLOSE_RES = {
+          "script"   => /<\/script[\s\/>]/i,
+          "style"    => /<\/style[\s\/>]/i,
+          "textarea" => /<\/textarea[\s\/>]/i,
+        }
 
-        # Byte ranges of raw-text elements, from the opening `<` up to the
-        # close tag. An unterminated element ends the scan and an unterminated
-        # comment is no comment; neither runs to the end.
+        # Byte ranges of raw-text element bodies, from the end of the opening
+        # tag up to the close tag, so the opener's own attributes stay markup.
+        # An unterminated element ends the scan and an unterminated comment is
+        # no comment; neither runs to the end.
         def raw_text_spans(html : String) : Array(Range(Int32, Int32))
           spans = [] of Range(Int32, Int32)
           pos = 0
           comments_close = true
+          tags_close = true
           # Without NO_UTF_CHECK PCRE2 validates the whole page on every call.
           opts = html.valid_encoding? ? Regex::MatchOptions::NO_UTF_CHECK : Regex::MatchOptions::None
+          anchored = opts | Regex::MatchOptions::ANCHORED
           while m = RAW_TEXT_SCAN_RE.match_at_byte_index(html, pos, opts)
             if name = m[1]?
-              close = Utils::ByteScan.byte_index(html, "</#{name.downcase}", m.byte_end(0))
+              opener = RAW_TEXT_TAG_RE.match_at_byte_index(html, m.byte_begin(0), anchored)
+              break unless opener
+              body = opener.byte_end(0)
+              close = RAW_TEXT_CLOSE_RES[name.downcase].match_at_byte_index(html, body, opts)
               break unless close
-              spans << (m.byte_begin(0)...close)
-              pos = close
-            else
+              spans << (body...close.byte_begin(0))
+              pos = close.byte_begin(0)
+            elsif m[0] == "<!--"
               # No `-->` after one `<!--` means none after any later one.
               close = Utils::ByteScan.byte_index(html, "-->", m.byte_end(0)) if comments_close
               comments_close = !close.nil?
               pos = close ? close + 3 : m.byte_end(0)
+            else
+              # A tag that never ends would be rescanned from every later
+              # one; after the first such miss, only step past the match.
+              tag = RAW_TEXT_TAG_RE.match_at_byte_index(html, m.byte_begin(0), anchored) if tags_close
+              tags_close = !tag.nil?
+              pos = tag ? tag.byte_end(0) : m.byte_end(0)
             end
           end
           spans
         end
 
-        # Yields every stretch of `html` outside raw-text elements and joins
-        # the results with those elements kept verbatim.
-        def outside_raw_text(html : String, & : String -> String) : String
+        # Yields every stretch of `html` outside raw-text bodies and joins the
+        # results with those bodies kept verbatim. `scripts: true` yields each
+        # `<script>` body too, as a stretch of its own: for a pass whose
+        # rewrite is right for the HTML a script inserts
+        # (`el.innerHTML = '<a href="/x/">'`), which still never matches
+        # across a body's edge.
+        def outside_raw_text(html : String, scripts : Bool = false, & : String -> String) : String
           return yield html unless html.matches?(RAW_TEXT_OPEN_RE)
 
           String.build(html.bytesize) do |io|
             pos = 0
             raw_text_spans(html).each do |span|
               io << yield html.byte_slice(pos, span.begin - pos)
-              io << html.byte_slice(span.begin, span.end - span.begin)
+              body = html.byte_slice(span.begin, span.end - span.begin)
+              script = scripts && html.byte_slice(span.end + 2, 6).compare("script", case_insensitive: true) == 0
+              io << (script ? yield(body) : body)
               pos = span.end
             end
             io << yield html.byte_slice(pos)

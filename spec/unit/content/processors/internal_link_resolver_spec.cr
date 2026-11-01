@@ -297,6 +297,21 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
         html, "https://user.github.io/repo"
       ).should eq %(<script src="/repo/app.js">el.innerHTML = '<a href="/x">';</script><style>a[href="/x"]{}</style><textarea><a href="/x"></textarea><a href="/repo/x">)
     end
+
+    it "prefixes links between upper-case raw-text elements and after an opener-looking attribute" do
+      upper = %(<SCRIPT>var a=1;</SCRIPT><p><a href="/mid/">mid</a></p><TEXTAREA>t</TEXTAREA><a href="/end/">e</a>)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(upper, "https://ex.io/repo", "/repo")
+        .should eq %(<SCRIPT>var a=1;</SCRIPT><p><a href="/repo/mid/">mid</a></p><TEXTAREA>t</TEXTAREA><a href="/repo/end/">e</a>)
+      attr = %(<a title="<textarea>" href="/x/">x</a><p>mid <a href="/mid/">m</a></p><textarea>t</textarea><a href="/end/">e</a>)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(attr, "https://ex.io/repo", "/repo")
+        .should eq %(<a title="<textarea>" href="/repo/x/">x</a><p>mid <a href="/repo/mid/">m</a></p><textarea>t</textarea><a href="/repo/end/">e</a>)
+    end
+
+    it "does not let a quote opened in a script body swallow the links after it" do
+      html = %(<script>s = "<img alt='";</script><a href="/x/">x</a><script>t = "' src='/y.png'>";</script>)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, "https://ex.io/repo", "/repo")
+        .should eq %(<script>s = "<img alt='";</script><a href="/repo/x/">x</a><script>t = "' src='/y.png'>";</script>)
+    end
   end
 
   describe ".absolutize_links" do

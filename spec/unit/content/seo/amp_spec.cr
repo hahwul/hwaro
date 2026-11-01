@@ -178,6 +178,15 @@ describe Hwaro::Content::Seo::Amp do
       end
     end
 
+    it "converts an <img> between upper-case raw-text elements" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      html = %(<html><head></head><body><TEXTAREA>x</TEXTAREA><img src="/b.png" width="4" height="3"><textarea>y</textarea></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, Hwaro::Models::Config.new)
+      result.should contain(%(<amp-img src="/b.png"))
+      result.should_not contain("<img")
+    end
+
     it "leaves an <img> inside a textarea or script as text" do
       page = Hwaro::Models::Page.new("test.md")
       page.url = "/test/"

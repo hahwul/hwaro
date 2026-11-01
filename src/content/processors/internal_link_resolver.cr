@@ -365,25 +365,20 @@ module Hwaro
         #
         # `<script>`/`<style>`/`<textarea>` bodies are text, not markup: a JS
         # `'<a href="/x">'` string or a textarea's sample HTML is left alone,
-        # like the lazy/responsive/external-link passes leave it. Only their
-        # opening tag (`<script src="/app.js">`) is rewritten.
+        # like the lazy/responsive/external-link passes leave it. Their opening
+        # tag (`<script src="/app.js">`) is markup and is rewritten. The scan
+        # runs per stretch between bodies, so a quote opened in a body never
+        # swallows the markup after it.
         private def rewrite_link_attrs(html : String, & : Bool, String -> String?) : String
-          spans = html.matches?(MarkdownExtensions::RAW_TEXT_OPEN_RE) ? MarkdownExtensions.raw_text_spans(html) : nil
-          i = 0
-          html.gsub(LINK_TAG_REGEX) do |tag, m|
-            if spans
-              at = m.byte_begin(0)
-              while i < spans.size && spans[i].end <= at
-                i += 1
+          MarkdownExtensions.outside_raw_text(html) do |chunk|
+            chunk.gsub(LINK_TAG_REGEX) do |tag|
+              tag.gsub(LINK_ATTR_REGEX) do |attr, am|
+                next attr unless name = am[2]?
+                value = am[4]
+                new_value = yield name.size == 6, value # 6: srcset
+                next attr if new_value.nil? || new_value == value
+                "#{am[1]}#{am[3]}#{new_value}#{am[3]}"
               end
-              next tag if i < spans.size && at > spans[i].begin
-            end
-            tag.gsub(LINK_ATTR_REGEX) do |attr, am|
-              next attr unless name = am[2]?
-              value = am[4]
-              new_value = yield name.size == 6, value # 6: srcset
-              next attr if new_value.nil? || new_value == value
-              "#{am[1]}#{am[3]}#{new_value}#{am[3]}"
             end
           end
         end
