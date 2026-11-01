@@ -182,8 +182,10 @@ module Hwaro
         # Quote-aware tag scans: `media="(width >= 600px)"` or
         # `title="a > b"` does not end the tag.
         AMP_LINK_TAG_RE = /<link\b#{Utils::TextUtils::HTML_TAG_ATTRS_QUOTED_VALUES}>/i
-        AMP_VIDEO_RE    = /<video(#{Utils::TextUtils::HTML_TAG_ATTRS_QUOTED_VALUES})>(.*?)<\/video>/mi
-        AMP_IFRAME_RE   = /<iframe(#{Utils::TextUtils::HTML_TAG_ATTRS_QUOTED_VALUES})>(.*?)<\/iframe>/mi
+        # The end tag in any form (`</iframe >`): an exact one ran on to the
+        # next element's.
+        AMP_VIDEO_RE  = /<video(#{Utils::TextUtils::HTML_TAG_ATTRS_QUOTED_VALUES})>(.*?)<\/video(?:[\s\/][^>]*)?>/mi
+        AMP_IFRAME_RE = /<iframe(#{Utils::TextUtils::HTML_TAG_ATTRS_QUOTED_VALUES})>(.*?)<\/iframe(?:[\s\/][^>]*)?>/mi
 
         private def self.strip_non_amp_attributes(attrs : String) : String
           attrs.gsub(AMP_DISALLOWED_ATTR_RE, "")

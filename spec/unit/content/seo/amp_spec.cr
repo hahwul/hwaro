@@ -514,6 +514,22 @@ describe Hwaro::Content::Seo::Amp do
       result.should_not contain("<iframe")
     end
 
+    # Regression: only an exact `</iframe>` / `</video>` ended the element, so
+    # one closed by `</iframe >` swallowed the content up to the next one.
+    it "converts an iframe or video closed with whitespace, and only that element" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+
+      html = %(<html><head></head><body><iframe src="https://a.com/x"></iframe ><p>One</p>) +
+             %(<iframe src="https://b.com/y"></iframe><video src="/a.mp4"></VIDEO\n><p>Two</p><video src="/b.mp4"></video></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should contain("</amp-iframe><p>One</p><amp-iframe")
+      result.should contain("</amp-video><p>Two</p><amp-video")
+      result.should_not contain("<iframe")
+      result.should_not contain("<video")
+    end
+
     it "adds a sandbox attribute and amp-iframe extension script" do
       page = Hwaro::Models::Page.new("test.md")
       page.url = "/test/"
