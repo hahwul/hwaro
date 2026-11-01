@@ -792,6 +792,37 @@ describe "Builder#render_deferred" do
     end
   end
 
+  # `serve --fast-start --stream`: the background pass renders most of the
+  # site, so it must batch and release rendered bodies like the cold pass
+  # does, or `--stream`/`--memory-limit` bounded only the priority pages.
+  it "streams the background pass under --stream" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/new.md", "+++\ntitle = \"New\"\ndate = 2026-06-01\n+++\nnew body\n")
+        File.write("content/old.md", "+++\ntitle = \"Old\"\ndate = 2020-01-01\n+++\nold body\n")
+        File.write("templates/index.html", "{{ content }}")
+        File.write("templates/page.html", "{{ content }}")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, stream: true, fast_start: true, fast_start_count: 1)
+        options.serve_mode = true
+        builder.run(options).should be_true
+        deferred = options.dup
+        deferred.fast_start = false
+        deferred.preserve_output = true
+        builder.render_deferred(deferred)
+
+        File.read("public/old/index.html").should contain("old body")
+        old = builder.site.not_nil!.pages.find! { |page| page.path == "old.md" }
+        old.content.should eq("")
+      end
+    end
+  end
+
   # A fast-start `--cache` session must leave the cache describing what it
   # wrote. It never recorded the page-set fingerprint or the render-input
   # digest, so a later session whose inputs were back at an OLDER session's

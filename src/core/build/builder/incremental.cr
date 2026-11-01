@@ -1538,7 +1538,11 @@ module Hwaro
           # those fields. A small set (homepage, top sections, N recent).
           renderable = (@priority_pages + pages).select(&.render)
 
-          count = if options.parallel && renderable.size > 1
+          # Most of the site renders here, so `--stream` batches it like the
+          # cold pass's Render phase.
+          count = if options.streaming?
+                    render_streaming(renderable, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, options.error_overlay, options.parallel, options.batch_size, !generated_outputs_read_content?(site))
+                  elsif options.parallel && renderable.size > 1
                     process_files_parallel(renderable, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: options.error_overlay, profiler: active_profiler)
                   else
                     process_files_sequential(renderable, site, templates, output_dir, minify, cache, highlight, verbose, global_vars, error_overlay: options.error_overlay, profiler: active_profiler)
