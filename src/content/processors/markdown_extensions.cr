@@ -295,7 +295,8 @@ module Hwaro
         # An unterminated element ends the scan and an unterminated comment is
         # no comment; neither runs to the end. `comments: true` also lists
         # each comment (`<!--` through `-->`): only the ones outside the
-        # bodies, as a browser parses them (`"<!--"` in a script opens none).
+        # bodies, as a browser parses them (`"<!--"` in a script opens none),
+        # including those after an unterminated element.
         def raw_text_spans(html : String, comments : Bool = false) : Array(Range(Int32, Int32))
           spans = [] of Range(Int32, Int32)
           pos = 0
@@ -304,15 +305,22 @@ module Hwaro
           # Without NO_UTF_CHECK PCRE2 validates the whole page on every call.
           opts = html.valid_encoding? ? Regex::MatchOptions::NO_UTF_CHECK : Regex::MatchOptions::None
           anchored = opts | Regex::MatchOptions::ANCHORED
+          bodies_close = true
           while m = RAW_TEXT_SCAN_RE.match_at_byte_index(html, pos, opts)
             if name = m[1]?
-              opener = RAW_TEXT_TAG_RE.match_at_byte_index(html, m.byte_begin(0), anchored)
-              break unless opener
-              body = opener.byte_end(0)
-              close = RAW_TEXT_CLOSE_RES[name.downcase].match_at_byte_index(html, body, opts)
-              break unless close
-              spans << (body...close.byte_begin(0))
-              pos = close.byte_begin(0)
+              opener = bodies_close ? RAW_TEXT_TAG_RE.match_at_byte_index(html, m.byte_begin(0), anchored) : nil
+              close = opener.try { |o| RAW_TEXT_CLOSE_RES[name.downcase].match_at_byte_index(html, o.byte_end(0), opts) }
+              if opener && close
+                spans << (opener.byte_end(0)...close.byte_begin(0))
+                pos = close.byte_begin(0)
+              else
+                # Unterminated: the body-only callers (link/image/AMP
+                # rewrites) keep stopping here; the heading passes still
+                # need the comments after it, so only the bodies stop.
+                break unless comments
+                bodies_close = false
+                pos = m.byte_end(0)
+              end
             elsif m[0] == "<!--"
               # No `-->` after one `<!--` means none after any later one.
               # From the `<!--`'s own dashes: `<!-->` and `<!--->` are whole

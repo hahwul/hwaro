@@ -70,6 +70,16 @@ describe Hwaro::Content::Processors::Markdown do
       html.should contain("<h2>C</h2>")
     end
 
+    # Regression: an unterminated inline `<script>` ended the shared scan, so
+    # the comments after it went unlisted and a commented-out heading got an
+    # id, an anchor and a TOC entry.
+    it "still skip a commented-out heading after an unterminated raw-text opener" do
+      content = "Use a <script> tag.\n\n## A\n\n<!--\n<h2>Hidden</h2>\n-->\n\n## B"
+      html, toc = Hwaro::Content::Processors::Markdown.new.render_with_anchors(content, anchor_style: "after")
+      toc.map(&.id).should eq(["a", "b"])
+      html.should contain("<h2>Hidden</h2>")
+    end
+
     # Regression: the comment scan did not skip script bodies, so a `"<!--"`
     # JS string opened a comment running to the next `-->` and every heading
     # between lost its id and TOC entry.
