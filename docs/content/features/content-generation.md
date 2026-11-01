@@ -73,7 +73,7 @@ Templates see the full source record as `page.extra.item`, so there is no need t
 
 ## Collisions
 
-An authored file always wins a contested path: if `content/products/red-widget.md` exists, a generated page for the same slug is dropped with a warning, never the other way around. Two records producing the same slug fail the build, naming both records.
+An authored file always wins a contested path: if `content/products/red-widget.md` exists (or a draft of it, its leaf bundle `red-widget/index.md`, a subsection `red-widget/_index.md`, or on a multilingual site the default-language spelling `red-widget.en.md`), a generated page for the same slug is dropped with a warning, never the other way around. Two records producing the same slug fail the build, naming both records.
 
 ## Rebuilds and Caching
 

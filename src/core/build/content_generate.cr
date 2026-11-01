@@ -402,22 +402,37 @@ module Hwaro
         #
         # A source `[content] ignore` hides (`ignore`, the site's
         # content_files) claims nothing: the build never reads it.
-        def authored_twin_exists?(path : String, content_root : String = "content", ignore : Models::ContentFilesConfig? = nil) : Bool
+        #
+        # `default_language` (a multilingual site's default code) adds the
+        # spelled-out default suffix (`<stem>.en.md`), which publishes the
+        # same URL as `<stem>.md`. A subsection index `<stem>/_index.md`
+        # owns that URL too.
+        def authored_twin_exists?(path : String, content_root : String = "content", ignore : Models::ContentFilesConfig? = nil,
+                                  default_language : String? = nil) : Bool
           parent = File.dirname(path)
           dir = File.join(content_root, parent)
           stem = File.basename(path, ".md")
           entries = dir_children(dir)
           return false if entries.empty?
           visible = ->(rel : String) { !ignore.try(&.ignored?(File.join(parent, rel))) }
+          suffixes = default_language ? {"", ".#{default_language}"} : {""}
 
           Phases::ReadContent::PAGE_EXTENSIONS.each do |ext|
-            return true if entries.includes?("#{stem}#{ext}") && visible.call("#{stem}#{ext}")
+            suffixes.each do |suffix|
+              name = "#{stem}#{suffix}#{ext}"
+              return true if entries.includes?(name) && visible.call(name)
+            end
           end
 
           if entries.includes?(stem)
             bundle_entries = dir_children(File.join(dir, stem))
             Phases::ReadContent::PAGE_EXTENSIONS.each do |ext|
-              return true if bundle_entries.includes?("index#{ext}") && visible.call("#{stem}/index#{ext}")
+              suffixes.each do |suffix|
+                {"index", "_index"}.each do |index|
+                  name = "#{index}#{suffix}#{ext}"
+                  return true if bundle_entries.includes?(name) && visible.call("#{stem}/#{name}")
+                end
+              end
             end
           end
 

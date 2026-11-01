@@ -125,6 +125,23 @@ describe "[[content.generate]] build integration" do
     end
   end
 
+  it "lets the default-language spelling and a subsection index win their URLs" do
+    config = CONFIG.sub(%(sitemap = true), %(sitemap = true\ndefault_language = "en"\n[languages.en]\nlanguage_name = "English"\n[languages.ko]\nlanguage_name = "Korean"\n))
+    contested = CONTENT_FILES.merge({
+      # A draft still owns its URL, exactly like a draft `red-widget.md`.
+      "products/red-widget.en.md"           => "+++\ntitle = 'Authored Red'\ndraft = true\n+++\nAuthored body.",
+      "products/blue-widget-3000/_index.md" => "+++\ntitle = 'Blue Section'\n+++\n",
+    })
+    build_site(config, content_files: contested, template_files: TEMPLATE_FILES, data_files: DATA_FILES) do
+      File.exists?("public/products/red-widget/index.html").should be_false
+      File.read("public/products/blue-widget-3000/index.html").should contain("<h1>Blue Section</h1>")
+      listing = File.read("public/products/index.html")
+      listing.should_not contain("Red Widget")
+      listing.should_not contain("Blue Widget")
+      File.read("public/sitemap.xml").should_not contain("/products/red-widget/")
+    end
+  end
+
   it "applies [permalinks] patterns to generated pages" do
     config = CONFIG + "\n[permalinks]\nproducts = \"/shop/:slug/\"\n"
     build_site(config, content_files: CONTENT_FILES, template_files: TEMPLATE_FILES, data_files: DATA_FILES) do

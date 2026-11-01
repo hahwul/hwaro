@@ -214,9 +214,10 @@ module Hwaro::Core::Build::Phases::ReadContent
     ctx.pages.each { |p| collected_paths << p.path }
     ctx.sections.each { |s| collected_paths << s.path }
 
+    default_language = config.multilingual? ? config.default_language : nil
     added = Hash(String, Int32).new(0)
     plans.each do |plan|
-      if collected_paths.includes?(plan.path) || ContentGenerate.authored_twin_exists?(plan.path, ignore: config.content_files)
+      if collected_paths.includes?(plan.path) || ContentGenerate.authored_twin_exists?(plan.path, ignore: config.content_files, default_language: default_language)
         Logger.warn "  #{plan.origin}: skipping generated page '#{plan.path}' — an authored content file already claims that path (authored content wins)."
         next
       end

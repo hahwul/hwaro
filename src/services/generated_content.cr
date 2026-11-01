@@ -90,7 +90,8 @@ module Hwaro
           plans.each do |plan|
             # Authored-wins, exactly like the build: a contested path lists
             # the authored file only, never a duplicate generated row.
-            next if Core::Build::ContentGenerate.authored_twin_exists?(plan.path, ignore: ignore || config.content_files)
+            next if Core::Build::ContentGenerate.authored_twin_exists?(plan.path, ignore: ignore || config.content_files,
+                      default_language: config.multilingual? ? config.default_language : nil)
 
             date = plan.date_raw.try { |raw| Utils::DateUtils.parse_content_date(raw) }
             state = date && date > now ? PublishState::Future : PublishState::Published
