@@ -314,6 +314,11 @@ describe "tool publication-state parity" do
 
           Hwaro::Services::GeneratedContent.infos("content").map(&.path).should eq(["products/red.md"])
 
+          # Front matter `path` moves the subsection index onto /shop/red/.
+          File.write("content/products/red/_index.md", "+++\ntitle = \"Red\"\npath = \"shop/red\"\n+++\n")
+          Hwaro::Services::GeneratedContent.infos("content").should be_empty
+          File.write("content/products/red/_index.md", "+++\ntitle = \"Red\"\n+++\n")
+
           # Without the pattern the subsection index owns /products/red/.
           File.write("config.toml", File.read("config.toml").sub(%(products = "/shop/:slug/"), ""))
           Hwaro::Services::GeneratedContent.infos("content").should be_empty

@@ -409,10 +409,11 @@ module Hwaro
         # spelled-out default suffix (`<stem>.en.md`), which publishes the
         # same URL as `<stem>.md`. A subsection index `<stem>/_index.md`
         # owns that URL too — unless `config` and `page_url` (the generated
-        # page's resolved URL, `plan_url`) show a `[permalinks]` pattern
-        # moved the page off it: section indexes skip pattern rules, so
+        # page's resolved URL, `plan_url`) show the two publish at different
+        # URLs: section indexes skip pattern rules, so
         # `products = "/shop/:slug/"` puts generated `red` at /shop/red/
-        # while `products/red/_index.md` keeps /products/red/.
+        # while `products/red/_index.md` keeps /products/red/ — unless its
+        # front matter `path`/`slug` moves it (see section_url).
         def authored_twin_exists?(path : String, content_root : String = "content", ignore : Models::ContentFilesConfig? = nil,
                                   default_language : String? = nil, config : Models::Config? = nil,
                                   page_url : String? = nil) : Bool
@@ -438,7 +439,7 @@ module Hwaro
                 {"index", "_index"}.each do |index|
                   name = "#{index}#{suffix}#{ext}"
                   next unless bundle_entries.includes?(name) && visible.call("#{stem}/#{name}")
-                  next if index == "_index" && config && page_url && url_for(File.join(parent, stem, name), config) != page_url
+                  next if index == "_index" && config && page_url && section_url(File.join(parent, stem, name), File.join(dir, stem, name), config) != page_url
                   return true
                 end
               end
@@ -454,9 +455,20 @@ module Hwaro
           url_for(plan.path, config, plan.title, plan.date_raw.try { |raw| Utils::DateUtils.parse_content_date(raw) })
         end
 
-        private def url_for(path : String, config : Models::Config, title : String = "", date : Time? = nil) : String
-          Utils::PermalinkResolver.resolve_url_lenient(path, config, slug: nil, custom_path: nil, language: nil,
+        private def url_for(path : String, config : Models::Config, title : String = "", date : Time? = nil,
+                            slug : String? = nil, custom_path : String? = nil) : String
+          Utils::PermalinkResolver.resolve_url_lenient(path, config, slug: slug, custom_path: custom_path, language: nil,
             date: date, title: title, version: config.versions.for_path(path))[0]
+        end
+
+        # A subsection index's URL, front matter `slug`/`path` included
+        # (`path = "shop/red"` moves it onto the generated page's URL).
+        private def section_url(path : String, file : String, config : Models::Config) : String
+          data = Processor::Markdown.parse(File.read(file), file)
+          url_for(path, config, data[:title], data[:date], data[:slug], data[:custom_path])
+        rescue File::Error | IO::Error | Hwaro::HwaroError
+          # Unreadable or malformed: the parse phase reports it.
+          url_for(path, config)
         end
 
         private def dir_children(dir : String) : Array(String)
