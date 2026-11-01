@@ -403,10 +403,20 @@ module Hwaro
 
         PNG_SIGNATURE = Bytes[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
 
+        # Read the start of `path` into `header`; the byte count read.
+        # Unbuffered: a buffered File allocates a 32 KiB read buffer for this
+        # one small read, per image per build (6 MiB of garbage for 200).
+        private def read_header(path : String, header : Bytes) : Int32
+          File.open(path) do |io|
+            io.read_buffering = false
+            io.read(header)
+          end
+        end
+
         # PNG: width/height are big-endian UInt32s at offsets 16/20 (IHDR).
         private def png_dimensions(path : String) : {Int32, Int32}?
           header = Bytes.new(24)
-          read = File.open(path, &.read(header))
+          read = read_header(path, header)
           return if read < 24
           return unless header[0, 8] == PNG_SIGNATURE
           width = IO::ByteFormat::BigEndian.decode(UInt32, header[16, 4])
@@ -538,7 +548,7 @@ module Hwaro
         # header size is not measured.
         private def bmp_dimensions(path : String) : {Int32, Int32}?
           header = Bytes.new(26)
-          read = File.open(path, &.read(header))
+          read = read_header(path, header)
           return if read < 26
           return unless header[0] == 0x42 && header[1] == 0x4D
           dib_size = IO::ByteFormat::LittleEndian.decode(UInt32, header[14, 4])
@@ -561,7 +571,7 @@ module Hwaro
         # little-endian UInt16s at offsets 6/8.
         private def gif_dimensions(path : String) : {Int32, Int32}?
           header = Bytes.new(10)
-          return if File.open(path, &.read(header)) < 10
+          return if read_header(path, header) < 10
           return unless String.new(header[0, 6]).in?("GIF87a", "GIF89a")
           width = IO::ByteFormat::LittleEndian.decode(UInt16, header[6, 2]).to_i32
           height = IO::ByteFormat::LittleEndian.decode(UInt16, header[8, 2]).to_i32
@@ -575,7 +585,7 @@ module Hwaro
         #   VP8X (extended): 24-bit LE (value - 1) canvas size at 24/27.
         private def webp_dimensions(path : String) : {Int32, Int32}?
           header = Bytes.new(30)
-          return if File.open(path, &.read(header)) < 30
+          return if read_header(path, header) < 30
           return unless String.new(header[0, 4]) == "RIFF" && String.new(header[8, 4]) == "WEBP"
           width, height = case String.new(header[12, 4])
                           when "VP8 "

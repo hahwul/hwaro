@@ -60,8 +60,9 @@ module Hwaro
         # re-read, so a serve pass that re-renders after an image swap prints
         # the new size.
         @@intrinsic_sizes = {} of String => {Time, Int64, {Int32, Int32}?}
-        # Original URL => `authored_variant_paths`, for this build.
-        @@authored_variant_paths = {} of String => Array(String)
+        # Original URL => {`authored_variant_paths`, the render-reads
+        # generation they were last handed out in}, for this build.
+        @@authored_variant_paths = {} of String => {Array(String), UInt64}
         # Every image whose size or bytes a render printed, for the serve
         # watcher: a copy-only change to one of them must re-render (see
         # `render_image_source_changed?`). Kept for the whole process — a
@@ -170,17 +171,18 @@ module Hwaro
         # image-derived data from (a srcset, an LQIP, a dominant colour): the
         # resize job's source, else the `static/` location an image that does
         # not exist yet would appear at. Also registers it with the serve
-        # watcher (see `render_image_source_changed?`). The caller records
-        # every returned path as a `--cache` render input: the source, then
-        # the files that would publish under one of its variant names
+        # watcher (see `render_image_source_changed?`). Yields every path the
+        # caller records as a `--cache` render input: the source, then the
+        # files that would publish under one of its variant names
         # (`authored_variant_paths`).
-        def self.watch_render_source(url : String) : Array(String)
-          return [] of String if url.includes?('\0')
+        def self.watch_render_source(url : String, & : String ->) : Nil
+          return if url.includes?('\0')
           job_source = source_path_for(url)
           source = job_source || File.join("static", url)
           @@lookup_mutex.synchronize { @@render_image_sources << Path.posix(source).normalize.to_s }
-          return [source] unless job_source
-          [source] + authored_variant_paths(url, job_source)
+          yield source
+          return unless job_source
+          authored_variant_paths(url, job_source).try &.each { |path| yield path }
         end
 
         # Where a file the site publishes itself under one of `url`'s variant
@@ -188,20 +190,30 @@ module Hwaro
         # static/. Such a file suppresses that variant (see `authored_for` in
         # process_images), so its appearing or vanishing changes the printed
         # srcset: recorded as reads, an absent path digests as "<absent>".
-        # Memoized per build.
-        private def self.authored_variant_paths(url : String, source : String) : Array(String)
+        #
+        # The render reads are one set for the whole build, so the list is
+        # handed out once per record (`TemplateEngine.render_reads_generation`)
+        # and nil after that: re-recording it for every page that prints the
+        # image (the summary pass runs on every build, cached or not) cost a
+        # warm build that rendered nothing ~200ms on 3000 pages.
+        private def self.authored_variant_paths(url : String, source : String) : Array(String)?
+          generation = Processors::TemplateEngine.render_reads_generation
           config = @@lookup_mutex.synchronize do
             if memo = @@authored_variant_paths[url]?
-              return memo
+              return if memo[1] == generation
+              @@authored_variant_paths[url] = {memo[0], generation}
+              return memo[0]
             end
             @@lookup_config
           end
-          return [] of String unless config
+          return unless config
           ip = config.image_processing
           widths = ip.widths.dup
-          # A width over the source's is clamped to it (either side: the
-          # header may predate an EXIF rotation).
-          intrinsic_size(source).try { |size| widths << size[0] << size[1] }
+          # A width over the source's (its displayed width, EXIF-aware) is
+          # clamped to it.
+          if (widest = widths.max?) && (source_width = intrinsic_size(source).try(&.[0])) && source_width < widest
+            widths << source_width
+          end
           ext = File.extname(source)
           stem = File.basename(source, ext)
           exts = [ext.downcase] + ip.formats.map { |format| ".#{format}" }
@@ -209,7 +221,12 @@ module Hwaro
           paths = widths.uniq!.flat_map do |width|
             exts.flat_map { |variant_ext| dirs.map { |dir| File.join(dir, "#{stem}_#{width}w#{variant_ext}") } }
           end
-          @@lookup_mutex.synchronize { @@authored_variant_paths[url] = paths }
+          @@lookup_mutex.synchronize do
+            # Another fiber computed and handed it out meanwhile.
+            return if @@authored_variant_paths[url]?.try(&.[1]) == generation
+            @@authored_variant_paths[url] = {paths, generation}
+          end
+          paths
         end
 
         # Source file published at the site-absolute, decoded `url` (no

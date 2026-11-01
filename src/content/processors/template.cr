@@ -482,7 +482,7 @@ module Hwaro
             # Serve re-renders the page too: its LQIP / dominant colour are
             # printed data (see ImageHooks.watch_render_source).
             if Content::Hooks::ImageHooks.processing_active?
-              Content::Hooks::ImageHooks.watch_render_source(normalized).each { |src| TemplateEngine.record_file_read(src) }
+              Content::Hooks::ImageHooks.watch_render_source(normalized) { |src| TemplateEngine.record_file_read(src) }
             end
 
             # Try to find a resized variant from the image hooks map
@@ -555,6 +555,9 @@ module Hwaro
         # render worker has its own env.
         @@render_reads = Set(String).new
         @@render_reads_mutex = Mutex.new
+        # Bumped by every `take_render_reads`: a caller that records the same
+        # reads on every call can record them once per record instead.
+        @@render_reads_generation = 0_u64
 
         ENV_READ_PREFIX  = "env:"
         FILE_READ_PREFIX = "file:"
@@ -594,9 +597,14 @@ module Hwaro
           record_render_read(FILE_READ_PREFIX + normalized)
         end
 
+        def self.render_reads_generation : UInt64
+          @@render_reads_mutex.synchronize { @@render_reads_generation }
+        end
+
         # Everything recorded since the last call, and start a new record.
         def self.take_render_reads : Set(String)
           @@render_reads_mutex.synchronize do
+            @@render_reads_generation &+= 1
             taken = @@render_reads
             @@render_reads = Set(String).new
             taken
