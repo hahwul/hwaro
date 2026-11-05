@@ -106,4 +106,23 @@ describe Hwaro::Utils::FrontmatterScanner do
       Hwaro::Utils::FrontmatterScanner.yaml_front_matter?("title: [unclosed\n").should be_true
     end
   end
+
+  # Regression: TOML/YAML positions were counted from the block, below the
+  # opening fence, so every reported line was one too low.
+  describe ".parse_error_message" do
+    it "counts TOML and YAML error lines from the top of the file" do
+      toml = "+++\ntitle = \"ok\"\nbad = \"x\n+++\nbody\n"
+      ex = expect_raises(TOML::ParseException) { TOML.parse(toml.match!(Hwaro::Utils::FrontmatterScanner::TOML_FRONTMATTER_RE)[1]) }
+      Hwaro::Utils::FrontmatterScanner.parse_error_message(ex, toml).should end_with(" at 3:#{ex.column_number}")
+
+      yaml = "---\n\ntitle: ok\ntags: [a\n---\nbody\n"
+      ex = expect_raises(YAML::ParseException) { YAML.parse(yaml.match!(Hwaro::Utils::FrontmatterScanner::YAML_FRONTMATTER_RE)[1]) }
+      ex.message.not_nil!.should contain("line 2, column 7")
+      Hwaro::Utils::FrontmatterScanner.parse_error_message(ex, yaml).should contain("flow sequence at line 4, column 7")
+    end
+
+    it "leaves other errors alone" do
+      Hwaro::Utils::FrontmatterScanner.parse_error_message(ArgumentError.new("at line 1"), "+++\n").should eq("at line 1")
+    end
+  end
 end

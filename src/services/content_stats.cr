@@ -210,7 +210,7 @@ module Hwaro
             nested = toml_data["taxonomies"]?.try(&.as_h?).try(&.["tags"]?)
             return toml_string_array(nested)
           rescue ex : TOML::ParseException | ArgumentError
-            warn_unparsed_frontmatter(path, "TOML", ex)
+            warn_unparsed_frontmatter(path, "TOML", ex, content)
           end
         when :yaml
           begin
@@ -224,7 +224,7 @@ module Hwaro
           rescue ex : YAML::ParseException | ArgumentError
             # Prose after a thematic break is body text, not broken front
             # matter (see FrontmatterScanner.yaml_front_matter?).
-            warn_unparsed_frontmatter(path, "YAML", ex) if Utils::FrontmatterScanner.yaml_front_matter_like?(source)
+            warn_unparsed_frontmatter(path, "YAML", ex, content) if Utils::FrontmatterScanner.yaml_front_matter_like?(source)
           end
         when :json
           # JSON front matter is a first-class dialect for the build, so a
@@ -236,7 +236,7 @@ module Hwaro
               return json_string_array(h["taxonomies"]?.try(&.as_h?).try(&.["tags"]?))
             end
           rescue ex : JSON::ParseException
-            warn_unparsed_frontmatter(path, "JSON", ex)
+            warn_unparsed_frontmatter(path, "JSON", ex, content)
           end
         end
 
@@ -266,8 +266,8 @@ module Hwaro
         terms.map { |term| Utils::TextUtils.normalize_term(term) }.reject(&.empty?)
       end
 
-      private def warn_unparsed_frontmatter(path : String, dialect : String, ex : Exception) : Nil
-        Logger.warn "#{path}: #{dialect} frontmatter parse error: #{ex.message}; tags not counted."
+      private def warn_unparsed_frontmatter(path : String, dialect : String, ex : Exception, content : String) : Nil
+        Logger.warn "#{path}: #{dialect} frontmatter parse error: #{Utils::FrontmatterScanner.parse_error_message(ex, content)}; tags not counted."
       end
     end
   end

@@ -147,6 +147,15 @@ module Hwaro
             ex.is_a?(JSON::ParseException) || ex.is_a?(ArgumentError) || ex.is_a?(Utils::Nesting::TooDeep)
         end
 
+        # `ex`'s message, with a front-matter parse error's lines counted
+        # from the top of `file_path` (see FrontmatterScanner).
+        protected def front_matter_error_message(ex : Exception, file_path : String) : String
+          return ex.message.to_s unless ex.is_a?(TOML::ParseException) || ex.is_a?(YAML::ParseException)
+          Utils::FrontmatterScanner.parse_error_message(ex, File.read(file_path))
+        rescue File::Error
+          ex.message.to_s
+        end
+
         # When set, the run resolves and reports every destination (counts,
         # manifest) but writes nothing to disk.
         property dry_run : Bool = false

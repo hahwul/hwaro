@@ -86,11 +86,11 @@ module Hwaro
           # with no `key:` line) must keep its FULL content — assigning
           # match[2] up front silently dropped the first block.
           if match = raw_content.match(TOML_FRONT_MATTER_REGEX)
-            if result = extract_from_toml(match[1], file_path, declared_keys)
+            if result = extract_from_toml(match[1], file_path, declared_keys, raw_content)
               markdown_content = match[2]
             end
           elsif match = raw_content.match(YAML_FRONT_MATTER_REGEX)
-            if result = extract_from_yaml(match[1], file_path, declared_keys)
+            if result = extract_from_yaml(match[1], file_path, declared_keys, raw_content)
               markdown_content = match[2]
             elsif yaml_empty_front_matter?(match[1])
               # `---\n---` / comment-only blocks are EMPTY front matter:
@@ -250,7 +250,7 @@ module Hwaro
         end
 
         # Extract front matter fields from TOML content
-        private def extract_from_toml(raw : String, file_path : String, declared_keys : Set(String)? = nil)
+        private def extract_from_toml(raw : String, file_path : String, declared_keys : Set(String)? = nil, content : String = "")
           toml_fm = begin
             TOML.parse(raw)
           rescue ex
@@ -264,7 +264,7 @@ module Hwaro
             end
             raise Hwaro::HwaroError.new(
               code: Hwaro::Errors::HWARO_E_CONTENT,
-              message: "Invalid TOML frontmatter in #{file_path}: #{ex.message}",
+              message: "Invalid TOML frontmatter in #{file_path}: #{Utils::FrontmatterScanner.parse_error_message(ex, content)}",
               hint: "Check TOML frontmatter between `+++` fences",
             )
           end
@@ -311,13 +311,13 @@ module Hwaro
           end
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_CONTENT,
-            message: "Invalid TOML frontmatter in #{file_path}: #{ex.message}",
+            message: "Invalid TOML frontmatter in #{file_path}: #{Utils::FrontmatterScanner.parse_error_message(ex, content)}",
             hint: "Check TOML frontmatter between `+++` fences",
           )
         end
 
         # Extract front matter fields from YAML content
-        private def extract_from_yaml(raw : String, file_path : String, declared_keys : Set(String)? = nil)
+        private def extract_from_yaml(raw : String, file_path : String, declared_keys : Set(String)? = nil, content : String = "")
           yaml_fm = begin
             YAML.parse(raw)
           rescue ex
@@ -336,7 +336,7 @@ module Hwaro
             return unless yaml_front_matter_like?(raw)
             raise Hwaro::HwaroError.new(
               code: Hwaro::Errors::HWARO_E_CONTENT,
-              message: "Invalid YAML frontmatter in #{file_path}: #{ex.message}",
+              message: "Invalid YAML frontmatter in #{file_path}: #{Utils::FrontmatterScanner.parse_error_message(ex, content)}",
               hint: "Check YAML frontmatter between `---` fences",
             )
           end
@@ -388,7 +388,7 @@ module Hwaro
           end
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_CONTENT,
-            message: "Invalid YAML frontmatter in #{file_path}: #{ex.message}",
+            message: "Invalid YAML frontmatter in #{file_path}: #{Utils::FrontmatterScanner.parse_error_message(ex, content)}",
             hint: "Check YAML frontmatter between `---` fences",
           )
         end

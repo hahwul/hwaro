@@ -332,8 +332,8 @@ module Hwaro
 
       # Remember a converter's parse error and signal failure (nil) to the
       # caller in one step, so every rescue arm stays a single line.
-      private def record_error(ex : Exception) : Nil
-        message = ex.message
+      private def record_error(ex : Exception, content : String) : Nil
+        message = Utils::FrontmatterScanner.parse_error_message(ex, content)
         @last_error = message.presence
         Logger.debug "Front matter parse error: #{message}"
         nil
@@ -446,7 +446,7 @@ module Hwaro
 
             "#{TOML_DELIMITER}\n#{toml_str}#{TOML_DELIMITER}\n#{body}"
           rescue ex
-            record_error(ex)
+            record_error(ex, content)
           end
         end
       end
@@ -463,7 +463,7 @@ module Hwaro
 
             "#{YAML_DELIMITER}\n#{yaml_str}#{YAML_DELIMITER}\n#{body}"
           rescue ex
-            record_error(ex)
+            record_error(ex, content)
           end
         end
       end
@@ -477,7 +477,7 @@ module Hwaro
             json_str = yaml_to_json_string(yaml_data)
             "#{json_str}\n#{body}"
           rescue ex
-            record_error(ex)
+            record_error(ex, content)
           end
         end
       end
@@ -491,7 +491,7 @@ module Hwaro
             json_str = toml_to_json_string(toml_data)
             "#{json_str}\n#{body}"
           rescue ex
-            record_error(ex)
+            record_error(ex, content)
           end
         end
       end
@@ -504,7 +504,7 @@ module Hwaro
           yaml_body = convert_json_to_yaml_string(json_data)
           "#{YAML_DELIMITER}\n#{yaml_body}#{YAML_DELIMITER}\n#{body}"
         rescue ex
-          record_error(ex)
+          record_error(ex, content)
         end
       end
 
@@ -518,7 +518,7 @@ module Hwaro
           toml_body = Utils::FrontmatterWriter::TomlBuilder.new(NULL_OMITTED_KEYS).build(yaml_any)
           "#{TOML_DELIMITER}\n#{toml_body}#{TOML_DELIMITER}\n#{body}"
         rescue ex
-          record_error(ex)
+          record_error(ex, content)
         end
       end
 
