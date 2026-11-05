@@ -250,7 +250,7 @@ module Hwaro
         end
 
         # Extract front matter fields from TOML content
-        private def extract_from_toml(raw : String, file_path : String, declared_keys : Set(String)? = nil, content : String = "")
+        private def extract_from_toml(raw : String, file_path : String, declared_keys : Set(String)?, content : String)
           toml_fm = begin
             TOML.parse(raw)
           rescue ex
@@ -317,7 +317,7 @@ module Hwaro
         end
 
         # Extract front matter fields from YAML content
-        private def extract_from_yaml(raw : String, file_path : String, declared_keys : Set(String)? = nil, content : String = "")
+        private def extract_from_yaml(raw : String, file_path : String, declared_keys : Set(String)?, content : String)
           yaml_fm = begin
             YAML.parse(raw)
           rescue ex

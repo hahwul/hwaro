@@ -24,7 +24,7 @@ module Hwaro
       # count from the block, which starts below the opening fence, so every
       # reported line was one (or more) too low. Other errors pass through.
       def parse_error_message(ex : Exception, content : String) : String
-        message = ex.message || ex.class.name
+        message = ex.message.to_s
         return message unless ex.is_a?(TOML::ParseException) || ex.is_a?(YAML::ParseException)
         return message unless fence = content.lchop('\uFEFF').match(/\A(?:\+\+\+|---)\s*\n/)
         offset = fence[0].count('\n')
