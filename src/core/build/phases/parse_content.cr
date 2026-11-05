@@ -496,16 +496,16 @@ module Hwaro::Core::Build::Phases::ParseContent
   end
 
   # Every published non-page file an `![[embed]]` can name, as
-  # `{relative path, URL}`: bundle assets of published pages, `[content.files]`
-  # outside withheld bundles, and `static/`.
-  private def published_embed_files(pages : Array(Models::Page), config : Models::Config) : Array({String, String})
-    files = [] of {String, String}
+  # `{relative path, URL, language}`: bundle assets of published pages,
+  # `[content.files]` outside withheld bundles, and `static/`.
+  private def published_embed_files(pages : Array(Models::Page), config : Models::Config) : Array(Content::Processors::Wikilinks::Index::FileEntry)
+    files = [] of Content::Processors::Wikilinks::Index::FileEntry
     pages.each do |page|
       next if page.assets.empty?
       bundle = File.dirname(page.path)
       base = page.url.ends_with?('/') ? page.url : "#{page.url}/"
       page.assets.each do |asset|
-        files << {asset, "#{base}#{asset.lchop("#{bundle}/")}"} if publishable_source_file?(File.join("content", asset))
+        files << {asset, "#{base}#{asset.lchop("#{bundle}/")}", page.language} if publishable_source_file?(File.join("content", asset))
       end
     end
     if config.content_files.enabled? && Dir.exists?("content")
@@ -515,14 +515,14 @@ module Hwaro::Core::Build::Phases::ParseContent
       Dir.glob("content/**/*") do |file|
         rel = file.lchop("content/")
         next if withheld_content_file?(rel, withheld)
-        files << {rel, "/#{rel}"} if config.content_files.publish?(rel) && publishable_source_file?(file)
+        files << {rel, "/#{rel}", nil} if config.content_files.publish?(rel) && publishable_source_file?(file)
       end
     end
     if Dir.exists?("static")
       Dir.glob("static/**/*") do |file|
         rel = file.lchop("static/")
         next if config.static.excluded?(rel) || config.sass_source?(rel)
-        files << {rel, "/#{rel}"} if publishable_source_file?(file)
+        files << {rel, "/#{rel}", nil} if publishable_source_file?(file)
       end
     end
     files

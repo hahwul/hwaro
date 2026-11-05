@@ -402,9 +402,11 @@ module Hwaro
 
           # Leaf bundle (`posts/my-post/index.md`): the slug is the bundle
           # directory, not "index" — a literal "index" slug collided across
-          # every same-day bundle once flattened into `_posts/`.
-          if slug == "index" && dir_part != "." && !dir_part.empty?
-            slug = File.basename(dir_part)
+          # every same-day bundle once flattened into `_posts/`. A
+          # translation (`index.ko.md`) keeps its language suffix, as a
+          # translated file's slug (`hello.ko`) does.
+          if (bundle_index = slug.match(/\Aindex((?:\.[^.]+)?)\z/)) && dir_part != "." && !dir_part.empty?
+            slug = File.basename(dir_part) + bundle_index[1]
           end
 
           # A source already named `YYYY-MM-DD-slug` (file or bundle dir)

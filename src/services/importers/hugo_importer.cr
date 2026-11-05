@@ -256,9 +256,11 @@ module Hwaro
           #
           # A branch bundle (`docs/_index.md`) publishes its sibling files the
           # same way, and every translation of a bundle sits in one directory,
-          # so the directory is copied once per run.
+          # so the directory is copied once per run. A leaf bundle's resources
+          # include its subdirectories (`images/cover.png`); a branch
+          # bundle's subdirectories are its child sections.
           if dest_path && (leaf_bundle || (base_name == "_index" && !section.empty?)) && @copied_asset_dirs.add?(File.dirname(file_path))
-            copy_bundle_assets(File.dirname(file_path), File.dirname(dest_path), output_dir, verbose, force)
+            copy_bundle_assets(File.dirname(file_path), File.dirname(dest_path), output_dir, verbose, force, recursive: leaf_bundle)
           end
 
           return :skipped unless written

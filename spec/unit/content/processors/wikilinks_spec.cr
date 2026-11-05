@@ -11,8 +11,8 @@ private def wl_page(path : String, url : String? = nil, language : String? = nil
   page
 end
 
-private def wl_index(pages : Array(Hwaro::Models::Page), files = [] of {String, String}) : Hwaro::Content::Processors::Wikilinks::Index
-  Hwaro::Content::Processors::Wikilinks::Index.new(pages, "en", -> { files })
+private def wl_index(pages : Array(Hwaro::Models::Page), files = [] of {String, String}, owned = [] of Hwaro::Content::Processors::Wikilinks::Index::FileEntry) : Hwaro::Content::Processors::Wikilinks::Index
+  Hwaro::Content::Processors::Wikilinks::Index.new(pages, "en", -> { owned + files.map { |rel, url| {rel, url, nil.as(String?)} } })
 end
 
 private def wl_rewrite(content : String, source : Hwaro::Models::Page, index, safe = false, misses : Array({String, String})? = nil, math = false) : String
@@ -269,6 +269,17 @@ describe Hwaro::Content::Processors::Wikilinks do
       wl_rewrite("![[photo.png|300]]", src, index).should eq("![photo\\.png](photo.png){width=300}")
       wl_rewrite("![[photo.png|300x200]]", src, index).should eq("![photo\\.png](photo.png){width=300 height=200}")
       wl_rewrite("![[photo.png|A trip]]", src, index).should eq("![A trip](photo.png)")
+    end
+
+    it "treats a section asset published once per language as one file, in the source's language" do
+      owned = [{"posts/pic.png", "/ko/posts/pic.png", "ko".as(String?)}, {"posts/pic.png", "/posts/pic.png", nil.as(String?)}]
+      idx = wl_index([src], [{"posts/pic.png", "/posts/pic.png"}], owned)
+      ko = wl_page("posts/b.ko.md", url: "/ko/posts/b/", language: "ko")
+      log = with_captured_log do
+        wl_rewrite("![[pic.png]]", wl_page("posts/a.md"), idx).should eq("![pic\\.png](/posts/pic.png)")
+        wl_rewrite("![[pic.png]]", ko, idx).should eq("![pic\\.png](/ko/posts/pic.png)")
+      end
+      log.should_not contain("Ambiguous")
     end
 
     it "reports a missing file, and links a non-image embed like a wikilink" do
