@@ -128,14 +128,19 @@ module Hwaro
         class Index
           @by_name = {} of String => Array(Models::Page)
           @by_path = {} of String => Array(Models::Page)
-          @files : Hash(String, Array({String, String}))? = nil
+          @files : Hash(String, Array(FileEntry))? = nil
           @mutex = Mutex.new
 
-          # `files` lists every published non-page file as
-          # `{relative path, URL}`; it is only called on the first file link
-          # that is not one of the source page's own bundle assets.
+          # `{relative path, URL, language}`: the language of the page whose
+          # assets publish the file there (nil for the default language and
+          # for files no page owns).
+          alias FileEntry = {String, String, String?}
+
+          # `files` lists every published non-page file; it is only called on
+          # the first file link that is not one of the source page's own
+          # bundle assets.
           def initialize(pages : Enumerable(Models::Page), default_language : String,
-                         @files_source : Proc(Array({String, String})) = -> { [] of {String, String} },
+                         @files_source : Proc(Array(FileEntry)) = -> { [] of FileEntry },
                          @warned : WarnLog = WarnLog.new)
             pages.each do |page|
               next unless keys = Index.keys_for(page, default_language)
@@ -196,6 +201,13 @@ module Hwaro
             files = @mutex.synchronize { @files ||= index_files }
             list = files[File.basename(want)]?.try(&.select { |entry| file_matches?(entry[0], want) })
             return if list.nil? || list.empty?
+            # One file publishes at several URLs when every language's index
+            # of its section owns it (`posts/a.png` → `/posts/a.png` and
+            # `/ko/posts/a.png`): those copies are one candidate, in the
+            # source's language when it has one.
+            list = list.group_by(&.[0]).values.map do |copies|
+              copies.find { |entry| entry[2] == source.language } || copies.find { |entry| entry[2].nil? } || copies.first
+            end
             pick(list, source, target) { |entry| {entry[0], File.dirname(entry[0])} }[1]
           end
 
@@ -204,10 +216,10 @@ module Hwaro
             want.includes?('/') ? low == want || low.ends_with?("/#{want}") : File.basename(low) == want
           end
 
-          private def index_files : Hash(String, Array({String, String}))
-            map = {} of String => Array({String, String})
+          private def index_files : Hash(String, Array(FileEntry))
+            map = {} of String => Array(FileEntry)
             @files_source.call.each do |entry|
-              (map[Wikilinks.key(File.basename(entry[0]))] ||= [] of {String, String}) << entry
+              (map[Wikilinks.key(File.basename(entry[0]))] ||= [] of FileEntry) << entry
             end
             map
           end

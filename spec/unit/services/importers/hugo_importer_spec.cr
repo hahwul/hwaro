@@ -463,6 +463,31 @@ describe Hwaro::Services::Importers::HugoImporter do
     end
   end
 
+  # Regression: only a bundle's top-level files were copied, so a leaf
+  # bundle's `images/cover.png` was dropped and `![](images/cover.png)` broke.
+  describe "leaf bundle resources in subdirectories" do
+    it "copies them, but not a nested bundle's or a branch bundle's child sections" do
+      Dir.mktmpdir do |tmpdir|
+        hugo_dir = setup_hugo_site(tmpdir)
+        write_hugo_content(hugo_dir, "posts/trip/index.md", "+++\ntitle = \"Trip\"\n+++\n![c](images/cover.png)\n")
+        write_hugo_content(hugo_dir, "posts/trip/images/cover.png", "cover")
+        write_hugo_content(hugo_dir, "posts/trip/images/raw/big.png", "big")
+        write_hugo_content(hugo_dir, "posts/trip/day2/index.md", "+++\ntitle = \"Day 2\"\n+++\nx\n")
+        write_hugo_content(hugo_dir, "posts/trip/day2/own.png", "own")
+        write_hugo_content(hugo_dir, "docs/_index.md", "+++\ntitle = \"Docs\"\n+++\n")
+        write_hugo_content(hugo_dir, "docs/sub/loose.png", "loose")
+        output_dir = File.join(tmpdir, "out")
+
+        Hwaro::Services::Importers::HugoImporter.new.run(make_hugo_options(hugo_dir, output_dir)).success.should be_true
+
+        File.read(File.join(output_dir, "posts", "trip", "images", "cover.png")).should eq("cover")
+        File.read(File.join(output_dir, "posts", "trip", "images", "raw", "big.png")).should eq("big")
+        File.read(File.join(output_dir, "posts", "trip", "day2", "own.png")).should eq("own")
+        File.exists?(File.join(output_dir, "docs", "sub", "loose.png")).should be_false
+      end
+    end
+  end
+
   # Regression: Hugo's `url` front matter (the page's whole published path)
   # was dropped, so an imported page moved and every link to it broke.
   describe "url front matter" do

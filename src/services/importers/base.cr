@@ -519,8 +519,9 @@ module Hwaro
           output_dir : String,
           verbose : Bool = false,
           force : Bool = false,
+          recursive : Bool = false,
         ) : Int32
-          BundleAssets.copy(source_dir, dest_dir, output_dir, @dry_run, "copy") do |src, dest|
+          BundleAssets.copy(source_dir, dest_dir, output_dir, @dry_run, "copy", recursive) do |src, dest|
             if File.exists?(dest) && !force
               @file_actions << FileAction.new(dest, "skipped")
               next false
@@ -528,7 +529,7 @@ module Hwaro
 
             action = File.exists?(dest) ? "overwritten" : "imported"
             unless @dry_run
-              Hwaro::Utils::FileSafe.mkdir_p(dest_dir) unless Dir.exists?(dest_dir)
+              Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest))
               File.copy(src, dest)
             end
             @file_actions << FileAction.new(dest, action)

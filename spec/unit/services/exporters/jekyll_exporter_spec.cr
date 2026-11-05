@@ -353,6 +353,25 @@ describe Hwaro::Services::Exporters::JekyllExporter do
       end
     end
 
+    it "keeps the language suffix on a translated leaf bundle's slug" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        {"trip", "hike"}.each do |name|
+          FileUtils.mkdir_p(File.join(content_dir, "posts", name))
+          File.write(File.join(content_dir, "posts", name, "index.ko.md"), "+++\ntitle = \"#{name}\"\ndate = \"2024-04-01\"\n+++\n\nBody\n")
+        end
+
+        exporter = Hwaro::Services::Exporters::JekyllExporter.new
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+        exporter.run(options)
+
+        File.exists?(File.join(output_dir, "_posts", "2024-04-01-trip.ko.md")).should be_true
+        File.exists?(File.join(output_dir, "_posts", "2024-04-01-hike.ko.md")).should be_true
+        File.exists?(File.join(output_dir, "_posts", "2024-04-01-index.ko.md")).should be_false
+      end
+    end
+
     it "keeps a leaf bundle's un-exported assets out of the skipped count" do
       # Jekyll's flat `_posts/` layout has no destination that keeps a bare
       # `![](cover.png)` resolving, so the assets stay behind with a warning
