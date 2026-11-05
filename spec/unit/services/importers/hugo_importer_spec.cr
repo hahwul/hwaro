@@ -486,6 +486,31 @@ describe Hwaro::Services::Importers::HugoImporter do
         File.exists?(File.join(output_dir, "docs", "sub", "loose.png")).should be_false
       end
     end
+
+    # Regression: `--force` wrote through a symlink at the destination,
+    # overwriting the file outside the output directory it pointed at.
+    it "never writes through a destination symlink, even with --force" do
+      Dir.mktmpdir do |tmpdir|
+        hugo_dir = setup_hugo_site(tmpdir)
+        write_hugo_content(hugo_dir, "posts/trip/index.md", "+++\ntitle = \"Trip\"\n+++\nx\n")
+        write_hugo_content(hugo_dir, "posts/trip/images/cover.png", "cover")
+        output_dir = File.join(tmpdir, "out")
+        victim = File.join(tmpdir, "victim")
+        Dir.mkdir_p(victim)
+        File.write(File.join(victim, "v.png"), "SECRET")
+        File.write(File.join(victim, "v.md"), "SECRET")
+        Dir.mkdir_p(File.join(output_dir, "posts", "trip", "images"))
+        File.symlink(File.join(victim, "v.png"), File.join(output_dir, "posts", "trip", "images", "cover.png"))
+        File.symlink(File.join(victim, "v.md"), File.join(output_dir, "posts", "trip", "index.md"))
+
+        options = make_hugo_options(hugo_dir, output_dir)
+        options.force = true
+        with_captured_log { Hwaro::Services::Importers::HugoImporter.new.run(options) }
+
+        File.read(File.join(victim, "v.png")).should eq("SECRET")
+        File.read(File.join(victim, "v.md")).should eq("SECRET")
+      end
+    end
   end
 
   # Regression: Hugo's `url` front matter (the page's whole published path)

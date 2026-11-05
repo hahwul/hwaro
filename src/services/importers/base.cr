@@ -477,6 +477,14 @@ module Hwaro
             return {false, nil}
           end
 
+          # `--force` overwrites a file, never what a symlink points at:
+          # `File.write` follows the link out of `output_dir`.
+          if File.symlink?(path)
+            Logger.warn "Skipped (destination is a symlink): #{path}"
+            @file_actions << FileAction.new(path, "skipped")
+            return {false, path}
+          end
+
           if File.exists?(path) && !force
             Logger.warn "Skipped (already exists): #{path}" if verbose
             @file_actions << FileAction.new(path, "skipped")
@@ -522,6 +530,11 @@ module Hwaro
           recursive : Bool = false,
         ) : Int32
           BundleAssets.copy(source_dir, dest_dir, output_dir, @dry_run, "copy", recursive) do |src, dest|
+            if File.symlink?(dest)
+              Logger.warn "Skipped (destination is a symlink): #{dest}"
+              @file_actions << FileAction.new(dest, "skipped")
+              next false
+            end
             if File.exists?(dest) && !force
               @file_actions << FileAction.new(dest, "skipped")
               next false
