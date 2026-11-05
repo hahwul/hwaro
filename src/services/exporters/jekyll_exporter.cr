@@ -56,7 +56,7 @@ module Hwaro
           rescue ex
             errors += 1
             content_errors += 1 if front_matter_error?(ex)
-            Logger.warn "Error exporting #{file_path}: #{ex.message}"
+            Logger.warn "Error exporting #{file_path}: #{front_matter_error_message(ex, file_path)}"
           end
 
           export_assets(content_dir, files, output_dir, verbose)

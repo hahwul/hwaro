@@ -1235,6 +1235,15 @@ describe Hwaro::Content::Processors::Markdown do
       (err.message || "").should contain("test.md")
     end
 
+    # Regression: the position was counted from the block, one line above
+    # where the bad line sits in the file.
+    it "reports the error's line in the file, not in the front-matter block" do
+      err = expect_raises(Hwaro::HwaroError) { processor.parse("+++\ntitle = \"ok\"\nbad = \"x\n+++\nbody\n", "test.md") }
+      (err.message || "").should match(/ at 3:\d+\z/)
+      err = expect_raises(Hwaro::HwaroError) { processor.parse("---\ntitle: ok\ntags: [a\n---\nbody\n", "test.md") }
+      (err.message || "").should contain("flow sequence at line 3, column 7")
+    end
+
     it "raises HWARO_E_CONTENT for invalid YAML when a file path is given" do
       raw = <<-MD
         ---

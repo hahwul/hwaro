@@ -5,6 +5,7 @@
 # module provides a brace-aware scanner that respects string literals.
 
 require "yaml"
+require "toml"
 
 module Hwaro
   module Utils
@@ -17,6 +18,22 @@ module Hwaro
       # its own variants that additionally capture the body.
       TOML_FRONTMATTER_RE = /\A\+\+\+\s*\n(.*?\n?)^\+\+\+\s*$\n?/m
       YAML_FRONTMATTER_RE = /\A---\s*\n(.*?\n?)^---\s*$\n?/m
+
+      # `ex`, a TOML or YAML parse error in the front matter of `content`,
+      # with its line numbers counted from the top of the file. The parsers
+      # count from the block, which starts below the opening fence, so every
+      # reported line was one (or more) too low. Other errors pass through.
+      def parse_error_message(ex : Exception, content : String) : String
+        message = ex.message.to_s
+        return message unless ex.is_a?(TOML::ParseException) || ex.is_a?(YAML::ParseException)
+        return message unless fence = content.lchop('\uFEFF').match(/\A(?:\+\+\+|---)\s*\n/)
+        offset = fence[0].count('\n')
+        if ex.is_a?(TOML::ParseException)
+          message.sub(/ at (\d+):(\d+)\z/) { |_, m| " at #{m[1].to_i + offset}:#{m[2]}" }
+        else
+          message.gsub(/\bline (\d+)/) { |_, m| "line #{m[1].to_i + offset}" }
+        end
+      end
 
       # The front-matter block at the top of `content` as {dialect, source}:
       # `{:toml, body}` / `{:yaml, body}` (the text between the fences) or
