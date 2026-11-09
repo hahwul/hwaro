@@ -1,4 +1,5 @@
 require "json"
+require "uri"
 require "digest/sha1"
 require "../../models/config"
 require "../../models/site"
@@ -290,8 +291,10 @@ module Hwaro
         # Map a site-internal (possibly base_path-prefixed) URL to the output
         # file it should resolve to: strip base_path, drop the leading slash,
         # join under output_dir, and append index.html for directory-like URLs.
+        # The query/fragment never names a file, and a percent-encoded path
+        # (the form a browser address bar copies) names the decoded file.
         private def self.precache_file_path(url : String, output_dir : String, base_path : String) : String
-          rel = url
+          rel = URI.decode(url.split(/[?#]/, 2).first)
           rel = rel[base_path.size..] if !base_path.empty? && rel.starts_with?(base_path)
           rel = rel.lchop('/')
           fpath = File.join(output_dir, rel)

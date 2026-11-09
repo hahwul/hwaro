@@ -113,7 +113,7 @@ module Hwaro
         # drops a repeated name (first declaration wins), so the parsed
         # `config.taxonomies` can no longer show the duplicate.
         taxonomy_names = (config.raw["taxonomies"]?.try(&.as_a?) || [] of TOML::Any)
-          .compact_map { |t| t.as_h?.try(&.["name"]?).try(&.as_s?) }
+          .compact_map(&.as_h?.try(&.["name"]?).try(&.as_s?))
         duplicates = taxonomy_names.tally.select { |_, count| count > 1 }.keys
         duplicates.each do |name|
           issues << Issue.new(id: "taxonomy-duplicate", level: :warning, category: "config", file: @config_path,

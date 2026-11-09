@@ -285,7 +285,7 @@ module Hwaro
         # Foreign file (static/search/index.json): anything that is not our
         # `{"shards": [{"id": ...}]}` shape yields no ids.
         shards = parsed.as_h?.try(&.["shards"]?).try(&.as_a?) || return [] of String
-        shards.compact_map { |s| s.as_h?.try(&.["id"]?).try(&.as_s?) }
+        shards.compact_map(&.as_h?.try(&.["id"]?).try(&.as_s?))
       rescue JSON::ParseException | File::Error
         [] of String
       end

@@ -225,9 +225,13 @@ describe Hwaro::Content::Seo::Feeds do
 
       ko_page = feed_page(path: "posts/hello.ko.md", url: "/ko/posts/hello/")
       ko_page.language = "ko"
+      # The language's own homepage: without one, home_url is the site root.
+      ko_home = Hwaro::Models::Section.new("_index.ko.md")
+      ko_home.is_index = true
+      ko_home.language = "ko"
 
       Dir.mktmpdir do |output_dir|
-        Hwaro::Content::Seo::Feeds.generate([ko_page], config, output_dir,
+        Hwaro::Content::Seo::Feeds.generate([ko_home, ko_page], config, output_dir,
           templates: templates, renderer: feed_renderer)
 
         content = File.read(File.join(output_dir, "ko", "rss.xml"))

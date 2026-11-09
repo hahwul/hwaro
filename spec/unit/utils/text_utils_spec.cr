@@ -338,6 +338,12 @@ describe Hwaro::Utils::TextUtils do
   end
 
   describe ".escape_xml" do
+    it "drops the U+FFFE/U+FFFF noncharacters XML forbids" do
+      Hwaro::Utils::TextUtils.escape_xml("a\uFFFEb\uFFFFc").should eq("abc")
+      Hwaro::Utils::TextUtils.escape_xml("a\uFFFE&").should eq("a&amp;")
+      Hwaro::Utils::TextUtils.escape_xml("，￼").should eq("，￼")
+    end
+
     it "escapes ampersand" do
       Hwaro::Utils::TextUtils.escape_xml("Tom & Jerry").should eq("Tom &amp; Jerry")
     end

@@ -376,7 +376,7 @@ module Hwaro
           end
 
           targets = doc["deployment"]?.try(&.as_h?).try(&.["targets"]?).try(&.as_a?)
-          if targets && targets.any? { |t| t.as_h?.try(&.has_key?("command")) }
+          if targets && targets.any?(&.as_h?.try(&.has_key?("command")))
             dangerous << "deploy commands (command)"
           end
           dangerous

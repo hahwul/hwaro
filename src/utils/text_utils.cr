@@ -647,6 +647,8 @@ module Hwaro
               # keep it; this also matches contains_xml_special?'s gate exactly.
               o = char.ord
               io << char unless o < 0x20 && o != 0x09 && o != 0x0A && o != 0x0D
+            when '\uFFFE', '\uFFFF'
+              # Noncharacters XML 1.0 also forbids (its Char production).
             else io << char
             end
           end
@@ -770,12 +772,15 @@ module Hwaro
       # Avoids the regex engine and Unicode decoding — all targets are 7-bit
       # ASCII so the byte view is exact even for UTF-8 input.
       private def contains_xml_special?(text : String) : Bool
-        text.each_byte do |b|
+        bytes = text.to_slice
+        bytes.each_with_index do |b, i|
           case b
           when 0x26, 0x3C, 0x3E, 0x22, 0x27 # & < > " '
             return true
           when 0x00..0x08, 0x0B, 0x0C, 0x0E..0x1F # XML-illegal C0 controls
             return true
+          when 0xEF # U+FFFE / U+FFFF (EF BF BE / EF BF BF)
+            return true if i + 2 < bytes.size && bytes[i + 1] == 0xBF && bytes[i + 2] >= 0xBE
           end
         end
         false

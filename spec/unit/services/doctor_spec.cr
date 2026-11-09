@@ -1310,6 +1310,26 @@ describe Hwaro::Services::Doctor do
         end
       end
 
+      it "resolves a percent-encoded [pwa] precache asset like the build does" do
+        Dir.mktmpdir do |dir|
+          config_path = File.join(dir, "config.toml")
+          File.write(config_path, %(title = "T"\nbase_url = "http://x"\n[pwa]\nenabled = true\nprecache_urls = ["/a%20b.css"]\n))
+          FileUtils.mkdir_p(File.join(dir, "static"))
+          File.write(File.join(dir, "static", "a b.css"), "body{}")
+
+          doctor = Hwaro::Services::Doctor.new(
+            content_dir: File.join(dir, "content"),
+            config_path: config_path,
+            templates_dir: File.join(dir, "templates"),
+            static_dir: File.join(dir, "static"),
+          )
+          Dir.cd(dir) do
+            issues = doctor.run
+            issues.any? { |i| i.id == "config-path-missing" && i.message.includes?("precache") }.should be_false
+          end
+        end
+      end
+
       it "still warns on a genuinely-missing [pwa] precache asset (non-route path)" do
         # Route-style values (trailing slash / no extension) are produced at
         # build time and can't be validated pre-build, so doctor stays quiet on

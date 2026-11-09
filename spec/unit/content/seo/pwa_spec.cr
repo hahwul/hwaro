@@ -516,6 +516,25 @@ describe Hwaro::Content::Seo::Pwa do
       end
     end
 
+    it "resolves a percent-encoded or query-carrying precache URL to its file" do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "special", "こんにちは"))
+        File.write(File.join(dir, "special", "こんにちは", "index.html"), "x")
+        File.write(File.join(dir, "app.css"), "body{}")
+        site = make_site(<<-TOML)
+          [pwa]
+          enabled = true
+          precache_urls = ["/special/%E3%81%93%E3%82%93%E3%81%AB%E3%81%A1%E3%81%AF/", "/app.css?v=2"]
+          TOML
+
+        Hwaro::Content::Seo::Pwa.generate(site, dir)
+
+        content = File.read(File.join(dir, "sw.js"))
+        content.should contain("/special/%E3%81%93%E3%82%93%E3%81%AB%E3%81%A1%E3%81%AF/")
+        content.should contain("/app.css?v=2")
+      end
+    end
+
     # The launch URL is always kept even when its output file isn't present
     # in the dir we generate into (it's the navigation fallback target).
     it "keeps the start_url in precache even without a backing file" do
