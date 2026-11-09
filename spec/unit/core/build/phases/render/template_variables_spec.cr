@@ -66,6 +66,30 @@ describe "hreflang on paginated listings" do
   end
 end
 
+describe "page.permalink on pager pages" do
+  # page/2/ printed page 1's permalink while `page.url` was its own.
+  it "is the pager's own absolute URL, for sections and taxonomy terms" do
+    build_site(
+      "title = \"T\"\nbase_url = \"https://example.com/sub\"\n\n[[taxonomies]]\nname = \"tags\"\npaginate_by = 1\n",
+      content_files: {
+        "blog/_index.md" => "+++\ntitle = \"Blog\"\npaginate = 1\n+++\n",
+        "blog/a.md"      => "+++\ntitle = \"A\"\ndate = 2024-01-01\ntags = [\"x\"]\n+++\n",
+        "blog/b.md"      => "+++\ntitle = \"B\"\ndate = 2024-01-02\ntags = [\"x\"]\n+++\n",
+      },
+      template_files: {
+        "page.html"          => "P",
+        "section.html"       => "{{ page.url }}|{{ page.permalink }}|{{ page_permalink }}",
+        "taxonomy.html"      => "",
+        "taxonomy_term.html" => "{{ page.url }}|{{ page.permalink }}|{{ page_permalink }}",
+      },
+    ) do
+      File.read("public/blog/index.html").should eq("/blog/|https://example.com/sub/blog/|https://example.com/sub/blog/")
+      File.read("public/blog/page/2/index.html").should eq("/blog/page/2/|https://example.com/sub/blog/page/2/|https://example.com/sub/blog/page/2/")
+      File.read("public/tags/x/page/2/index.html").should start_with("/tags/x/page/2/|https://example.com/sub/tags/x/page/2/|https://example.com/sub/tags/x/page/2/")
+    end
+  end
+end
+
 describe "resize_image with a page-bundle image" do
   # `resize_image(path=page.image)` with `image = "cover.png"` beside
   # index.md resolves under the page URL, like its og:image does.

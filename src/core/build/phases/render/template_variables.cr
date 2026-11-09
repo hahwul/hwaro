@@ -72,6 +72,13 @@ module Hwaro::Core::Build::Phases::Render
 
     # Generate permalink only if not already set
     page.generate_permalink(config.base_url) unless page.permalink
+    # A later pager (`/blog/page/2/`) is its own URL: its permalink follows
+    # `page.url` (effective_url), not page 1's stored one.
+    permalink = if effective_url == page.url
+                  page.permalink || ""
+                else
+                  "#{config.base_url.rstrip('/')}#{Utils::PathUtils.root_relative(effective_url)}"
+                end
 
     # Reuse cached Crinja arrays for tags/authors/assets/extra/translations
     # (avoids per-page .map allocation)
@@ -155,7 +162,7 @@ module Hwaro::Core::Build::Phases::Render
       "summary_truncated" => Crinja::Value.new(page.summary_truncated),
       "word_count"        => Crinja::Value.new(page.word_count),
       "reading_time"      => Crinja::Value.new(page.reading_time),
-      "permalink"         => Crinja::Value.new(page.permalink || ""),
+      "permalink"         => Crinja::Value.new(permalink),
       "weight"            => Crinja::Value.new(page.weight),
       "git"               => cached_raw["git"].as(Crinja::Value),
       "in_search_index"   => Crinja::Value.new(page.in_search_index),
@@ -246,7 +253,7 @@ module Hwaro::Core::Build::Phases::Render
     vars["page_summary"] = Crinja::Value.new(page.template_summary)
     vars["page_word_count"] = Crinja::Value.new(page.word_count)
     vars["page_reading_time"] = Crinja::Value.new(page.reading_time)
-    vars["page_permalink"] = Crinja::Value.new(page.permalink || "")
+    vars["page_permalink"] = Crinja::Value.new(permalink)
     vars["page_authors"] = authors_crinja
     vars["page_tags"] = tags_crinja
     vars["page_weight"] = Crinja::Value.new(page.weight)
