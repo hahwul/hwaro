@@ -44,7 +44,7 @@ describe Hwaro::Content::Processors::SyntaxHighlighter do
       ph = "<!--HWARO-SHORTCODE-PLACEHOLDER-0-->"
       content = "Inline #{ph} <i>x</i>.\n\n#{ph}\n\n#{ph} <script>y</script>\n"
       html = Hwaro::Content::Processors::SyntaxHighlighter.render(content, safe: true)
-      html.should eq("<p>Inline #{ph} <!-- raw HTML omitted -->x<!-- raw HTML omitted -->.</p>\n#{ph}\n#{ph}<!-- raw HTML omitted -->\n")
+      html.should eq("<p>Inline #{ph} <!-- raw HTML omitted -->x<!-- raw HTML omitted -->.</p>\n#{ph}\n<p>#{ph} <!-- raw HTML omitted -->y<!-- raw HTML omitted --></p>\n")
     end
 
     it "passes through HTML when safe mode is disabled" do
