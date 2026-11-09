@@ -117,7 +117,13 @@ module Hwaro
         # content source or a built output page.
         emit_route = ->(label : String, value : String) do
           before = issues.size
-          emit_missing(issues, label, value, resolver: ->(s : String) { path_resolves?(s) || route_resolves?(s, oracle) }, id: "config-path-missing", kind: "file")
+          # Decoded like the build's precache check (Pwa.precache_file_path):
+          # `/a%20b.css` names `a b.css`.
+          resolver = ->(s : String) do
+            decoded = URI.decode(s.split(/[?#]/, 2).first)
+            path_resolves?(decoded) || route_resolves?(decoded, oracle)
+          end
+          emit_missing(issues, label, value, resolver: resolver, id: "config-path-missing", kind: "file")
           unresolved_routes += 1 if issues.size > before
         end
 

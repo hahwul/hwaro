@@ -23,6 +23,22 @@ describe Hwaro::Content::Seo::Feeds do
     end
   end
 
+  describe "content:encoded" do
+    it "drops the U+FFFE/U+FFFF noncharacters inside CDATA" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      config.feeds.full_content = true
+
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "P"
+      page.url = "/post/"
+      page.content = "<p>a\uFFFEb\uFFFFc</p>"
+
+      rss = Hwaro::Content::Seo::Feeds.generate_rss([page], config, "rss.xml", false, "T", "")
+      rss.should contain("<![CDATA[<p>abc</p>]]>")
+    end
+  end
+
   describe "multilingual feeds" do
     it "filters main feed to default language pages when default_language_only is true (default)" do
       config = Hwaro::Models::Config.new
