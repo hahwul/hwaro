@@ -134,6 +134,36 @@ describe Hwaro::Core::Build::Phases::Transform do
       root.subsections.should be_empty
     end
 
+    # `docs/_index.md` (en only) + `docs/guide/_index.md` and its `.ko`
+    # translation: the ko guide fell back to the en parent and was listed in
+    # the English `section.subsections` / `get_section().subsections`.
+    it "does not list a translated subsection under a default-language parent" do
+      config = <<-TOML
+        title = "T"
+        base_url = "https://example.com/sub"
+        default_language = "en"
+        [languages.en]
+        weight = 1
+        [languages.ko]
+        weight = 2
+        TOML
+      content = {
+        "docs/_index.md"          => "+++\ntitle = \"Docs\"\n+++\n",
+        "docs/guide/_index.md"    => "+++\ntitle = \"Guide\"\n+++\n",
+        "docs/guide/_index.ko.md" => "+++\ntitle = \"가이드\"\n+++\n",
+      }
+      templates = {
+        "section.html" => "S:{% for s in section.subsections %}[{{ s.title }}]{% endfor %}" \
+                          "|G:{% for s in get_section(path=\"docs\").subsections %}[{{ s.title }}]{% endfor %}",
+        "page.html" => "{{ content }}",
+      }
+      build_site(config, content_files: content, template_files: templates) do
+        File.read("public/docs/index.html").should eq("S:[Guide]|G:[Guide]")
+        # The ko guide still renders, its breadcrumb still reaching the en parent.
+        File.exists?("public/ko/docs/guide/index.html").should be_true
+      end
+    end
+
     it "links page ancestors based on section path" do
       options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
       ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
@@ -184,6 +214,37 @@ describe Hwaro::Core::Build::Phases::Transform do
   end
 
   describe "#link_page_navigation" do
+    # ko pages in a section with no `_index.ko.md`: `section.pages` sorted
+    # them by the en section's `sort_by = "weight"`, prev/next by date.
+    it "orders untranslated-section pages like section.pages" do
+      config = <<-TOML
+        title = "T"
+        base_url = "https://example.com/sub"
+        default_language = "en"
+        [languages.en]
+        weight = 1
+        [languages.ko]
+        weight = 2
+        TOML
+      content = {
+        "blog/_index.md" => "+++\ntitle = \"Blog\"\nsort_by = \"weight\"\n+++\n",
+        "blog/a.ko.md"   => "+++\ntitle = \"KA\"\nweight = 2\ndate = \"2024-01-02\"\n+++\n",
+        "blog/b.ko.md"   => "+++\ntitle = \"KB\"\nweight = 1\ndate = \"2024-01-01\"\n+++\n",
+        "blog/c.ko.md"   => "+++\ntitle = \"KC\"\nweight = 3\ndate = \"2023-01-01\"\n+++\n",
+      }
+      templates = {
+        "page.html" => "{% for p in section.pages %}[{{ p.title }}]{% endfor %}" \
+                       "|L={% if page.lower %}{{ page.lower.title }}{% endif %}" \
+                       "|H={% if page.higher %}{{ page.higher.title }}{% endif %}",
+        "section.html" => "",
+      }
+      build_site(config, content_files: content, template_files: templates) do
+        # section.pages leaves the current page out.
+        File.read("public/ko/blog/c/index.html").should eq("[KB][KA]|L=KA|H=")
+        File.read("public/ko/blog/b/index.html").should eq("[KA][KC]|L=|H=KA")
+      end
+    end
+
     it "links pages with lower/higher in flat reading order" do
       options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
       ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
@@ -599,6 +660,31 @@ describe Hwaro::Core::Build::Phases::Transform do
       orders[0].should eq(orders[1])
       orders[0].size.should eq(7)
       orders[0].first.should eq("index.md")
+    end
+
+    # A root `_index.md` was weight-sorted among the top-level sections, so
+    # `01-intro/` (path sorts before `_index.md`) came before the homepage.
+    it "leads with a root _index.md, then its pages, then the sections" do
+      root = make_section("_index.md", "")
+      intro = make_section("01-intro/_index.md", "01-intro")
+      about = make_page("about.md", "")
+      b1 = make_page("01-intro/b1.md", "01-intro")
+
+      options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+      ctx.site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+      ctx.sections = [intro, root]
+      ctx.pages = [b1, about]
+      Hwaro::Core::Build::Builder.new.test_link_page_navigation(ctx)
+
+      root.lower.should be_nil
+      chain = [] of String
+      page = root.as(Hwaro::Models::Page)
+      while page
+        chain << page.path
+        page = page.higher
+      end
+      chain.should eq(["_index.md", "about.md", "01-intro/_index.md", "01-intro/b1.md"])
     end
   end
 

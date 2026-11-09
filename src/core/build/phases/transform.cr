@@ -70,12 +70,15 @@ module Hwaro::Core::Build::Phases::Transform
     sections_by_lang = sections.group_by { |s| {s.language || default_lang, s.version.try(&.name)} }
     pages_by_lang = pages.group_by { |p| {p.language || default_lang, p.version.try(&.name)} }
     losers = output_losers((pages + sections).as(Array(Models::Page)))
+    # Every language's sections, for sort settings a partition lacks.
+    all_sections = {} of {String, String?} => Models::Section
+    sections.each { |s| all_sections[{s.section, s.language}] ||= s }
 
     (sections_by_lang.keys | pages_by_lang.keys).map do |key|
       order = build_language_reading_order(
         sections_by_lang[key]? || [] of Models::Section,
         pages_by_lang[key]? || [] of Models::Page,
-        key[0], default_lang)
+        key[0], default_lang, all_sections)
       losers.empty? ? order : order.reject { |p| losers.includes?(p.path) }
     end
   end
@@ -94,6 +97,7 @@ module Hwaro::Core::Build::Phases::Transform
     pages : Array(Models::Page),
     lang : String,
     default_lang : String,
+    all_sections : Hash({String, String?}, Models::Section),
   ) : Array(Models::Page)
     # Build sections lookup
     sections_by_path = {} of String => Models::Section
@@ -115,9 +119,12 @@ module Hwaro::Core::Build::Phases::Transform
       pages_by_section[section] << page
     end
 
-    # Sort pages within each section using the section's sort_by setting
+    # Sort pages within each section using the section's sort_by setting.
+    # A section with no `_index` in this language sorts by the
+    # default-language one's settings — the fallback Site#section_for gives
+    # `section.pages`, which must list them in the same order.
     pages_by_section.each do |section_name, section_pages|
-      section = sections_by_path[section_name]?
+      section = sections_by_path[section_name]? || lookup_ancestor_section(all_sections, section_name, lang, default_lang)
       sort_by = section.try(&.sort_by) || "date"
       reverse = section.try(&.reverse) || false
       sorted = Utils::SortUtils.sort_pages(section_pages, sort_by, reverse)
@@ -135,11 +142,16 @@ module Hwaro::Core::Build::Phases::Transform
     # append_orphan_pages skips a known section's pages — so it dropped out
     # of prev/next entirely. With every parent present this is exactly the
     # literal top-level set, so complete trees keep their reading order.
+    #
+    # The root `_index.md` (section "") leads, as a root `index.md` does in
+    # append_orphan_pages: it is the homepage, not a sibling to sort by
+    # weight among the top-level sections. Its own pages follow it.
     top_sections = sections.select do |s|
       idx = s.section.rindex('/')
       idx.nil? || !sections_by_path.has_key?(s.section[0, idx])
     end
-    top_sections.sort! { |a, b| compare_sections_by_weight(a, b) }
+    root_sections, top_sections = top_sections.partition(&.section.empty?)
+    top_sections = root_sections + top_sections.sort! { |a, b| compare_sections_by_weight(a, b) }
 
     # Recursively flatten sections into reading order
     flat_list = [] of Models::Page
@@ -223,10 +235,9 @@ module Hwaro::Core::Build::Phases::Transform
         pages.each { |p| result << p }
       end
 
-      # Recurse into subsections (sorted by weight). Subsection links may
-      # cross languages — build_subsections attaches a translated subsection
-      # to the default-language parent when its own language has no parent
-      # `_index` — so keep only this language's subtree.
+      # Recurse into subsections (sorted by weight). build_subsections links
+      # only same-language, same-version children; the filter keeps the
+      # walk inside this partition regardless.
       # The root section's subsections are the top-level sections, which the
       # caller already walks as `top_sections` — recursing would list them twice.
       if section.subsections.size > 0 && !section.section.empty?
@@ -286,12 +297,16 @@ module Hwaro::Core::Build::Phases::Transform
         next
       end
 
-      # Link to the immediate parent section when it exists (same-language first).
-      # Never across a version boundary: an unversioned `docs/_index.md` is
-      # not the parent of `docs/v1/_index.md` in any listing, and a version
-      # root's breadcrumb stops at the version.
+      # Link to the immediate parent section when it exists. Same language
+      # only, like the root branch above: the lookup falls back to the
+      # default-language parent (right for breadcrumbs), but listing a
+      # translated subsection there put `가이드` beside `Guide` in the English
+      # `section.subsections`. Never across a version boundary either: an
+      # unversioned `docs/_index.md` is not the parent of `docs/v1/_index.md`
+      # in any listing, and a version root's breadcrumb stops at the version.
       parent_path = path_parts[0..-2].join("/")
       if (parent = lookup_ancestor_section(sections_by_path, parent_path, section.language, default_lang)) &&
+         (parent.language || default_lang) == (section.language || default_lang) &&
          parent.version.same?(section.version)
         parent.add_subsection(section)
       end
