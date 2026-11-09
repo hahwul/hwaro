@@ -39,6 +39,19 @@ module Hwaro
         # isn't rewritten.
         IMAGE_ATTR_RE = /(!\[[^\]]*\]\([^)]*\))\{([^{}]+)\}/
 
+        # True when the attribute block's `{` at byte `brace` of `line` is
+        # backslash-escaped (an odd run of `\` right before it): `\{#id}` is
+        # literal text, `\\{#id}` still an id block. Checked here, not in
+        # HEADING_ID_RE / HEADING_ATTR_RE: a per-character escape alternation
+        # in their text group exhausts the JIT stack on long heading lines.
+        private def escaped_brace?(line : String, brace : Int32) : Bool
+          run = 0
+          while brace - run > 0 && line.byte_at(brace - run - 1) == '\\'.ord
+            run += 1
+          end
+          run.odd?
+        end
+
         # Engine-generated marker comments (footnote data blocks, shortcode
         # placeholders) start with this prefix and must pass through the
         # transforming passes verbatim: a footnote body containing `~~x~~` or
