@@ -217,7 +217,7 @@ describe Hwaro::Content::Processors::TableParser do
       result.scan(/<td/).size.should be >= 1
     end
 
-    it "keeps overflow cells when a row has more columns than headers" do
+    it "drops overflow cells when a row has more columns than headers (GFM ex. 204)" do
       content = <<-MD
         | A | B |
         |---|---|
@@ -226,15 +226,22 @@ describe Hwaro::Content::Processors::TableParser do
 
       result = Hwaro::Content::Processors::TableParser.process(content)
       result.should contain("<table>")
-      # Only two headers are declared. /<th[ >]/ avoids matching the <thead>
-      # opening tag, so this counts real header cells (2).
+      # /<th[ >]/ avoids matching the <thead> opening tag.
       result.scan(/<th[ >]/).size.should eq(2)
-      result.should contain("<th>A</th>")
-      result.should contain("<th>B</th>")
-      # The overflow third cell is KEPT (not dropped as GFM would), producing a
-      # ragged 3-<td> body row. This locks the current keep-overflow contract.
-      result.scan(/<td/).size.should eq(3)
-      result.should contain("<td>3</td>")
+      result.scan(/<td/).size.should eq(2)
+      result.should_not contain("3")
+    end
+
+    it "does not form a table when the delimiter row's cell count differs from the header (GFM ex. 203)" do
+      content = <<-MD
+        | abc | def |
+        | --- |
+        | bar |
+        MD
+
+      result = Hwaro::Content::Processors::TableParser.process(content)
+      result.should_not contain("<table>")
+      result.should contain("| abc | def |")
     end
 
     it "handles escaped pipes within cells" do
