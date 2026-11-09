@@ -228,6 +228,15 @@ describe Hwaro::Content::Processors::FenceTracker do
       html_lines.call(["<!DOCTYPE html>", "text", "<!ELEMENT", "b>", "text"]).should eq [true, false, true, true, false]
     end
 
+    it "reads a shortcode placeholder followed by text as paragraph text, alone as a block" do
+      html_lines = ->(lines : Array(String)) do
+        tracker = Hwaro::Content::Processors::FenceTracker.new
+        lines.map { |line| tracker.fence_line?(line); tracker.html_block_line? }
+      end
+      ph = "<!--HWARO-SHORTCODE-PLACEHOLDER-0-->"
+      html_lines.call(["#{ph} see [[about]]", "", "#{ph}", "", "- #{ph} <del>x</del>"]).should eq [false, false, true, false, false]
+    end
+
     it "does not open a lone-tag HTML block inside a paragraph" do
       feed(["para", "<span>", "> >     y"]).should eq [false, false, true]
     end

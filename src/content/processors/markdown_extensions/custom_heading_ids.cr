@@ -62,6 +62,13 @@ module Hwaro
         # preprocess_footnotes before this prefix check can match them.
         ENGINE_MARKER_PREFIX = "<!--HWARO-"
 
+        # A line the transforming passes leave verbatim. A shortcode
+        # placeholder followed by text is not one: that text is the author's
+        # Markdown, as it would be with the call mid-line.
+        private def engine_marker_line?(line : String) : Bool
+          line.starts_with?(ENGINE_MARKER_PREFIX) && !InlineMarkdown::SHORTCODE_PLACEHOLDER_LEADS_TEXT_RE.matches?(line)
+        end
+
         # Unified fence-aware line processor.
         # This allows multiple extensions (heading_ids + strikethrough, etc.)
         # to be applied in a *single* pass over the document instead of
@@ -77,7 +84,7 @@ module Hwaro
           String.build do |io|
             tracker = FenceTracker.new
             content.each_line(chomp: false) do |line|
-              if tracker.fence_line?(line) || line.starts_with?(ENGINE_MARKER_PREFIX)
+              if tracker.fence_line?(line) || engine_marker_line?(line)
                 io << line
               else
                 io << yield(line)

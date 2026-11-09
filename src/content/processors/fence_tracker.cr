@@ -434,6 +434,9 @@ module Hwaro
           return false unless content.includes?('<')
           return false if column - container_column >= 4
           stripped = content.lstrip
+          # A shortcode placeholder followed by text is paragraph text in
+          # Markd (ext/markd_shortcode_placeholder_line.cr), not a comment block.
+          return false if InlineMarkdown::SHORTCODE_PLACEHOLDER_LEADS_TEXT_RE.matches?(stripped)
           if stripped.starts_with?("<!--")
             # `-->` may close it on the same line — even `<!-->`/`<!--->`.
             return true if stripped.index("-->", 2)

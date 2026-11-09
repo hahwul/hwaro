@@ -766,6 +766,51 @@ describe Hwaro::Core::Build::Builder do
       output.should_not contain("<p><div")
       output.should_not contain("</div></p>")
     end
+
+    it "keeps a shortcode at the start of a line inline when text follows it" do
+      # The placeholder comment opened a raw HTML block there: it cut the
+      # paragraph and left the rest of the line unrendered.
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {
+        "shortcodes/badge" => %(<span class="b">{{ t }}</span>),
+        "shortcodes/block" => %(<div class="my-block">Block</div>),
+      }
+      context = {} of String => Crinja::Value
+      results = {} of String => String
+
+      content = <<-MD
+        Some *intro* text
+        {{ badge(t="NEW") }} continued *emphasis* ~~old~~
+
+        {{ badge(t="FIRST") }} at **start** with `code` $x$
+
+        - {{ badge(t="LI") }} list *item*
+
+        {{ block() }} {{ badge(t="Z") }}
+
+        {{ badge(t="S") }} ~~gone~~ then *em*
+
+        {{ badge(t="M") }} $y$ then *em2*
+
+        MD
+      substituted = builder.test_process_shortcodes_jinja(content, templates, context, results, crinja_env_override: env)
+      md_config = Hwaro::Models::MarkdownConfig.new
+      md_config.math = true
+      rendered, _ = Hwaro::Processor::Markdown.render(substituted, markdown_config: md_config)
+      output = builder.test_replace_shortcode_placeholders(rendered, results)
+
+      output.should contain(%(<p>Some <em>intro</em> text\n<span class="b">NEW</span> continued <em>emphasis</em> <del>old</del></p>))
+      output.should contain(%(<p><span class="b">FIRST</span> at <strong>start</strong> with <code>code</code> <span class="math math-inline">))
+      output.should contain(%(<li><span class="b">LI</span> list <em>item</em></li>))
+      # Placeholders alone on their line still form a raw HTML block.
+      output.should contain(%(\n<div class="my-block">Block</div> <span class="b">Z</span>\n))
+      output.should_not contain(%(<p><div))
+      # hwaro's own passes run on that line too, and their `<del>`/math
+      # spans do not turn it back into a raw HTML block.
+      output.should contain(%(<p><span class="b">S</span> <del>gone</del> then <em>em</em></p>))
+      output.should contain(%(<p><span class="b">M</span> <span class="math math-inline">\\(y\\)</span> then <em>em2</em></p>))
+    end
   end
 
   describe "#render_shortcode_jinja" do

@@ -137,10 +137,20 @@ module Hwaro
         # find — leaking the escaped comment into table cells, definition
         # bodies, and footnotes.
         SHORTCODE_PLACEHOLDER_RE = /<!--HWARO-SHORTCODE-PLACEHOLDER-\d+-->/
-        SCPH_TOKEN_RE            = /\x00SCPH(\d{1,9})\x00/
-        MATHSPAN_TOKEN_RE        = /\x00MATHSPAN(\d{1,9})\x00/
-        CODESPAN_TOKEN_RE        = /\x00CODESPAN(\d{1,9})\x00/
-        LINK_TAG_TOKEN_RE        = /\x00IMTAG(\d{1,9})\x00/
+        # A line that opens with placeholders and then carries text: the
+        # shortcode was called inline there, so the line is paragraph text,
+        # not a raw HTML block (`ext/markd_shortcode_placeholder_line.cr`) or
+        # an engine marker line (`MarkdownExtensions.engine_marker_line?`). A
+        # line of placeholders alone stays a block. Anything else after them
+        # is text, `<` included: hwaro's own passes turn `~~x~~` and `$x$` on
+        # that line into `<del>`/`<span>` before Markd reads it, and inline
+        # HTML there is inline, as it is with the call mid-line.
+        # Possessive, so a second placeholder never counts as the "text".
+        SHORTCODE_PLACEHOLDER_LEADS_TEXT_RE = /\A(?:<!--HWARO-SHORTCODE-PLACEHOLDER-\d+-->[ \t]*)++[^ \t\r\n]/
+        SCPH_TOKEN_RE                       = /\x00SCPH(\d{1,9})\x00/
+        MATHSPAN_TOKEN_RE                   = /\x00MATHSPAN(\d{1,9})\x00/
+        CODESPAN_TOKEN_RE                   = /\x00CODESPAN(\d{1,9})\x00/
+        LINK_TAG_TOKEN_RE                   = /\x00IMTAG(\d{1,9})\x00/
         # A CommonMark URI autolink (`<https://…>`) as `HTML.escape` left it.
         AUTOLINK_RE = /&lt;([a-zA-Z][a-zA-Z0-9+.\-]{1,31}:(?:[^\s&]|&(?!lt;|gt;))*+)&gt;/
         # An entity or numeric character reference as `HTML.escape` left it.
