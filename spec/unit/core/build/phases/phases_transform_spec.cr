@@ -134,6 +134,36 @@ describe Hwaro::Core::Build::Phases::Transform do
       root.subsections.should be_empty
     end
 
+    # `docs/_index.md` (en only) + `docs/guide/_index.md` and its `.ko`
+    # translation: the ko guide fell back to the en parent and was listed in
+    # the English `section.subsections` / `get_section().subsections`.
+    it "does not list a translated subsection under a default-language parent" do
+      config = <<-TOML
+        title = "T"
+        base_url = "https://example.com/sub"
+        default_language = "en"
+        [languages.en]
+        weight = 1
+        [languages.ko]
+        weight = 2
+        TOML
+      content = {
+        "docs/_index.md"          => "+++\ntitle = \"Docs\"\n+++\n",
+        "docs/guide/_index.md"    => "+++\ntitle = \"Guide\"\n+++\n",
+        "docs/guide/_index.ko.md" => "+++\ntitle = \"가이드\"\n+++\n",
+      }
+      templates = {
+        "section.html" => "S:{% for s in section.subsections %}[{{ s.title }}]{% endfor %}" \
+                          "|G:{% for s in get_section(path=\"docs\").subsections %}[{{ s.title }}]{% endfor %}",
+        "page.html" => "{{ content }}",
+      }
+      build_site(config, content_files: content, template_files: templates) do
+        File.read("public/docs/index.html").should eq("S:[Guide]|G:[Guide]")
+        # The ko guide still renders, its breadcrumb still reaching the en parent.
+        File.exists?("public/ko/docs/guide/index.html").should be_true
+      end
+    end
+
     it "links page ancestors based on section path" do
       options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
       ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)

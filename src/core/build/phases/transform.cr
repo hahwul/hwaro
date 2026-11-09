@@ -223,10 +223,9 @@ module Hwaro::Core::Build::Phases::Transform
         pages.each { |p| result << p }
       end
 
-      # Recurse into subsections (sorted by weight). Subsection links may
-      # cross languages — build_subsections attaches a translated subsection
-      # to the default-language parent when its own language has no parent
-      # `_index` — so keep only this language's subtree.
+      # Recurse into subsections (sorted by weight). build_subsections links
+      # only same-language, same-version children; the filter keeps the
+      # walk inside this partition regardless.
       # The root section's subsections are the top-level sections, which the
       # caller already walks as `top_sections` — recursing would list them twice.
       if section.subsections.size > 0 && !section.section.empty?
@@ -286,12 +285,16 @@ module Hwaro::Core::Build::Phases::Transform
         next
       end
 
-      # Link to the immediate parent section when it exists (same-language first).
-      # Never across a version boundary: an unversioned `docs/_index.md` is
-      # not the parent of `docs/v1/_index.md` in any listing, and a version
-      # root's breadcrumb stops at the version.
+      # Link to the immediate parent section when it exists. Same language
+      # only, like the root branch above: the lookup falls back to the
+      # default-language parent (right for breadcrumbs), but listing a
+      # translated subsection there put `가이드` beside `Guide` in the English
+      # `section.subsections`. Never across a version boundary either: an
+      # unversioned `docs/_index.md` is not the parent of `docs/v1/_index.md`
+      # in any listing, and a version root's breadcrumb stops at the version.
       parent_path = path_parts[0..-2].join("/")
       if (parent = lookup_ancestor_section(sections_by_path, parent_path, section.language, default_lang)) &&
+         (parent.language || default_lang) == (section.language || default_lang) &&
          parent.version.same?(section.version)
         parent.add_subsection(section)
       end
