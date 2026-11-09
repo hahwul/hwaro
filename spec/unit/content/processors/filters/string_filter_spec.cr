@@ -135,4 +135,16 @@ describe Hwaro::Content::Processors::Filters::StringFilters do
       render_crinja(%(sha384-{{ "body{}" | sha384(base64=true) }})).should eq(Hwaro::Utils::DigestUtils.sri("body{}"))
     end
   end
+
+  describe "trim" do
+    it "strips whitespace by default" do
+      render_crinja(%({{ "  hi  " | trim }})).should eq("hi")
+    end
+
+    it "strips the given characters, like Jinja2's trim(chars)" do
+      render_crinja(%({{ "xxhixx" | trim("x") }})).should eq("hi")
+      render_crinja(%({{ "-_hi_-" | trim(chars="_-") }})).should eq("hi")
+      render_crinja(%({{ " xhi " | trim("x") }})).should eq(" xhi ")
+    end
+  end
 end

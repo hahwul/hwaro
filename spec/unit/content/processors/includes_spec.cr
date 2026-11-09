@@ -96,6 +96,15 @@ describe Hwaro::Content::Processors::Includes do
     end
   end
 
+  describe ".heading_id" do
+    it "reads an id block but not an escaped one, which is heading text" do
+      Includes.heading_id("## Title {#t}\n", "Title").should eq("t")
+      Includes.heading_id("## Title \\{#t}\n", "Title").should be_nil
+      Includes.heading_id("## Title \\{#t}\n", "Title {#t}").should be_nil
+      Includes.heading_id("## Title \\\\{#t}\n", "Title \\").should eq("t")
+    end
+  end
+
   describe ".heading_section" do
     md = "intro\n## Setup {#s}\nbody\n```\n# not a heading\n```\n### Deep\nd\n## Next\nn\n"
 

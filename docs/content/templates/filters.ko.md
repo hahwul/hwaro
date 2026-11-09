@@ -26,7 +26,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 | upper | 대문자로 변환 | {{ "hello" \| upper }} → HELLO |
 | lower | 소문자로 변환 | {{ "HELLO" \| lower }} → hello |
 | capitalize | 첫 글자를 대문자로 | {{ "hello" \| capitalize }} → Hello |
-| trim | 앞뒤 공백 제거 | {{ "  hi  " \| trim }} → hi |
+| trim | 앞뒤 공백 제거. 문자를 넘기면 그 문자들을 제거 | {{ "  hi  " \| trim }} → hi, {{ "xxhixx" \| trim("x") }} → hi |
 | replace | 텍스트 치환 | {{ "hello" \| replace("l", "x") }} → hexxo |
 | slugify | URL 슬러그로 변환 | {{ "Hello World" \| slugify }} → hello-world |
 | truncate_words | 단어 수 제한. `end`로 말줄임 문자 지정(기본 `...`) | {{ text \| truncate_words(20, end="…") }} |

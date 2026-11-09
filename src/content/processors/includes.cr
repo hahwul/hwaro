@@ -275,7 +275,10 @@ module Hwaro
             next if tracker.fence_line?(line)
             next unless m = ATX_RE.match(line)
             text = m[2]? || ""
-            next unless Utils::TextUtils.slugify(visible_text(text.sub(/[ \t]*\{[^{}]*\}\z/, ""))) == want
+            stripped = strip_attribute_block(text)
+            next unless Utils::TextUtils.slugify(visible_text(stripped)) == want
+            # An escaped `\{#id}` is heading text, not an id.
+            return if stripped == text
             return text[/\{\#([\w][\w:-]*)(?:[ \t][^{}]*)?\}\z/, 1]?
           end
         end
@@ -290,7 +293,7 @@ module Hwaro
             if tracker.fence_line?(line)
               para, skip = nil, false
             elsif m = ATX_RE.match(line)
-              text = (m[2]? || "").sub(/[ \t]*\{[^{}]*\}\z/, "")
+              text = strip_attribute_block(m[2]? || "")
               heads << {i, m[1].size, visible_text(text)}
               para, skip = nil, false
             elsif line.blank?
@@ -316,6 +319,14 @@ module Hwaro
 
         # A heading's source as the reader sees it: images and links reduced
         # to their text, tags dropped, entities decoded.
+        # A heading's text without its trailing `{#id .class}` block. An
+        # escaped `\{…}` stays: the renderer keeps it as literal text.
+        private def strip_attribute_block(text : String) : String
+          return text unless m = text.match(/[ \t]*(\{[^{}]*\})\z/)
+          return text if MarkdownExtensions.escaped_brace?(text, m.byte_begin(1))
+          text.byte_slice(0, m.byte_begin(0))
+        end
+
         private def visible_text(source : String) : String
           # Code spans are text as written, so they are set aside first.
           codes = [] of String

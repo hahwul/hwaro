@@ -428,6 +428,9 @@ module Hwaro
 
           # Parse alignments from separator
           separator_cells = split_row(separator_line)
+          # GFM: a delimiter row whose cell count differs from the header's
+          # does not form a table.
+          return {nil, 0} unless separator_cells.size == headers.size
           alignments = separator_cells.map { |cell| parse_alignment(cell) }
 
           # Parse body rows
@@ -440,8 +443,8 @@ module Hwaro
             # Also break if we hit another separator (new table)
             break if separator_row?(line) && i > start_index + 2
 
-            cells = split_row(line)
-            rows << cells
+            # GFM: excess cells beyond the header's count are ignored.
+            rows << split_row(line).first(headers.size)
             i += 1
           end
 

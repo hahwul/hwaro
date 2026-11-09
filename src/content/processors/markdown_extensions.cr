@@ -120,7 +120,9 @@ module Hwaro
               end
 
               if do_heading_ids && transformed.includes?("{#")
-                transformed = transformed.gsub(HEADING_ID_RE) do |_|
+                transformed = transformed.gsub(HEADING_ID_RE) do |full_match|
+                  # `{#` precedes group 4.
+                  next full_match if escaped_brace?(transformed, $~.byte_begin(4) - 2)
                   if config.safe
                     "#{$1}#{$2} #{$3.rstrip}"
                   else
@@ -138,7 +140,7 @@ module Hwaro
               # of this flag.
               if config.attributes && transformed.includes?('{')
                 transformed = transformed.gsub(HEADING_ATTR_RE) do |full_match|
-                  if MarkdownAttributes.parse($4)
+                  if !escaped_brace?(transformed, $~.byte_begin(4) - 1) && MarkdownAttributes.parse($4)
                     if config.safe
                       "#{$1}#{$2} #{$3.rstrip}"
                     else
