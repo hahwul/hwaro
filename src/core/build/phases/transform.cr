@@ -135,11 +135,16 @@ module Hwaro::Core::Build::Phases::Transform
     # append_orphan_pages skips a known section's pages — so it dropped out
     # of prev/next entirely. With every parent present this is exactly the
     # literal top-level set, so complete trees keep their reading order.
+    #
+    # The root `_index.md` (section "") leads, as a root `index.md` does in
+    # append_orphan_pages: it is the homepage, not a sibling to sort by
+    # weight among the top-level sections. Its own pages follow it.
     top_sections = sections.select do |s|
       idx = s.section.rindex('/')
       idx.nil? || !sections_by_path.has_key?(s.section[0, idx])
     end
-    top_sections.sort! { |a, b| compare_sections_by_weight(a, b) }
+    root_sections, top_sections = top_sections.partition(&.section.empty?)
+    top_sections = root_sections + top_sections.sort! { |a, b| compare_sections_by_weight(a, b) }
 
     # Recursively flatten sections into reading order
     flat_list = [] of Models::Page

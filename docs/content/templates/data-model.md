@@ -426,7 +426,7 @@ Rendered HTML content is available as the top-level `content` variable.
 
 ### page.lower / page.higher
 
-Navigation follows the flat reading order across the entire site, similar to mdBook or Docusaurus. Pages are ordered depth-first through the section tree: **section index → section pages → subsections (recursive)**. Within each section, pages are sorted by the section's `sort_by` setting (weight, date, or title). Pages in a directory with no `_index.md` come after the section tree, grouped by directory and sorted like a section's pages (by date, then path). The site root `index.md` always comes first.
+Navigation follows the flat reading order across the entire site, similar to mdBook or Docusaurus. Pages are ordered depth-first through the section tree: **section index → section pages → subsections (recursive)**. Within each section, pages are sorted by the section's `sort_by` setting (weight, date, or title). Pages in a directory with no `_index.md` come after the section tree, grouped by directory and sorted like a section's pages (by date, then path). The homepage (a root `index.md` or `_index.md`) always comes first; a root `_index.md` is a section, so the root-level pages follow it, ahead of the other sections.
 
 | Property | Type | Description |
 |----------|------|-------------|

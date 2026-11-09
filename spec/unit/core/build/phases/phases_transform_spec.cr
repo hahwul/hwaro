@@ -630,6 +630,31 @@ describe Hwaro::Core::Build::Phases::Transform do
       orders[0].size.should eq(7)
       orders[0].first.should eq("index.md")
     end
+
+    # A root `_index.md` was weight-sorted among the top-level sections, so
+    # `01-intro/` (path sorts before `_index.md`) came before the homepage.
+    it "leads with a root _index.md, then its pages, then the sections" do
+      root = make_section("_index.md", "")
+      intro = make_section("01-intro/_index.md", "01-intro")
+      about = make_page("about.md", "")
+      b1 = make_page("01-intro/b1.md", "01-intro")
+
+      options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public")
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+      ctx.site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+      ctx.sections = [intro, root]
+      ctx.pages = [b1, about]
+      Hwaro::Core::Build::Builder.new.test_link_page_navigation(ctx)
+
+      root.lower.should be_nil
+      chain = [] of String
+      page = root.as(Hwaro::Models::Page)
+      while page
+        chain << page.path
+        page = page.higher
+      end
+      chain.should eq(["_index.md", "about.md", "01-intro/_index.md", "01-intro/b1.md"])
+    end
   end
 
   describe "#relink_navigation_for_sections" do
