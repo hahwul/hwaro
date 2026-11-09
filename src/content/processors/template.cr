@@ -204,8 +204,12 @@ module Hwaro
           @env.functions["get_section"] = Crinja.function({path: ""}) do
             path_arg = arguments["path"].to_s
             path_arg = path_arg.unicode_normalize(:nfc) unless path_arg.ascii_only?
-            # "blog", "/blog", "blog/" and "/blog/" all name the same section.
-            url_key = "/#{path_arg.strip('/')}/"
+            # "blog", "/blog", "blog/" and "/blog/" all name the same section:
+            # each map is tried with the bare name before the URL, so a ko
+            # page's "/blog" finds the ko section (url /ko/blog/) rather than
+            # falling through to the en one whose URL is "/blog/".
+            name_key = path_arg.strip('/')
+            url_key = "/#{name_key}/"
 
             # A section name can occur in every language variant. Resolve an
             # ambiguous name in the current page's language before falling
@@ -222,7 +226,7 @@ module Hwaro
                 next unless candidate_map = language_maps[candidate]?
                 next unless candidate_map.raw.is_a?(Hash)
                 raw_candidate_map = candidate_map.raw.as(Hash)
-                if found = raw_candidate_map[path_arg]? || raw_candidate_map[url_key]?
+                if found = raw_candidate_map[path_arg]? || raw_candidate_map[name_key]? || raw_candidate_map[url_key]?
                   return found
                 end
               end
@@ -232,7 +236,7 @@ module Hwaro
             sections_map = env.resolve("__sections_by_key__")
             if !sections_map.raw.nil? && sections_map.raw.is_a?(Hash)
               raw_map = sections_map.raw.as(Hash)
-              found = raw_map[path_arg]? || raw_map[url_key]?
+              found = raw_map[path_arg]? || raw_map[name_key]? || raw_map[url_key]?
               found || Crinja::Value.new(nil)
             else
               # Fallback to linear search O(N) if map is not available
