@@ -156,6 +156,28 @@ describe "cache: generated outputs converge on the clean build" do
     end
   end
 
+  # Deleting the override touches no page, so an all-hit warm build skipped
+  # the feeds and kept the override's output on disk forever.
+  it "restores the built-in feed on a warm --cache build after the feed template is deleted" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        shortcode_project
+        clean_build
+        expected = File.read("public/rss.xml")
+
+        FileUtils.rm_rf("public")
+        FileUtils.rm_rf(".hwaro_cache.json")
+        File.write("templates/rss.xml.jinja", "CUSTOM {{ feed.kind }}")
+        run_builder(true, false)
+        File.read("public/rss.xml").should eq("CUSTOM main")
+
+        File.delete("templates/rss.xml.jinja")
+        run_builder(true, false)
+        File.read("public/rss.xml").should eq(expected)
+      end
+    end
+  end
+
   # `serve` keeps the Builder alive and regenerates search/feeds from the
   # in-memory page set after every edit. A `serve --cache` whose start was
   # an all-hit build had every page's content empty, so the first

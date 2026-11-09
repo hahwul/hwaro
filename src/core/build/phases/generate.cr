@@ -78,8 +78,8 @@ module Hwaro::Core::Build::Phases::Generate
     # Feeds never join the skip when a user feed template exists: the
     # skip's cache-hit signal only reflects content changes, so a
     # template-only edit followed by a warm --cache build would keep
-    # serving the stale feed output forever.
-    skip_feeds = skip_unchanged && !feed_template_present?
+    # serving the stale feed output forever (see feeds_need_regeneration?).
+    skip_feeds = skip_unchanged && !feeds_need_regeneration?
     # Run independent SEO generators in parallel.
     tasks = [
       # Each generator's published files are claimed whether written or

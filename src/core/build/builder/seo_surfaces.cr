@@ -36,6 +36,14 @@ module Hwaro
           Content::Seo::Feeds::FEED_TEMPLATE_KEYS.values.any? { |key| templates.has_key?(key) }
         end
 
+        # Must a warm `--cache` build regenerate the feeds even when no page
+        # rendered? Yes while an override template exists, and on the build
+        # after any template change: deleting `rss.xml.jinja` touches no
+        # page, and skipping kept the override's output on disk forever.
+        def feeds_need_regeneration? : Bool
+          feed_template_present? || (@cache.try(&.templates_changed?) || false)
+        end
+
         # Remember what this feed generation published and, on a serve pass
         # (`prune`), delete the feeds the previous generation published and
         # this one did not — a section whose `generate_feeds` was just turned

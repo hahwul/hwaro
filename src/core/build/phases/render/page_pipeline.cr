@@ -17,7 +17,8 @@ module Hwaro::Core::Build::Phases::Render
   #     after every edit, so a `serve --cache` whose start was an all-hit
   #     build served corrupted search.json and feeds from the first edit on.
   #   * `generate_seo_outputs` never lets the feeds join the skip while a
-  #     user feed template exists (`feed_template_present?`), so an all-hit
+  #     user feed template exists or the templates changed
+  #     (`feeds_need_regeneration?`), so an all-hit
   #     warm build still regenerates rss.xml — from `page.content`. Without
   #     hydration that feed carried raw shortcode markup, unresolved `@/`
   #     links and no base_path: the exact corruption #775 fixed, back on the
@@ -25,7 +26,7 @@ module Hwaro::Core::Build::Phases::Render
   private def cached_content_needed?(ctx : Lifecycle::BuildContext, site : Models::Site) : Bool
     return true unless generate_outputs_unchanged?(ctx)
     return true if ctx.options.serve_mode
-    return true if feed_template_present?
+    return true if feeds_need_regeneration?
     site.config.taxonomies.any?(&.feed)
   end
 
