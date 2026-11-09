@@ -44,7 +44,8 @@ module Hwaro
           base_path : String,
           language : String?,
           kind : String,
-          section_url : String?
+          section_url : String?,
+          home_path : String? = nil
 
         # Every main, section and per-language feed file the current config
         # and page set publish. The builder claims these whether `generate`
@@ -80,7 +81,7 @@ module Hwaro
           written = [] of String
           each_feed(pages, config, output_dir) do |feed|
             written << process_feed(feed.pages, config, feed.dir, feed.custom_filename, feed.title, feed.base_path, verbose, feed.language,
-              templates: templates, renderer: renderer, kind: feed.kind, section_url: feed.section_url)
+              templates: templates, renderer: renderer, kind: feed.kind, section_url: feed.section_url, home_path: feed.home_path)
           end
           written
         end
@@ -264,8 +265,6 @@ module Hwaro
               }
             end
 
-            # Don't emit a feed for a language with no content — its channel
-            # <link> would point at a non-existent /{lang}/ home (404).
             next if lang_pages.empty?
 
             # Build the output directory: output_dir/{lang}/
@@ -279,8 +278,12 @@ module Hwaro
             # base_path corresponds to the URL prefix for this language feed
             # e.g., "/ko/" so the self-referencing link becomes base_url/ko/rss.xml
             base_path = "/#{lang_code}/"
+            # A language with pages but no homepage of its own has no
+            # /{lang}/ page: the channel link points at the site root, as the
+            # JSON-LD Home crumb does (Site#home_language?).
+            has_home = pages.any? { |p| p.home? && p.render && !p.draft && p.language == lang_code }
 
-            yield FeedSpec.new(lang_pages, lang_output_dir, "", feed_title, base_path, lang_code, "language", nil)
+            yield FeedSpec.new(lang_pages, lang_output_dir, "", feed_title, base_path, lang_code, "language", nil, has_home ? nil : "/")
           end
         end
 
@@ -299,6 +302,7 @@ module Hwaro
           section_url : String? = nil,
           taxonomy : String? = nil,
           term : String? = nil,
+          home_path : String? = nil,
         ) : String
           # Determine feed type and filename
           feed_type = config.feeds.type.downcase
@@ -332,17 +336,17 @@ module Hwaro
           feed_content = if template_source && renderer
                            context = build_template_context(
                              pages, config, feed_type, filename, is_text, feed_title, base_path, language,
-                             kind: kind, section_url: section_url, taxonomy: taxonomy, term: term,
+                             kind: kind, section_url: section_url, taxonomy: taxonomy, term: term, home_path: home_path,
                            )
                            render_feed_template(template_key, template_source, renderer, context)
                          else
                            case feed_type
                            when "atom"
-                             generate_atom(pages, config, filename, is_text, feed_title, base_path, language)
+                             generate_atom(pages, config, filename, is_text, feed_title, base_path, language, home_path)
                            when "json"
-                             generate_json(pages, config, filename, is_text, feed_title, base_path, language)
+                             generate_json(pages, config, filename, is_text, feed_title, base_path, language, home_path)
                            else
-                             generate_rss(pages, config, filename, is_text, feed_title, base_path, language)
+                             generate_rss(pages, config, filename, is_text, feed_title, base_path, language, home_path)
                            end
                          end
 
@@ -455,9 +459,10 @@ module Hwaro
           section_url : String?,
           taxonomy : String?,
           term : String?,
+          home_path : String? = nil,
         ) : Hash(String, Crinja::Value)
           base_url, feed_url = build_feed_url(config, base_path, filename)
-          home_url = feed_home_url(config, base_path)
+          home_url = feed_home_url(config, home_path || base_path)
 
           # Deterministic feed timestamp: newest content date across entries
           # (same rule as the Atom generator) so identical input renders
@@ -606,6 +611,7 @@ module Hwaro
           feed_title : String,
           base_path : String,
           language : String? = nil,
+          home_path : String? = nil,
         ) : String
           base_url, feed_url = build_feed_url(config, base_path, filename)
           full_content = config.feeds.full_content
@@ -618,7 +624,7 @@ module Hwaro
             str << "<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\" xmlns:content=\"http://purl.org/rss/1.0/modules/content/\">\n"
             str << "  <channel>\n"
             str << "    <title>#{Utils::TextUtils.escape_xml(feed_title)}</title>\n"
-            str << "    <link>#{Utils::TextUtils.escape_xml(feed_home_url(config, base_path))}</link>\n"
+            str << "    <link>#{Utils::TextUtils.escape_xml(feed_home_url(config, home_path || base_path))}</link>\n"
             str << "    <description>#{Utils::TextUtils.escape_xml(config.description)}</description>\n"
 
             if language
@@ -696,9 +702,13 @@ module Hwaro
           feed_title : String,
           base_path : String,
           language : String? = nil,
+          home_path : String? = nil,
         ) : String
           base_url, feed_url = build_feed_url(config, base_path, filename)
+          # `<id>` stays the feed's own IRI (unique per feed, need not resolve);
+          # the alternate link must name a page that exists.
           home_url = feed_home_url(config, base_path)
+          link_url = feed_home_url(config, home_path || base_path)
           # Atom <updated> must be deterministic: derive it from the newest
           # content date (updated||date) across entries rather than the build
           # wall-clock, so two builds of identical input stay byte-identical.
@@ -723,7 +733,7 @@ module Hwaro
             end
 
             str << "  <title>#{Utils::TextUtils.escape_xml(feed_title)}</title>\n"
-            str << "  <link href=\"#{Utils::TextUtils.escape_xml(home_url)}\" />\n"
+            str << "  <link href=\"#{Utils::TextUtils.escape_xml(link_url)}\" />\n"
             str << "  <link href=\"#{Utils::TextUtils.escape_xml(feed_url)}\" rel=\"self\" />\n"
             str << "  <updated>#{feed_updated.to_rfc3339}</updated>\n"
             str << "  <id>#{Utils::TextUtils.escape_xml(home_url)}</id>\n"
@@ -787,6 +797,7 @@ module Hwaro
           feed_title : String,
           base_path : String,
           language : String? = nil,
+          home_path : String? = nil,
         ) : String
           base_url, feed_url = build_feed_url(config, base_path, filename)
           content_key = is_text ? "content_text" : "content_html"
@@ -795,7 +806,7 @@ module Hwaro
             j.object do
               j.field "version", "https://jsonfeed.org/version/1.1"
               j.field "title", feed_title
-              j.field "home_page_url", feed_home_url(config, base_path)
+              j.field "home_page_url", feed_home_url(config, home_path || base_path)
               j.field "feed_url", feed_url
               j.field "description", config.description unless config.description.empty?
               j.field "language", language if language
@@ -919,21 +930,16 @@ module Hwaro
           # XML 1.0 forbids these C0 controls even inside CDATA (escape_xml
           # drops them for every other element), so one stray form feed
           # would make the whole feed unparseable.
-          text.gsub(/[\x00-\x08\x0B\x0C\x0E-\x1F]/, "").gsub("]]>", "]]]]><![CDATA[>")
+          text.gsub(/[\x00-\x08\x0B\x0C\x0E-\x1F\x{FFFE}\x{FFFF}]/, "").gsub("]]>", "]]]]><![CDATA[>")
         end
 
         private def self.get_content_for_feed(page : Models::Page, config : Models::Config) : String
+          # Not full content: the same summary RSS `<description>` carries
+          # (front matter description, then the `<!-- more -->` summary,
+          # the automatic summary, a truncated body). A 300-char cut of the
+          # whole body published past the more-marker in Atom and JSON.
+          return summary_for_feed(page, config) unless config.feeds.full_content
           truncate = config.feeds.truncate
-          full_content = config.feeds.full_content
-
-          # When full_content is false, prefer the front matter description
-          unless full_content
-            if desc = page.description
-              return desc unless desc.empty?
-            end
-            # Fall back to truncated content (default 300 chars)
-            truncate = 300 if truncate <= 0
-          end
 
           # Reuse already-rendered HTML from the Render phase when available,
           # avoiding an expensive duplicate Markdown → HTML conversion.
