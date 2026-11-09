@@ -167,7 +167,7 @@ module Hwaro
 
           parsed.attrs.each do |key, value|
             escaped_value = HTML.escape(value)
-            key_re = /\b#{Regex.escape(key)}\s*=\s*"[^"]*"/i
+            key_re = /(?<![\w-])#{Regex.escape(key)}\s*=\s*"[^"]*"/i
             result = if result.matches?(key_re)
                        result.sub(key_re, %(#{key}="#{escaped_value}"), backreferences: false)
                      else

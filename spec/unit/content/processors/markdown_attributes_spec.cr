@@ -170,5 +170,18 @@ describe Hwaro::Content::Processors::MarkdownAttributes do
       result = Hwaro::Content::Processors::MarkdownAttributes.merge_attrs(%(<img src="a.png" alt="alt text"), parsed)
       result.should eq(%(<img src="a.png" alt="use \\1 for the first group"))
     end
+
+    # `\b` matches right after `-`, so `width` used to find `data-width`.
+    it "keeps an attribute whose name is a dash-suffix of another distinct" do
+      parsed = Hwaro::Content::Processors::MarkdownAttributes.parse("data-width=1 width=800").not_nil!
+      result = Hwaro::Content::Processors::MarkdownAttributes.merge_attrs(%(<img src="a.png" alt="p"), parsed)
+      result.should eq(%(<img src="a.png" alt="p" data-width="1" width="800"))
+    end
+
+    it "replaces only the exact attribute when a dash-prefixed one precedes it" do
+      parsed = Hwaro::Content::Processors::MarkdownAttributes.parse("width=800").not_nil!
+      result = Hwaro::Content::Processors::MarkdownAttributes.merge_attrs(%(<img src="a.png" data-width="1" width="10"), parsed)
+      result.should eq(%(<img src="a.png" data-width="1" width="800"))
+    end
   end
 end
