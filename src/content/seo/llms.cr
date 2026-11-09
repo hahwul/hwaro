@@ -133,7 +133,10 @@ module Hwaro
                 # destination cannot contain a raw space (`[t](/a b/)` is not
                 # a link), and a page whose slug or filename has one used to
                 # come out exactly that way.
+                # An unbalanced `)` (`slug = "foo)bar"`) would end the link
+                # destination early, so parentheses are escaped too.
                 link = Utils::TextUtils.encode_url_path(base_url.empty? ? p.url : "#{base_url}#{p.url}")
+                  .gsub('(', "%28").gsub(')', "%29")
                 # The root index commonly has `title = ""` so its heading
                 # falls through to the site title; without this fallback
                 # the homepage rendered as `- [](url)` (no link label).
