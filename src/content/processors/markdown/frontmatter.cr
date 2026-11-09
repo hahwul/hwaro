@@ -367,7 +367,7 @@ module Hwaro
           end
           warn_typo_keys(unknown_keys, file_path, declared_keys)
 
-          front_matter_keys = yaml_fm.as_h?.try(&.keys).try { |ks| ks.compact_map(&.as_s?) } || [] of String
+          front_matter_keys = yaml_fm.as_h?.try(&.keys).try(&.compact_map(&.as_s?)) || [] of String
           taxonomies = extract_taxonomies(yaml_fm, front_matter_keys, file_path)
           tags = fm_string_array(yaml_fm, "tags", file_path)
           tags = taxonomies["tags"]? || tags if tags.empty?

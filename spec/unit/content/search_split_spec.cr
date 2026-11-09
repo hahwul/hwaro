@@ -144,7 +144,7 @@ describe "search split_by_heading" do
       "docs/v2/a.md"      => "+++\ntitle = \"A2\"\n+++\n## New Api\n\nx\n",
       "docs/v1/a.md"      => "+++\ntitle = \"A1\"\n+++\n## Old Api\n\nx\n",
     }) do |dir|
-      headings = records(dir).compact_map { |r| r["heading"]?.try(&.as_s) }
+      headings = records(dir).compact_map(&.["heading"]?.try(&.as_s))
       headings.should contain("New Api")
       headings.should_not contain("Old Api")
       records(dir).find! { |r| r["heading"]? == "New Api" }["version"].should eq("v2")

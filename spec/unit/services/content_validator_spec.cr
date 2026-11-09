@@ -734,7 +734,7 @@ private def validator_issues(body : String, files : Hash(String, String) = {} of
     File.write(File.join(content_dir, "source.md"), "---\ntitle: Source\ndescription: Desc\n---\n\n#{body}\n")
     issues = Hwaro::Services::ContentValidator.new(content_dir).run
   end
-  issues.select { |i| i.file.try(&.ends_with?("source.md")) }
+  issues.select(&.file.try(&.ends_with?("source.md")))
 end
 
 private def alt_messages(body : String) : Array(String)
