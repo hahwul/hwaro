@@ -44,7 +44,8 @@ module Hwaro
         # literal text, `\\{#id}` still an id block. Checked here, not in
         # HEADING_ID_RE / HEADING_ATTR_RE: a per-character escape alternation
         # in their text group exhausts the JIT stack on long heading lines.
-        private def escaped_brace?(line : String, brace : Int32) : Bool
+        # Also read by Includes, whose heading lookups must agree with the id.
+        def escaped_brace?(line : String, brace : Int32) : Bool
           run = 0
           while brace - run > 0 && line.byte_at(brace - run - 1) == '\\'.ord
             run += 1
