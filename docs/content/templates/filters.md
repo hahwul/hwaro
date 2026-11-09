@@ -26,7 +26,7 @@ Besides the built-ins in the tables below, these Jinja2 filters are available: `
 | upper | Uppercase | {{ "hello" \| upper }} → HELLO |
 | lower | Lowercase | {{ "HELLO" \| lower }} → hello |
 | capitalize | Capitalize first | {{ "hello" \| capitalize }} → Hello |
-| trim | Remove whitespace | {{ "  hi  " \| trim }} → hi |
+| trim | Remove whitespace, or the given characters, from both ends | {{ "  hi  " \| trim }} → hi, {{ "xxhixx" \| trim("x") }} → hi |
 | replace | Replace text | {{ "hello" \| replace("l", "x") }} → hexxo |
 | slugify | URL slug | {{ "Hello World" \| slugify }} → hello-world |
 | truncate_words | Limit words; `end` sets the suffix (default `...`) | {{ text \| truncate_words(20, end="…") }} |

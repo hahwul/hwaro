@@ -222,9 +222,11 @@ module Hwaro
               Crinja::Value.new(parts)
             end
 
-            # Trim filter
-            env.filters["trim"] = Crinja.filter do
-              target.to_s.strip
+            # Trim filter — Jinja2's `trim(chars=None)`: strips whitespace, or
+            # any of the given characters, from both ends.
+            env.filters["trim"] = Crinja.filter({chars: nil}) do
+              chars = arguments["chars"]
+              chars.none? || chars.undefined? ? target.to_s.strip : target.to_s.strip(chars.to_s)
             end
           end
         end
