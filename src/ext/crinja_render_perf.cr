@@ -506,7 +506,7 @@ end
 # a presized Hash starts at 8 entries, twice what a 3-key one needs.
 class Crinja
   def with_scope(bindings : Variables, &)
-    ctx = Context.new(self.context)
+    ctx = Context.new(context)
     ctx.adopt_scope(bindings.dup)
     with_scope(ctx) { |c| yield c }
   end
