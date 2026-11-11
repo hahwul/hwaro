@@ -209,7 +209,9 @@ control). This file contains:
 
 Output paths are stored relative to the project root, so the file stays valid
 when the project moves: restored by CI under another checkout path, shared
-between Docker and a native run, or kept across a directory rename.
+between Docker and a native run, or kept across a directory rename. An output
+directory outside the project (`-o /var/www/site`) is still recorded as an
+absolute path.
 
 Add `.hwaro_cache.json` to your `.gitignore` (the one `hwaro init` scaffolds already lists it):
 
