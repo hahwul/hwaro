@@ -203,3 +203,36 @@ describe "Hwaro::Content::Processors::InlineMarkdown.render autolinks" do
     out.should eq(%(see <a href="https://x.com/a_b_c?q=1&amp;r=2">https://x.com/a_b_c?q=1&amp;r=2</a> and &lt;javascript:alert(1)&gt; and a &lt; b &gt; c))
   end
 end
+
+describe "Hwaro::Content::Processors::InlineMarkdown::DISPLAY_MATH_RE" do
+  display = Hwaro::Content::Processors::InlineMarkdown::DISPLAY_MATH_RE
+  # The pattern before its body loop became possessive: a lazy group per
+  # character kept one JIT frame each, so a stray `$$` with 150 KB of
+  # blank-line-free text after it (a long list or table) failed the build
+  # with "JIT stack limit reached".
+  lazy = /\$\$((?:(?!\n[ \t\r]*\n).)*?)\$\$/m
+  spans = ->(text : String, regex : Regex) { text.scan(regex).map { |m| {m.byte_begin, m.byte_end, m[1]} } }
+
+  it "matches exactly what the lazy pattern matched" do
+    ["$$$", "$$$$", "$$$$$", "$$a$$$", "$$$a$$", "$$a$", "$$a\n$$", "$$a\n\n$$", "$$a\n \t\r\n$$", "$$a\r\n\r\n$$",
+     "$$a\r\n$$", "$$\n$$", "$$\n\n$$", "$$a$$b$$c$$", "$$a\n\n$$b$$", "x$$\\$$$", "$$a\n", "$$a\n\n", "$$é\n ü$$"].each do |text|
+      spans.call(text, display).should eq(spans.call(text, lazy)), text.inspect
+    end
+    rng = Random.new(20261111)
+    alphabet = ["$", "$", "$$", "a", "é", " ", "\t", "\r", "\n", "\n", "\\", "\n\n", "\r\n", "\n \n"]
+    100_000.times do
+      text = String.build { |io| rng.rand(0..14).times { io << alphabet.sample(rng) } }
+      spans.call(text, display).should eq(spans.call(text, lazy)), text.inspect
+    end
+  end
+
+  it "reads past a stray $$ and through a long formula without a regex error" do
+    math = Hwaro::Content::Processors::InlineMarkdown::Flags.new(math: true)
+    stray = "A stray $$ here:\n" + "- item text\n" * 40_000
+    display.match(stray).should be_nil
+    Hwaro::Content::Processors::InlineMarkdown.render(stray, flags: math).should start_with("A stray $$ here:")
+    formula = "$$\n" + "x^2 + y_1 \\\\\n" * 40_000 + "$$"
+    display.match(formula).try(&.[0].bytesize).should eq(formula.bytesize)
+    display.match("$$\n" + "x\n" * 200_000).should be_nil
+  end
+end
