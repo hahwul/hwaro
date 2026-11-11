@@ -263,20 +263,30 @@ module Hwaro::Core::Build::Phases::Initialize
   # ~100µs per entry). The tree is cut into units two levels down (the
   # usual shape is a few sections, each holding one directory per page),
   # the units are deleted concurrently, and the serial `rm_rf` that follows
-  # removes the now-empty parents — and anything the workers could not, with
-  # exactly the semantics it always had (failures are skipped silently, a
-  # symlink is unlinked, never followed). `--no-parallel` keeps it serial.
+  # removes the now-empty parents and retries anything the workers could
+  # not. A symlink is unlinked, never followed, and failures are skipped
+  # silently, as before — but per unit: the serial sweep stopped at the
+  # first entry of a directory it could not delete and kept that entry's
+  # later siblings, while each worker unit is attempted on its own, so a
+  # tree holding a read-only directory now loses everything else around it.
+  # `setup_output_dir` still sees what is left and reports the tree as not
+  # fresh. `--no-parallel` keeps it serial.
   private def remove_output_trees(paths : Array(String), parallel : Bool = true) : Nil
-    units = paths
-    2.times do
-      break if !parallel || units.size >= OUTPUT_DELETE_FANOUT_MIN
-      units = units.flat_map { |path| directory_children(path) || [path] }
-    end
-    if parallel && units.size >= OUTPUT_DELETE_FANOUT_MIN
+    if parallel && (units = output_delete_units(paths)).size >= OUTPUT_DELETE_FANOUT_MIN
       config = ParallelConfig.new(max_workers: OUTPUT_DELETE_WORKERS, wake_idle: true)
       Parallel(String, Nil).new(config).process(units) { |unit, _| FileUtils.rm_rf(unit) }
     end
     FileUtils.rm_rf(paths)
+  end
+
+  # The units `paths` is cut into: every entry two levels down (a leaf
+  # stays a unit of its own). Always both levels — many root entries next
+  # to one big section would otherwise leave that section a single unit,
+  # deleted by one worker as slowly as the serial sweep.
+  private def output_delete_units(paths : Array(String)) : Array(String)
+    units = paths
+    2.times { units = units.flat_map { |path| directory_children(path) || [path] } }
+    units
   end
 
   # The entries of `path` when it is a real directory (a symlink to one is
