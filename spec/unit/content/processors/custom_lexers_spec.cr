@@ -71,6 +71,16 @@ describe Hwaro::Content::Processors::CustomLexers do
     end
   end
 
+  # A looping symlink cannot be resolved (ELOOP); it used to drop every
+  # grammar of the directory, not just itself.
+  it "skips a grammar file that is a looping symlink" do
+    posix_only!("symlinks")
+    with_lexers({"mydsl.xml" => CUSTOM_GRAMMAR}) do
+      File.symlink("loop.xml", File.join("lexers", "loop.xml"))
+      Hwaro::Content::Processors::CustomLexers.files("lexers").should eq([File.join("lexers", "mydsl.xml")])
+    end
+  end
+
   it "lets a custom alias override a bundled lexer" do
     bundled = server_highlight("[core]\nname = x\n", "ini")
     with_lexers({"ini.xml" => INI_OVERRIDE}) do

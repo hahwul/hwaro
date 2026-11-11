@@ -31,7 +31,7 @@ module Hwaro
 
         # The grammar files in `dir`, sorted for a deterministic load order.
         def files(dir : String) : Array(String)
-          Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "*.xml")).select { |path| File.file?(path) }.sort!
+          Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "*.xml")).select { |path| Utils::PathUtils.file?(path) }.sort!
         end
 
         # Parse every grammar in `dir`. Returns the grammars to register, a

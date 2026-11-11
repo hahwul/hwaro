@@ -134,7 +134,7 @@ module Hwaro::Core::Build::Phases::Render
     return [] of String unless config && config.sass.enabled && Dir.exists?(source_dir)
     glob_match = File::MatchOptions.glob_default | File::MatchOptions::DotFiles
     Dir.glob(File.join(source_dir, "**", "*.scss"), match: glob_match).compact_map do |src_path|
-      next if File.basename(src_path).starts_with?("_") || !File.file?(src_path)
+      next if File.basename(src_path).starts_with?("_") || !Utils::PathUtils.file?(src_path)
       relative = Path[src_path].relative_to(source_dir).to_s
       next if config.static.excluded?(relative)
       File.expand_path(File.join(output_dir, relative.sub(/\.scss\z/, ".css")))

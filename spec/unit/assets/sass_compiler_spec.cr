@@ -43,6 +43,21 @@ describe Hwaro::Assets::SassCompiler do
       end
     end
 
+    # `ln -s loop.scss loop.scss` cannot be resolved (ELOOP): the entry is
+    # skipped, not the reason the whole build fails.
+    it "skips an entry that is a looping symlink" do
+      posix_only!("symlinks")
+      Dir.mktmpdir do |dir|
+        Dir.mkdir_p(File.join(dir, "static"))
+        File.write(File.join(dir, "static", "ok.scss"), "a { color: red; }")
+        File.symlink("loop.scss", File.join(dir, "static", "loop.scss"))
+        compile_in(dir) do |compiler, output|
+          compiler.compile_all(output).should eq(1)
+          File.exists?(File.join(output, "ok.css")).should be_true
+        end
+      end
+    end
+
     it "returns 0 when sass is disabled" do
       Dir.mktmpdir do |dir|
         Dir.mkdir_p(File.join(dir, "static"))
