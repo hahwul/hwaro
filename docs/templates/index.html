@@ -17,7 +17,7 @@
         <link rel="manifest" href="/icons/site.webmanifest" />
         <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
         <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
-        <link rel="preload" href="/images/landing/cover.jpg" as="image" fetchpriority="high">
+        <link rel="preload" href="/fonts/Silkscreen-Regular.woff2" as="font" type="font/woff2" crossorigin>
         {{ auto_includes_css }}
         <!-- Progressive enhancement: scroll reveals only apply with JS, so a
              no-JS visitor sees every section at full opacity. -->
@@ -57,13 +57,12 @@
 
         <main class="landing">
             <!-- ============================================================
-                 HERO - immersive: brazier art + embers behind centered copy
+                 HERO - centered copy over the pixel hearth
                  ============================================================ -->
             <section class="hero">
-                <div class="hero-bg" aria-hidden="true">
-                    <canvas id="ember-canvas"></canvas>
-                </div>
+                <canvas id="hearth" class="hero-fire" aria-hidden="true"></canvas>
                 <div class="hero-content">
+                    <p class="hero-eyebrow">Hwaro{% if page.language != "ko" %} <span lang="ko">화로</span>{% endif %} · {{ "landing.hero_eyebrow" | t }}</p>
                     <h1>
                         {{ "landing.hero_title_1" | t }}<br />
                         <span class="highlight">{{ "landing.hero_title_2" | t }}</span>
@@ -87,22 +86,21 @@
                  SPEED - the measured build, replayed in real time
                  ============================================================ -->
             <section class="speed reveal" id="speed">
-                <div class="lp-wrap">
-                    <div class="speed-header">
-                        <h2>{{ "landing.speed_title" | t }}</h2>
-                        <p>
-                            {% if page.language == "ko" %}
-                            공개 <a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">SSG 벤치마크</a>의
-                            minimal 워크로드(순수 마크다운 → HTML) 기준 콜드 빌드 중앙값입니다.
-                            {% else %}
-                            Median cold build on the open
-                            <a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">SSG benchmark</a>,
-                            minimal workload: pure markdown to HTML.
-                            {% endif %}
-                        </p>
-                    </div>
-
+                <div class="lp-wrap speed-grid">
                     <div class="speed-stage">
+                        <div class="speed-header">
+                            <h2>{{ "landing.speed_title" | t }}</h2>
+                            <p>
+                                {% if page.language == "ko" %}
+                                공개 <a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">SSG 벤치마크</a>의
+                                minimal 워크로드(순수 마크다운 → HTML) 기준 콜드 빌드 중앙값입니다.
+                                {% else %}
+                                Median cold build on the open
+                                <a href="https://hahwul.github.io/ssg-benchmark/" target="_blank" rel="noopener">SSG benchmark</a>,
+                                minimal workload: pure markdown to HTML.
+                                {% endif %}
+                            </p>
+                        </div>
                         <!-- The markup carries the finished figure so a no-JS
                              page shows 0.44 beside its already-full bar; the
                              replay script rewinds it before animating. -->
@@ -122,86 +120,66 @@
                         </p>
                     </div>
 
-                    <ul class="speed-modes">
-                        <li>
-                            <span class="mode-name">minimal</span>
-                            <span class="mode-desc">{{ "landing.mode_minimal" | t }}</span>
-                            <span class="mode-time">0.44s</span>
-                        </li>
-                        <li>
-                            <span class="mode-name">blog</span>
-                            <span class="mode-desc">{{ "landing.mode_blog" | t }}</span>
-                            <span class="mode-time">0.59s</span>
-                        </li>
-                        <li>
-                            <span class="mode-name">heavy</span>
-                            <span class="mode-desc">{{ "landing.mode_heavy" | t }}</span>
-                            <span class="mode-time">1.50s</span>
-                        </li>
-                    </ul>
+                    <div class="speed-side">
+                        <!-- Mode bars share one scale: width = seconds / 1.5. -->
+                        <ul class="speed-modes">
+                            <li>
+                                <span class="mode-name">minimal</span>
+                                <span class="mode-desc">{{ "landing.mode_minimal" | t }}</span>
+                                <span class="mode-bar" aria-hidden="true"><i style="--w: 29.3%"></i></span>
+                                <span class="mode-time">0.44s</span>
+                            </li>
+                            <li>
+                                <span class="mode-name">blog</span>
+                                <span class="mode-desc">{{ "landing.mode_blog" | t }}</span>
+                                <span class="mode-bar" aria-hidden="true"><i style="--w: 39.3%"></i></span>
+                                <span class="mode-time">0.59s</span>
+                            </li>
+                            <li>
+                                <span class="mode-name">heavy</span>
+                                <span class="mode-desc">{{ "landing.mode_heavy" | t }}</span>
+                                <span class="mode-bar" aria-hidden="true"><i style="--w: 100%"></i></span>
+                                <span class="mode-time">1.50s</span>
+                            </li>
+                        </ul>
+                        <p class="speed-scale">{{ "landing.modes_scale" | t }}</p>
+                    </div>
                 </div>
             </section>
 
             <!-- ============================================================
-                 FEATURES - bento, six cells, no holes
+                 FEATURES - six notched cells, keyed like config
                  ============================================================ -->
-            <section class="bento reveal" id="features">
+            <section class="features reveal" id="features">
                 <div class="lp-wrap">
                     <div class="section-header">
                         <h2>{{ "landing.features_title" | t }}</h2>
                         <p>{{ "landing.features_sub" | t }}</p>
                     </div>
-                    <div class="bento-grid">
-                        <article class="bento-cell cell-seo">
+                    <div class="feature-grid">
+                        <article class="feature">
                             <h3>built_in_seo</h3>
-                            <p>
-                                {{ "landing.seo_desc" | t }}
-                            </p>
-                            <div class="og-fan" aria-hidden="true">
-                                {% set fan = resize_image(path="/images/og-style-examples/style-terminal.png", width=640) %}
-                                <img src="{{ fan.url }}" alt="" width="640" height="336" loading="lazy" decoding="async" />
-                                {% set fan = resize_image(path="/images/og-style-examples/style-bauhaus.png", width=640) %}
-                                <img src="{{ fan.url }}" alt="" width="640" height="336" loading="lazy" decoding="async" />
-                                {% set fan = resize_image(path="/images/og-style-examples/style-editorial.png", width=640) %}
-                                <img src="{{ fan.url }}" alt="" width="640" height="336" loading="lazy" decoding="async" />
-                            </div>
+                            <p>{{ "landing.seo_desc" | t }}</p>
                         </article>
-                        <article class="bento-cell cell-fast">
+                        <article class="feature">
                             <h3>blazing_fast</h3>
-                            <p>
-                                {{ "landing.fast_desc" | t }}
-                            </p>
+                            <p>{{ "landing.fast_desc" | t }}</p>
                         </article>
-                        <article class="bento-cell cell-markdown">
+                        <article class="feature">
                             <h3>markdown_first</h3>
                             <p>{{ "landing.markdown_desc" | t }}</p>
-                            <pre aria-hidden="true"><code class="hljs"><span class="hljs-section">+++</span>
-<span class="hljs-attr">title</span> = <span class="hljs-string">"Hello"</span>
-<span class="hljs-attr">tags</span> = [<span class="hljs-string">"crystal"</span>]
-<span class="hljs-attr">toc</span> = <span class="hljs-literal">true</span>
-<span class="hljs-section">+++</span></code></pre>
                         </article>
-                        <article class="bento-cell cell-templates">
+                        <article class="feature">
                             <h3>flexible_templates</h3>
-                            <p>
-                                {{ "landing.templates_desc" | t }}
-                            </p>
-                            {% raw %}<pre aria-hidden="true"><code class="hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">extends</span> <span class="hljs-string">"base.html"</span> <span class="hljs-meta">%}</span>
-<span class="hljs-meta">{%</span> <span class="hljs-keyword">block</span> <span class="hljs-title">content</span> <span class="hljs-meta">%}</span>
-  <span class="hljs-template-variable">{{ page.content | safe }}</span>
-<span class="hljs-meta">{%</span> <span class="hljs-keyword">endblock</span> <span class="hljs-meta">%}</span></code></pre>{% endraw %}
+                            <p>{{ "landing.templates_desc" | t }}</p>
                         </article>
-                        <article class="bento-cell cell-taxonomies">
+                        <article class="feature">
                             <h3>taxonomies</h3>
-                            <p>
-                                {{ "landing.taxonomies_desc" | t }}
-                            </p>
+                            <p>{{ "landing.taxonomies_desc" | t }}</p>
                         </article>
-                        <article class="bento-cell cell-extensible">
+                        <article class="feature">
                             <h3>extensible</h3>
-                            <p>
-                                {{ "landing.extensible_desc" | t }}
-                            </p>
+                            <p>{{ "landing.extensible_desc" | t }}</p>
                         </article>
                     </div>
                 </div>
@@ -372,185 +350,115 @@
         </main>
         {{ auto_includes_js }}
         <script>
-        // Ember particles rising from the hero art. Two depth layers, a
-        // per-ember flicker, and the occasional bright spark. Spawn is
-        // biased toward the brazier at center. Skipped entirely under
-        // prefers-reduced-motion; rAF pauses on hidden tabs by itself.
+        // Pixel hearth: a cellular fire shaped into a mound and drawn as a
+        // grid of square cells, echoing the pixel logo. One settled frame
+        // under prefers-reduced-motion; paused while the hero is off screen.
         (function() {
+            var canvas = document.getElementById('hearth');
+            if (!canvas || !canvas.getContext) return;
+            var ctx = canvas.getContext('2d');
+            var hero = canvas.parentElement;
             var reduce = window.matchMedia &&
                 window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            var canvas = document.getElementById('ember-canvas');
-            if (!canvas || reduce) return;
-            var ctx = canvas.getContext('2d');
-            var host = canvas.parentElement;
-            var embers = [];
-            var dpr = Math.min(window.devicePixelRatio || 1, 2);
-            var W = 0, H = 0;
-            var MAX = Math.min(64, Math.max(36, Math.round(window.innerWidth / 24)));
+            var CELL = 9, HOT = 36;
+            var cols = 0, rows = 0, heat = null, raf = 0, last = 0, visible = true;
 
-            function resize() {
-                W = host.offsetWidth;
-                H = host.offsetHeight;
-                canvas.width = W * dpr;
-                canvas.height = H * dpr;
-                canvas.style.width = W + 'px';
-                canvas.style.height = H + 'px';
-                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-            }
-            resize();
-            window.addEventListener('resize', resize);
-
-            // Center-biased x: the average of two rolls clusters around the
-            // brazier; the far layer spreads wider than the near one.
-            function biasedX(spread) {
-                var r = (Math.random() + Math.random()) / 2;
-                return W * (0.5 + (r - 0.5) * spread);
+            // Ember ramp, cold to white-hot, interpolated to HOT + 1 steps.
+            var STOPS = [[7, 7, 9], [52, 14, 13], [132, 38, 27], [204, 93, 75],
+                         [236, 122, 102], [255, 198, 142], [255, 241, 216]];
+            var palette = [];
+            for (var i = 0; i <= HOT; i++) {
+                var t = i / HOT * (STOPS.length - 1);
+                var k = Math.min(t | 0, STOPS.length - 2), f = t - k;
+                palette.push('rgb(' +
+                    Math.round(STOPS[k][0] + (STOPS[k + 1][0] - STOPS[k][0]) * f) + ',' +
+                    Math.round(STOPS[k][1] + (STOPS[k + 1][1] - STOPS[k][1]) * f) + ',' +
+                    Math.round(STOPS[k][2] + (STOPS[k + 1][2] - STOPS[k][2]) * f) + ')');
             }
 
-            function Ember() {
-                this.reset();
-                this.y = Math.random() * H;
-                this.life = Math.random();
-            }
-
-            Ember.prototype.reset = function() {
-                // ~1/4 far (small, slow, dim), ~3/4 near; 1 in 18 is a spark.
-                this.far = Math.random() < 0.28;
-                this.spark = !this.far && Math.random() < 0.055;
-                this.x = biasedX(this.far ? 1.7 : 1.1);
-                this.y = H + 4;
-                this.r = this.far
-                    ? Math.random() * 1.1 + 0.5
-                    : Math.random() * 2.2 + 0.9;
-                if (this.spark) this.r += 0.8;
-                var speed = this.far ? 0.5 : 1.0;
-                this.vx = (Math.random() - 0.5) * 0.6 * speed;
-                this.vy = -(Math.random() * 1.3 + 0.45) * speed;
-                if (this.spark) this.vy *= 1.6;
-                this.life = 1;
-                this.decay = (Math.random() * 0.008 + 0.003) * (this.far ? 1.25 : 1);
-                this.drift = (Math.random() * 0.3 + 0.1) * speed;
-                this.wobble = Math.random() * Math.PI * 2;
-                this.flicker = Math.random() * Math.PI * 2;
-                this.flickerSpeed = Math.random() * 0.25 + 0.08;
-                var hue = Math.random();
-                if (this.spark) {
-                    this.color = [255, 235 + Math.random() * 20 | 0, 150 + Math.random() * 60 | 0];
-                } else if (hue < 0.5) {
-                    this.color = [255, 160 + Math.random() * 60 | 0, 30 + Math.random() * 30 | 0];
-                } else if (hue < 0.8) {
-                    this.color = [255, 80 + Math.random() * 60 | 0, 20 + Math.random() * 20 | 0];
-                } else {
-                    this.color = [255, 220 + Math.random() * 35 | 0, 80 + Math.random() * 60 | 0];
+            // Each cell cools a little and drifts sideways as it rises.
+            function step() {
+                for (var x = 0; x < cols; x++) {
+                    for (var y = 1; y < rows; y++) {
+                        var src = y * cols + x, h = heat[src];
+                        if (!h) { heat[src - cols] = 0; continue; }
+                        var dst = src - cols - (Math.random() * 3 | 0) + 1;
+                        if (dst >= 0) heat[dst] = Math.max(0, h - (Math.random() * 3.4 | 0));
+                    }
                 }
-            };
-
-            Ember.prototype.update = function() {
-                this.wobble += 0.04;
-                this.flicker += this.flickerSpeed;
-                this.x += this.vx + Math.sin(this.wobble) * this.drift;
-                this.y += this.vy;
-                this.life -= this.decay;
-                if (this.life <= 0 || this.y < -10 || this.x < -10 || this.x > W + 10) {
-                    this.reset();
-                }
-            };
-
-            Ember.prototype.draw = function(ctx) {
-                var base = this.far ? 0.4 : 0.68;
-                var a = this.life * base * (0.75 + Math.sin(this.flicker) * 0.25);
-                if (a <= 0.01) return;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.r * this.life, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(' + this.color[0] + ',' + this.color[1] + ',' + this.color[2] + ',' + a + ')';
-                ctx.shadowColor = 'rgba(' + this.color[0] + ',' + this.color[1] + ',' + this.color[2] + ',' + (a * 0.55) + ')';
-                ctx.shadowBlur = this.r * (this.spark ? 8 : 5);
-                ctx.fill();
-            };
-
-            for (var i = 0; i < MAX; i++) {
-                embers.push(new Ember());
             }
 
-            function loop() {
-                ctx.clearRect(0, 0, W, H);
-                for (var i = 0; i < embers.length; i++) {
-                    embers[i].update();
-                    embers[i].draw(ctx);
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                for (var y = 0; y < rows; y++) {
+                    for (var x = 0; x < cols; x++) {
+                        var h = heat[y * cols + x];
+                        if (h > 1) {
+                            ctx.fillStyle = palette[h];
+                            ctx.fillRect(x * CELL, y * CELL, CELL - 1, CELL - 1);
+                        }
+                    }
                 }
-                ctx.shadowBlur = 0;
-                ctx.shadowColor = 'transparent';
-                requestAnimationFrame(loop);
             }
-            loop();
+
+            // The fuel row is a parabola, hottest at the center: a mound of
+            // coals rather than a wall of flame.
+            function seed() {
+                var w = hero.clientWidth;
+                var c = Math.ceil(w / CELL);
+                if (!w || c === cols) return;
+                cols = c;
+                rows = w < 700 ? 28 : 34;
+                canvas.width = cols * CELL;
+                canvas.height = rows * CELL;
+                heat = new Uint8Array(cols * rows);
+                for (var x = 0; x < cols; x++) {
+                    var d = (x - cols / 2) / (cols * 0.47);
+                    heat[(rows - 1) * cols + x] = Math.max(0, Math.round(HOT * (1 - d * d)));
+                }
+                for (var i = 0; i < 80; i++) step();
+                draw();
+            }
+
+            function loop(ts) {
+                raf = requestAnimationFrame(loop);
+                if (ts - last < 60) return;
+                last = ts;
+                step();
+                draw();
+            }
+
+            function play() {
+                cancelAnimationFrame(raf);
+                if (!reduce && visible && heat) raf = requestAnimationFrame(loop);
+            }
+
+            seed();
+            play();
+            window.addEventListener('resize', seed);
+            if ('IntersectionObserver' in window) {
+                new IntersectionObserver(function(entries) {
+                    visible = entries[0].isIntersecting;
+                    play();
+                }).observe(hero);
+            }
         })();
         </script>
         <script>
-        // Hero pointer parallax (fine pointers only) + bento spotlight +
-        // header glass on scroll. All rAF-throttled, all skipped under
-        // prefers-reduced-motion where they would move things.
+        // Header picks up its glass once the page leaves the very top.
         (function() {
-            var reduce = window.matchMedia &&
-                window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-            // Header picks up its glass once the page leaves the very top.
             var header = document.querySelector('.landing-header');
-            if (header) {
-                var scrolled = null;
-                function onScroll() {
-                    var now = window.scrollY > 12;
-                    if (now !== scrolled) {
-                        scrolled = now;
-                        header.classList.toggle('is-scrolled', now);
-                    }
-                }
-                window.addEventListener('scroll', onScroll, { passive: true });
-                onScroll();
-            }
-
-            // Bento spotlight follows the cursor inside each cell.
-            var cells = document.querySelectorAll('.bento-cell');
-            for (var i = 0; i < cells.length; i++) {
-                cells[i].addEventListener('mousemove', function(e) {
-                    var b = this.getBoundingClientRect();
-                    this.style.setProperty('--mx', (e.clientX - b.left) + 'px');
-                    this.style.setProperty('--my', (e.clientY - b.top) + 'px');
-                });
-            }
-
-            // Pointer parallax: the brazier drifts a few px against the
-            // cursor; the glow layer moves a little more (CSS multiplies).
-            if (reduce) return;
-            var fine = window.matchMedia && window.matchMedia('(pointer: fine)').matches;
-            var bg = document.querySelector('.hero-bg');
-            var hero = document.querySelector('.hero');
-            if (!fine || !bg || !hero) return;
-            var tx = 0, ty = 0, cx = 0, cy = 0, raf = null;
-
-            function tick() {
-                cx += (tx - cx) * 0.06;
-                cy += (ty - cy) * 0.06;
-                bg.style.setProperty('--par-x', cx.toFixed(2) + 'px');
-                bg.style.setProperty('--par-y', cy.toFixed(2) + 'px');
-                if (Math.abs(tx - cx) > 0.05 || Math.abs(ty - cy) > 0.05) {
-                    raf = requestAnimationFrame(tick);
-                } else {
-                    raf = null;
+            if (!header) return;
+            var scrolled = null;
+            function onScroll() {
+                var now = window.scrollY > 12;
+                if (now !== scrolled) {
+                    scrolled = now;
+                    header.classList.toggle('is-scrolled', now);
                 }
             }
-
-            hero.addEventListener('mousemove', function(e) {
-                var b = hero.getBoundingClientRect();
-                tx = ((e.clientX - b.left) / b.width - 0.5) * -14;
-                ty = ((e.clientY - b.top) / b.height - 0.5) * -8;
-                if (!raf) raf = requestAnimationFrame(tick);
-            });
-
-            hero.addEventListener('mouseleave', function() {
-                tx = 0;
-                ty = 0;
-                if (!raf) raf = requestAnimationFrame(tick);
-            });
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
         })();
         </script>
         <script>
@@ -663,17 +571,17 @@
                     if (running) return;
                     if (reduce) {
                         num.textContent = (MS / 1000).toFixed(2);
-                        fill.style.transform = 'scaleX(1)';
+                        fill.style.clipPath = 'inset(0)';
                         stage.classList.add('is-done');
                         return;
                     }
                     running = true;
                     stage.classList.remove('is-done');
                     fill.style.transition = 'none';
-                    fill.style.transform = 'scaleX(0)';
+                    fill.style.clipPath = 'inset(0 100% 0 0)';
                     void fill.offsetWidth; /* flush the reset */
-                    fill.style.transition = 'transform ' + MS + 'ms linear';
-                    fill.style.transform = 'scaleX(1)';
+                    fill.style.transition = 'clip-path ' + MS + 'ms linear';
+                    fill.style.clipPath = 'inset(0)';
                     var t0 = null;
                     function step(ts) {
                         if (t0 === null) t0 = ts;
