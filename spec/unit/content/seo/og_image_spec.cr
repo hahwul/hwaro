@@ -1343,6 +1343,37 @@ describe Hwaro::Content::Seo::OgImage do
       end
     end
 
+    # A warm build that changes nothing leaves the manifest alone: rewriting
+    # it (renamed into place) needs a writable directory, and a read-only
+    # og-images/ failed a build that had nothing to write.
+    it "does not rewrite an unchanged manifest" do
+      posix_only!("chmod-based permissions")
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.title = "My Site"
+        config.og.auto_image.enabled = true
+        config.og.auto_image.format = "svg"
+        page = Hwaro::Models::Page.new("test.md")
+        page.title = "My Post"
+        page.url = "/posts/my-post/"
+        page.render = true
+
+        Hwaro::Content::Seo::OgImage.generate([page], config, dir)
+        img_dir = File.join(dir, "og-images")
+        manifest = File.read(File.join(img_dir, ".og_manifest.json"))
+        File.chmod(img_dir, 0o555)
+        begin
+          # Root writes anyway; nothing to assert there.
+          next if File::Info.writable?(img_dir)
+          page.image = nil
+          Hwaro::Content::Seo::OgImage.generate([page], config, dir).should eq({generated: 0, skipped: 1})
+          File.read(File.join(img_dir, ".og_manifest.json")).should eq(manifest)
+        ensure
+          File.chmod(img_dir, 0o755)
+        end
+      end
+    end
+
     it "round-trips manifest correctly" do
       Dir.mktmpdir do |dir|
         manifest_path = File.join(dir, "manifest.json")

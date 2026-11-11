@@ -1662,7 +1662,9 @@ module Hwaro
         # Save the OG manifest file. Renamed into place, so whatever sits on
         # its name — a read-only or unreadable file, a dangling or looping
         # symlink, a link to a file elsewhere — is replaced instead of
-        # failing the build or being written through.
+        # failing the build or being written through. A manifest that already
+        # holds these bytes is left alone: a warm build that changed nothing
+        # writes nothing (renaming into place needs a writable directory).
         def self.save_manifest(manifest_path : String, config_hash : String, entries : Hash(String, String))
           json = JSON.build do |j|
             j.object do
@@ -1675,6 +1677,7 @@ module Hwaro
               end
             end
           end
+          return if Hwaro::Utils::PathUtils.file?(manifest_path) && (File.read(manifest_path) rescue nil) == json
           Hwaro::Utils::FileSafe.atomic_write(manifest_path, json)
         end
       end
