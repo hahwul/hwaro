@@ -112,6 +112,32 @@ describe Hwaro::Core::Lifecycle::Manager do
       error.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
       error.exit_code.should eq(Hwaro::Errors::EXIT_CONFIG)
     end
+
+    # A full disk, a read-only output file or a plain file where a hook's
+    # directory must go is the environment's fault, like the same failure in
+    # a phase action: exit 6 with the path, not HWARO_E_INTERNAL / exit 70.
+    it "classifies an IO::Error from a hook as HWARO_E_IO instead of Abort" do
+      manager = Hwaro::Core::Lifecycle::Manager.new
+      ctx = Hwaro::Core::Lifecycle::BuildContext.new(Hwaro::Config::Options::BuildOptions.new)
+      second_ran = false
+
+      manager.on(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, priority: 100, name: "og_image:generate") do |_|
+        raise File::Error.new("Unable to create directory: 'public/og-images': File exists", file: "public/og-images")
+      end
+      manager.on(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, priority: 1, name: "after-raise") do |_|
+        second_ran = true
+        Hwaro::Core::Lifecycle::HookResult::Continue
+      end
+
+      error = expect_raises(Hwaro::HwaroError) do
+        manager.trigger(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, ctx)
+      end
+      error.code.should eq(Hwaro::Errors::HWARO_E_IO)
+      error.exit_code.should eq(6)
+      (error.message || "").should contain("og_image:generate")
+      (error.message || "").should contain("public/og-images")
+      second_ran.should be_false
+    end
   end
 
   describe "#trigger" do
