@@ -605,6 +605,19 @@ describe Hwaro::Core::Build::Phases::Render do
       renamed = builder.test_io_error_signature(File::Error.new("Error renaming file: 'public/a/x.tmp' -> 'public/a/index.html': No space left on device", file: "public/a/x.tmp", other: "public/a/index.html"))
       renamed.should eq("Error renaming file: '…' -> '…': No space left on device")
     end
+
+    # The stdlib quotes the path escaped (`inspect_unquoted`): `q"a` reads
+    # `'q\"a'`, so a path with a quote or a non-printable character kept its
+    # own message and never grouped.
+    it "groups failures on paths the error message escapes" do
+      builder = Hwaro::Core::Build::Builder.new
+      signature = ->(path : String) do
+        ex = File::Error.from_os_error("Error opening file with mode 'w'", Errno::ENOSPC, file: path)
+        builder.test_io_error_signature(ex)
+      end
+      signature.call(%(public/q"a/index.html)).should eq(signature.call("public/tab\tb/index.html"))
+      signature.call(%(public/q"a/index.html)).should eq(signature.call("public/plain/index.html"))
+    end
   end
 
   # Regression for https://github.com/hahwul/hwaro/issues/481

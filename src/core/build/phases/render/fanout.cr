@@ -207,9 +207,10 @@ module Hwaro::Core::Build::Phases::Render
   # `render_error_signature`, so two different ones can never merge here.
   private def io_error_signature(ex : IO::Error) : String
     message = ex.message.to_s
-    # `File::Error` quotes the path(s): `…: '<file>': <errno>`.
+    # `File::Error` quotes the path(s) escaped (`inspect_unquoted`, the same
+    # on Crystal 1.21 and 1.22): `…: '<file>': <errno>`.
     {ex.target, ex.as?(File::Error).try(&.other)}.each do |path|
-      message = message.gsub("'#{path}'", "'…'") if path
+      message = message.gsub("'#{path.inspect_unquoted}'", "'…'") if path
     end
     # An error raised on an open file reads `write (<path>): <errno>`, and
     # its `target` is the File's inspect string, not that path.
