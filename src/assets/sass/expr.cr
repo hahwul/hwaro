@@ -1689,13 +1689,28 @@ module Hwaro
             end
           end
 
+          # A key is a duplicate when an earlier key `eq?`s it. Two strings
+          # are equal exactly when their decoded text is, and a string key
+          # equals nothing else from its side (Str#eq?), so string keys are
+          # found in a set and only the other keys are compared one by one.
+          # Every reference to a map variable re-reads the literal, and
+          # comparing each key with all earlier ones made an 800-key icon
+          # map cost 320k comparisons per `map-get`.
+          # ponytail: number/color/list keys are still compared pairwise;
+          # bucket them too if a large map keyed by those shows up.
           private def eval_map(node : MapE) : Value
             entries = Array(MapEntry).new
+            strings = Set(String).new
+            others = [] of Value
             node.pairs.each do |pair|
               key = eval(pair.key)
-              if entries.any?(&.key.eq?(key))
-                raise DuplicateKeyError.new("Duplicate key")
+              duplicate = others.any?(&.eq?(key))
+              if key.is_a?(Str)
+                duplicate ||= !strings.add?(key.decoded)
+              else
+                others << key
               end
+              raise DuplicateKeyError.new("Duplicate key") if duplicate
               entries << MapEntry.new(key, eval(pair.value))
             end
             MapV.new(entries)
