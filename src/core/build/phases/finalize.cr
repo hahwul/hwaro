@@ -11,6 +11,13 @@ module Hwaro::Core::Build::Phases::Finalize
       build_cache = @cache || raise "Cache not initialized"
       # Claimed before the prune so a `--cache` build keeps the headers file.
       claim_csp_headers_file(ctx)
+      # `sw.js` and `manifest.json` are written AFTER this phase (see
+      # PwaHooks), so they are claimed here: unclaimed, nothing removed
+      # them once `[pwa]` was switched off, and the stale service worker
+      # kept being published.
+      @config.try do |config|
+        Content::Seo::Pwa.published_outputs(config, ctx.options.output_dir).each { |path| claim_generated_output(path) }
+      end
       # Serve rebuilds keep their output directory; see
       # `sweep_stale_derived_outputs` (a no-op on the first build).
       sweep_stale_derived_outputs(ctx.options.output_dir)

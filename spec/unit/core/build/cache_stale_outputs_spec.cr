@@ -275,6 +275,40 @@ describe "warm --cache builds" do
   # Switching a generator off (or skipping it by flag) never reaches its own
   # manifest prune, so the claims diff in Finalize has to remove its files.
   describe "generated images once the feature stops running" do
+    # A service worker that stays published keeps serving the precache it
+    # was built for, to every returning visitor.
+    it "removes sw.js and manifest.json when [pwa] is disabled" do
+      with_cached_site do
+        base = File.read("config.toml")
+        File.write("config.toml", base + "\n[pwa]\nenabled = true\nname = \"X\"\n")
+        cached_build
+        cached_build
+        File.exists?("public/sw.js").should be_true
+        File.exists?("public/manifest.json").should be_true
+
+        File.write("config.toml", base + "\n[pwa]\nenabled = false\n")
+        cached_build
+        File.exists?("public/sw.js").should be_false
+        File.exists?("public/manifest.json").should be_false
+      end
+    end
+
+    it "keeps a static sw.js and manifest.json once [pwa] is disabled" do
+      with_cached_site do
+        base = File.read("config.toml")
+        FileUtils.mkdir_p("static")
+        File.write("static/sw.js", "// mine")
+        File.write("static/manifest.json", "{}")
+        File.write("config.toml", base + "\n[pwa]\nenabled = true\nname = \"X\"\n")
+        cached_build
+
+        File.write("config.toml", base + "\n[pwa]\nenabled = false\n")
+        cached_build
+        File.read("public/sw.js").should eq("// mine")
+        File.read("public/manifest.json").should eq("{}")
+      end
+    end
+
     it "removes auto-generated OG images when auto images are disabled" do
       with_cached_site do
         base = File.read("config.toml")

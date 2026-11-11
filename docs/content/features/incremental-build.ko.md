@@ -162,7 +162,8 @@ serve는 재빌드 전후로 해당 집합의 지문을 계산하고, 지문이 
 스텁, AMP 미러, 자동 생성된 OG 이미지, 더 이상 아무도 쓰지 않는 텀의 택소노미
 페이지(그 텀의 피드 포함), 섹션이 더 이상 채우지 않는 페이지네이션 페이지가
 모두 해당합니다. 기능 자체를 끄는 경우(`[amp] enabled = false`,
-`[og.auto_image] enabled = false`, `[image_processing] enabled = false`, 또는
+`[og.auto_image] enabled = false`, `[image_processing] enabled = false`,
+`[pwa] enabled = false`(`sw.js`와 `manifest.json`), 또는
 `--skip-og-image` / `--skip-image-processing` 플래그)도 같은 이유로 다음
 빌드에서 그동안 발행하던 파일이 정리되며, `[image_processing] widths`에서 뺀
 너비의 이미지도 마찬가지입니다.
