@@ -18,5 +18,6 @@ class Dir
     paths = [] of String
     previous_def(patterns, match, follow_symlinks) { |path| paths << path }
     paths.each { |path| yield path }
+    nil
   end
 end

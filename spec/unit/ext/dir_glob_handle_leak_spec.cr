@@ -29,7 +29,9 @@ describe "Dir.glob with a block (ext/dir_glob_handle_leak)" do
         Dir.glob(pattern) { break }
       end
 
-      open_fd_count.should eq(before)
+      # A leak can only raise the count; a GC cycle during the loop may
+      # lower it (finalizing handles earlier specs in this process left).
+      open_fd_count.should be <= before
     end
   end
 
