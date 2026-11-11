@@ -31,11 +31,14 @@
     color: var(--border);
 }
 
-.breadcrumbs a {
+/* .docs-main prefix: the prose-link rule (.docs-main li a) would otherwise
+   paint these as underlined ember links. */
+.docs-main .breadcrumbs a {
     color: var(--text-muted);
+    text-decoration: none;
 }
 
-.breadcrumbs a:hover {
+.docs-main .breadcrumbs a:hover {
     color: var(--primary);
 }
 
@@ -57,12 +60,12 @@
 .docs-main > h1:first-of-type::after {
     content: "";
     display: block;
-    width: 56px;
-    height: 3px;
+    width: 68px; /* six 8px cells, 4px apart */
+    height: 8px;
     margin-top: var(--space-4);
-    border-radius: 999px;
     background: var(--spark);
-    transform-origin: left center;
+    -webkit-mask: repeating-linear-gradient(90deg, #000 0 8px, transparent 8px 12px);
+    mask: repeating-linear-gradient(90deg, #000 0 8px, transparent 8px 12px);
 }
 
 /* Entrance — one quiet rise for the content column and a drawn-in ember
@@ -74,7 +77,7 @@
     }
 
     .docs-main > h1:first-of-type::after {
-        animation: docs-rule 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.15s backwards;
+        animation: docs-rule 0.5s steps(6, end) 0.15s backwards;
     }
 }
 
@@ -89,19 +92,20 @@
     }
 }
 
+/* The cells light one by one. */
 @keyframes docs-rule {
     from {
-        transform: scaleX(0);
+        clip-path: inset(0 100% 0 0);
     }
     to {
-        transform: scaleX(1);
+        clip-path: inset(0);
     }
 }
 
 /* Page description directly under the title reads as a standfirst. */
 .docs-main > h1:first-of-type + p {
-    font-size: var(--step-1);
-    line-height: 1.5;
+    font-size: 1.16em;
+    line-height: 1.6;
     color: var(--text-secondary);
     text-wrap: pretty;
 }
@@ -116,9 +120,10 @@
 }
 
 .docs-main h2 {
-    font-size: var(--step-1);
-    font-weight: 600;
-    letter-spacing: -0.01em;
+    font-size: 1.5rem;
+    font-weight: 620;
+    line-height: 1.25;
+    letter-spacing: -0.015em;
     color: var(--heading);
     margin: var(--space-7) 0 var(--space-4);
     padding-bottom: var(--space-2);
@@ -127,16 +132,18 @@
 }
 
 .docs-main h3 {
-    font-size: var(--step-0);
+    font-size: 1.2rem;
     font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
     color: var(--heading);
     margin: var(--space-6) 0 var(--space-3);
 }
 
 .docs-main h4 {
-    font-size: 0.92rem;
+    font-size: 1rem;
     font-weight: 600;
-    color: var(--text-secondary);
+    color: var(--heading);
     margin: var(--space-5) 0 var(--space-2);
 }
 
@@ -154,7 +161,16 @@
 }
 
 .docs-main li {
-    margin-bottom: var(--space-1);
+    margin-bottom: 0.35em;
+}
+
+.docs-main li > ul,
+.docs-main li > ol {
+    margin: 0.35em 0 0;
+}
+
+.docs-main ul {
+    list-style: square;
 }
 
 .docs-main li::marker {
@@ -250,13 +266,24 @@
    Code
    ============================================================================= */
 
-/* Inline code — warm ember tint so it reads as a distinct token. */
+/* Inline code — a neutral chip. Ember is reserved for links, so a page dense
+   with identifiers stays calm and a link is never mistaken for code. */
 code {
-    background: var(--primary-tint);
-    color: var(--primary-strong);
-    padding: 0.12rem 0.38rem;
-    font-size: 0.85em;
+    background: var(--bg-subtle);
+    color: var(--heading);
+    padding: 0.1rem 0.36rem;
+    font-size: 0.86em;
     border-radius: var(--radius-sm);
+}
+
+/* The hairline is prose-only (:where keeps it weightless, so `pre code` and
+   the landing's bare command strings still reset it). */
+:where(.docs-main) code {
+    border: 1px solid var(--border-subtle);
+}
+
+a code {
+    color: inherit;
 }
 
 pre {
@@ -274,8 +301,9 @@ pre code.hljs {
     background: transparent;
     color: var(--text);
     padding: 0;
+    border: 0;
     border-radius: 0;
-    font-size: 0.82rem;
+    font-size: 0.84rem;
 }
 
 .code-wrapper {
@@ -288,7 +316,8 @@ pre code.hljs {
 }
 
 .code-copy-btn {
-    font-family: var(--font-mono);
+    font-family: var(--font-pixel);
+    text-transform: uppercase;
     position: absolute;
     top: 0.55rem;
     right: 0.55rem;
@@ -377,11 +406,11 @@ pre code .ln {
 }
 
 .docs-main th {
-    font-family: var(--font-mono);
+    font-family: var(--font-pixel);
     font-size: 0.7rem;
-    font-weight: 600;
+    font-weight: 400;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.04em;
     color: var(--text-secondary);
     background: var(--bg-subtle);
     border-bottom: 1px solid var(--border);
@@ -399,6 +428,21 @@ pre code .ln {
 .docs-main td code {
     font-size: 0.8rem;
     white-space: nowrap;
+}
+
+/* Markdown tables arrive wrapped by templates/hooks/render-table.html: the
+   wrapper owns the frame and scrolls, the table keeps its natural width. */
+.table-scroll {
+    margin: var(--space-4) 0 var(--space-5);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius);
+    overflow-x: auto;
+}
+
+.docs-main .table-scroll > table {
+    margin: 0;
+    border: 0;
+    border-radius: 0;
 }
 
 /* =============================================================================
@@ -425,8 +469,8 @@ blockquote p + p {
 
 hr {
     border: none;
-    height: 1px;
-    background: var(--border-subtle);
+    height: 4px;
+    background: repeating-linear-gradient(90deg, var(--border) 0 4px, transparent 4px 8px);
     margin: var(--space-7) 0;
 }
 
@@ -461,11 +505,26 @@ kbd {
     color: var(--text-secondary);
 }
 
+/* Small Korean labels: Hangul needs a size up from the Latin mono caps,
+   and no tracking. */
+:lang(ko) .sidebar-title,
+:lang(ko) .toc-title,
+:lang(ko) .docs-main th,
+:lang(ko) .pn-label {
+    font-family: var(--font-sans);
+    font-size: 0.78rem;
+    letter-spacing: 0;
+}
+
 /* Mobile */
 @media (max-width: 768px) {
     .docs-main table {
         display: block;
         overflow-x: auto;
+    }
+
+    .docs-main .table-scroll > table {
+        display: table;
     }
 
     .heading-anchor {

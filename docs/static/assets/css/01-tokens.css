@@ -23,6 +23,15 @@
   font-display: swap;
 }
 
+/* Silkscreen — the pixel face for small labels and figures (Latin only). */
+@font-face {
+  font-family: "Silkscreen";
+  src: url("/fonts/Silkscreen-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /* Dark by default; [data-theme="light"] re-resolves every pair below. */
   color-scheme: dark;
@@ -91,8 +100,10 @@
 
   /* Shape, depth, motion, measure. */
   --measure: 68ch;
-  --radius: 10px;
-  --radius-sm: 6px;
+  /* Pixel grammar: corners are square; framed blocks get the stepped pixel
+     outline in 05-components.css instead of a rounded border. */
+  --radius: 0px;
+  --radius-sm: 0px;
   --shadow-sm: 0 1px 2px light-dark(rgba(42, 36, 31, 0.05), rgba(0, 0, 0, 0.3));
   --shadow:    0 2px 8px light-dark(rgba(42, 36, 31, 0.08), rgba(0, 0, 0, 0.4));
   --shadow-lg: 0 16px 70px light-dark(rgba(42, 36, 31, 0.18), rgba(0, 0, 0, 0.5));
@@ -101,11 +112,18 @@
   /* Faces — Geist, self-hosted. */
   --font-sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  /* Hangul falls through to the mono stack; :lang(ko) labels opt out. */
+  --font-pixel: "Silkscreen", "Geist Mono", ui-monospace, monospace;
 
-  /* Layout (docs-specific). */
+  /* Layout (docs-specific). --page-max caps the three-column frame so the
+     sidebar, article and TOC stay together on wide screens; --prose is the
+     article column; --text-docs is the reading size (16px phone, 17px desk). */
   --header-h: 60px;
   --sidebar-w: 264px;
   --toc-w: 232px;
+  --page-max: 1480px;
+  --prose: 46rem;
+  --text-docs: clamp(1rem, 0.96rem + 0.14vw, 1.0625rem);
 }
 
 /* Pre-light-dark() browsers: pin the static DARK palette (the docs' default
