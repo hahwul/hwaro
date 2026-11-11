@@ -170,19 +170,23 @@ module Hwaro::Core::Build::Phases::Finalize
       end
     end
 
-    listing = {} of String => Array(String)
+    # A Set per parent: the usual answer is "spelled as asked", and one
+    # section holds a directory per page — an Array made that membership
+    # test a scan of the whole section for every page (20k pages: 200M
+    # string compares, a third of a warm build).
+    listing = {} of String => Set(String)
     dirs.to_a.sort_by!(&.size).each do |dir|
       parent = File.dirname(dir)
       name = File.basename(dir)
-      children = listing[parent] ||= Dir.children(parent)
+      children = listing[parent] ||= Dir.children(parent).to_set
       next if children.includes?(name)
       key = Utils::PathUtils.output_fold_key(name)
-      next unless index = children.index { |child| Utils::PathUtils.output_fold_key(child) == key }
-      actual = children[index]
+      next unless actual = children.find { |child| Utils::PathUtils.output_fold_key(child) == key }
       tmp = File.join(parent, "hwaro-respell-#{Process.pid}.tmp")
       File.rename(File.join(parent, actual), tmp)
       File.rename(tmp, dir)
-      children[index] = name
+      children.delete(actual)
+      children << name
     end
   rescue ex : File::Error
     Logger.debug "Could not respell output directories: #{ex.message}"
