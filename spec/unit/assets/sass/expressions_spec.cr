@@ -346,7 +346,7 @@ describe "Sass map literal duplicate keys" do
   # that quadratic in the key count (~16x on a 4x map; linear is ~4x).
   it "reads a map of many string keys in linear time" do
     source = ->(count : Int32) { "$m: (#{Array.new(count) { |i| "k#{i}: #{i}" }.join(", ")}); x { y: map-get($m, k0); }" }
-    best = ->(scss : String) { Array.new(3) { started = Time.instant; compile(scss).should contain("y: 0;"); Time.instant - started }.min }
+    best = ->(scss : String) { best_cpu_time { compile(scss).should contain("y: 0;") } }
     small = best.call(source.call(3000))
     large = best.call(source.call(12000))
     ratio = large / {small, 1.millisecond}.max

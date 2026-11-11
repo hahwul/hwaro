@@ -44,7 +44,7 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
   # linear work grows ~4x on a 4x input, a UTF-8 check of the whole text
   # per tag ~16x.
   describe "pre-filters on large input" do
-    best = ->(block : -> Bool) { Array.new(3) { started = Time.instant; block.call.should be_false; Time.instant - started }.min }
+    best = ->(block : -> Bool) { best_cpu_time { block.call.should be_false } }
 
     it "decides a template full of control tags needs no shortcode pass in linear time" do
       builder = Hwaro::Core::Build::Builder.new

@@ -189,7 +189,7 @@ describe Hwaro::MarkdRegexStackFix do
     # copy of the rest of the paragraph plus a UTF-8 check of it, per `&`.
     it "renders a hard-wrapped paragraph full of ampersands in linear time" do
       para = ->(lines : Int32) { "AT&T R&D a & b ?x=1&y=2 &amp; &bogus;\n" * lines }
-      best = ->(markdown : String) { Array.new(3) { started = Time.instant; Markd.to_html(markdown); Time.instant - started }.min }
+      best = ->(markdown : String) { best_cpu_time { Markd.to_html(markdown) } }
       Markd.to_html(para.call(300)) # warm up
       small = best.call(para.call(3000))
       large = best.call(para.call(12000))

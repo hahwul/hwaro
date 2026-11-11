@@ -101,7 +101,7 @@ describe Hwaro::Content::Processors::InlineMarkdown do
     # wall-clock constant: linear work grows ~4x on a 4x input, that ~16x.
     it "rewrites many links in linear time" do
       text = ->(count : Int32) { "see [a](http://x/y) and ![i](/i.png) é " * count }
-      best = ->(input : String) { Array.new(3) { started = Time.instant; Hwaro::Content::Processors::InlineMarkdown.render(input); Time.instant - started }.min }
+      best = ->(input : String) { best_cpu_time { Hwaro::Content::Processors::InlineMarkdown.render(input) } }
       small = best.call(text.call(4000))
       large = best.call(text.call(16000))
       ratio = large / {small, 1.millisecond}.max
