@@ -4,8 +4,8 @@ require "../../../../../src/core/build/builder"
 # Reopen Builder to expose private Initialize-phase helpers for testing.
 module Hwaro::Core::Build
   class Builder
-    def test_setup_output_dir(output_dir : String, incremental : Bool = false)
-      setup_output_dir(output_dir, incremental)
+    def test_setup_output_dir(output_dir : String, incremental : Bool = false, parallel : Bool = true)
+      setup_output_dir(output_dir, incremental, parallel)
     end
 
     def test_copy_static_files(output_dir : String, verbose : Bool = false, incremental : Bool = false)
@@ -81,6 +81,43 @@ describe Hwaro::Core::Build::Phases::Initialize do
 
           Dir.exists?("public").should be_true
           File.exists?("public/stale.html").should be_false
+        end
+      end
+    end
+
+    # The wipe fans out once the tree holds enough entries: a section with
+    # one directory per page is the shape that takes that path.
+    it "wipes a large tree and never follows a symlink out of it" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("outside")
+          File.write("outside/keep.txt", "keep")
+          200.times do |i|
+            FileUtils.mkdir_p("public/posts/post-#{i}")
+            File.write("public/posts/post-#{i}/index.html", "page #{i}")
+          end
+          File.write("public/index.html", "home")
+          File.symlink(File.join(dir, "outside"), "public/posts/linked")
+          File.symlink(File.join(dir, "outside"), "public/top-link")
+
+          builder = Hwaro::Core::Build::Builder.new
+          builder.test_setup_output_dir("public", incremental: false).should be_true
+
+          Dir.children("public").should be_empty
+          File.read("outside/keep.txt").should eq("keep")
+        end
+      end
+    end
+
+    it "wipes a large tree serially with parallel off" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          200.times { |i| FileUtils.mkdir_p("public/posts/post-#{i}") }
+
+          builder = Hwaro::Core::Build::Builder.new
+          builder.test_setup_output_dir("public", incremental: false, parallel: false).should be_true
+
+          Dir.children("public").should be_empty
         end
       end
     end

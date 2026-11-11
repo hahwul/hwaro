@@ -69,7 +69,7 @@ module Hwaro::Core::Build::Phases::Initialize
       # own `static/.hwaro-dev` (published by copy_static_files below like any
       # hidden static file) is not mistaken for one.
       dev_marker_found = !ctx.options.serve_mode && Utils::DevMarker.present?(output_dir)
-      fresh = setup_output_dir(output_dir, keep_output)
+      fresh = setup_output_dir(output_dir, keep_output, ctx.options.parallel)
       @kept_output_dir = keep_output ? output_dir : nil
       # A symlinked output directory is a publish-through-the-link setup: a
       # web server may be serving the tree behind it while this build runs.
@@ -168,7 +168,7 @@ module Hwaro::Core::Build::Phases::Initialize
 
   # True when the directory is empty now because this call created or
   # cleared it (never for a kept tree).
-  private def setup_output_dir(output_dir : String, incremental : Bool = false) : Bool
+  private def setup_output_dir(output_dir : String, incremental : Bool = false, parallel : Bool = true) : Bool
     # Sanity-check the destination on EVERY path, not just the one that wipes
     # it. `--cache`, `--preserve-output` and `hwaro serve` all take the
     # incremental branch, and `build --cache -o content` used to exit 0 after
@@ -223,9 +223,9 @@ module Hwaro::Core::Build::Phases::Initialize
         unless entries.empty?
           Logger.info "Output directory #{output_dir} -> #{Hwaro::Utils::PathUtils.resolved_real_path(output_dir)} (clearing #{entries.size} entries behind the symlink)"
         end
-        FileUtils.rm_rf(entries.map { |entry| File.join(output_dir, entry) })
+        remove_output_trees(entries.map { |entry| File.join(output_dir, entry) }, parallel)
       else
-        FileUtils.rm_rf(output_dir)
+        remove_output_trees([output_dir], parallel)
       end
     end
     ensure_output_dir(output_dir)
@@ -247,6 +247,45 @@ module Hwaro::Core::Build::Phases::Initialize
     # Verified, not assumed: `rm_rf` gives up silently on entries it cannot
     # delete (a read-only tree), and those files are still there.
     (!incremental || !existed_before) && output_dir_empty?(output_dir)
+  end
+
+  # Fewer deletable units than this and the serial sweep is already instant.
+  OUTPUT_DELETE_FANOUT_MIN = 64
+  # Deleting is kernel-bound: measured on APFS, 4 threads take ~45% off the
+  # wall time and 8 or 14 take no more, only extra system time spent on the
+  # filesystem's own locks.
+  OUTPUT_DELETE_WORKERS = 4
+
+  # `FileUtils.rm_rf(paths)`, with the bulk of the unlinking spread over
+  # worker threads. Removing the previous build's tree is one unlink or
+  # rmdir per entry, serially — on a 5000-page site that was the single
+  # slowest step of a rebuild (longer than rendering the pages; APFS takes
+  # ~100µs per entry). The tree is cut into units two levels down (the
+  # usual shape is a few sections, each holding one directory per page),
+  # the units are deleted concurrently, and the serial `rm_rf` that follows
+  # removes the now-empty parents — and anything the workers could not, with
+  # exactly the semantics it always had (failures are skipped silently, a
+  # symlink is unlinked, never followed). `--no-parallel` keeps it serial.
+  private def remove_output_trees(paths : Array(String), parallel : Bool = true) : Nil
+    units = paths
+    2.times do
+      break if !parallel || units.size >= OUTPUT_DELETE_FANOUT_MIN
+      units = units.flat_map { |path| directory_children(path) || [path] }
+    end
+    if parallel && units.size >= OUTPUT_DELETE_FANOUT_MIN
+      config = ParallelConfig.new(max_workers: OUTPUT_DELETE_WORKERS, wake_idle: true)
+      Parallel(String, Nil).new(config).process(units) { |unit, _| FileUtils.rm_rf(unit) }
+    end
+    FileUtils.rm_rf(paths)
+  end
+
+  # The entries of `path` when it is a real directory (a symlink to one is
+  # a leaf: `rm_rf` unlinks it), nil for anything else or when unreadable.
+  private def directory_children(path : String) : Array(String)?
+    return unless File.info?(path, follow_symlinks: false).try(&.directory?)
+    Dir.children(path).map { |entry| File.join(path, entry) }
+  rescue File::Error
+    nil
   end
 
   private def output_dir_empty?(output_dir : String) : Bool
