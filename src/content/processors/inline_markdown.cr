@@ -327,9 +327,11 @@ module Hwaro
         private def replace_links(text : String, open_re : Regex, & : String, String, String?, String -> String) : String
           return text unless text.includes?("](")
           bytes = text.to_slice
+          # Validate once: PCRE2 otherwise re-checks the whole text per link.
+          options = text.valid_encoding? ? Regex::MatchOptions::NO_UTF_CHECK : Regex::MatchOptions::None
           String.build do |io|
             pos = 0
-            while m = open_re.match_at_byte_index(text, pos)
+            while m = open_re.match_at_byte_index(text, pos, options)
               from = m.byte_begin(0)
               tail_start = m.byte_end(0)
               io.write bytes[pos, from - pos]
