@@ -265,22 +265,24 @@ module Hwaro
           lines[first...stop].join
         end
 
-        # The custom id (`## Setup {#install}`, `{#install .cls}`) of the
-        # first ATX heading of `markdown` that `heading_section` would match,
-        # or nil when that heading has none (its id is then the slug).
-        def heading_id(markdown : String, heading : String) : String?
-          want = Utils::TextUtils.slugify(heading)
+        # The custom id (`## Setup {#install}`, `{#install .cls}`) of every
+        # ATX heading of `markdown`, by the slug `heading_section` matches a
+        # heading on (look one up with `slugify(heading)`). The first heading
+        # with a slug wins; its id is nil when it has none (its id is then
+        # the slug).
+        def heading_ids(markdown : String) : Hash(String, String?)
+          ids = {} of String => String?
           tracker = FenceTracker.new
           markdown.each_line(chomp: false) do |line|
             next if tracker.fence_line?(line)
             next unless m = ATX_RE.match(line)
             text = m[2]? || ""
             stripped = strip_attribute_block(text)
-            next unless Utils::TextUtils.slugify(visible_text(stripped)) == want
             # An escaped `\{#id}` is heading text, not an id.
-            return if stripped == text
-            return text[/\{\#([\w][\w:-]*)(?:[ \t][^{}]*)?\}\z/, 1]?
+            id = stripped == text ? nil : text[/\{\#([\w][\w:-]*)(?:[ \t][^{}]*)?\}\z/, 1]?
+            ids.put_if_absent(Utils::TextUtils.slugify(visible_text(stripped)), id)
           end
+          ids
         end
 
         # `{first line, level, visible text}` of every heading outside code.

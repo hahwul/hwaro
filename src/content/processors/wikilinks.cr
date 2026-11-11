@@ -129,6 +129,8 @@ module Hwaro
           @by_name = {} of String => Array(Models::Page)
           @by_path = {} of String => Array(Models::Page)
           @files : Hash(String, Array(FileEntry))? = nil
+          # `{content, Includes.heading_ids(content)}` per linked-to page.
+          @heading_ids = {} of Models::Page => {String, Hash(String, String?)}
           @mutex = Mutex.new
 
           # `{relative path, URL, language}`: the language of the page whose
@@ -209,6 +211,19 @@ module Hwaro
               copies.find { |entry| entry[2] == source.language } || copies.find { |entry| entry[2].nil? } || copies.first
             end
             pick(list, source, target) { |entry| {entry[0], File.dirname(entry[0])} }[1]
+          end
+
+          # The custom `{#id}` of `heading` on `page`, nil when it has none.
+          # The page is read once, not once per link (a glossary linked
+          # 8000 times was 8000 scans); the map is dropped when the page's
+          # content is replaced, as a serve rebuild does to an edited page.
+          def heading_id(page : Models::Page, heading : String) : String?
+            raw = page.raw_content
+            ids = @mutex.synchronize do
+              memo = @heading_ids[page]?
+              memo && memo[0].same?(raw) ? memo[1] : (@heading_ids[page] = {raw, Includes.heading_ids(raw)})[1]
+            end
+            ids[Utils::TextUtils.slugify(heading)]?
           end
 
           private def file_matches?(rel : String, want : String) : Bool
@@ -312,10 +327,10 @@ module Hwaro
               return image(link, url, inline)
             end
           elsif link.target.empty?
-            return "[#{text(link.text, inline)}](##{encode(fragment(source, link.heading))})"
+            return "[#{text(link.text, inline)}](##{encode(fragment(source, link.heading, index))})"
           elsif page = index.resolve(link.target, source)
             dest = "@/#{encode(page.path)}"
-            dest += "##{encode(fragment(page, link.heading))}" if link.heading
+            dest += "##{encode(fragment(page, link.heading, index))}" if link.heading
             return "[#{text(link.text, inline)}](#{dest})"
           elsif link.file? && (url = index.resolve_file(link.target, source))
             # An attachment (`[[doc.pdf]]`, `![[doc.pdf]]`): a plain link.
@@ -349,8 +364,8 @@ module Hwaro
 
         # The id `heading` gets on `page`: its custom `{#id}` when the
         # source declares one, else the slug.
-        private def fragment(page : Models::Page, heading : String?) : String
-          heading.try { |h| Includes.heading_id(page.raw_content, h) } || slug(heading)
+        private def fragment(page : Models::Page, heading : String?, index : Index) : String
+          heading.try { |h| index.heading_id(page, h) } || slug(heading)
         end
 
         # Same rule HeadingIds applies to a rendered heading, so the

@@ -49,6 +49,27 @@ describe Hwaro::Content::Processors::Wikilinks do
       wl_rewrite("[[#Here]]", local, idx).should eq("[Here](#here-id)")
     end
 
+    it "resolves heading links in one pass over the target page" do
+      count = 6000
+      long = wl_page("notes/long.md")
+      long.raw_content = String.build { |io| count.times { |i| io << "## Term " << i << "\n\ndefinition\n\n" } }
+      idx = wl_index([long])
+      links = String.build { |io| count.times { |i| io << "- [[#Term " << i << "]]\n" } }
+      started = Time.instant
+      out = wl_rewrite(links, long, idx)
+      (Time.instant - started).should be < 10.seconds # a rescan of the target per link took minutes
+      out.lines.last.should eq("- [Term 5999](#term-5999)")
+    end
+
+    it "reads a page's heading ids again once its content changes" do
+      note = wl_page("notes/Edited.md")
+      idx = wl_index([note])
+      note.raw_content = "## Setup {#one}\n"
+      wl_rewrite("[[#Setup]]", note, idx).should eq("[Setup](#one)")
+      note.raw_content = "## Setup {#two}\n\n## Other\n"
+      wl_rewrite("[[#Setup]] [[Edited#Other|o]]", note, idx).should eq("[Setup](#two) [o](@/notes/Edited.md#other)")
+    end
+
     it "links a block ref to the page without the fragment" do
       wl_rewrite("[[My Note#^abc123]]", src, index).should eq("[My Note](@/notes/My%20Note.md)")
     end

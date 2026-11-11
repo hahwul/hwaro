@@ -96,12 +96,16 @@ describe Hwaro::Content::Processors::Includes do
     end
   end
 
-  describe ".heading_id" do
+  describe ".heading_ids" do
     it "reads an id block but not an escaped one, which is heading text" do
-      Includes.heading_id("## Title {#t}\n", "Title").should eq("t")
-      Includes.heading_id("## Title \\{#t}\n", "Title").should be_nil
-      Includes.heading_id("## Title \\{#t}\n", "Title {#t}").should be_nil
-      Includes.heading_id("## Title \\\\{#t}\n", "Title \\").should eq("t")
+      Includes.heading_ids("## Title {#t}\n").should eq({"title" => "t"})
+      Includes.heading_ids("## Title \\{#t}\n").should eq({Hwaro::Utils::TextUtils.slugify("Title {#t}") => nil})
+      Includes.heading_ids("## Title \\\\{#t}\n").should eq({Hwaro::Utils::TextUtils.slugify("Title \\") => "t"})
+    end
+
+    it "keeps the first heading of a slug and skips fenced ones" do
+      markdown = "```\n## A {#fenced}\n```\n## A\n## A {#late}\n## B {#b .wide}\n"
+      Includes.heading_ids(markdown).should eq({"a" => nil, "b" => "b"})
     end
   end
 
