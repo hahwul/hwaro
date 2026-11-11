@@ -206,6 +206,10 @@ control). This file contains:
 - **Entries** — per-file records with path, mtime, content hash, and output path
   (the output path is also what identifies a removed page's stale file)
 
+Output paths are stored relative to the project root, so the file stays valid
+when the project moves: restored by CI under another checkout path, shared
+between Docker and a native run, or kept across a directory rename.
+
 Add `.hwaro_cache.json` to your `.gitignore` (the one `hwaro init` scaffolds already lists it):
 
 ```gitignore

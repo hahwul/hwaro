@@ -874,6 +874,41 @@ describe "warm --cache builds" do
       File.exists?("public/posts/gone/index.html").should be_true
     end
   end
+
+  # CI restoring the cache under another checkout path, Docker vs native, a
+  # renamed project directory: the entries named the old tree, the prune
+  # refused every one of them, and the pages stayed published for good.
+  it "prunes deleted, drafted and re-slugged pages after the workspace moved" do
+    Dir.mktmpdir do |tmp|
+      before = File.join(tmp, "a")
+      after = File.join(tmp, "b")
+      with_cached_site do |dir|
+        File.write("content/posts/draft.md", "+++\ntitle = \"Draft\"\n+++\nbody")
+        File.write("content/about.md", "+++\ntitle = \"About\"\n+++\nbody")
+        cached_build
+        FileUtils.cp_r(dir, before)
+      end
+      File.rename(before, after)
+
+      Dir.cd(after) do
+        File.exists?("public/legacy/index.html").should be_true
+        File.delete("content/posts/gone.md")
+        File.write("content/posts/draft.md", "+++\ntitle = \"Draft\"\ndraft = true\n+++\nbody")
+        File.write("content/about.md", "+++\ntitle = \"About\"\nslug = \"about-us\"\n+++\nbody")
+        kept = File.info("public/posts/keep/index.html").modification_time
+        cached_build
+
+        File.exists?("public/posts/gone/index.html").should be_false
+        File.exists?("public/legacy/index.html").should be_false
+        File.exists?("public/posts/draft/index.html").should be_false
+        File.exists?("public/about/index.html").should be_false
+        File.exists?("public/about-us/index.html").should be_true
+        # Moving the tree is not an edit: the untouched page stays a cache hit.
+        File.info("public/posts/keep/index.html").modification_time.should eq(kept)
+        File.read(".hwaro_cache.json").should_not contain(File.basename(tmp))
+      end
+    end
+  end
 end
 
 describe "orphaned output deletion" do

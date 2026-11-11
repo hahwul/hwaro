@@ -671,9 +671,9 @@ describe Hwaro::Core::Build::Cache do
         File.write(test_file, "content")
 
         cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
-        cache.update(test_file, output_paths: ["out.json", "out.xml"])
+        cache.update(test_file, output_paths: [File.join(dir, "out.json"), File.join(dir, "out.xml")])
 
-        cache.output_paths_for(test_file).should eq(["out.json", "out.xml"])
+        cache.output_paths_for(test_file).should eq([File.join(dir, "out.json"), File.join(dir, "out.xml")])
       end
     end
 
@@ -684,10 +684,10 @@ describe Hwaro::Core::Build::Cache do
         File.write(test_file, "content")
 
         cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
-        cache.update(test_file, output_paths: ["out.json"])
-        cache.update(test_file, output_paths: ["out.json", "out.xml"])
+        cache.update(test_file, output_paths: [File.join(dir, "out.json")])
+        cache.update(test_file, output_paths: [File.join(dir, "out.json"), File.join(dir, "out.xml")])
 
-        cache.output_paths_for(test_file).should eq(["out.json", "out.xml"])
+        cache.output_paths_for(test_file).should eq([File.join(dir, "out.json"), File.join(dir, "out.xml")])
       end
     end
 
@@ -1068,11 +1068,11 @@ describe Hwaro::Core::Build::Cache do
         File.write(test_file, "content")
 
         cache1 = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
-        cache1.update(test_file, output_paths: ["out.json", "out.xml"])
+        cache1.update(test_file, output_paths: [File.join(dir, "out.json"), File.join(dir, "out.xml")])
         cache1.save
 
         cache2 = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
-        cache2.output_paths_for(test_file).should eq(["out.json", "out.xml"])
+        cache2.output_paths_for(test_file).should eq([File.join(dir, "out.json"), File.join(dir, "out.xml")])
       end
     end
 

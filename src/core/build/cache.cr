@@ -323,11 +323,76 @@ module Hwaro
         # rebuilds that reuse it.
         @racy_copies = Set(String).new
 
+        # The workspace an entry's output paths are anchored to. They are
+        # absolute in memory (what `OutputGuard.safe_output_path` hands the
+        # render) and RELATIVE to this root on disk whenever they lie inside
+        # it, like `CacheMetadata#output_dir`: stored absolute, a cache that
+        # moved with its workspace (CI restoring it under another checkout
+        # path, Docker vs native, a renamed project directory) kept naming
+        # the old tree, the Finalize prune refused every path outside the
+        # current output directory, and a deleted, drafted or re-slugged
+        # page stayed published on every later `--cache` build.
+        @root : String
+
         def initialize(@enabled : Bool = true, @cache_path : String = CACHE_FILE)
           @entries = {} of String => CacheEntry
           @metadata = CacheMetadata.new
           @mutex = Mutex.new
+          @root = @enabled ? File.expand_path(Dir.current) : ""
           load if @enabled
+        end
+
+        # In-memory form of an output path a caller passed to #update: the
+        # render's own output is absolute already, alias stubs and `/page/N/`
+        # files arrive spelled relative to the working directory.
+        private def anchored(path : String) : String
+          path.empty? || Utils::PathUtils.absolute?(path) ? path : File.expand_path(path, @root)
+        end
+
+        # `entry` (a struct copy) with every output path it records mapped.
+        private def map_output_paths(entry : CacheEntry, & : String -> String) : CacheEntry
+          entry.output_path = yield entry.output_path
+          entry.output_paths = entry.output_paths.map { |path| yield path }
+          entry.derived_paths = entry.derived_paths.map { |path| yield path }
+          entry
+        end
+
+        # On-disk form: relative to the workspace when inside it.
+        private def portable(entry : CacheEntry) : CacheEntry
+          map_output_paths(entry) do |path|
+            relative = Utils::PathUtils.relative_path(path, @root)
+            relative && !relative.empty? ? relative : path
+          end
+        end
+
+        # Back to the in-memory form, anchored to where the workspace is NOW.
+        # A plain join on POSIX: #portable strips the root off an
+        # already-canonical path, so there is nothing to normalize, and this
+        # runs for every entry of every warm build. (Windows expands, to get
+        # its own separators back.) Absolute paths — an output directory
+        # outside the workspace, or a cache written before paths were stored
+        # relative — pass through.
+        private def reanchored(entry : CacheEntry) : CacheEntry
+          map_output_paths(entry) do |path|
+            next path if path.empty? || Utils::PathUtils.absolute?(path)
+            {% if flag?(:windows) %}
+              File.expand_path(path, @root)
+            {% else %}
+              File.join(@root, path)
+            {% end %}
+          end
+        end
+
+        # True when an entry names an output outside the directory the cache
+        # says it was built for: a cache written with absolute paths whose
+        # workspace has since moved. Nothing it records can be pruned (or
+        # trusted to exist), so #load treats it like a missing cache.
+        private def foreign_outputs? : Bool
+          return false if @metadata.output_dir.empty?
+          output_root = File.expand_path(@metadata.output_dir, @root)
+          @entries.each_value.any? do |entry|
+            !entry.output_path.empty? && !Utils::PathUtils.within?(entry.output_path, output_root)
+          end
         end
 
         # Set the current build's template and config checksums.
@@ -686,6 +751,9 @@ module Hwaro
           return unless @enabled
           return unless File.exists?(file_path)
 
+          output_path = anchored(output_path)
+          output_paths = output_paths.map { |path| anchored(path) }
+          derived_paths = derived_paths.map { |path| anchored(path) }
           effective_template_hash = template_hash || @current_template_hash
 
           begin
@@ -841,7 +909,7 @@ module Hwaro
               # is a struct, so this leaves @metadata itself untouched.
               stamped = @metadata
               stamped.generator_version = Hwaro::VERSION
-              CacheData.new(metadata: stamped, entries: @entries.values)
+              CacheData.new(metadata: stamped, entries: @entries.values.map! { |entry| portable(entry) })
             end
             # SERVE_CACHE_FILE lives under `.hwaro/`, which may not exist yet.
             parent = File.dirname(@cache_path)
@@ -895,8 +963,15 @@ module Hwaro
             data = CacheData.from_json(content)
             @metadata = data.metadata
             @racy_copies = @metadata.racy_copies.to_set
-            data.entries.each { |e| @entries[e.path] = e }
+            data.entries.each { |e| @entries[e.path] = reanchored(e) }
             @loaded = true
+            if foreign_outputs?
+              Logger.info "  Cache: written for another workspace path — rebuilding from scratch."
+              @entries.clear
+              @metadata = CacheMetadata.new
+              @loaded = false
+              @dirty = true
+            end
           rescue JSON::ParseException | JSON::SerializableError
             # Fall back to legacy format (plain array of entries); mark dirty
             # so the next save upgrades the file to the metadata format even
