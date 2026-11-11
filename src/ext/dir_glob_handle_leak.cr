@@ -14,7 +14,7 @@
 # early — and yields them afterwards. Same paths, same order; the caller's
 # block just runs after the walk instead of in the middle of it.
 class Dir
-  def self.glob(patterns : Enumerable, match : File::MatchOptions = File::MatchOptions.glob_default, follow_symlinks : Bool = false, &block : String -> _)
+  def self.glob(patterns : Enumerable, match : File::MatchOptions = File::MatchOptions.glob_default, follow_symlinks : Bool = false, & : String -> _)
     paths = [] of String
     previous_def(patterns, match, follow_symlinks) { |path| paths << path }
     paths.each { |path| yield path }
