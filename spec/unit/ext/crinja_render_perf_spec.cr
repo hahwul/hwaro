@@ -304,4 +304,47 @@ describe "ext/crinja_render_perf" do
       template.render({"name" => Crinja::Value.new("three")}).should eq("<three>")
     end
   end
+
+  describe "render bindings" do
+    it "does not write template assignments back into the caller's hash" do
+      bindings = {"name" => Crinja::Value.new("one")}
+      template = Crinja.new.from_string("{% set name = 'two' %}{% set extra = 1 %}{{ name }}")
+
+      template.render(bindings).should eq("two")
+      bindings.keys.should eq(["name"])
+      bindings["name"].to_s.should eq("one")
+    end
+
+    it "resolves every binding of a large set" do
+      bindings = Hash(String, Crinja::Value).new
+      100.times { |i| bindings["v#{i}"] = Crinja::Value.new(i) }
+      source = (0...100).map { |i| "{{ v#{i} }}" }.join(",")
+
+      Crinja.new.from_string(source).render(bindings).should eq((0...100).join(","))
+    end
+  end
+
+  describe "Crinja.dictionary" do
+    it "keeps keys, values and insertion order past the presize threshold" do
+      [3, 8, 9, 70].each do |size|
+        source = Hash(String, Crinja::Value).new
+        size.times { |i| source["k#{size - i}"] = Crinja::Value.new(i) }
+
+        dict = Crinja.dictionary(source)
+
+        dict.size.should eq(size)
+        dict.keys.map(&.to_s).should eq(source.keys)
+        dict.values.map(&.to_s).should eq(source.values.map(&.to_s))
+      end
+    end
+
+    it "iterates a large object in insertion order from a template" do
+      source = Hash(String, Crinja::Value).new
+      20.times { |i| source["k#{i}"] = Crinja::Value.new(i) }
+
+      Crinja.new.from_string("{% for k, v in obj %}{{ k }}={{ v }};{% endfor %}")
+        .render({"obj" => Crinja::Value.new(source)})
+        .should eq((0...20).map { |i| "k#{i}=#{i};" }.join)
+    end
+  end
 end

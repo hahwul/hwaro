@@ -26,7 +26,12 @@ module Hwaro::Core::Build::Phases::Render
     # entries including heavy __all_pages__) because page vars are the
     # smaller set (~50 entries) and we only iterate global_vars once via
     # merge! rather than duplicating it per page.
-    vars = {} of String => Crinja::Value
+    #
+    # Sized up front for the usual 59–72 entries (page vars + ~30 globals):
+    # growing from empty reallocates the table four times on the way there,
+    # and the last table is a large object that takes the GC's global lock
+    # (see src/ext/crinja_render_perf.cr). Larger sets grow once more.
+    vars = Hash(String, Crinja::Value).new(initial_capacity: 64)
 
     effective_url = page_url_override || page.url
 
