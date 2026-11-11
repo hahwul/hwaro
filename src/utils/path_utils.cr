@@ -16,6 +16,17 @@ module Hwaro
         path.rstrip(File::SEPARATOR)
       end
 
+      # `File.file?` for an entry found by walking a user's tree. It follows
+      # symlinks, and only a MISSING target answers false: a link that
+      # cannot be resolved at all (`ln -s loop.md loop.md` fails with ELOOP)
+      # raises `File::Error`, which took the whole build down over a link
+      # the copiers had already warned about and skipped.
+      def file?(path : String) : Bool
+        File.file?(path)
+      rescue File::Error
+        false
+      end
+
       # True when the normalized relative *path* climbs out of its base: its
       # first segment is exactly `..`. A string-prefix test also matched
       # legal names such as `..public`.

@@ -712,6 +712,30 @@ describe "responsive variants with a trailing-slash output directory" do
   end
 end
 
+describe "responsive variants beside a looping symlink" do
+  # The copiers warn and skip such a link; the variant scan then stat'ed it
+  # (ELOOP raises) and failed the whole build.
+  it "skips the link and still resizes the real images" do
+    posix_only!("symlinks")
+    build_site(
+      %(title = "t"\nbase_url = "https://example.com"\n[image_processing]\nenabled = true\nwidths = [8]\n),
+      content_files: {"posts/_index.md" => "+++\ntitle = \"P\"\n+++\n", "posts/b/index.md" => "+++\ntitle = \"B\"\n+++\nbody\n", "posts/b/pic.png" => png_body(16, 16)},
+      template_files: {"page.html" => "{{ content }}", "section.html" => "{{ content }}", "index.html" => "{{ content }}"},
+      static_files: {"img/a.png" => png_body(16, 16)},
+    ) do |_, builder|
+      File.symlink("loop.png", "static/img/loop.png")
+      File.symlink("loop.png", "content/posts/b/loop.png")
+      File.symlink("loop.md", "content/posts/loop.md")
+      FileUtils.rm_rf("public")
+
+      builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", highlight: false, parallel: false)).should be_true
+      File.exists?("public/img/a_8w.png").should be_true
+      File.exists?("public/posts/b/pic_8w.png").should be_true
+      File.exists?("public/posts/b/index.html").should be_true
+    end
+  end
+end
+
 private def rebuild_cached : Nil
   builder = Hwaro::Core::Build::Builder.new
   Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }

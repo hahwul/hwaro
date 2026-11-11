@@ -704,6 +704,25 @@ describe Hwaro::Models::Page do
       end
     end
 
+    # `ln -s loop.md content/posts/loop.md`: stat'ing the link fails with
+    # ELOOP, which `File.file?` raises — the whole build died on a link the
+    # read phase had just warned it was skipping.
+    it "skips a looping symlink instead of raising" do
+      posix_only!("symlinks")
+      Dir.mktmpdir do |dir|
+        bundle = File.join(dir, "posts")
+        FileUtils.mkdir_p(bundle)
+        File.write(File.join(bundle, "_index.md"), "# Section")
+        File.write(File.join(bundle, "pic.png"), "x")
+        File.symlink("loop.md", File.join(bundle, "loop.md"))
+        File.symlink("loop.png", File.join(bundle, "loop.png"))
+
+        page = Hwaro::Models::Page.new("posts/_index.md")
+        page.is_index = true
+        page.collect_assets(dir).should eq(["posts/pic.png"])
+      end
+    end
+
     it "honors [content.files] allow/disallow when content_files is enabled" do
       Dir.mktmpdir do |dir|
         bundle = File.join(dir, "post")

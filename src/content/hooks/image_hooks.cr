@@ -790,7 +790,7 @@ module Hwaro
           # variants: the raw copy itself is withheld (Phases::Write).
           withheld = builder.try(&.withheld_bundle_dirs) || Set(String).new
           Dir.glob(File.join("content", "**", "*")).each do |file|
-            next unless File.file?(file)
+            next unless Hwaro::Utils::PathUtils.file?(file)
             next unless Processors::ImageProcessor.image?(file)
             next unless safe_path?(file, "content")
             relative = Path[file].relative_to("content").to_s
@@ -824,7 +824,7 @@ module Hwaro
           # too. Excluded cruft is filtered out just below.
           glob_match = File::MatchOptions.glob_default | File::MatchOptions::DotFiles
           Dir.glob(File.join("static", "**", "*"), match: glob_match).each do |file|
-            next unless File.file?(file)
+            next unless Hwaro::Utils::PathUtils.file?(file)
             next unless Processors::ImageProcessor.image?(file)
             next unless safe_path?(file, "static")
 
@@ -874,7 +874,7 @@ module Hwaro
           count = 0
           changed_paths.each do |src_path|
             next unless Processors::ImageProcessor.image?(src_path)
-            next unless File.file?(src_path)
+            next unless Hwaro::Utils::PathUtils.file?(src_path)
 
             if src_path.starts_with?("static/")
               next unless safe_source_path?(src_path, "static")
