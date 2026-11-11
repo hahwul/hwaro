@@ -25,7 +25,14 @@ module Hwaro
         # `(?:[^"\\]|\\.)*`, `caption="The \"big\" reveal"` matched only up to the
         # first escaped quote: the value silently became `The \` and the rest of
         # the argument list was mis-split.
-        SHORTCODE_ARGS_REGEX  = /(\w+)\s*=\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([^,\s]+))/
+        #
+        # The quoted loops are possessive, here and in BLOCK_OPEN_RE: a value
+        # reads one way only (a `\` always takes the next character, anything
+        # else but the quote stands alone), so no shorter read can end on the
+        # closing quote. Backtracking kept one JIT frame per character, and a
+        # 50 KB value (a base64 data URI) failed the build with "JIT stack
+        # limit reached".
+        SHORTCODE_ARGS_REGEX  = /(\w+)\s*=\s*(?:"((?:[^"\\]++|\\.)*+)"|'((?:[^'\\]++|\\.)*+)'|([^,\s]+))/
         MAX_SHORTCODE_NESTING = 5
         # Each value parses one way only — a quoted value when its closing
         # quote is followed by a separator or the next `key=`, otherwise an
@@ -34,7 +41,7 @@ module Hwaro
         # a failing tag (ten quoted args and a stray word, or a URL with a
         # long query string and a `%`) backtracked exponentially into
         # PCRE2's match limit, and the Regex::Error aborted the build.
-        BLOCK_OPEN_RE = /\{\%\s*([a-zA-Z_][\w\-]*)\s*(?:\((.*?)\)|((?:\w+\s*=\s*(?>"(?:[^"\\]|\\.)*"(?=[\s,%]|\w+\s*=)|'(?:[^'\\]|\\.)*'(?=[\s,%]|\w+\s*=)|[^,%\s]++)\s*+,?\s*+)*))\s*\%\}/
+        BLOCK_OPEN_RE = /\{\%\s*([a-zA-Z_][\w\-]*)\s*(?:\((.*?)\)|((?:\w+\s*=\s*(?>"(?:[^"\\]++|\\.)*+"(?=[\s,%]|\w+\s*=)|'(?:[^'\\]++|\\.)*+'(?=[\s,%]|\w+\s*=)|[^,%\s]++)\s*+,?\s*+)*))\s*\%\}/
         # Support both bare {% end %} and named {% endNAME %}.
         BLOCK_CLOSE_RE = /\{\%\s*end(?:\s+[a-zA-Z_][\w\-]*)?\s*\%\}/i
         # Broader close matcher for the outer fence loop's block pairing: it

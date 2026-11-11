@@ -67,6 +67,37 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
     end
   end
 
+  describe "long quoted argument values" do
+    # The patterns before their quoted-value loops became possessive: one
+    # backtracking frame per character, so a 50 KB value (a base64 data
+    # URI) raised "JIT stack limit reached" and failed the build.
+    old_args = /(\w+)\s*=\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([^,\s]+))/
+    old_open = /\{\%\s*([a-zA-Z_][\w\-]*)\s*(?:\((.*?)\)|((?:\w+\s*=\s*(?>"(?:[^"\\]|\\.)*"(?=[\s,%]|\w+\s*=)|'(?:[^'\\]|\\.)*'(?=[\s,%]|\w+\s*=)|[^,%\s]++)\s*+,?\s*+)*))\s*\%\}/
+    matches = ->(text : String, regex : Regex) { text.scan(regex).map { |m| {m.byte_begin, m.byte_end, m.to_a} } }
+
+    it "matches exactly what the backtracking patterns matched" do
+      rng = Random.new(20261111)
+      alphabet = ["k=", "k =", "\"", "'", "\\", "\\\"", "\\'", "\\\\", "a", "b c", " ", ",", "\n", "é", "%", "(", ")", "{% n ", " %}", "="]
+      20_000.times do
+        text = String.build { |io| rng.rand(1..12).times { io << alphabet.sample(rng) } }
+        matches.call(text, Hwaro::Core::Build::ShortcodeProcessor::SHORTCODE_ARGS_REGEX).should eq(matches.call(text, old_args)), text.inspect
+        tag = "{% n k=#{text} %}"
+        matches.call(tag, Hwaro::Core::Build::ShortcodeProcessor::BLOCK_OPEN_RE).should eq(matches.call(tag, old_open)), tag.inspect
+      end
+    end
+
+    it "expands a call and a block whose quoted value is 200 KB" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/note" => %(<b>{{ text | length }}{{ body }}</b>)}
+      big = "a" * 200_000
+      builder.test_sc_parse_args(%(text="#{big}"))["text"].bytesize.should eq(200_000)
+      builder.test_sc_parse_args(%(text='#{big}'))["text"].bytesize.should eq(200_000)
+      builder.test_sc_process(%({{ note(text="#{big}") }}), templates).should contain("<b>200000</b>")
+      builder.test_sc_process(%({% note text="#{big}" %}x{% end %}), templates).should contain("<b>200000x</b>")
+      builder.test_sc_process(%({% note text='#{big}' %}x{% end %}), templates).should contain("<b>200000x</b>")
+    end
+  end
+
   describe "block shortcodes with arguments" do
     it "passes named args from a block shortcode opening tag" do
       builder = Hwaro::Core::Build::Builder.new
