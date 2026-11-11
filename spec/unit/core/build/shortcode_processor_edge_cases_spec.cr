@@ -40,6 +40,33 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
     result.scan("<b>x</b>").size.should eq(30_000)
   end
 
+  # Scaling, not a wall-clock constant (see markd_regex_stack_fix_spec):
+  # linear work grows ~4x on a 4x input, a UTF-8 check of the whole text
+  # per tag ~16x.
+  describe "pre-filters on large input" do
+    best = ->(block : -> Bool) { Array.new(3) { started = Time.instant; block.call.should be_false; Time.instant - started }.min }
+
+    it "decides a template full of control tags needs no shortcode pass in linear time" do
+      builder = Hwaro::Core::Build::Builder.new
+      template = ->(count : Int32) { %(<p class="a">{{ page.title }} {% if page.draft %}d{% endif %}</p>\n) * count }
+      small_text, large_text = template.call(3000), template.call(12000)
+      small = best.call(-> { builder.shortcode_scan_needed?(small_text) })
+      large = best.call(-> { builder.shortcode_scan_needed?(large_text) })
+      ratio = large / {small, 1.millisecond}.max
+      ratio.should be < 9.0, "#{small.total_milliseconds.round}ms -> #{large.total_milliseconds.round}ms"
+    end
+
+    it "skips a long line of shortcode examples in code spans in linear time" do
+      builder = Hwaro::Core::Build::Builder.new
+      line = ->(count : Int32) { %(é `{{ note(text="hi") }}` ) * count }
+      small_text, large_text = line.call(3000), line.call(12000)
+      small = best.call(-> { builder.test_content_may_contain_shortcodes?(small_text) })
+      large = best.call(-> { builder.test_content_may_contain_shortcodes?(large_text) })
+      ratio = large / {small, 1.millisecond}.max
+      ratio.should be < 9.0, "#{small.total_milliseconds.round}ms -> #{large.total_milliseconds.round}ms"
+    end
+  end
+
   describe "block shortcodes with arguments" do
     it "passes named args from a block shortcode opening tag" do
       builder = Hwaro::Core::Build::Builder.new

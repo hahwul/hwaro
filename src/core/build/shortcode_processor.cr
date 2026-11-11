@@ -105,17 +105,30 @@ module Hwaro
           false
         end
 
+        # Byte offsets and one UTF-8 check for the line (see
+        # `utf_checked_once`): a char-position match per code span converted
+        # the offset and re-validated the line each time, quadratic on a long
+        # line of spans.
         private def has_shortcode_token_outside_inline_code?(line : String) : Bool
+          options = utf_checked_once(line)
           pos = 0
-          while match = INLINE_CODE_RE.match(line, pos)
-            before = line[pos...match.begin]
+          while match = INLINE_CODE_RE.match_at_byte_index(line, pos, options)
+            before = line.byte_slice(pos, match.byte_begin - pos)
             return true if before.includes?("{{") || before.includes?("{%")
 
-            pos = match.begin + match[0].size
+            pos = match.byte_end
           end
 
-          tail = line[pos..]
+          tail = line.byte_slice(pos)
           tail.includes?("{{") || tail.includes?("{%")
+        end
+
+        # Match options for a loop of matches over `text`: PCRE2 re-validates
+        # the UTF-8 of the whole subject on every match call, so a text with
+        # thousands of tags paid O(text) per tag. Validate once instead;
+        # invalid text keeps the check, and PCRE2's own error for it.
+        private def utf_checked_once(text : String) : Regex::MatchOptions
+          text.valid_encoding? ? Regex::MatchOptions::NO_UTF_CHECK : Regex::MatchOptions::None
         end
 
         # Process shortcodes in content (Jinja2/Crinja style)
@@ -519,9 +532,9 @@ module Hwaro
 
         # True when `text` carries at least one shortcode named closer (i.e.
         # one that `normalize_named_closers` would actually rewrite).
-        private def named_closer?(text : String) : Bool
+        private def named_closer?(text : String, options : Regex::MatchOptions) : Bool
           pos = 0
-          while m = NAMED_CLOSER_RE.match_at_byte_index(text, pos)
+          while m = NAMED_CLOSER_RE.match_at_byte_index(text, pos, options)
             return true unless CRINJA_CONTROL_KEYWORDS.includes?(m[1].downcase)
             pos = m.byte_begin + m[0].bytesize
           end
@@ -543,15 +556,11 @@ module Hwaro
         # call, or a non-control `{% name %}` block opener.
         def shortcode_scan_needed?(text : String) : Bool
           return false unless Utils::ByteScan.includes?(text, "{{") || Utils::ByteScan.includes?(text, "{%")
-          return true if named_closer?(text)
+          options = utf_checked_once(text)
+          return true if named_closer?(text, options)
           return true if SHORTCODE_CALL_SCAN_RE.matches?(text)
 
-          pos = 0
-          while m = BLOCK_OPEN_RE.match_at_byte_index(text, pos)
-            return true unless control_tag_open?(m)
-            pos = m.byte_begin + m[0].bytesize
-          end
-          false
+          !next_block_open(text, 0, options).nil?
         end
 
         private def process_shortcodes_in_chunk(content : String, templates : Hash(String, String), context : Hash(String, Crinja::Value), shortcode_results : Hash(String, String)?, crinja_env_override : Crinja?, template_cache_override : Hash(UInt64, Crinja::Template)?, depth : Int32, spans : Array(String) = [] of String, warnings : Array(String)? = nil) : String
@@ -700,10 +709,7 @@ module Hwaro
           end
 
           close_re = BLOCK_CLOSE_RE
-          # PCRE2 re-validates the UTF-8 of the whole remaining subject on
-          # every match call, so a page with thousands of block shortcodes
-          # paid O(document) per tag — quadratic overall. Validate once.
-          match_opts = content.valid_encoding? ? Regex::MatchOptions::NO_UTF_CHECK : Regex::MatchOptions::None
+          match_opts = utf_checked_once(content)
 
           result = String::Builder.new
           pos = 0
