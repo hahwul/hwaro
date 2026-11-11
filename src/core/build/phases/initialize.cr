@@ -860,7 +860,7 @@ module Hwaro::Core::Build::Phases::Initialize
         # it, so any `section` text it prints (raw, quoted) is a read too.
         needs_section_pages: closure.any? { |dep|
           src = templates[dep]
-          dep.starts_with?("shortcodes/") ? src.includes?("section") : template_reads_variable?(src, "section")
+          dep.starts_with?("shortcodes/") ? src.includes?("section") : template_reads_section_pages?(src)
         },
         # Targeted on purpose — see the record's doc comment. These feed the
         # render worker heuristic, where a false positive costs parallelism.
@@ -870,22 +870,50 @@ module Hwaro::Core::Build::Phases::Initialize
     end
   end
 
-  # Whether `source` can read the top-level variable `name`. A substring test
-  # also hit `page.section`, `<section>` and comments, so nearly every
-  # template paid the O(section size) per-page `section.pages` copy —
-  # quadratic on a large section. Lexed instead: only an identifier token
-  # that is not an attribute (`x.section`) counts. Over-approximates
-  # (`{% set section = … %}` counts) and a lexer error counts as a read.
-  private def template_reads_variable?(source : String, name : String) : Bool
-    return false unless source.includes?(name)
+  # `section.<name>` reads that cannot observe `section.pages` or
+  # `section.pages_count` — every other key of the object
+  # build_template_variables assembles.
+  SECTION_ATTRIBUTES_WITHOUT_PAGES = {
+    "title", "description", "list", "subsections", "assets",
+    "page_template", "paginate_path", "redirect_to",
+  }
+
+  # Whether `source` can observe the per-page `section.pages` array (or its
+  # count). A substring test also hit `page.section`, `<section>` and
+  # comments, so nearly every template paid the O(section size) per-page
+  # copy — quadratic on a large section. Lexed instead: only an identifier
+  # token `section` that is not itself an attribute (`x.section`) counts, and
+  # not when it is immediately read as one of the attributes above — a
+  # breadcrumb's `{{ section.title }}` cost every page of a 32k-page section
+  # the same copy. Over-approximates: `section` alone (assigned, passed,
+  # filtered, subscripted), `section.pages`, any attribute not listed, and a
+  # lexer error all count as a read.
+  private def template_reads_section_pages?(source : String) : Bool
+    return false unless source.includes?("section")
     lexer = Crinja::Parser::TemplateLexer.new(Content::Processors::Template.engine.env.config, source)
     after_point = false
+    # :none, :section (just lexed `section`) or :attribute (lexed `section.`).
+    pending = :none
     # Each token consumes input; the cap only guards against a lexer stall.
     (source.bytesize + 2).times do
       token = lexer.next_token
+      case pending
+      when :section
+        return true unless token.kind.point?
+        pending = :attribute
+        next
+      when :attribute
+        return true unless token.kind.identifier? && SECTION_ATTRIBUTES_WITHOUT_PAGES.includes?(token.value)
+        pending = :none
+        after_point = false
+        next
+      end
       return false if token.kind.eof?
-      return true if token.kind.identifier? && token.value == name && !after_point
-      after_point = token.kind.point?
+      if token.kind.identifier? && token.value == "section" && !after_point
+        pending = :section
+      else
+        after_point = token.kind.point?
+      end
     end
     true
   rescue

@@ -479,6 +479,33 @@ describe Hwaro::Core::Build::Phases::Initialize do
       end
     end
 
+    it "skips the section.pages copy for templates that only read section attributes other than the pages" do
+      # `{{ section.title }}` in a page template (a breadcrumb) still paid the
+      # copy of every sibling page per page: 32k pages in one section took 30 s
+      # where `{{ page.section }}` took 5.
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("templates")
+          File.write("templates/crumb.html", %(<nav>{{ section.title }} {{ section.description | upper }} {{ section . list }}{% if section.redirect_to %}x{% endif %}</nav>))
+          File.write("templates/count.html", %({{ section.title }} {{ section.pages_count }}))
+          File.write("templates/loop.html", %({% for p in section.pages %}{{ p.title }}{% endfor %}))
+          File.write("templates/subscript.html", %({{ section["pages"] | length }}))
+          File.write("templates/whole.html", %({{ section | length }}))
+          File.write("templates/passed.html", %({{ section.title }}{{ render_nav(section) }}))
+          File.write("templates/unknown.html", %({{ section.pagez }}))
+          File.write("templates/trailing.html", %({{ section.title }} {{ section }}))
+
+          builder = Hwaro::Core::Build::Builder.new
+          builder.test_load_templates
+          features = builder.test_template_var_features
+          features["crumb"]?.try(&.needs_section_pages).should be_false
+          %w[count loop subscript whole passed unknown trailing].each do |name|
+            features[name]?.try(&.needs_section_pages).should be_true
+          end
+        end
+      end
+    end
+
     it "keeps the section.pages copy for a template whose shortcode prints a `section` read" do
       # A template-invoked shortcode's output is compiled with the template,
       # so a raw `{{ section.pages }}` it prints reads `section` although no

@@ -361,7 +361,8 @@ module Hwaro::Core::Build::Phases::Render
         default_lang = config.default_language
         section_pages_array = paginator.pages.map { |p| page_to_crinja_list_value(p, default_lang) }
       elsif features && !features.needs_section_pages
-        # The template's closure never mentions `section`, so the O(section
+        # The template's closure never reads `section.pages` or its count
+        # (see Initialize#template_reads_section_pages?), so the O(section
         # size) minus-current copy below can never be observed — on a flat
         # N-page site it was the only super-linear per-page cost (N-1
         # element copies for every page). section_pages_array stays empty.
