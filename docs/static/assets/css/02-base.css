@@ -27,6 +27,12 @@ body {
     text-rendering: optimizeLegibility;
 }
 
+/* Korean wraps between words, never inside one. */
+:lang(ko) {
+    word-break: keep-all;
+    overflow-wrap: break-word;
+}
+
 ::selection {
     background: var(--selection);
 }

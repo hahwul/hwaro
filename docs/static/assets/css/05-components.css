@@ -162,11 +162,11 @@ ul.page-list li {
 }
 
 .pn-label {
-    font-family: var(--font-mono);
-    font-size: 0.65rem;
-    font-weight: 600;
+    font-family: var(--font-pixel);
+    font-size: 0.68rem;
+    font-weight: 400;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.06em;
     color: var(--text-muted);
 }
 
@@ -287,9 +287,10 @@ ul.page-list li {
 }
 
 .error-page .error-code {
-    font-size: clamp(3.5rem, 10vw, 5rem);
-    font-weight: 650;
-    letter-spacing: -0.03em;
+    font-family: var(--font-pixel);
+    font-size: clamp(3.5rem, 10vw, 5.5rem);
+    font-weight: 400;
+    letter-spacing: 0;
     line-height: 1;
     color: var(--heading);
     margin: 0;
@@ -298,11 +299,12 @@ ul.page-list li {
 .error-page .error-code::after {
     content: "";
     display: block;
-    width: 56px;
-    height: 3px;
+    width: 68px;
+    height: 8px;
     margin: var(--space-4) auto 0;
-    border-radius: 999px;
     background: var(--spark);
+    -webkit-mask: repeating-linear-gradient(90deg, #000 0 8px, transparent 8px 12px);
+    mask: repeating-linear-gradient(90deg, #000 0 8px, transparent 8px 12px);
 }
 
 .error-page p {
@@ -327,4 +329,60 @@ ul.page-list li {
 .error-home:hover {
     color: var(--primary);
     border-color: var(--primary);
+}
+
+/* =============================================================================
+   Pixel outline — the docs' share of the landing's pixel grammar
+   Framed blocks swap their 1px border for four 2px strips that stop short of
+   the corners, so every frame reads as a stepped pixel shape. It is a
+   box-shadow, not a clip-path: focus rings and scrolling stay untouched.
+   Recolor per element or state with --ring.
+   ============================================================================= */
+
+.docs-main pre,
+.table-scroll,
+.card,
+.pn-card,
+.search-trigger,
+.theme-toggle,
+.lang-switch-btn,
+.error-home {
+    border: 0;
+    box-shadow:
+        0 -2px var(--ring, var(--border)),
+        0 2px var(--ring, var(--border)),
+        -2px 0 var(--ring, var(--border)),
+        2px 0 var(--ring, var(--border));
+    transition:
+        box-shadow var(--transition),
+        color var(--transition),
+        background var(--transition);
+}
+
+.docs-main pre,
+.table-scroll {
+    --ring: var(--border-subtle);
+}
+
+.card:hover,
+.pn-card:hover {
+    --ring: color-mix(in srgb, var(--primary) 55%, var(--border));
+}
+
+.search-trigger:hover,
+.lang-switch-btn:hover {
+    --ring: var(--text-muted);
+}
+
+.theme-toggle:hover,
+.error-home:hover {
+    --ring: var(--primary);
+}
+
+/* The phone header's icon-only controls carry no frame at all. */
+@media (max-width: 768px) {
+    .search-trigger,
+    .lang-switch-btn {
+        box-shadow: none;
+    }
 }

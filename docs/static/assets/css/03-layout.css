@@ -20,7 +20,7 @@
     border-bottom: 1px solid var(--border-subtle);
     display: flex;
     align-items: center;
-    padding: 0 var(--space-5);
+    padding: 0 max(var(--space-5), calc((100% - var(--page-max)) / 2 + var(--space-5)));
     z-index: 100;
 }
 
@@ -169,15 +169,14 @@
     align-items: center;
     gap: 1px;
     padding: 2px 5px;
-    font-family: var(--font-mono);
+    font-family: var(--font-pixel);
     font-size: 0.62rem;
-    font-weight: 500;
+    font-weight: 400;
     letter-spacing: 0.02em;
     line-height: 1.2;
     color: var(--text-muted);
     background: var(--bg-subtle);
     border: 1px solid var(--border);
-    border-radius: 4px;
 }
 
 .header-divider {
@@ -319,21 +318,41 @@
    Layout container
    ============================================================================= */
 
+/* One centered frame: sidebar | article | TOC. The side columns are sticky
+   rather than fixed so the whole frame can be capped at --page-max and stay
+   together on wide screens. The article keeps column 2 on pages without a
+   TOC too, so its left edge never jumps between pages. */
 .docs-container {
-    display: flex;
+    display: grid;
+    grid-template-columns: var(--sidebar-w) minmax(0, 1fr) var(--toc-w);
+    max-width: var(--page-max);
+    margin-inline: auto;
     padding-top: var(--header-h);
     min-height: 100dvh;
 }
 
+/* Sidebar-less pages (404, taxonomy terms, shortcode market) flow as a block. */
+.docs-container:not(:has(.docs-sidebar)) {
+    display: block;
+}
+
+.docs-container:not(:has(.docs-sidebar)) .docs-main {
+    margin-inline: auto;
+}
+
+.sidebar-overlay {
+    display: none;
+}
+
 /* =============================================================================
-   Sidebar — fixed left navigation
+   Sidebar — sticky left navigation
    ============================================================================= */
 
 .docs-sidebar {
-    position: fixed;
+    grid-column: 1;
+    position: sticky;
     top: var(--header-h);
-    left: 0;
-    width: var(--sidebar-w);
+    align-self: start;
     height: calc(100dvh - var(--header-h));
     background: var(--bg);
     border-right: 1px solid var(--border-subtle);
@@ -371,11 +390,11 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-family: var(--font-mono);
-    font-size: 0.66rem;
-    font-weight: 600;
+    font-family: var(--font-pixel);
+    font-size: 0.72rem;
+    font-weight: 400;
     text-transform: uppercase;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.06em;
     color: var(--text-muted);
     padding: 0.5rem 0.5rem 0.5rem 0.75rem;
     border-radius: var(--radius-sm);
@@ -398,9 +417,8 @@
 
 .sidebar-title::before {
     content: "";
-    width: 5px;
-    height: 5px;
-    border-radius: 1px;
+    width: 6px;
+    height: 6px;
     background: var(--border);
     flex-shrink: 0;
     transition: background 0.25s ease, box-shadow 0.25s ease;
@@ -558,21 +576,20 @@ details[open] > summary .sidebar-chevron {
     left: -1px;
     top: 50%;
     transform: translateY(-50%);
-    width: 2px;
-    height: 60%;
-    border-radius: 999px;
-    background: var(--spark);
+    width: 4px;
+    height: 12px;
+    background: var(--primary);
 }
 
 /* =============================================================================
-   TOC — fixed right
+   TOC — sticky right
    ============================================================================= */
 
 .docs-toc {
-    position: fixed;
+    grid-column: 3;
+    position: sticky;
     top: var(--header-h);
-    right: 0;
-    width: var(--toc-w);
+    align-self: start;
     height: calc(100dvh - var(--header-h));
     padding: var(--space-6) var(--space-4) var(--space-7);
     overflow-y: auto;
@@ -589,11 +606,11 @@ details[open] > summary .sidebar-chevron {
 }
 
 .toc-title {
-    font-family: var(--font-mono);
-    font-size: 0.66rem;
-    font-weight: 600;
+    font-family: var(--font-pixel);
+    font-size: 0.7rem;
+    font-weight: 400;
     text-transform: uppercase;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.06em;
     color: var(--text-muted);
     margin-bottom: var(--space-3);
 }
@@ -612,8 +629,8 @@ details[open] > summary .sidebar-chevron {
     position: relative;
     display: block;
     padding: 0.3rem 0.75rem;
-    color: var(--text-muted);
-    font-size: 0.79rem;
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
     line-height: 1.5;
     border-left: 1px solid transparent;
     margin-left: -1px;
@@ -629,35 +646,27 @@ details[open] > summary .sidebar-chevron {
     color: var(--primary);
 }
 
-/* Active marker — a tapering ember streak along the guide line. */
+/* Active marker — one lit cell on the guide line. */
 .docs-toc a.active::before {
     content: "";
     position: absolute;
-    left: -1px;
+    left: -2px;
     top: 50%;
     transform: translateY(-50%);
-    width: 2px;
-    height: 180%;
+    width: 4px;
+    height: 12px;
     pointer-events: none;
-    border-radius: 999px;
-    background: linear-gradient(
-        180deg,
-        transparent 0%,
-        var(--rule-from) 30%,
-        var(--primary) 50%,
-        var(--rule-to) 70%,
-        transparent 100%
-    );
+    background: var(--primary);
 }
 
 .docs-toc ul ul a {
     padding-left: 1.35rem;
-    font-size: 0.75rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
 }
 
 .docs-toc ul ul ul a {
     padding-left: 1.9rem;
-    font-size: 0.75rem;
 }
 
 /* =============================================================================
@@ -665,21 +674,14 @@ details[open] > summary .sidebar-chevron {
    ============================================================================= */
 
 .docs-main {
-    flex: 1;
-    margin-left: var(--sidebar-w);
-    margin-right: var(--toc-w);
-    padding: var(--space-6) var(--space-7) var(--space-7);
-    max-width: calc(100% - var(--sidebar-w) - var(--toc-w));
+    --main-pad: clamp(1.5rem, 4vw, 4rem);
+    grid-column: 2;
+    justify-self: center;
+    width: 100%;
+    max-width: calc(var(--prose) + 2 * var(--main-pad));
+    padding: var(--space-6) var(--main-pad) var(--space-7);
     min-width: 0;
-}
-
-.docs-main > * {
-    max-width: 44rem;
-}
-
-.docs-main.no-toc {
-    margin-right: 0;
-    max-width: calc(100% - var(--sidebar-w));
+    font-size: var(--text-docs);
 }
 
 /* =============================================================================
@@ -687,14 +689,13 @@ details[open] > summary .sidebar-chevron {
    ============================================================================= */
 
 /* Hide TOC on medium screens. */
-@media (max-width: 1280px) {
-    .docs-toc {
-        display: none;
+@media (max-width: 1180px) {
+    .docs-container {
+        grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
     }
 
-    .docs-main {
-        margin-right: 0;
-        max-width: calc(100% - var(--sidebar-w));
+    .docs-toc {
+        display: none;
     }
 }
 
@@ -710,15 +711,16 @@ details[open] > summary .sidebar-chevron {
     .search-trigger-label {
         display: none;
     }
-
-    .docs-main {
-        padding: var(--space-6) var(--space-6) var(--space-7);
-    }
 }
 
 /* Mobile: sidebar becomes a drawer. */
 @media (max-width: 768px) {
+    .docs-container {
+        display: block;
+    }
+
     .docs-sidebar {
+        position: fixed;
         left: -110%;
         width: min(300px, 84vw);
         z-index: 200;
@@ -746,10 +748,7 @@ details[open] > summary .sidebar-chevron {
         display: block;
     }
 
-    .docs-main,
-    .docs-main.no-toc {
-        margin-left: 0;
-        margin-right: 0;
+    .docs-main {
         padding: var(--space-5) var(--space-4) var(--space-6);
         max-width: 100%;
     }

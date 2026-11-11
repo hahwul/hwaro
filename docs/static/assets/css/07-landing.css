@@ -1,20 +1,34 @@
 /* =============================================================================
-   Hwaro Landing — ember editorial, dark-locked
+   Hwaro Landing — "pixel hearth", dark-locked
    The page hardcodes data-theme="dark", so every token resolves to its dark
-   side here. All rules stay scoped to landing classes.
+   side here. The pixel flame from the logo is the page's one motif: a live
+   pixel fire under the hero, a pixel face for small labels and figures, and
+   stepped ("notched") corners on every filled block. All rules stay scoped
+   to landing classes.
    ============================================================================= */
 
 .landing-body {
-    /* The landing sits a step deeper than the docs: close to the original
-       pure-black stage, so the fire art and embers carry the scene. */
+    /* The landing sits a step deeper than the docs, so the fire carries
+       the scene. */
     --bg: #070709;
     --bg-subtle: #101014;
     --bg-code: #121216;
     --border: #222229;
     --border-subtle: #17171c;
     --glass: rgba(7, 7, 9, 0.82);
+    /* Stepped corners: one pixel step of 4px (controls) or 8px (cells). */
+    --notch-sm: polygon(4px 0, calc(100% - 4px) 0, calc(100% - 4px) 4px, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 4px calc(100% - 4px), 0 calc(100% - 4px), 0 4px, 4px 4px);
+    --notch: polygon(8px 0, calc(100% - 8px) 0, calc(100% - 8px) 8px, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 8px calc(100% - 8px), 0 calc(100% - 8px), 0 8px, 8px 8px);
     background: var(--bg);
     color: var(--text);
+}
+
+/* clip-path hides an outside outline, so notched controls draw focus inside. */
+.landing-body .btn:focus-visible,
+.landing-body .hero-install:focus-visible,
+.landing-body .showcase-card:focus-visible {
+    outline: 2px solid var(--heading);
+    outline-offset: -5px;
 }
 
 .visually-hidden {
@@ -130,208 +144,127 @@ html:not(.js) .landing-header,
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    padding: 0.72rem 1.5rem;
-    border-radius: var(--radius-sm);
+    min-height: 44px;
+    padding: 0 1.4rem;
     font-size: 0.95rem;
-    font-weight: 550;
+    font-weight: 600;
     line-height: 1;
-    transition:
-        background var(--transition),
-        color var(--transition),
-        transform 0.1s ease;
+    clip-path: var(--notch-sm);
+    transition: background var(--transition), transform 0.1s ease;
 }
 
 .btn:active {
     transform: translateY(1px);
 }
 
-/* The landing keeps its original signature: a white primary on black.
-   The ember accent stays in the headline, links, and data. */
+.btn-primary,
+.btn-primary:hover {
+    color: #160a07;
+}
+
 .btn-primary {
-    background: var(--heading);
-    color: var(--bg);
-    transition:
-        background var(--transition),
-        color var(--transition),
-        box-shadow 0.3s ease,
-        transform 0.1s ease;
+    background: var(--primary);
 }
 
 .btn-primary:hover {
-    background: #ffffff;
-    color: var(--bg);
-    box-shadow: 0 0 28px color-mix(in srgb, var(--primary) 35%, transparent);
+    background: var(--primary-strong);
 }
 
 /* =============================================================================
-   Hero - immersive: brazier art + embers behind centered copy
+   Hero — centered copy over the pixel hearth
    ============================================================================= */
 
-.hero {
+/* .landing prefix: must outweigh the `.landing section` rhythm below. */
+.landing .hero {
     position: relative;
-    min-height: 100dvh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding-top: 64px;
+    isolation: isolate;
     overflow: hidden;
+    text-align: center;
+    /* Exactly one screen tall, so the hearth's base rests on the bottom edge
+       of the viewport; the copy centers in what is left above the fire. */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 100vh;
+    min-height: 100svh;
+    padding: calc(64px + clamp(1.5rem, 6vh, 6.5rem)) 0 clamp(230px, 34vh, 300px);
 }
 
-.hero-bg {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    z-index: 0;
-    /* Pointer parallax targets, driven by a lerped rAF loop in the page
-       script. Zero without JS or under reduced motion. */
-    --par-x: 0px;
-    --par-y: 0px;
-}
-
-/* Toned-down fire cover as an immersive backdrop. The pseudo-element is
-   sized to the artwork (capped at its native 1280px) and centred at 48%, so
-   the radial feather stays locked to the image's edges at every viewport:
-   the art dissolves into the black stage with no visible border. The inner
-   scrim keeps the centred title readable over the flames. */
-.hero-bg::before {
+/* The fire's light on the floor: present without JS and under the pixels. */
+.hero::before {
     content: "";
     position: absolute;
-    top: 48%;
-    left: 50%;
-    width: min(1240px, 94vw);
-    aspect-ratio: 16 / 9;
-    transform: translate(calc(-50% + var(--par-x)), calc(-50% + var(--par-y)));
-    will-change: transform;
-    background-image:
-        radial-gradient(
-            ellipse 68% 60% at 50% 50%,
-            rgba(0, 0, 0, 0.5) 0%,
-            rgba(0, 0, 0, 0.18) 55%,
-            rgba(0, 0, 0, 0) 82%
-        ),
-        url("/images/landing/cover.jpg");
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: cover;
-    filter: saturate(0.58) brightness(0.88);
-    -webkit-mask-image: radial-gradient(
-        ellipse 50% 50% at 50% 50%,
-        #000 24%,
-        rgba(0, 0, 0, 0.5) 58%,
-        transparent 88%
-    );
-    mask-image: radial-gradient(
-        ellipse 50% 50% at 50% 50%,
-        #000 24%,
-        rgba(0, 0, 0, 0.5) 58%,
-        transparent 88%
-    );
-}
-
-/* A slow breathing glow behind the brazier — the fire's light on the room.
-   Pure opacity animation on a composited layer, so it costs nothing. */
-.hero-bg::after {
-    content: "";
-    position: absolute;
-    top: 52%;
-    left: 50%;
-    width: min(1100px, 100vw);
-    aspect-ratio: 16 / 10;
-    transform: translate(calc(-50% + var(--par-x) * 1.6), calc(-50% + var(--par-y) * 1.6));
+    inset: auto 0 0;
+    height: 340px;
+    z-index: -2;
     background: radial-gradient(
-        ellipse 50% 42% at 50% 55%,
-        color-mix(in srgb, var(--primary) 14%, transparent),
-        rgba(255, 140, 60, 0.05) 45%,
+        ellipse 46% 100% at 50% 100%,
+        color-mix(in srgb, var(--primary) 20%, transparent),
         transparent 72%
     );
-    mix-blend-mode: screen;
-    opacity: 0.7;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .hero-bg::after {
-        animation: hero-breathe 5.5s ease-in-out infinite;
-    }
-}
-
-@keyframes hero-breathe {
-    0%, 100% { opacity: 0.55; }
-    50% { opacity: 0.95; }
-}
-
-#ember-canvas {
+/* Sized by the page script to a whole number of 9px cells. */
+.hero-fire {
     position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 1;
+    left: 0;
+    bottom: 0;
+    z-index: -1;
+    max-width: none;
+    image-rendering: pixelated;
+    -webkit-mask-image: linear-gradient(180deg, transparent, #000 30%);
+    mask-image: linear-gradient(180deg, transparent, #000 30%);
 }
 
 .hero-content {
-    position: relative;
-    z-index: 2;
-    text-align: center;
     padding: 0 var(--space-5);
     max-width: 960px;
-    width: 100%;
+    margin: 0 auto;
+}
+
+.hero-eyebrow {
+    margin: 0;
+    font-family: var(--font-pixel);
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--primary);
+}
+
+.hero-eyebrow [lang="ko"] {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    letter-spacing: 0;
 }
 
 .hero-content h1 {
-    font-size: clamp(2.6rem, 6vw, 4.4rem);
+    font-size: clamp(2.5rem, 6.4vw, 5rem);
     font-weight: 700;
-    letter-spacing: -0.04em;
-    line-height: 1.05;
+    letter-spacing: -0.045em;
+    line-height: 1;
     color: var(--heading);
-    margin: 0 0 var(--space-5);
+    margin: 1.1rem 0 1.4rem;
     text-wrap: balance;
-    /* keep the title legible over the bright flames behind it */
-    text-shadow:
-        0 2px 28px rgba(0, 0, 0, 0.65),
-        0 1px 6px rgba(0, 0, 0, 0.55);
+}
+
+/* Hangul wants more leading and none of the Latin tightening. */
+:lang(ko) .hero-content h1 {
+    font-size: clamp(2.2rem, 5.4vw, 4.2rem);
+    letter-spacing: -0.02em;
+    line-height: 1.15;
 }
 
 .hero-content .highlight {
     color: var(--primary);
-    /* Ember gradient sweep across the second line. Browsers without
-       background-clip:text keep the solid color above. */
-    background: linear-gradient(
-        100deg,
-        var(--rule-from) 0%,
-        var(--rule-to) 34%,
-        #ffb864 50%,
-        var(--rule-from) 66%,
-        var(--rule-to) 100%
-    );
-    background-size: 240% 100%;
-    background-position: 100% 0;
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    /* the h1 shadow would bleed through a transparent fill */
-    text-shadow: none;
-    filter: drop-shadow(0 2px 18px rgba(0, 0, 0, 0.55));
-}
-
-@media (prefers-reduced-motion: no-preference) {
-    .hero-content .highlight {
-        animation: ember-sheen 9s ease-in-out 1.4s infinite;
-    }
-}
-
-@keyframes ember-sheen {
-    0%, 68%, 100% { background-position: 100% 0; }
-    18%, 50% { background-position: 0% 0; }
 }
 
 .hero-sub {
-    font-size: 1.1rem;
-    line-height: 1.75;
-    color: var(--text);
-    max-width: 52ch;
-    margin: 0 auto var(--space-6);
+    font-size: 1.08rem;
+    line-height: 1.65;
+    color: var(--text-secondary);
+    max-width: 46ch;
+    margin: 0 auto 1.9rem;
     text-wrap: pretty;
-    text-shadow: 0 1px 12px rgba(0, 0, 0, 0.6);
 }
 
 .hero-actions {
@@ -346,12 +279,11 @@ html:not(.js) .landing-header,
     display: inline-flex;
     align-items: center;
     gap: 0.6rem;
-    padding: 0.62rem 1rem;
-    background: color-mix(in srgb, var(--bg) 72%, transparent);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
+    min-height: 44px;
+    padding: 0 1rem;
+    background: #131317;
+    border: 1px solid #34343c;
+    clip-path: var(--notch-sm);
     color: var(--text-muted);
     cursor: pointer;
     transition: border-color var(--transition), color var(--transition);
@@ -361,7 +293,7 @@ html:not(.js) .landing-header,
     background: transparent;
     padding: 0;
     font-size: 0.85rem;
-    color: var(--text-secondary);
+    color: var(--text);
 }
 
 .hero-install:hover {
@@ -369,42 +301,29 @@ html:not(.js) .landing-header,
     color: var(--text);
 }
 
-/* Entry - a cinematic rise out of soft focus, only when motion is welcome. */
+/* Entry — the copy rises once, only when motion is welcome. */
 @media (prefers-reduced-motion: no-preference) {
-    .hero-content h1,
-    .hero-content .hero-sub,
-    .hero-content .hero-actions {
-        opacity: 0;
-        transform: translateY(22px) scale(0.985);
-        filter: blur(6px);
-        animation: lp-rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    .hero-content > * {
+        animation: lp-rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) backwards;
     }
 
-    .hero-content .hero-sub {
-        animation-delay: 0.15s;
+    .hero-content > h1 {
+        animation-delay: 0.06s;
     }
 
-    .hero-content .hero-actions {
-        animation-delay: 0.3s;
+    .hero-content > .hero-sub {
+        animation-delay: 0.14s;
     }
 
-    .hero-bg {
-        opacity: 0;
-        animation: lp-fade 1.4s ease 0.1s forwards;
+    .hero-content > .hero-actions {
+        animation-delay: 0.22s;
     }
 }
 
 @keyframes lp-rise {
-    to {
-        opacity: 1;
-        transform: none;
-        filter: none;
-    }
-}
-
-@keyframes lp-fade {
-    to {
-        opacity: 1;
+    from {
+        opacity: 0;
+        transform: translateY(14px);
     }
 }
 
@@ -425,41 +344,26 @@ html:not(.js) .landing-header,
 
 .section-header h2,
 .speed-header h2 {
-    font-size: var(--step-3);
+    font-size: clamp(1.7rem, 3.4vw, 2.5rem);
     font-weight: 650;
-    letter-spacing: -0.02em;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
     color: var(--heading);
-    margin: 0 0 var(--space-2);
+    margin: 0 0 var(--space-3);
     text-wrap: balance;
 }
 
-/* Ember rule under each section title, drawn in as the section reveals. */
-.section-header h2::after,
-.speed-header h2::after {
-    content: "";
-    display: block;
-    width: 44px;
-    height: 3px;
-    border-radius: 999px;
-    margin-top: var(--space-3);
-    background: var(--spark);
-    transform-origin: left center;
-}
-
-html.js .reveal .section-header h2::after,
-html.js .reveal .speed-header h2::after {
-    transform: scaleX(0);
-    transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.25s;
-}
-
-html.js .reveal.is-visible .section-header h2::after,
-html.js .reveal.is-visible .speed-header h2::after {
-    transform: scaleX(1);
+:lang(ko) .section-header h2,
+:lang(ko) .speed-header h2,
+:lang(ko) .get-started h2 {
+    letter-spacing: -0.015em;
+    line-height: 1.25;
 }
 
 .section-header p,
 .speed-header p {
     margin: 0;
+    max-width: 52ch;
     color: var(--text-secondary);
     text-wrap: pretty;
 }
@@ -481,7 +385,7 @@ html.js .reveal.is-visible {
    The section itself still fades as a unit; children add a second beat.
    Everything is scoped to :not(.is-settled): once the entrance has played,
    these rules vanish entirely so hover transforms win again. */
-html.js .reveal:not(.is-settled) .bento-cell,
+html.js .reveal:not(.is-settled) .feature,
 html.js .reveal:not(.is-settled) .speed-modes li,
 html.js .reveal:not(.is-settled) .showcase-card,
 html.js .reveal:not(.is-settled) .scaffold-card {
@@ -493,7 +397,7 @@ html.js .reveal:not(.is-settled) .scaffold-card {
     transition-delay: calc(0.08s + var(--stagger, 0) * 0.07s);
 }
 
-html.js .reveal.is-visible:not(.is-settled) .bento-cell,
+html.js .reveal.is-visible:not(.is-settled) .feature,
 html.js .reveal.is-visible:not(.is-settled) .speed-modes li,
 html.js .reveal.is-visible:not(.is-settled) .showcase-card,
 html.js .reveal.is-visible:not(.is-settled) .scaffold-card {
@@ -501,17 +405,17 @@ html.js .reveal.is-visible:not(.is-settled) .scaffold-card {
     transform: none;
 }
 
-.bento-cell:nth-child(1), .speed-modes li:nth-child(1),
+.feature:nth-child(1), .speed-modes li:nth-child(1),
 .showcase-card:nth-child(1), .scaffold-card:nth-child(1) { --stagger: 0; }
-.bento-cell:nth-child(2), .speed-modes li:nth-child(2),
+.feature:nth-child(2), .speed-modes li:nth-child(2),
 .showcase-card:nth-child(2), .scaffold-card:nth-child(2) { --stagger: 1; }
-.bento-cell:nth-child(3), .speed-modes li:nth-child(3),
+.feature:nth-child(3), .speed-modes li:nth-child(3),
 .showcase-card:nth-child(3), .scaffold-card:nth-child(3) { --stagger: 2; }
-.bento-cell:nth-child(4), .showcase-card:nth-child(4),
+.feature:nth-child(4), .showcase-card:nth-child(4),
 .scaffold-card:nth-child(4) { --stagger: 3; }
-.bento-cell:nth-child(5), .showcase-card:nth-child(5),
+.feature:nth-child(5), .showcase-card:nth-child(5),
 .scaffold-card:nth-child(5) { --stagger: 4; }
-.bento-cell:nth-child(6), .showcase-card:nth-child(6) { --stagger: 5; }
+.feature:nth-child(6), .showcase-card:nth-child(6) { --stagger: 5; }
 
 @media (prefers-reduced-motion: reduce) {
     html.js .reveal {
@@ -520,17 +424,11 @@ html.js .reveal.is-visible:not(.is-settled) .scaffold-card {
         transition: none;
     }
 
-    html.js .reveal:not(.is-settled) .bento-cell,
+    html.js .reveal:not(.is-settled) .feature,
     html.js .reveal:not(.is-settled) .speed-modes li,
     html.js .reveal:not(.is-settled) .showcase-card,
     html.js .reveal:not(.is-settled) .scaffold-card {
         opacity: 1;
-        transform: none;
-        transition: none;
-    }
-
-    html.js .reveal .section-header h2::after,
-    html.js .reveal .speed-header h2::after {
         transform: none;
         transition: none;
     }
@@ -540,77 +438,63 @@ html.js .reveal.is-visible:not(.is-settled) .scaffold-card {
    Speed — the measured build, replayed
    ============================================================================= */
 
-.speed {
-    background: var(--bg-subtle);
-    border-block: 1px solid var(--border-subtle);
+.speed-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(1.75rem, 6vw, 5rem);
+    align-items: center;
 }
 
 .speed-header {
-    margin-bottom: var(--space-6);
-    max-width: 60ch;
+    margin-bottom: var(--space-5);
 }
 
 .speed-figure {
-    font-family: var(--font-mono);
-    font-size: clamp(3.2rem, 7vw, 5rem);
-    font-weight: 600;
+    font-family: var(--font-pixel);
+    font-size: clamp(3.6rem, 9vw, 6.5rem);
     line-height: 1;
     color: var(--heading);
-    margin: 0 0 var(--space-4);
+    margin: 0;
     font-variant-numeric: tabular-nums;
+    transform-origin: left center;
 }
 
 .speed-unit {
     font-size: 0.5em;
-    color: var(--text-muted);
+    color: var(--primary);
     margin-left: 0.08em;
 }
 
-.speed-stage.is-done .speed-number {
-    color: var(--primary);
-}
-
-/* Finish beat — the number pops and the bar flashes when the build lands. */
+/* Finish beat — the figure pops when the build lands. */
 @media (prefers-reduced-motion: no-preference) {
     .speed-stage.is-done .speed-figure {
         animation: speed-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
-    }
-
-    .speed-stage.is-done .speed-fill {
-        animation: speed-flash 0.7s ease-out;
     }
 }
 
 @keyframes speed-pop {
     0% { transform: scale(1); }
-    35% { transform: scale(1.06); }
+    35% { transform: scale(1.05); }
     100% { transform: scale(1); }
 }
 
-@keyframes speed-flash {
-    0% { box-shadow: 0 0 24px 4px color-mix(in srgb, var(--primary) 65%, transparent); }
-    100% { box-shadow: 0 0 0 0 transparent; }
-}
-
+/* A segmented meter: unlit cells on the track, lit cells on the fill. The
+   replay script reveals the fill with clip-path so the cells never stretch. */
 .speed-track {
-    height: 6px;
-    border-radius: 999px;
-    background: var(--border-subtle);
-    overflow: hidden;
+    height: 22px;
+    margin-top: 1.1rem;
+    background: repeating-linear-gradient(90deg, var(--border) 0 10px, transparent 10px 14px);
 }
 
 .speed-fill {
     display: block;
     height: 100%;
-    width: 100%;
-    border-radius: 999px;
-    background: var(--spark);
-    transform-origin: left center;
+    background: repeating-linear-gradient(90deg, var(--primary) 0 10px, transparent 10px 14px);
 }
 
-/* Only a JS-driven page starts the bar at zero; no-JS sees it full. */
+/* Only a JS-driven page starts the meter empty; no-JS sees it full. */
 html.js .speed-fill {
-    transform: scaleX(0);
+    clip-path: inset(0 100% 0 0);
 }
 
 .speed-caption {
@@ -619,17 +503,26 @@ html.js .speed-fill {
     gap: var(--space-3);
     flex-wrap: wrap;
     margin: var(--space-3) 0 0;
-    font-size: 0.8rem;
+    font-family: var(--font-pixel);
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
     color: var(--text-muted);
 }
 
+:lang(ko) .speed-caption {
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    letter-spacing: 0;
+}
+
 .speed-replay {
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    padding: 0.22rem 0.6rem;
+    font: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    padding: 0.25rem 0.6rem;
     background: transparent;
     border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
     color: var(--text-secondary);
     cursor: pointer;
     transition: color var(--transition), border-color var(--transition);
@@ -642,224 +535,91 @@ html.js .speed-fill {
 
 .speed-modes {
     list-style: none;
-    margin: var(--space-6) 0 0;
+    margin: 0;
     padding: 0;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: var(--space-3);
+    border-bottom: 1px solid var(--border);
 }
 
 .speed-modes li {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: var(--space-4) var(--space-5);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--bg);
+    display: grid;
+    grid-template-columns: 5.2em 12.5em minmax(0, 1fr) 3.4em;
+    gap: var(--space-4);
+    align-items: center;
+    padding: 0.85rem 0;
+    border-top: 1px solid var(--border);
+    font-size: 0.88rem;
 }
 
 .mode-name {
     font-family: var(--font-mono);
-    font-size: 0.8rem;
-    font-weight: 600;
     color: var(--heading);
 }
 
 .mode-desc {
-    font-size: 0.8rem;
     color: var(--text-muted);
+}
+
+.mode-bar {
+    height: 8px;
+}
+
+.mode-bar i {
+    display: block;
+    width: var(--w);
+    height: 100%;
+    background: repeating-linear-gradient(90deg, var(--primary) 0 6px, transparent 6px 8px);
 }
 
 .mode-time {
     font-family: var(--font-mono);
-    font-size: 1.15rem;
-    font-weight: 600;
-    color: var(--primary);
-    margin-top: var(--space-2);
+    text-align: right;
+    color: var(--heading);
     font-variant-numeric: tabular-nums;
 }
 
+.speed-scale {
+    margin: var(--space-3) 0 0;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
 /* =============================================================================
-   Bento — six cells, no holes
+   Features — six notched cells, keyed like config
    ============================================================================= */
 
-.bento-grid {
+.feature-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: var(--space-3);
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
 }
 
-.bento-cell {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
+.feature {
     min-width: 0;
-    padding: var(--space-5);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-    transition: border-color 0.3s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    padding: 1.5rem 1.4rem 1.6rem;
+    background: var(--bg-subtle);
+    clip-path: var(--notch);
+    transition: background 0.25s ease;
 }
 
-/* Pointer spotlight — a soft ember glow that follows the cursor. The page
-   script feeds --mx/--my; without JS the layer simply never lights up. */
-.bento-cell::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: radial-gradient(
-        320px circle at var(--mx, 50%) var(--my, 50%),
-        color-mix(in srgb, var(--primary) 10%, transparent),
-        transparent 70%
-    );
-    opacity: 0;
-    transition: opacity 0.35s ease;
+.feature:hover {
+    background: #16161b;
 }
 
-.bento-cell:hover {
-    border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
-    transform: translateY(-2px);
+.feature h3 {
+    font-family: var(--font-pixel);
+    font-size: 0.8rem;
+    font-weight: 400;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--primary);
+    margin: 0;
 }
 
-.bento-cell:hover::before {
-    opacity: 1;
-}
-
-.bento-cell > * {
-    position: relative;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .bento-cell,
-    .bento-cell::before {
-        transition: none;
-    }
-
-    .bento-cell:hover {
-        transform: none;
-    }
-}
-
-.bento-cell h3 {
-    font-family: var(--font-mono);
+.feature p {
+    margin: 0.75rem 0 0;
     font-size: 0.92rem;
-    font-weight: 600;
-    color: var(--heading);
-    margin: 0;
-}
-
-.bento-cell p {
-    margin: 0;
-    font-size: 0.88rem;
     line-height: 1.6;
     color: var(--text-secondary);
-}
-
-/* A: OG collage cell — real build output as the visual. */
-.cell-seo {
-    grid-column: span 2;
-    grid-row: span 2;
-    background: var(--bg-subtle);
-    overflow: hidden;
-}
-
-.og-fan {
-    position: relative;
-    margin-top: auto;
-    min-height: 220px;
-}
-
-.og-fan img {
-    position: absolute;
-    width: 58%;
-    height: auto;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow);
-    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* The fan spreads a touch wider when the cell is hovered. */
-.cell-seo:hover .og-fan img:nth-child(1) {
-    transform: rotate(-7.5deg) translate(-4%, -3%);
-}
-
-.cell-seo:hover .og-fan img:nth-child(2) {
-    transform: rotate(1.5deg) translateY(-6%);
-}
-
-.cell-seo:hover .og-fan img:nth-child(3) {
-    transform: rotate(8.5deg) translate(4%, -3%);
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .og-fan img {
-        transition: none;
-    }
-}
-
-.og-fan img:nth-child(1) {
-    left: 0;
-    bottom: 6%;
-    transform: rotate(-5deg);
-}
-
-.og-fan img:nth-child(2) {
-    left: 21%;
-    bottom: 16%;
-    transform: rotate(1.5deg);
-}
-
-.og-fan img:nth-child(3) {
-    left: 42%;
-    bottom: 2%;
-    transform: rotate(6deg);
-}
-
-.cell-fast {
-    grid-column: span 2;
-}
-
-/* C: a real front-matter snippet in real highlight classes. */
-.cell-markdown {
-    background: var(--bg-code);
-}
-
-.cell-markdown pre {
-    margin: var(--space-2) 0 0;
-    padding: 0;
-    border: none;
-    background: transparent;
-}
-
-.cell-markdown pre code {
-    font-size: 0.78rem;
-}
-
-/* D: a matching template snippet balances the front-matter cell beside it;
-   the default cell background keeps the two from reading as twins. */
-.cell-templates pre {
-    margin: auto 0 0;
-    padding: var(--space-2) 0 0;
-    border: none;
-    background: transparent;
-}
-
-.cell-templates pre code {
-    font-size: 0.78rem;
-}
-
-.cell-taxonomies {
-    grid-column: span 2;
-    background: var(--primary-tint);
-    border-color: color-mix(in srgb, var(--primary) 25%, var(--border));
-}
-
-.cell-extensible {
-    grid-column: span 2;
 }
 
 /* =============================================================================
@@ -895,9 +655,7 @@ html.js .speed-fill {
     display: block;
     width: 100%;
     height: auto;
-    border-radius: var(--radius);
     border: 1px solid var(--border);
-    box-shadow: var(--shadow);
     transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease;
 }
 
@@ -958,7 +716,6 @@ html.js .speed-fill {
 .og-track img {
     width: 300px;
     height: auto;
-    border-radius: var(--radius-sm);
     border: 1px solid var(--border);
 }
 
@@ -1004,16 +761,15 @@ html.js .speed-fill {
 
 .showcase-card {
     display: block;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
     overflow: hidden;
     background: var(--bg-subtle);
-    transition: transform 0.25s ease, border-color var(--transition);
+    clip-path: var(--notch);
+    transition: transform 0.25s ease, background 0.25s ease;
 }
 
 .showcase-card:hover {
     transform: translateY(-3px);
-    border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+    background: #16161b;
 }
 
 .showcase-preview {
@@ -1068,19 +824,15 @@ html.js .speed-fill {
 .get-started {
     text-align: center;
     border-top: 1px solid var(--border-subtle);
-    background: radial-gradient(
-        620px 320px at 50% 100%,
-        color-mix(in srgb, var(--primary) 9%, transparent),
-        transparent 72%
-    );
 }
 
 .get-started h2 {
-    font-size: var(--step-3);
+    font-size: clamp(1.7rem, 3.4vw, 2.5rem);
     font-weight: 650;
-    letter-spacing: -0.02em;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
     color: var(--heading);
-    margin: 0 0 var(--space-2);
+    margin: 0 0 var(--space-3);
 }
 
 .get-started > .lp-wrap > p {
@@ -1098,7 +850,6 @@ html.js .speed-fill {
     gap: 2px;
     padding: 3px;
     border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
     background: var(--bg-subtle);
     margin-bottom: var(--space-3);
 }
@@ -1109,7 +860,6 @@ html.js .speed-fill {
     padding: 0.38rem 0.9rem;
     font-size: 0.82rem;
     color: var(--text-secondary);
-    border-radius: 4px;
     cursor: pointer;
     transition: color var(--transition), background var(--transition);
 }
@@ -1133,7 +883,6 @@ html.js .speed-fill {
     padding: 0.8rem 1rem;
     background: var(--bg-code);
     border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
 }
 
 .install-cmd code {
@@ -1194,37 +943,23 @@ html.js .speed-fill {
    ============================================================================= */
 
 @media (max-width: 960px) {
-    .hero-content h1 {
-        font-size: clamp(2.2rem, 8.5vw, 3.2rem);
+    .speed-grid {
+        grid-template-columns: 1fr;
     }
 
-    .bento-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .cell-seo,
-    .cell-fast,
-    .cell-taxonomies,
-    .cell-extensible {
-        grid-column: span 2;
-    }
-
-    .cell-seo {
-        grid-row: auto;
-    }
-
+    .feature-grid,
     .showcase-grid {
         grid-template-columns: repeat(2, 1fr);
-    }
-
-    .speed-modes {
-        grid-template-columns: 1fr;
     }
 }
 
 @media (max-width: 640px) {
     .landing section {
         padding-block: var(--space-7);
+    }
+
+    .landing .hero {
+        padding: calc(64px + 2rem) 0 240px;
     }
 
     .landing-header {
@@ -1236,19 +971,7 @@ html.js .speed-fill {
         font-size: 0.82rem;
     }
 
-    .bento-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .cell-seo,
-    .cell-fast,
-    .cell-markdown,
-    .cell-templates,
-    .cell-taxonomies,
-    .cell-extensible {
-        grid-column: auto;
-    }
-
+    .feature-grid,
     .showcase-grid {
         grid-template-columns: 1fr;
     }
@@ -1262,7 +985,23 @@ html.js .speed-fill {
         justify-content: center;
     }
 
-    .og-fan {
-        min-height: 160px;
+    /* name + time on one line, the bar beneath; the description would only
+       crowd a phone row. */
+    .speed-modes li {
+        grid-template-columns: 1fr auto;
+        gap: var(--space-2) var(--space-4);
+    }
+
+    .mode-desc {
+        display: none;
+    }
+
+    .mode-time {
+        order: 2;
+    }
+
+    .mode-bar {
+        order: 3;
+        grid-column: 1 / -1;
     }
 }
