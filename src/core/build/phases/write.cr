@@ -470,8 +470,10 @@ module Hwaro::Core::Build::Phases::Write
         return false unless Utils::OutputGuard.safe_to_delete_file?(path, kept)
         begin
           File.delete(path)
-        rescue File::NotFoundError
-          # A parallel render worker removed it first.
+        rescue File::Error
+          # A parallel render worker removed it first — and may already have
+          # made its own directory there, which unlink refuses (EPERM or
+          # EISDIR, not ENOENT). Either way the caller's retry decides.
         end
         return true
       end

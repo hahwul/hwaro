@@ -700,7 +700,42 @@ private class RivalWorkerBuilder < Hwaro::Core::Build::Builder
   end
 end
 
+# The same rival, one step later: this worker has already seen the stale
+# FILE, and by the time it unlinks, a directory stands there instead.
+private class LateRivalWorkerBuilder < Hwaro::Core::Build::Builder
+  def initialize(kept_output_dir : String)
+    super()
+    @kept_output_dir = kept_output_dir
+  end
+
+  def test_mkdir_output(dir : String)
+    mkdir_output(dir)
+  end
+
+  def written_this_build?(path : String) : Bool
+    if File.file?("public/blog")
+      File.delete("public/blog")
+      Hwaro::Utils::FileSafe.mkdir_p("public/blog/b")
+    end
+    super
+  end
+end
+
 describe "Phases::Write mkdir_output under parallel render" do
+  # Unlinking a directory is EPERM/EISDIR, not ENOENT: the page failed with
+  # "Error deleting file: 'public/blog': Operation not permitted".
+  it "creates the directory when a rival worker replaces the stale file mid-removal" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("public")
+        File.write("public/blog", "previous build's file")
+        LateRivalWorkerBuilder.new("public").test_mkdir_output("public/blog/a")
+        Dir.exists?("public/blog/a").should be_true
+        Dir.exists?("public/blog/b").should be_true
+      end
+    end
+  end
+
   it "creates the directory when a rival worker already removed the stale file" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do
