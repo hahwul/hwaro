@@ -55,6 +55,7 @@
 # Remove when: upstream markd stops repeating groups over unbounded input.
 
 require "markd"
+require "./markd_entity_fix" # Rule::NAMED_HTML_ENTITY
 
 # These patches REPLACE upstream methods wholesale (no `previous_def`), so a
 # shard bump that changes them would be silently reverted. Fail the build
@@ -92,6 +93,7 @@ module Hwaro
       Markd::Rule::EMAIL_AUTO_LINK     => EMAIL_AUTO_LINK,
       Markd::Rule::AUTO_LINK           => anchored(Markd::Rule::AUTO_LINK),
       Markd::Rule::NUMERIC_HTML_ENTITY => anchored(Markd::Rule::NUMERIC_HTML_ENTITY),
+      Markd::Rule::NAMED_HTML_ENTITY   => anchored(Markd::Rule::NAMED_HTML_ENTITY),
     }
 
     def self.anchored(regex : Regex) : Regex

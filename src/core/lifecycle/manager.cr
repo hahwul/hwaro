@@ -71,6 +71,16 @@ module Hwaro
             # Classified errors propagate unchanged so the CLI can surface
             # them with their documented exit code / JSON payload.
             raise ex
+          rescue ex : IO::Error
+            # Same classification as a phase action (see `run_phase`): a full
+            # disk under `amp:generate`, or a plain file where a hook's
+            # directory must go, is an environment problem (exit 6, with the
+            # path), not the "hwaro bug" HWARO_E_INTERNAL / exit 70 reports.
+            raise Hwaro::HwaroError.new(
+              code: Hwaro::Errors::HWARO_E_IO,
+              message: "Hook '#{hook.name}' failed at #{point}: #{ex.message}",
+              cause: ex,
+            )
           rescue ex
             Logger.error "  Hook '#{hook.name}' failed at #{point}: #{ex.message}"
             Logger.debug "  Backtrace: #{ex.backtrace?.try(&.first(5).join("\n    ")) || "unavailable"}"

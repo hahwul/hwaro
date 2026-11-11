@@ -700,7 +700,76 @@ private class RivalWorkerBuilder < Hwaro::Core::Build::Builder
   end
 end
 
+# The same rival, one step later: this worker has already seen the stale
+# FILE, and by the time it unlinks, a directory stands there instead.
+private class LateRivalWorkerBuilder < Hwaro::Core::Build::Builder
+  def initialize(kept_output_dir : String)
+    super()
+    @kept_output_dir = kept_output_dir
+  end
+
+  def test_mkdir_output(dir : String)
+    mkdir_output(dir)
+  end
+
+  def written_this_build?(path : String) : Bool
+    if File.file?("public/blog")
+      File.delete("public/blog")
+      Hwaro::Utils::FileSafe.mkdir_p("public/blog/b")
+    end
+    super
+  end
+end
+
+# A worker with no rival: only the filesystem stands in its way.
+private class KeptOutputBuilder < Hwaro::Core::Build::Builder
+  def initialize(kept_output_dir : String)
+    super()
+    @kept_output_dir = kept_output_dir
+  end
+
+  def test_mkdir_output(dir : String)
+    mkdir_output(dir)
+  end
+end
+
 describe "Phases::Write mkdir_output under parallel render" do
+  # Unlinking a directory is EPERM/EISDIR, not ENOENT: the page failed with
+  # "Error deleting file: 'public/blog': Operation not permitted".
+  it "creates the directory when a rival worker replaces the stale file mid-removal" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("public")
+        File.write("public/blog", "previous build's file")
+        LateRivalWorkerBuilder.new("public").test_mkdir_output("public/blog/a")
+        Dir.exists?("public/blog/a").should be_true
+        Dir.exists?("public/blog/b").should be_true
+      end
+    end
+  end
+
+  # Only a rival's outcome (gone, or a directory now) is swallowed; a real
+  # failure names the file that could not be deleted, not the mkdir after.
+  it "reports why a stale file could not be deleted" do
+    posix_only!("chmod-based permissions")
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("public")
+        File.write("public/blog", "previous build's file")
+        File.chmod("public", 0o555)
+        begin
+          # Root deletes it anyway; nothing to assert there.
+          next if File::Info.writable?("public")
+          expect_raises(File::Error, /Error deleting file: 'public\/blog'.*Permission denied/) do
+            KeptOutputBuilder.new("public").test_mkdir_output("public/blog/a")
+          end
+        ensure
+          File.chmod("public", 0o755)
+        end
+      end
+    end
+  end
+
   it "creates the directory when a rival worker already removed the stale file" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do

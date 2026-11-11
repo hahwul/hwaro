@@ -4,8 +4,12 @@ require "../../../../../src/core/build/builder"
 # Reopen Builder to expose private Initialize-phase helpers for testing.
 module Hwaro::Core::Build
   class Builder
-    def test_setup_output_dir(output_dir : String, incremental : Bool = false)
-      setup_output_dir(output_dir, incremental)
+    def test_setup_output_dir(output_dir : String, incremental : Bool = false, parallel : Bool = true)
+      setup_output_dir(output_dir, incremental, parallel)
+    end
+
+    def test_output_delete_units(paths : Array(String))
+      output_delete_units(paths)
     end
 
     def test_copy_static_files(output_dir : String, verbose : Bool = false, incremental : Bool = false)
@@ -81,6 +85,97 @@ describe Hwaro::Core::Build::Phases::Initialize do
 
           Dir.exists?("public").should be_true
           File.exists?("public/stale.html").should be_false
+        end
+      end
+    end
+
+    # The wipe fans out once the tree holds enough entries: a section with
+    # one directory per page is the shape that takes that path.
+    it "wipes a large tree and never follows a symlink out of it" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("outside")
+          File.write("outside/keep.txt", "keep")
+          200.times do |i|
+            FileUtils.mkdir_p("public/posts/post-#{i}")
+            File.write("public/posts/post-#{i}/index.html", "page #{i}")
+          end
+          File.write("public/index.html", "home")
+          File.symlink(File.join(dir, "outside"), "public/posts/linked")
+          File.symlink(File.join(dir, "outside"), "public/top-link")
+
+          builder = Hwaro::Core::Build::Builder.new
+          builder.test_setup_output_dir("public", incremental: false).should be_true
+
+          Dir.children("public").should be_empty
+          File.read("outside/keep.txt").should eq("keep")
+        end
+      end
+    end
+
+    # Many root entries must not stop the split: a big section left as one
+    # unit is deleted by one worker, as slowly as the serial sweep.
+    it "splits a big section into units next to many root entries" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("outside/deep")
+          File.write("outside/keep.txt", "keep")
+          File.write("outside/deep/keep.txt", "keep")
+          100.times do |i|
+            FileUtils.mkdir_p("public/posts/post-#{i}")
+            File.write("public/posts/post-#{i}/index.html", "page #{i}")
+          end
+          70.times { |i| File.write("public/top-#{i}.html", "x") }
+          File.symlink(File.join(dir, "outside"), "public/top-link")
+          File.symlink(File.join(dir, "outside"), "public/posts/linked")
+          File.symlink(File.join(dir, "outside/deep"), "public/posts/post-0/linked")
+
+          builder = Hwaro::Core::Build::Builder.new
+          units = builder.test_output_delete_units(["public"])
+          units.should contain("public/posts/post-99")
+          units.should contain("public/top-link")
+          units.should_not contain("public/posts")
+
+          builder.test_setup_output_dir("public", incremental: false).should be_true
+          Dir.children("public").should be_empty
+          File.read("outside/keep.txt").should eq("keep")
+          File.read("outside/deep/keep.txt").should eq("keep")
+        end
+      end
+    end
+
+    # The workers skip what they cannot delete one unit at a time, so the
+    # sweep leaves less behind than a serial one, but never calls it fresh.
+    it "reports a tree with an undeletable directory as not fresh" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          200.times do |i|
+            FileUtils.mkdir_p("public/posts/post-#{i}")
+            File.write("public/posts/post-#{i}/index.html", "page #{i}")
+          end
+          File.chmod("public/posts/post-150", 0o555)
+          begin
+            # Root deletes it anyway; nothing to assert there.
+            next if File::Info.writable?("public/posts/post-150")
+            Hwaro::Core::Build::Builder.new.test_setup_output_dir("public", incremental: false).should be_false
+            File.exists?("public/posts/post-150/index.html").should be_true
+            Dir.children("public/posts").should eq(["post-150"])
+          ensure
+            File.chmod("public/posts/post-150", 0o755)
+          end
+        end
+      end
+    end
+
+    it "wipes a large tree serially with parallel off" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          200.times { |i| FileUtils.mkdir_p("public/posts/post-#{i}") }
+
+          builder = Hwaro::Core::Build::Builder.new
+          builder.test_setup_output_dir("public", incremental: false, parallel: false).should be_true
+
+          Dir.children("public").should be_empty
         end
       end
     end
@@ -438,6 +533,33 @@ describe Hwaro::Core::Build::Phases::Initialize do
           features["alias"]?.try(&.needs_section_pages).should be_true
           # A template that may hold shortcodes keeps the SEO/JSON-LD vars.
           features["post"]?.try(&.needs_seo).should be_true
+        end
+      end
+    end
+
+    it "skips the section.pages copy for templates that only read section attributes other than the pages" do
+      # `{{ section.title }}` in a page template (a breadcrumb) still paid the
+      # copy of every sibling page per page: 32k pages in one section took 30 s
+      # where `{{ page.section }}` took 5.
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("templates")
+          File.write("templates/crumb.html", %(<nav>{{ section.title }} {{ section.description | upper }} {{ section . list }}{% if section.redirect_to %}x{% endif %}</nav>))
+          File.write("templates/count.html", %({{ section.title }} {{ section.pages_count }}))
+          File.write("templates/loop.html", %({% for p in section.pages %}{{ p.title }}{% endfor %}))
+          File.write("templates/subscript.html", %({{ section["pages"] | length }}))
+          File.write("templates/whole.html", %({{ section | length }}))
+          File.write("templates/passed.html", %({{ section.title }}{{ render_nav(section) }}))
+          File.write("templates/unknown.html", %({{ section.pagez }}))
+          File.write("templates/trailing.html", %({{ section.title }} {{ section }}))
+
+          builder = Hwaro::Core::Build::Builder.new
+          builder.test_load_templates
+          features = builder.test_template_var_features
+          features["crumb"]?.try(&.needs_section_pages).should be_false
+          %w[count loop subscript whole passed unknown trailing].each do |name|
+            features[name]?.try(&.needs_section_pages).should be_true
+          end
         end
       end
     end

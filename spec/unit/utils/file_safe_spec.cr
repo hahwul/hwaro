@@ -204,6 +204,24 @@ describe Hwaro::Utils::FileSafe do
     end
   end
 
+  describe "written bytes" do
+    it "writes multi-byte and empty content byte for byte" do
+      Dir.mktmpdir do |dir|
+        big = "héllo 화로 \u{1F525}\n" * 5000
+        {"" => "empty", "한글 ✓\n" => "small", big => "big"}.each do |content, name|
+          atomic = File.join(dir, "#{name}-atomic.html")
+          fresh = File.join(dir, "#{name}-new.html")
+          Hwaro::Utils::FileSafe.atomic_write(atomic, content)
+          Hwaro::Utils::FileSafe.write_new(fresh, content)
+
+          File.read(atomic).should eq(content)
+          File.read(fresh).should eq(content)
+          File.size(fresh).should eq(content.bytesize)
+        end
+      end
+    end
+  end
+
   describe ".write_new" do
     it "writes content to a new file without a temp sibling" do
       Dir.mktmpdir do |root|

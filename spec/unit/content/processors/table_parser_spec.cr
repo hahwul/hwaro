@@ -32,6 +32,41 @@ describe Hwaro::Content::Processors::TableParser do
       content = "| Left | Center | Right |\n|:-----|:------:|------:|\n| a    | b      | c     |"
       Hwaro::Content::Processors::TableParser.has_table?(content).should be_true
     end
+
+    # The gate before its whitespace runs stopped crossing newlines: three
+    # adjacent `\s*` made it cubic in the length of a whitespace run, so a
+    # page of deeply indented lines took seconds and a 4000-space run raised
+    # "match limit exceeded". It is only a gate, so the new one must answer
+    # exactly as the old one did.
+    it "answers exactly as the backtracking gate did" do
+      old_gate = /^\s*(?:> ?)?\s*\|?\s*:?-+:?\s*\|/m
+      ["|---|", "a | b\n---|---", "> | a |\n> |---|", ">\n|---|", "> \n \n| \n :-: \n\n |", "|\n---\n|", "--- \n\n\t|", "|---",
+       "|---\n| 1 |", " | - |", "\r|\r-\r|", "-\n", "> > |---|", ">|-|", ": - |", ":-:\n\n\n|", "a\n\n\n-|"].each do |text|
+        Hwaro::Content::Processors::TableParser.has_table?(text).should eq(old_gate.matches?(text)), text.inspect
+      end
+      rng = Random.new(20261111)
+      alphabet = [" ", " ", "\t", "\r", "\n", "\n", "|", "|", "-", "-", ":", ">", "> ", "a", " ", "　", "\n\n", "---", "\\"]
+      matched = 0
+      100_000.times do
+        text = String.build { |io| rng.rand(0..12).times { io << alphabet.sample(rng) } }
+        want = old_gate.matches?(text)
+        matched += 1 if want
+        Hwaro::Content::Processors::TableParser.has_table?(text).should eq(want), text.inspect
+      end
+      matched.should be > 5_000 # the corpus does exercise the "yes" side
+    end
+
+    it "reads long whitespace runs and deep indentation without backtracking" do
+      Hwaro::Content::Processors::TableParser.has_table?("intro\n\n" + " " * 600_000 + "a | b\n").should be_false
+      Hwaro::Content::Processors::TableParser.has_table?("a\n" + "\n" * 600_000 + "b | c\n").should be_false
+      table = "\n| a | b |\n|---|---|\n| 1 | 2 |\n"
+      indented = "para\n\n" + (" " * 256 + "code line here\n") * 1500 + table
+      nested = "```json\n" + Array.new(400) { |i| " " * (2 * i) + %("k": {\n) }.join + "```\n" + table
+      started = Time.instant
+      Hwaro::Content::Processors::TableParser.has_table?(indented).should be_true
+      Hwaro::Content::Processors::TableParser.has_table?(nested).should be_true
+      (Time.instant - started).should be < 2.seconds # 5 s and 20 s with the cubic gate
+    end
   end
 
   describe ".process" do

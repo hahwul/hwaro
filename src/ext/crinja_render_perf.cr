@@ -489,3 +489,39 @@ class Crinja::Template
     result
   end
 end
+
+# Per-render hash construction without the growth ladder.
+#
+# Every page render copied its ~100 template variables into the new
+# context's scope with `merge!` — insert by insert into an empty Hash, which
+# reallocates its entry table at 8, 16, 32, 64 and 128 entries. The last two
+# tables are past bdwgc's small-object limit, so each one takes the global
+# allocation lock and counts toward the next collection: with N render
+# workers that lock is where they queue. `Hash#dup` copies the finished
+# table in one allocation; same entries, same order.
+#
+# `Crinja.dictionary` (every `Value.new(hash)`: the `page`, `section`,
+# `toc`… objects built per page) had the same ladder with 72-byte entries.
+# Sized up front it allocates once. Small dictionaries keep the stock path:
+# a presized Hash starts at 8 entries, twice what a 3-key one needs.
+class Crinja
+  def with_scope(bindings : Variables, &)
+    ctx = Context.new(context)
+    ctx.adopt_scope(bindings.dup)
+    with_scope(ctx) { |c| yield c }
+  end
+
+  def self.dictionary(object : Hash) : Dictionary
+    dict = object.size > 8 ? Dictionary.new(initial_capacity: object.size) : Dictionary.new
+    object.each { |key, value| dict[Value.new(key)] = Value.new value }
+    dict
+  end
+end
+
+class Crinja::Util::ScopeMap(K, V)
+  # Replace this (still empty) scope's table with `scope`, which the caller
+  # hands over: it must not be shared with anything else.
+  def adopt_scope(scope : Hash(K, V)) : Nil
+    @scope = scope
+  end
+end

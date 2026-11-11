@@ -1640,7 +1640,8 @@ module Hwaro
 
         # Load the OG manifest file. Returns {config_hash, entries}.
         def self.load_manifest(manifest_path : String) : Tuple(String, Hash(String, String))
-          return {"", {} of String => String} unless File.exists?(manifest_path)
+          # A regular file only: opening a FIFO of that name blocks forever.
+          return {"", {} of String => String} unless File.file?(manifest_path)
           # Valid JSON that is not an object (`[]`, `null`) makes `Any#[]?` raise.
           return {"", {} of String => String} unless data = JSON.parse(File.read(manifest_path)).as_h?
           config_hash = data["config_hash"]?.try(&.as_s?) || ""
@@ -1658,7 +1659,12 @@ module Hwaro
           {"", {} of String => String}
         end
 
-        # Save the OG manifest file.
+        # Save the OG manifest file. Renamed into place, so whatever sits on
+        # its name — a read-only or unreadable file, a dangling or looping
+        # symlink, a link to a file elsewhere — is replaced instead of
+        # failing the build or being written through. A manifest that already
+        # holds these bytes is left alone: a warm build that changed nothing
+        # writes nothing (renaming into place needs a writable directory).
         def self.save_manifest(manifest_path : String, config_hash : String, entries : Hash(String, String))
           json = JSON.build do |j|
             j.object do
@@ -1671,7 +1677,8 @@ module Hwaro
               end
             end
           end
-          File.write(manifest_path, json)
+          return if Hwaro::Utils::PathUtils.file?(manifest_path) && (File.read(manifest_path) rescue nil) == json
+          Hwaro::Utils::FileSafe.atomic_write(manifest_path, json)
         end
       end
     end

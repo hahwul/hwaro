@@ -162,7 +162,8 @@ serve는 재빌드 전후로 해당 집합의 지문을 계산하고, 지문이 
 스텁, AMP 미러, 자동 생성된 OG 이미지, 더 이상 아무도 쓰지 않는 텀의 택소노미
 페이지(그 텀의 피드 포함), 섹션이 더 이상 채우지 않는 페이지네이션 페이지가
 모두 해당합니다. 기능 자체를 끄는 경우(`[amp] enabled = false`,
-`[og.auto_image] enabled = false`, `[image_processing] enabled = false`, 또는
+`[og.auto_image] enabled = false`, `[image_processing] enabled = false`,
+`[pwa] enabled = false`(`sw.js`와 `manifest.json`), 또는
 `--skip-og-image` / `--skip-image-processing` 플래그)도 같은 이유로 다음
 빌드에서 그동안 발행하던 파일이 정리되며, `[image_processing] widths`에서 뺀
 너비의 이미지도 마찬가지입니다.
@@ -196,6 +197,12 @@ serve는 재빌드 전후로 해당 집합의 지문을 계산하고, 지문이 
 
 - **메타데이터** — 마지막 빌드의 템플릿·설정 체크섬
 - **항목** — 파일별 레코드(경로, mtime, 콘텐츠 해시, 출력 경로). 출력 경로는 제거된 페이지의 오래된 파일을 찾는 데에도 쓰입니다
+
+출력 경로는 프로젝트 루트 기준 상대 경로로 저장되므로, 프로젝트 위치가
+바뀌어도 캐시 파일은 그대로 유효합니다. CI가 다른 체크아웃 경로에 복원한
+경우, Docker와 네이티브 실행이 함께 쓰는 경우, 디렉터리 이름을 바꾼 경우가
+모두 해당합니다. 단, 프로젝트 밖의 출력 디렉터리(`-o /var/www/site`)는
+절대 경로로 기록됩니다.
 
 `.hwaro_cache.json`은 `.gitignore`에 추가합니다(`hwaro init`이 스캐폴드하는 `.gitignore`에는 이미 포함되어 있습니다).
 

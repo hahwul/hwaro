@@ -819,7 +819,8 @@ describe "stale output cleanup on file removal" do
 
         outputs = builder.stale_outputs_for_removed(["content/posts/gone.md"], "public")
         outputs.any?(&.ends_with?("public/posts/gone/index.html")).should be_true
-        outputs.should contain(File.join("public", "posts/gone/index.json"))
+        # The cache hands back the absolute form it keeps in memory.
+        outputs.should contain(File.expand_path(File.join("public", "posts/gone/index.json")))
       end
     end
   end

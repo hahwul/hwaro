@@ -26,7 +26,12 @@ module Hwaro::Core::Build::Phases::Render
     # entries including heavy __all_pages__) because page vars are the
     # smaller set (~50 entries) and we only iterate global_vars once via
     # merge! rather than duplicating it per page.
-    vars = {} of String => Crinja::Value
+    #
+    # Sized up front for the usual 59–72 entries (page vars + ~30 globals):
+    # growing from empty reallocates the table four times on the way there,
+    # and the last table is a large object that takes the GC's global lock
+    # (see src/ext/crinja_render_perf.cr). Larger sets grow once more.
+    vars = Hash(String, Crinja::Value).new(initial_capacity: 64)
 
     effective_url = page_url_override || page.url
 
@@ -356,7 +361,8 @@ module Hwaro::Core::Build::Phases::Render
         default_lang = config.default_language
         section_pages_array = paginator.pages.map { |p| page_to_crinja_list_value(p, default_lang) }
       elsif features && !features.needs_section_pages
-        # The template's closure never mentions `section`, so the O(section
+        # The template's closure never reads `section.pages` or its count
+        # (see Initialize#template_reads_section_pages?), so the O(section
         # size) minus-current copy below can never be observed — on a flat
         # N-page site it was the only super-linear per-page cost (N-1
         # element copies for every page). section_pages_array stays empty.

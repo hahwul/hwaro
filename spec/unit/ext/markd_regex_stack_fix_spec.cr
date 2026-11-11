@@ -185,6 +185,19 @@ describe Hwaro::MarkdRegexStackFix do
       ratio.should be < 9.0, "#{small.total_milliseconds.round}ms -> #{large.total_milliseconds.round}ms"
     end
 
+    # A named-entity candidate at every `&` took the `^`-rule fallback: a
+    # copy of the rest of the paragraph plus a UTF-8 check of it, per `&`.
+    it "renders a hard-wrapped paragraph full of ampersands in linear time" do
+      para = ->(lines : Int32) { "AT&T R&D a & b ?x=1&y=2 &amp; &bogus;\n" * lines }
+      best = ->(markdown : String) { best_cpu_time { Markd.to_html(markdown) } }
+      Markd.to_html(para.call(300)) # warm up
+      small = best.call(para.call(3000))
+      large = best.call(para.call(12000))
+      ratio = large / {small, 1.millisecond}.max
+      ratio.should be < 9.0, "#{small.total_milliseconds.round}ms -> #{large.total_milliseconds.round}ms"
+      Markd.to_html(para.call(1)).should eq("<p>AT&amp;T R&amp;D a &amp; b ?x=1&amp;y=2 &amp; &amp;bogus;</p>\n")
+    end
+
     it "renders a very long email-like autolink without a JIT stack error" do
       render_within("<a@" + "b." * 100000 + "c>\n", 10.0).should start_with("<p>")
     end

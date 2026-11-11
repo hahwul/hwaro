@@ -1043,7 +1043,7 @@ module Hwaro::Core::Build::Phases::Render
                      # it declares one (Wikilinks#fragment), so that id is
                      # part of what the link renders.
                      index.resolve(link.target, page).try { |t|
-                       id = link.heading.try { |h| Content::Processors::Includes.heading_id(t.raw_content, h) }
+                       id = link.heading.try { |h| index.heading_id(t, h) }
                        "#{t.path} #{t.url}##{id}"
                      } ||
                        (index.resolve_file(link.target, page) if link.file?) || ""

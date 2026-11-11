@@ -239,7 +239,14 @@ module Hwaro
         # The optional `> ` lets a table quoted inside a blockquote (or an
         # admonition body) past this gate; `process` then parses it through
         # `blockquote_prefix`.
-        TABLE_SEPARATOR_CHECK = /^\s*(?:> ?)?\s*\|?\s*:?-+:?\s*\|/m
+        # The whitespace before the hyphens stays on its line (`[^\S\n]`) and
+        # every run is possessive. As `^\s*(?:> ?)?\s*\|?\s*:?-+:?\s*\|` the
+        # three leading runs also crossed newlines, which found nothing more
+        # (whatever follows the last newline they cross matches from that
+        # line's own start) but made a failed match cubic in the length of a
+        # whitespace run: seconds on a page of deeply indented lines, and
+        # "match limit exceeded" from a 4000-space run.
+        TABLE_SEPARATOR_CHECK = /^[^\S\n]*+(?:> ?)?[^\S\n]*+\|?[^\S\n]*+:?-++:?\s*+\|/m
 
         def has_table?(content : String) : Bool
           TABLE_SEPARATOR_CHECK.matches?(content)

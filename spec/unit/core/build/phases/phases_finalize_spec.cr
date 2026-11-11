@@ -124,6 +124,72 @@ describe Hwaro::Core::Build::Phases::Finalize do
       end
     end
 
+    it "respells it for an output directory spelled with a trailing slash too" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          Dir.mkdir_p("public/posts/Foo")
+          File.write("public/posts/Foo/index.html", "<p>post</p>")
+          if !Hwaro::Utils::PathUtils.case_folding_fs?(File.join(dir, "public"))
+            pending!("needs a case-insensitive filesystem")
+          end
+
+          builder = Hwaro::Core::Build::Builder.new
+          cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: ".hwaro_cache.json")
+          Dir.mkdir_p("content/posts")
+          File.write("content/posts/foo.md", "# post")
+          cache.update("content/posts/foo.md", "public/posts/foo/index.html")
+          builder.test_set_cache(cache)
+
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public/", cache: true)
+          ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+          page = Hwaro::Models::Page.new("posts/foo.md")
+          page.url = "/posts/foo/"
+          ctx.pages = [page]
+
+          builder.test_run_finalize(ctx, Hwaro::Profiler.new(enabled: false))
+
+          Dir.children("public/posts").should eq(["foo"])
+        end
+      end
+    end
+
+    it "respells only the mismatched directory among many siblings" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          Dir.mkdir_p("public/posts/Foo")
+          if !Hwaro::Utils::PathUtils.case_folding_fs?(File.join(dir, "public"))
+            pending!("needs a case-insensitive filesystem")
+          end
+          names = ["foo"] + (0...40).map { |i| "post-#{i}" }
+          names.each do |name|
+            Dir.mkdir_p("public/posts/#{name}")
+            File.write("public/posts/#{name}/index.html", name)
+          end
+
+          builder = Hwaro::Core::Build::Builder.new
+          cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: ".hwaro_cache.json")
+          Dir.mkdir_p("content/posts")
+          pages = names.map do |name|
+            File.write("content/posts/#{name}.md", "# #{name}")
+            cache.update("content/posts/#{name}.md", "public/posts/#{name}/index.html")
+            page = Hwaro::Models::Page.new("posts/#{name}.md")
+            page.url = "/posts/#{name}/"
+            page
+          end
+          builder.test_set_cache(cache)
+
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", cache: true)
+          ctx = Hwaro::Core::Lifecycle::BuildContext.new(options)
+          ctx.pages = pages
+
+          builder.test_run_finalize(ctx, Hwaro::Profiler.new(enabled: false))
+
+          Dir.children("public/posts").sort!.should eq(names.sort)
+          File.read("public/posts/foo/index.html").should eq("foo")
+        end
+      end
+    end
+
     # Regression: the source survives but the page moved (`slug`, `path`,
     # a permalink rule), so the entry is rewritten with the new output and
     # the file at the old URL used to stay published forever.

@@ -79,6 +79,99 @@ describe Hwaro::Core::Build::Cache do
     end
   end
 
+  describe "entry output paths" do
+    it "are stored relative to the workspace and re-anchored where it is loaded" do
+      Dir.mktmpdir do |tmp|
+        first = File.join(tmp, "a")
+        second = File.join(tmp, "b")
+        Dir.mkdir(first)
+        Dir.cd(first) do
+          File.write("page.md", "body")
+          cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: "c.json")
+          cache.set_global_checksums("t", "c", output_dir: "public")
+          # The render's own output is absolute; alias stubs arrive relative.
+          cache.update("page.md", File.expand_path("public/page/index.html"),
+            output_paths: [File.expand_path("public/page/index.json")],
+            derived_paths: ["public/old/index.html"])
+          cache.save
+          File.read("c.json").should_not contain(File.basename(tmp))
+        end
+        File.rename(first, second)
+
+        Dir.cd(second) do
+          cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: "c.json")
+          cache.tracks_output_dir?("public").should be_true
+          cache.output_paths_for("page.md").should eq([File.expand_path("public/page/index.json")])
+          cache.derived_paths_for("page.md").should eq([File.expand_path("public/old/index.html")])
+          cache.prune_entries_not_in(Set(String).new).should eq([
+            File.expand_path("public/page/index.html"),
+            File.expand_path("public/page/index.json"),
+            File.expand_path("public/old/index.html"),
+          ])
+        end
+      end
+    end
+
+    it "stay absolute for an output directory outside the workspace" do
+      Dir.mktmpdir do |tmp|
+        project = File.join(tmp, "project")
+        output = File.join(File.realpath(tmp), "out", "index.html")
+        Dir.mkdir(project)
+        Dir.cd(project) do
+          File.write("page.md", "body")
+          cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: "c.json")
+          cache.set_global_checksums("t", "c", output_dir: File.dirname(output))
+          cache.update("page.md", output)
+          cache.save
+
+          reloaded = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: "c.json")
+          reloaded.tracks_output_dir?(File.dirname(output)).should be_true
+          reloaded.prune_entries_not_in(Set(String).new).should eq([output])
+        end
+      end
+    end
+
+    # What the current release wrote: every output path absolute.
+    it "keep working from a cache that stored them absolute, in the same workspace" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("page.md", "body")
+          output = File.expand_path("public/page/index.html")
+          cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: "c.json")
+          cache.set_global_checksums("t", "c", output_dir: "public")
+          cache.update("page.md", output)
+          cache.save
+          File.write("c.json", File.read("c.json").sub(%("output_path":"public/page/index.html"), %("output_path":#{output.to_json})))
+          File.read("c.json").should contain(output)
+
+          reloaded = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: "c.json")
+          reloaded.tracks_output_dir?("public").should be_true
+          reloaded.stats[:total].should eq(1)
+          reloaded.prune_entries_not_in(Set(String).new).should eq([output])
+        end
+      end
+    end
+
+    # The same file after its workspace moved: its entries name a tree that
+    # is not this one, so nothing they record can be pruned.
+    it "make a cache that stored them absolute for another workspace start over" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("page.md", "body")
+          cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: "c.json")
+          cache.set_global_checksums("t", "c", output_dir: "public")
+          cache.update("page.md", File.expand_path("public/page/index.html"))
+          cache.save
+          File.write("c.json", File.read("c.json").sub(%("output_path":"public/), %("output_path":"/elsewhere/site/public/)))
+
+          reloaded = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: "c.json")
+          reloaded.tracks_output_dir?("public").should be_false
+          reloaded.stats[:total].should eq(0)
+        end
+      end
+    end
+  end
+
   describe "#set_global_checksums output-directory tracking" do
     it "invalidates every entry when the output directory changes" do
       Dir.mktmpdir do |dir|

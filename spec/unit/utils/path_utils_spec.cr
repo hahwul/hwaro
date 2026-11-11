@@ -157,6 +157,15 @@ describe Hwaro::Utils::PathUtils do
     it "does not double the separator of the filesystem root" do
       Hwaro::Utils::PathUtils.within?("/etc", "/").should be_true
     end
+
+    # `File.expand_path("public/")` keeps the separator shell completion
+    # typed, and the directory itself then tested as outside its own root.
+    it "treats a root spelled with a trailing separator as the same directory" do
+      Hwaro::Utils::PathUtils.within?("/a/b", "/a/b/").should be_true
+      Hwaro::Utils::PathUtils.within?("/a/b/c", "/a/b/").should be_true
+      Hwaro::Utils::PathUtils.within?("/a/bc", "/a/b/").should be_false
+      Hwaro::Utils::PathUtils.within?("/a", "/a/b/").should be_false
+    end
   end
 
   describe ".resolves_within?" do

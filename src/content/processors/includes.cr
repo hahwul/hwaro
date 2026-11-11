@@ -64,7 +64,14 @@ module Hwaro
         SETEXT_RE    = /\A {0,3}(=+|-+)[ \t]*\r?\n?\z/
         REF_DEF_RE   = /\A {0,3}\[(?!\^)[^\]]+\]:/
         THEMATIC_RE  = /\A {0,3}(?:(?:\*[ \t]*){3,}|(?:_[ \t]*){3,}|(?:-[ \t]*){3,})\r?\n?\z/
-        ATX_RE       = /\A {0,3}(\#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*\r?\n?\z/
+        # Linear in a whitespace run (a lazy `(.*?)` before a backtracking
+        # closing-sequence tail was quadratic and hit the match limit). The
+        # text still ends at the first point the rest is a closing sequence;
+        # that point always follows a non-blank character (a blank before it
+        # would close too), so the text grows one blank run plus one
+        # character at a time, and the tail commits (possessive) since each
+        # of its runs has one possible length.
+        ATX_RE = /\A {0,3}(\#{1,6})(?:[ \t]+((?:[ \t]*+[^ \t\n])*?))?(?:[ \t]++#++)?+[ \t]*+\r?\n?\z/
 
         # The fence-option keys `include_code` passes through, in the order
         # they are written (`title` is the alias `FenceOptions` reads as `name`).
@@ -265,22 +272,24 @@ module Hwaro
           lines[first...stop].join
         end
 
-        # The custom id (`## Setup {#install}`, `{#install .cls}`) of the
-        # first ATX heading of `markdown` that `heading_section` would match,
-        # or nil when that heading has none (its id is then the slug).
-        def heading_id(markdown : String, heading : String) : String?
-          want = Utils::TextUtils.slugify(heading)
+        # The custom id (`## Setup {#install}`, `{#install .cls}`) of every
+        # ATX heading of `markdown`, by the slug `heading_section` matches a
+        # heading on (look one up with `slugify(heading)`). The first heading
+        # with a slug wins; its id is nil when it has none (its id is then
+        # the slug).
+        def heading_ids(markdown : String) : Hash(String, String?)
+          ids = {} of String => String?
           tracker = FenceTracker.new
           markdown.each_line(chomp: false) do |line|
             next if tracker.fence_line?(line)
             next unless m = ATX_RE.match(line)
             text = m[2]? || ""
             stripped = strip_attribute_block(text)
-            next unless Utils::TextUtils.slugify(visible_text(stripped)) == want
             # An escaped `\{#id}` is heading text, not an id.
-            return if stripped == text
-            return text[/\{\#([\w][\w:-]*)(?:[ \t][^{}]*)?\}\z/, 1]?
+            id = stripped == text ? nil : text[/\{\#([\w][\w:-]*)(?:[ \t][^{}]*)?\}\z/, 1]?
+            ids.put_if_absent(Utils::TextUtils.slugify(visible_text(stripped)), id)
           end
+          ids
         end
 
         # `{first line, level, visible text}` of every heading outside code.

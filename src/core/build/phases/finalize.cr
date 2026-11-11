@@ -11,6 +11,13 @@ module Hwaro::Core::Build::Phases::Finalize
       build_cache = @cache || raise "Cache not initialized"
       # Claimed before the prune so a `--cache` build keeps the headers file.
       claim_csp_headers_file(ctx)
+      # `sw.js` and `manifest.json` are written AFTER this phase (see
+      # PwaHooks), so they are claimed here: unclaimed, nothing removed
+      # them once `[pwa]` was switched off, and the stale service worker
+      # kept being published.
+      @config.try do |config|
+        Content::Seo::Pwa.published_outputs(config, ctx.options.output_dir).each { |path| claim_generated_output(path) }
+      end
       # Serve rebuilds keep their output directory; see
       # `sweep_stale_derived_outputs` (a no-op on the first build).
       sweep_stale_derived_outputs(ctx.options.output_dir)
@@ -158,7 +165,8 @@ module Hwaro::Core::Build::Phases::Finalize
   # already takes the new name. A no-op everywhere the probe says the
   # filesystem is case-sensitive.
   private def respell_folded_output_dirs(owned : Set(String), output_dir : String) : Nil
-    root = File.expand_path(output_dir)
+    # expand_path keeps the trailing separator of `-o public/`.
+    root = Utils::PathUtils.chomp_separator(File.expand_path(output_dir))
     return unless Dir.exists?(root) && Utils::PathUtils.case_folding_fs?(root)
 
     dirs = Set(String).new
@@ -170,19 +178,23 @@ module Hwaro::Core::Build::Phases::Finalize
       end
     end
 
-    listing = {} of String => Array(String)
+    # A Set per parent: the usual answer is "spelled as asked", and one
+    # section holds a directory per page — an Array made that membership
+    # test a scan of the whole section for every page (20k pages: 200M
+    # string compares, a third of a warm build).
+    listing = {} of String => Set(String)
     dirs.to_a.sort_by!(&.size).each do |dir|
       parent = File.dirname(dir)
       name = File.basename(dir)
-      children = listing[parent] ||= Dir.children(parent)
+      children = listing[parent] ||= Dir.children(parent).to_set
       next if children.includes?(name)
       key = Utils::PathUtils.output_fold_key(name)
-      next unless index = children.index { |child| Utils::PathUtils.output_fold_key(child) == key }
-      actual = children[index]
+      next unless actual = children.find { |child| Utils::PathUtils.output_fold_key(child) == key }
       tmp = File.join(parent, "hwaro-respell-#{Process.pid}.tmp")
       File.rename(File.join(parent, actual), tmp)
       File.rename(tmp, dir)
-      children[index] = name
+      children.delete(actual)
+      children << name
     end
   rescue ex : File::Error
     Logger.debug "Could not respell output directories: #{ex.message}"

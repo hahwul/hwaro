@@ -1343,6 +1343,37 @@ describe Hwaro::Content::Seo::OgImage do
       end
     end
 
+    # A warm build that changes nothing leaves the manifest alone: rewriting
+    # it (renamed into place) needs a writable directory, and a read-only
+    # og-images/ failed a build that had nothing to write.
+    it "does not rewrite an unchanged manifest" do
+      posix_only!("chmod-based permissions")
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.title = "My Site"
+        config.og.auto_image.enabled = true
+        config.og.auto_image.format = "svg"
+        page = Hwaro::Models::Page.new("test.md")
+        page.title = "My Post"
+        page.url = "/posts/my-post/"
+        page.render = true
+
+        Hwaro::Content::Seo::OgImage.generate([page], config, dir)
+        img_dir = File.join(dir, "og-images")
+        manifest = File.read(File.join(img_dir, ".og_manifest.json"))
+        File.chmod(img_dir, 0o555)
+        begin
+          # Root writes anyway; nothing to assert there.
+          next if File::Info.writable?(img_dir)
+          page.image = nil
+          Hwaro::Content::Seo::OgImage.generate([page], config, dir).should eq({generated: 0, skipped: 1})
+          File.read(File.join(img_dir, ".og_manifest.json")).should eq(manifest)
+        ensure
+          File.chmod(img_dir, 0o755)
+        end
+      end
+    end
+
     it "round-trips manifest correctly" do
       Dir.mktmpdir do |dir|
         manifest_path = File.join(dir, "manifest.json")
@@ -1352,6 +1383,49 @@ describe Hwaro::Content::Seo::OgImage do
         config_hash, loaded = Hwaro::Content::Seo::OgImage.load_manifest(manifest_path)
         config_hash.should eq("confighash")
         loaded.should eq(entries)
+      end
+    end
+
+    # Written in place, each of these failed the whole build (as an internal
+    # error), or wrote through the link into a file outside the output.
+    it "replaces a manifest that cannot be written in place" do
+      posix_only!("chmod-based permissions and symlinks")
+      Dir.mktmpdir do |dir|
+        manifest_path = File.join(dir, ".og_manifest.json")
+        entries = {"slug-a" => "hash1"}
+
+        File.write(manifest_path, "{}")
+        File.chmod(manifest_path, 0o444)
+        Hwaro::Content::Seo::OgImage.save_manifest(manifest_path, "h1", entries)
+        Hwaro::Content::Seo::OgImage.load_manifest(manifest_path).should eq({"h1", entries})
+
+        File.delete(manifest_path)
+        File.symlink(manifest_path, manifest_path)
+        Hwaro::Content::Seo::OgImage.save_manifest(manifest_path, "h2", entries)
+        Hwaro::Content::Seo::OgImage.load_manifest(manifest_path).should eq({"h2", entries})
+
+        victim = File.join(dir, "victim.txt")
+        File.write(victim, "keep")
+        File.delete(manifest_path)
+        File.symlink(victim, manifest_path)
+        Hwaro::Content::Seo::OgImage.save_manifest(manifest_path, "h3", entries)
+        Hwaro::Content::Seo::OgImage.load_manifest(manifest_path).should eq({"h3", entries})
+        File.read(victim).should eq("keep")
+        Dir.children(dir).sort!.should eq([".og_manifest.json", "victim.txt"])
+      end
+    end
+
+    # Opening a FIFO for reading blocks until something writes to it: the
+    # build hung (this example did too, rather than fail).
+    it "treats a manifest that is not a regular file as empty" do
+      posix_only!("mkfifo")
+      Dir.mktmpdir do |dir|
+        manifest_path = File.join(dir, ".og_manifest.json")
+        pending!("needs mkfifo") unless Process.run("mkfifo", [manifest_path]).success?
+
+        Hwaro::Content::Seo::OgImage.load_manifest(manifest_path).should eq({"", {} of String => String})
+        Hwaro::Content::Seo::OgImage.save_manifest(manifest_path, "h", {"a" => "b"})
+        Hwaro::Content::Seo::OgImage.load_manifest(manifest_path).should eq({"h", {"a" => "b"}})
       end
     end
 

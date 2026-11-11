@@ -69,7 +69,7 @@ module Hwaro::Core::Build::Phases::Initialize
       # own `static/.hwaro-dev` (published by copy_static_files below like any
       # hidden static file) is not mistaken for one.
       dev_marker_found = !ctx.options.serve_mode && Utils::DevMarker.present?(output_dir)
-      fresh = setup_output_dir(output_dir, keep_output)
+      fresh = setup_output_dir(output_dir, keep_output, ctx.options.parallel)
       @kept_output_dir = keep_output ? output_dir : nil
       # A symlinked output directory is a publish-through-the-link setup: a
       # web server may be serving the tree behind it while this build runs.
@@ -168,7 +168,7 @@ module Hwaro::Core::Build::Phases::Initialize
 
   # True when the directory is empty now because this call created or
   # cleared it (never for a kept tree).
-  private def setup_output_dir(output_dir : String, incremental : Bool = false) : Bool
+  private def setup_output_dir(output_dir : String, incremental : Bool = false, parallel : Bool = true) : Bool
     # Sanity-check the destination on EVERY path, not just the one that wipes
     # it. `--cache`, `--preserve-output` and `hwaro serve` all take the
     # incremental branch, and `build --cache -o content` used to exit 0 after
@@ -223,9 +223,9 @@ module Hwaro::Core::Build::Phases::Initialize
         unless entries.empty?
           Logger.info "Output directory #{output_dir} -> #{Hwaro::Utils::PathUtils.resolved_real_path(output_dir)} (clearing #{entries.size} entries behind the symlink)"
         end
-        FileUtils.rm_rf(entries.map { |entry| File.join(output_dir, entry) })
+        remove_output_trees(entries.map { |entry| File.join(output_dir, entry) }, parallel)
       else
-        FileUtils.rm_rf(output_dir)
+        remove_output_trees([output_dir], parallel)
       end
     end
     ensure_output_dir(output_dir)
@@ -247,6 +247,55 @@ module Hwaro::Core::Build::Phases::Initialize
     # Verified, not assumed: `rm_rf` gives up silently on entries it cannot
     # delete (a read-only tree), and those files are still there.
     (!incremental || !existed_before) && output_dir_empty?(output_dir)
+  end
+
+  # Fewer deletable units than this and the serial sweep is already instant.
+  OUTPUT_DELETE_FANOUT_MIN = 64
+  # Deleting is kernel-bound: measured on APFS, 4 threads take ~45% off the
+  # wall time and 8 or 14 take no more, only extra system time spent on the
+  # filesystem's own locks.
+  OUTPUT_DELETE_WORKERS = 4
+
+  # `FileUtils.rm_rf(paths)`, with the bulk of the unlinking spread over
+  # worker threads. Removing the previous build's tree is one unlink or
+  # rmdir per entry, serially — on a 5000-page site that was the single
+  # slowest step of a rebuild (longer than rendering the pages; APFS takes
+  # ~100µs per entry). The tree is cut into units two levels down (the
+  # usual shape is a few sections, each holding one directory per page),
+  # the units are deleted concurrently, and the serial `rm_rf` that follows
+  # removes the now-empty parents and retries anything the workers could
+  # not. A symlink is unlinked, never followed, and failures are skipped
+  # silently, as before — but per unit: the serial sweep stopped at the
+  # first entry of a directory it could not delete and kept that entry's
+  # later siblings, while each worker unit is attempted on its own, so a
+  # tree holding a read-only directory now loses everything else around it.
+  # `setup_output_dir` still sees what is left and reports the tree as not
+  # fresh. `--no-parallel` keeps it serial.
+  private def remove_output_trees(paths : Array(String), parallel : Bool = true) : Nil
+    if parallel && (units = output_delete_units(paths)).size >= OUTPUT_DELETE_FANOUT_MIN
+      config = ParallelConfig.new(max_workers: OUTPUT_DELETE_WORKERS, wake_idle: true)
+      Parallel(String, Nil).new(config).process(units) { |unit, _| FileUtils.rm_rf(unit) }
+    end
+    FileUtils.rm_rf(paths)
+  end
+
+  # The units `paths` is cut into: every entry two levels down (a leaf
+  # stays a unit of its own). Always both levels — many root entries next
+  # to one big section would otherwise leave that section a single unit,
+  # deleted by one worker as slowly as the serial sweep.
+  private def output_delete_units(paths : Array(String)) : Array(String)
+    units = paths
+    2.times { units = units.flat_map { |path| directory_children(path) || [path] } }
+    units
+  end
+
+  # The entries of `path` when it is a real directory (a symlink to one is
+  # a leaf: `rm_rf` unlinks it), nil for anything else or when unreadable.
+  private def directory_children(path : String) : Array(String)?
+    return unless File.info?(path, follow_symlinks: false).try(&.directory?)
+    Dir.children(path).map { |entry| File.join(path, entry) }
+  rescue File::Error
+    nil
   end
 
   private def output_dir_empty?(output_dir : String) : Bool
@@ -821,7 +870,7 @@ module Hwaro::Core::Build::Phases::Initialize
         # it, so any `section` text it prints (raw, quoted) is a read too.
         needs_section_pages: closure.any? { |dep|
           src = templates[dep]
-          dep.starts_with?("shortcodes/") ? src.includes?("section") : template_reads_variable?(src, "section")
+          dep.starts_with?("shortcodes/") ? src.includes?("section") : template_reads_section_pages?(src)
         },
         # Targeted on purpose — see the record's doc comment. These feed the
         # render worker heuristic, where a false positive costs parallelism.
@@ -831,22 +880,50 @@ module Hwaro::Core::Build::Phases::Initialize
     end
   end
 
-  # Whether `source` can read the top-level variable `name`. A substring test
-  # also hit `page.section`, `<section>` and comments, so nearly every
-  # template paid the O(section size) per-page `section.pages` copy —
-  # quadratic on a large section. Lexed instead: only an identifier token
-  # that is not an attribute (`x.section`) counts. Over-approximates
-  # (`{% set section = … %}` counts) and a lexer error counts as a read.
-  private def template_reads_variable?(source : String, name : String) : Bool
-    return false unless source.includes?(name)
+  # `section.<name>` reads that cannot observe `section.pages` or
+  # `section.pages_count` — every other key of the object
+  # build_template_variables assembles.
+  SECTION_ATTRIBUTES_WITHOUT_PAGES = {
+    "title", "description", "list", "subsections", "assets",
+    "page_template", "paginate_path", "redirect_to",
+  }
+
+  # Whether `source` can observe the per-page `section.pages` array (or its
+  # count). A substring test also hit `page.section`, `<section>` and
+  # comments, so nearly every template paid the O(section size) per-page
+  # copy — quadratic on a large section. Lexed instead: only an identifier
+  # token `section` that is not itself an attribute (`x.section`) counts, and
+  # not when it is immediately read as one of the attributes above — a
+  # breadcrumb's `{{ section.title }}` cost every page of a 32k-page section
+  # the same copy. Over-approximates: `section` alone (assigned, passed,
+  # filtered, subscripted), `section.pages`, any attribute not listed, and a
+  # lexer error all count as a read.
+  private def template_reads_section_pages?(source : String) : Bool
+    return false unless source.includes?("section")
     lexer = Crinja::Parser::TemplateLexer.new(Content::Processors::Template.engine.env.config, source)
     after_point = false
+    # :none, :section (just lexed `section`) or :attribute (lexed `section.`).
+    pending = :none
     # Each token consumes input; the cap only guards against a lexer stall.
     (source.bytesize + 2).times do
       token = lexer.next_token
+      case pending
+      when :section
+        return true unless token.kind.point?
+        pending = :attribute
+        next
+      when :attribute
+        return true unless token.kind.identifier? && SECTION_ATTRIBUTES_WITHOUT_PAGES.includes?(token.value)
+        pending = :none
+        after_point = false
+        next
+      end
       return false if token.kind.eof?
-      return true if token.kind.identifier? && token.value == name && !after_point
-      after_point = token.kind.point?
+      if token.kind.identifier? && token.value == "section" && !after_point
+        pending = :section
+      else
+        after_point = token.kind.point?
+      end
     end
     true
   rescue

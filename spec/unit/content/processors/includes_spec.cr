@@ -96,12 +96,48 @@ describe Hwaro::Content::Processors::Includes do
     end
   end
 
-  describe ".heading_id" do
+  describe ".heading_ids" do
     it "reads an id block but not an escaped one, which is heading text" do
-      Includes.heading_id("## Title {#t}\n", "Title").should eq("t")
-      Includes.heading_id("## Title \\{#t}\n", "Title").should be_nil
-      Includes.heading_id("## Title \\{#t}\n", "Title {#t}").should be_nil
-      Includes.heading_id("## Title \\\\{#t}\n", "Title \\").should eq("t")
+      Includes.heading_ids("## Title {#t}\n").should eq({"title" => "t"})
+      Includes.heading_ids("## Title \\{#t}\n").should eq({Hwaro::Utils::TextUtils.slugify("Title {#t}") => nil})
+      Includes.heading_ids("## Title \\\\{#t}\n").should eq({Hwaro::Utils::TextUtils.slugify("Title \\") => "t"})
+    end
+
+    it "keeps the first heading of a slug and skips fenced ones" do
+      markdown = "```\n## A {#fenced}\n```\n## A\n## A {#late}\n## B {#b .wide}\n"
+      Includes.heading_ids(markdown).should eq({"a" => nil, "b" => "b"})
+    end
+
+    it "reads a heading holding a long whitespace run" do
+      Includes.heading_ids("## Early\n\n## wide#{" " * 3000}gap #\n").should eq({"early" => nil, "wide-gap" => nil})
+    end
+  end
+
+  describe "ATX_RE" do
+    # The backtracking form ATX_RE replaced; it gives up (match limit) on a
+    # long whitespace run, so it is compared on short lines only.
+    old_atx = /\A {0,3}(\#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*\r?\n?\z/
+
+    it "captures what the backtracking form captured" do
+      rng = Random.new(20261111)
+      pieces = [" ", "  ", "\t", "#", "##", "\\#", "a", "b c", "{#id}", "{#x .c}", "}", "{", "\r", ".", "\\", "#{" " * 5}"]
+      endings = ["", "\n", "\r\n", "\r", " \n", "\t\r\n", " #\n", " ##  \r\n"]
+      4000.times do
+        line = String.build do |io|
+          io << " " * rng.rand(0..4) << "#" * rng.rand(0..7)
+          rng.rand(0..8).times { io << pieces.sample(rng) }
+          io << endings.sample(rng)
+        end
+        want = old_atx.match(line)
+        got = Includes::ATX_RE.match(line)
+        {got.nil?, got.try(&.[1]?), got.try(&.[2]?)}.should eq({want.nil?, want.try(&.[1]?), want.try(&.[2]?)}), line.inspect
+      end
+    end
+
+    it "reads a long whitespace run without giving up" do
+      Includes::ATX_RE.match("## wide#{" " * 20000}gap\n").try(&.[2]?).should eq("wide#{" " * 20000}gap")
+      Includes::ATX_RE.match("## wide#{" \t" * 20000}##  \n").try(&.[2]?).should eq("wide")
+      Includes::ATX_RE.match("## #{"# " * 20000}x\n").try(&.[2]?).should eq("#{"# " * 20000}x")
     end
   end
 

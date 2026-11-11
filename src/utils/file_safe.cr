@@ -123,7 +123,7 @@ module Hwaro
         target = path.to_s
         tmp = temp_path(target)
         begin
-          File.write(tmp, content)
+          write_unbuffered(tmp, content)
           File.rename(tmp, target)
         rescue ex
           # Never leave the temp file behind — a failed write must look
@@ -138,11 +138,22 @@ module Hwaro
       # reader can be watching: a plain create-and-write. Same classified
       # error when a directory stands where the file must go.
       def self.write_new(path : String | Path, content : String) : Nil
-        File.write(path, content)
+        write_unbuffered(path, content)
       rescue ex
         target = path.to_s
         raise directory_in_the_way_error(target, ex) if Dir.exists?(target)
         raise ex
+      end
+
+      # One `write(2)` straight from the string's bytes. `File.write` with a
+      # String goes through `IO::Buffered`, which allocates a 32 KiB buffer
+      # per file for anything smaller than that — on a 20k-page site that is
+      # 640 MB of large-object garbage, and every collection it triggers
+      # stops all render workers on the GC lock. A Bytes payload makes
+      # `File.write` set `sync` and skip the buffer; the bytes on disk are
+      # the same.
+      private def self.write_unbuffered(path : String | Path, content : String) : Nil
+        File.write(path, content.to_slice)
       end
 
       # A directory where a FILE must go is almost always a content page

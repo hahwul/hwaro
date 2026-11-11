@@ -471,7 +471,7 @@ module Hwaro
         return [] of String if Path[page_dir].normalize == Path[content_dir].normalize
 
         @assets = Dir.glob(File.join(Utils::PathUtils.glob_escape(page_dir), "**", "*")).sort!.compact_map do |file|
-          next unless File.file?(file)
+          next unless Utils::PathUtils.file?(file)
           next if Core::Build::Phases::ReadContent::PAGE_EXTENSIONS.includes?(File.extname(file).downcase)
           next if nested_bundle?(page_dir, file, content_dir, bundle_dirs, content_files)
 

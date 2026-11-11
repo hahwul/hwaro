@@ -275,6 +275,40 @@ describe "warm --cache builds" do
   # Switching a generator off (or skipping it by flag) never reaches its own
   # manifest prune, so the claims diff in Finalize has to remove its files.
   describe "generated images once the feature stops running" do
+    # A service worker that stays published keeps serving the precache it
+    # was built for, to every returning visitor.
+    it "removes sw.js and manifest.json when [pwa] is disabled" do
+      with_cached_site do
+        base = File.read("config.toml")
+        File.write("config.toml", base + "\n[pwa]\nenabled = true\nname = \"X\"\n")
+        cached_build
+        cached_build
+        File.exists?("public/sw.js").should be_true
+        File.exists?("public/manifest.json").should be_true
+
+        File.write("config.toml", base + "\n[pwa]\nenabled = false\n")
+        cached_build
+        File.exists?("public/sw.js").should be_false
+        File.exists?("public/manifest.json").should be_false
+      end
+    end
+
+    it "keeps a static sw.js and manifest.json once [pwa] is disabled" do
+      with_cached_site do
+        base = File.read("config.toml")
+        FileUtils.mkdir_p("static")
+        File.write("static/sw.js", "// mine")
+        File.write("static/manifest.json", "{}")
+        File.write("config.toml", base + "\n[pwa]\nenabled = true\nname = \"X\"\n")
+        cached_build
+
+        File.write("config.toml", base + "\n[pwa]\nenabled = false\n")
+        cached_build
+        File.read("public/sw.js").should eq("// mine")
+        File.read("public/manifest.json").should eq("{}")
+      end
+    end
+
     it "removes auto-generated OG images when auto images are disabled" do
       with_cached_site do
         base = File.read("config.toml")
@@ -872,6 +906,41 @@ describe "warm --cache builds" do
       File.exists?("public/posts/keep/index.html").should be_true
       File.read("public/posts/keep/index.html").should eq(before)
       File.exists?("public/posts/gone/index.html").should be_true
+    end
+  end
+
+  # CI restoring the cache under another checkout path, Docker vs native, a
+  # renamed project directory: the entries named the old tree, the prune
+  # refused every one of them, and the pages stayed published for good.
+  it "prunes deleted, drafted and re-slugged pages after the workspace moved" do
+    Dir.mktmpdir do |tmp|
+      before = File.join(tmp, "a")
+      after = File.join(tmp, "b")
+      with_cached_site do |dir|
+        File.write("content/posts/draft.md", "+++\ntitle = \"Draft\"\n+++\nbody")
+        File.write("content/about.md", "+++\ntitle = \"About\"\n+++\nbody")
+        cached_build
+        FileUtils.cp_r(dir, before)
+      end
+      File.rename(before, after)
+
+      Dir.cd(after) do
+        File.exists?("public/legacy/index.html").should be_true
+        File.delete("content/posts/gone.md")
+        File.write("content/posts/draft.md", "+++\ntitle = \"Draft\"\ndraft = true\n+++\nbody")
+        File.write("content/about.md", "+++\ntitle = \"About\"\nslug = \"about-us\"\n+++\nbody")
+        kept = File.info("public/posts/keep/index.html").modification_time
+        cached_build
+
+        File.exists?("public/posts/gone/index.html").should be_false
+        File.exists?("public/legacy/index.html").should be_false
+        File.exists?("public/posts/draft/index.html").should be_false
+        File.exists?("public/about/index.html").should be_false
+        File.exists?("public/about-us/index.html").should be_true
+        # Moving the tree is not an edit: the untouched page stays a cache hit.
+        File.info("public/posts/keep/index.html").modification_time.should eq(kept)
+        File.read(".hwaro_cache.json").should_not contain(File.basename(tmp))
+      end
     end
   end
 end

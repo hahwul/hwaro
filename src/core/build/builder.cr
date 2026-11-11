@@ -204,9 +204,10 @@ module Hwaro
         # resolvable. `needs_seo`/`needs_jsonld` are substring checks and are
         # forced on when the closure can hold shortcodes (template shortcodes
         # render with the same vars hash and could read anything).
-        # `needs_section_pages` lexes the closure for a `section` identifier,
-        # except in shortcode templates, whose output is compiled as template
-        # text — a plain substring check covers what they print.
+        # `needs_section_pages` lexes the closure for a `section` identifier
+        # that is not read as an attribute other than the pages (`section.title`
+        # is free), except in shortcode templates, whose output is compiled as
+        # template text — a plain substring check covers what they print.
         #
         # `listing_fanout_*` are the exception: they gate no output at all,
         # only the render phase's auto worker count (see

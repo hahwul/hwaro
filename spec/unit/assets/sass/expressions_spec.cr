@@ -310,3 +310,46 @@ describe "Sass namespaced-reference failures" do
     css.should contain("y: calc(100% - 2px);")
   end
 end
+
+describe "Sass map literal duplicate keys" do
+  rejected = ->(keys : Array(String)) do
+    begin
+      compile("$m: (#{keys.map_with_index { |key, i| "#{key}: #{i}" }.join(", ")}); x { y: length($m); }")
+      false
+    rescue ex : Hwaro::Assets::Sass::SyntaxError
+      raise ex unless ex.message.to_s.includes?("Duplicate key")
+      true
+    end
+  end
+
+  # String keys are looked up by their decoded text instead of compared
+  # with every earlier key, so the answer must stay the pairwise one: a
+  # key is a duplicate when an earlier key `eq?`s it.
+  it "rejects exactly the maps in which an earlier key equals a later one" do
+    pool = ["a", %("a"), "'a'", "b", %("b c"), %("\\e900"), %("\\E900"), "\\61", "1", "1.0", "1px", "96px", "1in", "100%",
+            "#fff", "#ffffff", "white", "red", "true", %("true"), "null", "(1 2)", "(1, 2)", "[1 2]"]
+    values = pool.map { |key| Hwaro::Assets::Sass::Expr.coerce(key) }
+    rng = Random.new(20261111)
+    lists = pool.each_index.flat_map { |i| pool.each_index.map { |j| [i, j] } }.to_a
+    1500.times { lists << Array.new(rng.rand(3..6)) { rng.rand(pool.size) } }
+    duplicates = 0
+    lists.each do |list|
+      want = list.each_with_index.any? { |key, at| list.first(at).any? { |earlier| values[earlier].eq?(values[key]) } }
+      duplicates += 1 if want
+      rejected.call(list.map { |i| pool[i] }).should eq(want), list.map { |i| pool[i] }.inspect
+    end
+    duplicates.should be > 100
+  end
+
+  # Scaling, not a wall-clock constant: every reference to the variable
+  # re-reads the map, and checking each key against all earlier ones made
+  # that quadratic in the key count (~16x on a 4x map; linear is ~4x).
+  it "reads a map of many string keys in linear time" do
+    source = ->(count : Int32) { "$m: (#{Array.new(count) { |i| "k#{i}: #{i}" }.join(", ")}); x { y: map-get($m, k0); }" }
+    best = ->(scss : String) { best_cpu_time { compile(scss).should contain("y: 0;") } }
+    small = best.call(source.call(3000))
+    large = best.call(source.call(12000))
+    ratio = large / {small, 1.millisecond}.max
+    ratio.should be < 9.0, "#{small.total_milliseconds.round}ms -> #{large.total_milliseconds.round}ms"
+  end
+end

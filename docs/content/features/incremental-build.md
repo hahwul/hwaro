@@ -167,7 +167,8 @@ Everything a removed page brought with it goes too: its `aliases` redirect
 stubs, its AMP mirror, its auto-generated OG image, the taxonomy term page of
 a tag nobody uses any more (with that term's feed), and the pagination page a
 section no longer fills. Turning a whole feature off — `[amp] enabled = false`,
-`[og.auto_image] enabled = false`, `[image_processing] enabled = false`, or
+`[og.auto_image] enabled = false`, `[image_processing] enabled = false`,
+`[pwa] enabled = false` (its `sw.js` and `manifest.json`), or
 the `--skip-og-image` / `--skip-image-processing` flags — removes what it used
 to publish on the next build for the same reason, as does dropping a width
 from `[image_processing] widths`.
@@ -205,6 +206,12 @@ control). This file contains:
 - **Metadata** — template and config checksums from the last build
 - **Entries** — per-file records with path, mtime, content hash, and output path
   (the output path is also what identifies a removed page's stale file)
+
+Output paths are stored relative to the project root, so the file stays valid
+when the project moves: restored by CI under another checkout path, shared
+between Docker and a native run, or kept across a directory rename. An output
+directory outside the project (`-o /var/www/site`) is still recorded as an
+absolute path.
 
 Add `.hwaro_cache.json` to your `.gitignore` (the one `hwaro init` scaffolds already lists it):
 

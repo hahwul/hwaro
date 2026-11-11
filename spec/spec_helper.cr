@@ -6,6 +6,7 @@ require "./support/registry_helper"
 require "./support/template_helper"
 require "./support/image_hooks_helper"
 require "./support/platform_helper"
+require "./support/timing_helper"
 
 # Suppress Logger output during tests
 Hwaro::Logger.io = IO::Memory.new

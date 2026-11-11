@@ -604,12 +604,85 @@ describe Hwaro::Core::Build::Cache do
       end
     end
 
-    it "does nothing for non-existent files" do
+    # `rsync -a`, `tar`, `cp -p`, a restored backup: the bytes are new and the
+    # mtime is OLDER. The page re-rendered, but the entry kept describing the
+    # previous render, so putting the previous file back was a cache hit on
+    # output that came from the other one.
+    it "replaces the entry when the source's mtime went backwards" do
       Dir.mktmpdir do |dir|
         cache_path = File.join(dir, ".hwaro_cache.json")
+        test_file = File.join(dir, "test.md")
+        newer = Time.utc - 1.hour
+        older = Time.utc - 2.hours
+
+        File.write(test_file, "version A")
+        File.touch(test_file, newer)
         cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
-        cache.update("/nonexistent/file.md")
-        cache.stats[:total].should eq(0)
+        cache.update(test_file)
+
+        File.write(test_file, "version B, restored")
+        File.touch(test_file, older)
+        cache.changed?(test_file).should be_true
+        cache.update(test_file)
+        cache.changed?(test_file).should be_false
+
+        File.write(test_file, "version A")
+        File.touch(test_file, newer)
+        cache.changed?(test_file).should be_true
+      end
+    end
+
+    # The render wrote the page, then the source could not be described (an
+    # editor's delete-and-rename save, a directory moved away and back). The
+    # entry of the PREVIOUS render must not survive that: it would match
+    # again as soon as the inputs it describes came back.
+    it "stops vouching for the last render when the source is gone at update time" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        test_file = File.join(dir, "test.md")
+        old_output = File.join(dir, "old.html")
+        new_output = File.join(dir, "new.html")
+        stamp = Time.utc - 1.hour
+
+        File.write(test_file, "content")
+        File.touch(test_file, stamp)
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        cache.update(test_file, old_output, template_hash: "t1")
+
+        File.delete(test_file)
+        cache.update(test_file, new_output, template_hash: "t2")
+
+        File.write(test_file, "content")
+        File.touch(test_file, stamp)
+        cache.changed?(test_file, template_hash: "t1").should be_true
+        cache.changed?(test_file, template_hash: "t2").should be_true
+        # What that render wrote is still on record, so a page that never
+        # comes back takes its output with it; the file it stopped writing
+        # is handed to the prune.
+        cache.take_orphaned_outputs.should eq([old_output])
+        cache.prune_entries_not_in(Set(String).new).should eq([new_output])
+      end
+    end
+
+    it "stops vouching for the last render when the source cannot be read" do
+      posix_only!("chmod-based permissions")
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        test_file = File.join(dir, "test.md")
+        stamp = Time.utc - 1.hour
+
+        File.write(test_file, "content")
+        File.touch(test_file, stamp)
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        cache.update(test_file, template_hash: "t1")
+
+        File.chmod(test_file, 0o000)
+        pending!("running as root: the file stays readable") if File::Info.readable?(test_file)
+        cache.update(test_file, template_hash: "t2")
+        File.chmod(test_file, 0o644)
+
+        cache.changed?(test_file, template_hash: "t1").should be_true
+        cache.changed?(test_file, template_hash: "t2").should be_true
       end
     end
 
@@ -671,9 +744,9 @@ describe Hwaro::Core::Build::Cache do
         File.write(test_file, "content")
 
         cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
-        cache.update(test_file, output_paths: ["out.json", "out.xml"])
+        cache.update(test_file, output_paths: [File.join(dir, "out.json"), File.join(dir, "out.xml")])
 
-        cache.output_paths_for(test_file).should eq(["out.json", "out.xml"])
+        cache.output_paths_for(test_file).should eq([File.join(dir, "out.json"), File.join(dir, "out.xml")])
       end
     end
 
@@ -684,10 +757,10 @@ describe Hwaro::Core::Build::Cache do
         File.write(test_file, "content")
 
         cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
-        cache.update(test_file, output_paths: ["out.json"])
-        cache.update(test_file, output_paths: ["out.json", "out.xml"])
+        cache.update(test_file, output_paths: [File.join(dir, "out.json")])
+        cache.update(test_file, output_paths: [File.join(dir, "out.json"), File.join(dir, "out.xml")])
 
-        cache.output_paths_for(test_file).should eq(["out.json", "out.xml"])
+        cache.output_paths_for(test_file).should eq([File.join(dir, "out.json"), File.join(dir, "out.xml")])
       end
     end
 
@@ -1068,11 +1141,11 @@ describe Hwaro::Core::Build::Cache do
         File.write(test_file, "content")
 
         cache1 = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
-        cache1.update(test_file, output_paths: ["out.json", "out.xml"])
+        cache1.update(test_file, output_paths: [File.join(dir, "out.json"), File.join(dir, "out.xml")])
         cache1.save
 
         cache2 = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
-        cache2.output_paths_for(test_file).should eq(["out.json", "out.xml"])
+        cache2.output_paths_for(test_file).should eq([File.join(dir, "out.json"), File.join(dir, "out.xml")])
       end
     end
 

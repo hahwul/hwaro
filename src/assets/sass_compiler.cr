@@ -39,7 +39,7 @@ module Hwaro
         glob_match = File::MatchOptions.glob_default | File::MatchOptions::DotFiles
         project_root = Dir.current
         Dir.glob(File.join(SOURCE_DIR, "**", "*.scss"), match: glob_match) do |src_path|
-          next unless File.file?(src_path)
+          next unless Utils::PathUtils.file?(src_path)
           next if File.basename(src_path).starts_with?("_")
 
           relative = Path[src_path].relative_to(SOURCE_DIR).to_s
