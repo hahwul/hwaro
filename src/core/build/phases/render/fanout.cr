@@ -51,6 +51,7 @@ module Hwaro::Core::Build::Phases::Render
     # blog); deduping by normalized error signature collapses that into
     # one summary with the list of affected pages.
     failures = [] of NamedTuple(page_path: String, message: String)
+    io_signatures = {} of String => String
 
     # Each worker renders with its own Crinja env and template cache.
     ParallelHelper.each_concurrently(pages, worker_count) do |page, worker_id|
@@ -72,6 +73,7 @@ module Hwaro::Core::Build::Phases::Render
       error_mutex.synchronize do
         classified_error ||= output_write_error(page, ex)
         failures << {page_path: page.path, message: ex.message.to_s}
+        io_signatures[ex.message.to_s] = io_error_signature(ex)
       end
     rescue ex
       error_mutex.synchronize do
@@ -89,7 +91,7 @@ module Hwaro::Core::Build::Phases::Render
       Logger.debug "  Backtrace: #{ex.backtrace?.try(&.first(3).join("\n    ")) || "unavailable"}"
     end
 
-    finalize_render_failures(failures, classified_error, verbose)
+    finalize_render_failures(failures, classified_error, verbose, io_signatures)
 
     # Published, not processed: a page whose URL no writer could accept must
     # not be reported as built. Returned as a delta so streaming batches and
@@ -111,8 +113,9 @@ module Hwaro::Core::Build::Phases::Render
     failures : Array(NamedTuple(page_path: String, message: String)),
     classified_error : Hwaro::HwaroError?,
     verbose : Bool,
+    io_signatures : Hash(String, String) = {} of String => String,
   )
-    report_render_failures(failures, verbose) unless failures.empty?
+    report_render_failures(failures, verbose, io_signatures) unless failures.empty?
 
     if err = classified_error
       raise err
@@ -144,9 +147,12 @@ module Hwaro::Core::Build::Phases::Render
   # Collapse identical errors raised across many pages (typical of a
   # broken shared template) into a single summary line, preserving the
   # full page list. `--verbose` opts back into per-page detail.
+  # `io_signatures` maps an I/O failure's message to its grouping key (see
+  # `io_error_signature`).
   private def report_render_failures(
     failures : Array(NamedTuple(page_path: String, message: String)),
     verbose : Bool,
+    io_signatures : Hash(String, String) = {} of String => String,
   )
     # A template error carries Crinja's source excerpt, so ONE failure in a
     # minified (single-line) template printed a multi-megabyte console line —
@@ -161,7 +167,7 @@ module Hwaro::Core::Build::Phases::Render
       return
     end
 
-    grouped = failures.group_by { |f| render_error_signature(f[:message]) }
+    grouped = failures.group_by { |f| io_signatures[f[:message]]? || render_error_signature(f[:message]) }
     grouped.each do |signature, group|
       if group.size == 1
         Logger.error "Render failed for #{group.first[:page_path]}: #{Utils::TextUtils.truncate_error(group.first[:message])}"
@@ -190,6 +196,24 @@ module Hwaro::Core::Build::Phases::Render
     normalized = message.sub(/^Template error for [^:]+:\s*/, "")
     first_line = normalized.lines.first?.try(&.strip) || normalized.strip
     first_line.empty? ? normalized.strip : first_line
+  end
+
+  # Grouping key for an I/O failure: its message with the file it names
+  # replaced by `…`. That file is the page's own output, so on a full disk
+  # every remaining page failed with a message of its own and none of them
+  # grouped — thousands of `Render failed for …: write (/…/index.html): No
+  # space left on device` lines. Only ever applied to an `IO::Error`, whose
+  # message shape the stdlib fixes; a template error keeps
+  # `render_error_signature`, so two different ones can never merge here.
+  private def io_error_signature(ex : IO::Error) : String
+    message = ex.message.to_s
+    # `File::Error` quotes the path(s): `…: '<file>': <errno>`.
+    {ex.target, ex.as?(File::Error).try(&.other)}.each do |path|
+      message = message.gsub("'#{path}'", "'…'") if path
+    end
+    # An error raised on an open file reads `write (<path>): <errno>`, and
+    # its `target` is the File's inspect string, not that path.
+    message.sub(/\A(\w+) \(.*\)(?=: )/, "\\1 (…)")
   end
 
   # The `template: <file>:<line>:<col> ..` line Crinja appends below the
@@ -227,6 +251,7 @@ module Hwaro::Core::Build::Phases::Render
     # than the default build.
     classified_error : Hwaro::HwaroError? = nil
     failures = [] of NamedTuple(page_path: String, message: String)
+    io_signatures = {} of String => String
 
     pages.each do |page|
       page_start = profiler ? Time.instant : nil
@@ -243,12 +268,13 @@ module Hwaro::Core::Build::Phases::Render
     rescue ex : IO::Error
       classified_error ||= output_write_error(page, ex)
       failures << {page_path: page.path, message: ex.message.to_s}
+      io_signatures[ex.message.to_s] = io_error_signature(ex)
     rescue ex
       failures << {page_path: page.path, message: ex.message.to_s}
       Logger.debug "  Backtrace: #{ex.backtrace?.try(&.first(3).join("\n    ")) || "unavailable"}"
     end
 
-    finalize_render_failures(failures, classified_error, verbose)
+    finalize_render_failures(failures, classified_error, verbose, io_signatures)
 
     @published_pages.get - published_before
   end

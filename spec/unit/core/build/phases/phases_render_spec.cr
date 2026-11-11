@@ -32,6 +32,10 @@ module Hwaro::Core::Build
       report_render_failures(failures, verbose)
     end
 
+    def test_io_error_signature(ex : IO::Error)
+      io_error_signature(ex)
+    end
+
     def test_build_global_vars(site : Models::Site)
       build_global_vars(site)
     end
@@ -77,6 +81,16 @@ private def features_for(site_loop : Bool, section_loop : Bool)
   {"page" => Hwaro::Core::Build::Builder::TemplateVarFeatures.new(
     needs_seo: false, needs_jsonld: false, needs_section_pages: section_loop,
     listing_fanout_site: site_loop, listing_fanout_section: section_loop)}
+end
+
+# Every page write fails the way a full disk does: an `IO::Error` raised on
+# the open output file, whose message names that file.
+private class FullDiskBuilder < Hwaro::Core::Build::Builder
+  private def publish_output(path : String, content : String) : Nil
+    File.open(path, "w") do |file|
+      raise IO::Error.from_os_error("write", Errno::ENOSPC, target: file)
+    end
+  end
 end
 
 describe Hwaro::Core::Build::Phases::Render do
@@ -527,6 +541,69 @@ describe Hwaro::Core::Build::Phases::Render do
       output = buffer.to_s
       output.should contain("Render failed for 8 pages: Unterminated tag")
       output.should contain("… and 3 more")
+    end
+  end
+
+  # An I/O failure names the page's own output file, so no two were ever
+  # "the same error": a full disk printed one line per remaining page.
+  describe "I/O failures across many pages" do
+    {true, false}.each do |parallel|
+      it "reports a full disk once, not once per page (parallel: #{parallel})" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            File.write("config.toml", %(title = "t"\nbase_url = "http://localhost"\n))
+            FileUtils.mkdir_p("content/posts")
+            FileUtils.mkdir_p("templates")
+            File.write("templates/page.html", "{{ content }}")
+            12.times { |i| File.write("content/posts/p#{i}.md", "+++\ntitle = \"P#{i}\"\n+++\nbody") }
+
+            error = nil
+            log = with_captured_log do
+              error = expect_raises(Hwaro::HwaroError) do
+                FullDiskBuilder.new.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: parallel, highlight: false))
+              end
+            end
+            error.not_nil!.code.should eq(Hwaro::Errors::HWARO_E_IO)
+            # The classified error still names the first failing file.
+            error.not_nil!.message.to_s.should match(/write \(.*index\.html\): No space left on device/)
+
+            log.should contain("Render failed for 12 pages: write (…): No space left on device")
+            log.should contain("  - posts/p0.md")
+            log.should contain("… and 7 more")
+            log.scan("No space left on device").size.should eq(1)
+          end
+        end
+      end
+    end
+
+    it "still prints each page's own file under --verbose" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "t"\nbase_url = "http://localhost"\n))
+          FileUtils.mkdir_p("content/posts")
+          FileUtils.mkdir_p("templates")
+          File.write("templates/page.html", "{{ content }}")
+          3.times { |i| File.write("content/posts/p#{i}.md", "+++\ntitle = \"P#{i}\"\n+++\nbody") }
+
+          log = with_captured_log do
+            expect_raises(Hwaro::HwaroError) do
+              FullDiskBuilder.new.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false, verbose: true))
+            end
+          end
+          log.should contain("posts/p1/index.html): No space left on device")
+          log.should contain("posts/p2/index.html): No space left on device")
+        end
+      end
+    end
+
+    it "keeps different files' failures apart when the errors differ" do
+      builder = Hwaro::Core::Build::Builder.new
+      full = builder.test_io_error_signature(File::Error.new("Error opening file with mode 'w': 'public/a/index.html': No space left on device", file: "public/a/index.html"))
+      full.should eq("Error opening file with mode 'w': '…': No space left on device")
+      denied = builder.test_io_error_signature(File::Error.new("Error opening file with mode 'w': 'public/b/index.html': Permission denied", file: "public/b/index.html"))
+      denied.should_not eq(full)
+      renamed = builder.test_io_error_signature(File::Error.new("Error renaming file: 'public/a/x.tmp' -> 'public/a/index.html': No space left on device", file: "public/a/x.tmp", other: "public/a/index.html"))
+      renamed.should eq("Error renaming file: '…' -> '…': No space left on device")
     end
   end
 
