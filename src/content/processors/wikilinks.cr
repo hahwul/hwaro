@@ -219,11 +219,14 @@ module Hwaro
           # content is replaced, as a serve rebuild does to an edited page.
           def heading_id(page : Models::Page, heading : String) : String?
             raw = page.raw_content
-            ids = @mutex.synchronize do
-              memo = @heading_ids[page]?
-              memo && memo[0].same?(raw) ? memo[1] : (@heading_ids[page] = {raw, Includes.heading_ids(raw)})[1]
+            memo = @mutex.synchronize { @heading_ids[page]? }
+            unless memo && memo[0].same?(raw)
+              # Scanned outside the lock, which every render worker shares;
+              # two workers racing on one page both scan, either result is right.
+              memo = {raw, Includes.heading_ids(raw)}
+              @mutex.synchronize { @heading_ids[page] = memo }
             end
-            ids[Utils::TextUtils.slugify(heading)]?
+            memo[1][Utils::TextUtils.slugify(heading)]?
           end
 
           private def file_matches?(rel : String, want : String) : Bool

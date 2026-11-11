@@ -61,6 +61,14 @@ describe Hwaro::Content::Processors::Wikilinks do
       out.lines.last.should eq("- [Term 5999](#term-5999)")
     end
 
+    it "links into a page that has a heading with a long whitespace run" do
+      wide = wl_page("notes/Target.md")
+      wide.raw_content = "## Early\n\ntext\n\n## wide#{" " * 3000}gap\n"
+      linker = wl_page("notes/linker.md")
+      idx = wl_index([linker, wide])
+      wl_rewrite("see [[Target#Early]]", linker, idx).should eq("see [Target \\> Early](@/notes/Target.md#early)")
+    end
+
     it "reads a page's heading ids again once its content changes" do
       note = wl_page("notes/Edited.md")
       idx = wl_index([note])

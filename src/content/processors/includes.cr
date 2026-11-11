@@ -64,7 +64,14 @@ module Hwaro
         SETEXT_RE    = /\A {0,3}(=+|-+)[ \t]*\r?\n?\z/
         REF_DEF_RE   = /\A {0,3}\[(?!\^)[^\]]+\]:/
         THEMATIC_RE  = /\A {0,3}(?:(?:\*[ \t]*){3,}|(?:_[ \t]*){3,}|(?:-[ \t]*){3,})\r?\n?\z/
-        ATX_RE       = /\A {0,3}(\#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*\r?\n?\z/
+        # Linear in a whitespace run (a lazy `(.*?)` before a backtracking
+        # closing-sequence tail was quadratic and hit the match limit). The
+        # text still ends at the first point the rest is a closing sequence;
+        # that point always follows a non-blank character (a blank before it
+        # would close too), so the text grows one blank run plus one
+        # character at a time, and the tail commits (possessive) since each
+        # of its runs has one possible length.
+        ATX_RE = /\A {0,3}(\#{1,6})(?:[ \t]+((?:[ \t]*+[^ \t\n])*?))?(?:[ \t]++#++)?+[ \t]*+\r?\n?\z/
 
         # The fence-option keys `include_code` passes through, in the order
         # they are written (`title` is the alias `FenceOptions` reads as `name`).
