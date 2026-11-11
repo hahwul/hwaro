@@ -1625,8 +1625,14 @@ module Hwaro
           deferred_ctx.partial_render = true
 
           # Trigger BeforeRender hooks directly — we're not re-running the
-          # Render phase, just the prep work it would have done.
-          @lifecycle.trigger(Lifecycle::HookPoint::BeforeRender, deferred_ctx)
+          # Render phase, just the prep work it would have done. A hook
+          # that fails here (an I/O error is raised, not returned as Abort)
+          # must not cost the deferred pages: warn and render them anyway.
+          begin
+            @lifecycle.trigger(Lifecycle::HookPoint::BeforeRender, deferred_ctx)
+          rescue ex : Hwaro::HwaroError
+            Logger.warn "Fast-start: #{ex.message}"
+          end
           # The page values the cold pass cached predate the fields those
           # hooks just filled for the deferred pages (`image`, summaries).
           @cache_manager.clear("page_crinja_value", "section_pages_crinja", "section_assets_crinja",

@@ -757,6 +757,19 @@ describe "Builder#run_incremental translation_key collisions" do
   end
 end
 
+# A BeforeRender hook that hits an I/O error (a transient ENOSPC, say)
+# only in the fast-start background pass.
+private class DeferredOnlyIoFailure
+  include Hwaro::Core::Lifecycle::Hookable
+
+  def register_hooks(manager : Hwaro::Core::Lifecycle::Manager)
+    manager.on(Hwaro::Core::Lifecycle::HookPoint::BeforeRender, priority: 10, name: "probe:io") do |ctx|
+      raise IO::Error.new("No space left on device") if ctx.priority_pages.nil? && ctx.partial_render
+      Hwaro::Core::Lifecycle::HookResult::Continue
+    end
+  end
+end
+
 describe "Builder#render_deferred" do
   # `--fast-start`: the cold pass runs the BeforeRender hooks (auto OG
   # images, image resize) for the priority pages only, so every listing it
@@ -794,6 +807,36 @@ describe "Builder#render_deferred" do
         File.read("public/new/index.html").should eq(expected)
         File.read("public/old/index.html").should eq(expected)
         File.read("public/404.html").should eq(expected)
+      end
+    end
+  end
+
+  # A failing hook used to log and carry on here; the deferred pages must
+  # not be left unwritten (404 until the next save) when it raises instead.
+  it "renders the deferred pages when a BeforeRender hook hits an I/O error" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/new.md", "+++\ntitle = \"New\"\ndate = 2026-06-01\n+++\nnew body\n")
+        File.write("content/old.md", "+++\ntitle = \"Old\"\ndate = 2020-01-01\n+++\nold body\n")
+        File.write("templates/index.html", "{{ content }}")
+        File.write("templates/page.html", "{{ content }}")
+
+        builder = Hwaro::Core::Build::Builder.new
+        builder.register(DeferredOnlyIoFailure.new)
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, fast_start: true, fast_start_count: 1)
+        options.serve_mode = true
+        builder.run(options).should be_true
+        File.exists?("public/old/index.html").should be_false
+        deferred = options.dup
+        deferred.fast_start = false
+        deferred.preserve_output = true
+        log = with_captured_log { builder.render_deferred(deferred) }
+        File.read("public/old/index.html").should contain("old body")
+        log.should contain("No space left on device")
       end
     end
   end
