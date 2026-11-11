@@ -746,16 +746,30 @@ module Hwaro
         # now (#859). A racy read stores its own digest; a file whose stamp
         # moved since the read stores a hash that never matches, so the next
         # build re-renders it.
+        #
+        # Every call follows a render that just wrote this page's output, so
+        # it ALWAYS replaces the entry: one page has one writer per build,
+        # and the previous entry describes a render that is no longer on
+        # disk. Kept — because the source's mtime went backwards (`rsync -a`,
+        # `tar`, `cp -p`), or because the source was briefly gone or
+        # unreadable — it matched again as soon as the old inputs came back,
+        # and the page stayed on the other render's output for good. A
+        # source that cannot be described is recorded with a hash that never
+        # matches: the next build re-renders it, or, when it never comes
+        # back, still finds the files to remove.
         # Thread-safe: protected by mutex for concurrent parallel builds.
         def update(file_path : String, output_path : String = "", cascade_hash : String = "", template_hash : String? = nil, output_paths : Array(String) = [] of String, assets_hash : String = "", git_hash : String = "", derived_paths : Array(String) = [] of String, relations_hash : String = "", source_read : {Int64, Int64, String?}? = nil)
           return unless @enabled
-          return unless File.exists?(file_path)
 
           output_path = anchored(output_path)
           output_paths = output_paths.map { |path| anchored(path) }
           derived_paths = derived_paths.map { |path| anchored(path) }
           effective_template_hash = template_hash || @current_template_hash
 
+          mtime = UNSTABLE_MTIME
+          size = -1_i64
+          content_hash = ""
+          stable = false
           begin
             now = Time.utc.to_unix_ms
             info = File.info(file_path)
@@ -777,48 +791,44 @@ module Hwaro
             end
 
             # Compute hash outside the lock to minimize contention
-            content_hash = if edited_since_read
-                             ""
-                           else
-                             read_digest || compute_file_hash(file_path)
-                           end
-            stable = Cache.stable_mtime?(mtime, now) && read_digest.nil? && !edited_since_read
-
-            entry = CacheEntry.new(
-              path: file_path,
-              mtime: stable ? mtime : UNSTABLE_MTIME,
-              size: size,
-              hash: content_hash,
-              output_path: output_path,
-              template_hash: effective_template_hash,
-              config_hash: @current_config_hash,
-              cascade_hash: cascade_hash,
-              output_paths: output_paths,
-              assets_hash: assets_hash,
-              git_hash: git_hash,
-              derived_paths: derived_paths,
-              relations_hash: relations_hash,
-            )
-
-            @mutex.synchronize do
-              # Re-check under lock: another fiber may have written a newer entry
-              current = @entries[file_path]?
-              if current.nil? || current.mtime <= mtime
-                if previous = current
-                  fresh = output_paths.dup.concat(derived_paths) << output_path
-                  (previous.output_paths + previous.derived_paths).each do |old_path|
-                    @orphaned_outputs << old_path unless old_path.empty? || fresh.includes?(old_path)
-                  end
-                  unless previous.output_path.empty? || fresh.includes?(previous.output_path)
-                    @orphaned_outputs << previous.output_path
-                  end
-                end
-                @entries[file_path] = entry
-                @dirty = true
-              end
+            unless edited_since_read
+              content_hash = read_digest || compute_file_hash(file_path)
+              stable = Cache.stable_mtime?(mtime, now) && read_digest.nil?
             end
           rescue ex
-            Logger.debug "Cache: failed to update entry for #{file_path}: #{ex.message}"
+            Logger.debug "Cache: failed to describe #{file_path}, it re-renders next build: #{ex.message}"
+            content_hash = ""
+            stable = false
+          end
+
+          entry = CacheEntry.new(
+            path: file_path,
+            mtime: stable ? mtime : UNSTABLE_MTIME,
+            size: size,
+            hash: content_hash,
+            output_path: output_path,
+            template_hash: effective_template_hash,
+            config_hash: @current_config_hash,
+            cascade_hash: cascade_hash,
+            output_paths: output_paths,
+            assets_hash: assets_hash,
+            git_hash: git_hash,
+            derived_paths: derived_paths,
+            relations_hash: relations_hash,
+          )
+
+          @mutex.synchronize do
+            if previous = @entries[file_path]?
+              fresh = output_paths.dup.concat(derived_paths) << output_path
+              (previous.output_paths + previous.derived_paths).each do |old_path|
+                @orphaned_outputs << old_path unless old_path.empty? || fresh.includes?(old_path)
+              end
+              unless previous.output_path.empty? || fresh.includes?(previous.output_path)
+                @orphaned_outputs << previous.output_path
+              end
+            end
+            @entries[file_path] = entry
+            @dirty = true
           end
         end
 
