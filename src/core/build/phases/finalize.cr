@@ -158,7 +158,8 @@ module Hwaro::Core::Build::Phases::Finalize
   # already takes the new name. A no-op everywhere the probe says the
   # filesystem is case-sensitive.
   private def respell_folded_output_dirs(owned : Set(String), output_dir : String) : Nil
-    root = File.expand_path(output_dir)
+    # expand_path keeps the trailing separator of `-o public/`.
+    root = Utils::PathUtils.chomp_separator(File.expand_path(output_dir))
     return unless Dir.exists?(root) && Utils::PathUtils.case_folding_fs?(root)
 
     dirs = Set(String).new

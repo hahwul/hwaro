@@ -328,10 +328,12 @@ module Hwaro
 
       # True when `path` is `root` or lies under it. Both must already be in
       # comparable (expanded or resolved) form. A root that already ends in a
-      # separator — the filesystem root "/" — is not given a second one.
+      # separator — the filesystem root "/" — is not given a second one, and
+      # any other trailing separator is dropped: `File.expand_path` keeps the
+      # one in `public/`, and the directory itself then tested as outside it.
       def within?(path : String, root : String) : Bool
         path = comparable_path(path)
-        root = comparable_path(root)
+        root = chomp_separator(comparable_path(root))
         return true if path == root
         path.starts_with?(root.ends_with?(File::SEPARATOR) ? root : root + File::SEPARATOR)
       end

@@ -693,6 +693,25 @@ describe "resize_image fill/crop variants and content image dimensions (build)" 
   end
 end
 
+describe "responsive variants with a trailing-slash output directory" do
+  # `-o public/` is what shell completion types. The variants of an image at
+  # the ROOT of static/ land in the output directory itself, which tested as
+  # outside `public/`, so they (and the page's srcset) were silently dropped.
+  it "resizes an image at the root of static/" do
+    build_site(
+      %(title = "t"\nbase_url = "https://example.com"\n[image_processing]\nenabled = true\nwidths = [8]\n),
+      content_files: {"a.md" => "+++\ntitle = \"A\"\n+++\n![logo](/logo.png)\n"},
+      template_files: {"page.html" => "{{ content }}", "index.html" => "{{ content }}"},
+      static_files: {"logo.png" => png_body(16, 16), "img/deep.png" => png_body(16, 16)},
+      output_dir: "public/",
+    ) do
+      File.exists?("public/img/deep_8w.png").should be_true
+      File.exists?("public/logo_8w.png").should be_true
+      File.read("public/a/index.html").should contain("/logo_8w.png 8w")
+    end
+  end
+end
+
 private def rebuild_cached : Nil
   builder = Hwaro::Core::Build::Builder.new
   Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
