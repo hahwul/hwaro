@@ -105,6 +105,29 @@ Crinja.filter(:format) do
   sprintf target.to_s, arguments.varargs.map { |arg| arg.number? ? arg.as_number : arg }
 end
 
+# `replace` on a number, boolean or none replaces in its text, as Jinja2
+# does. Upstream required a string and raised "Unexpected type in Crinja
+# value", so `{{ page.extra.price | replace(".", ",") }}` failed the page.
+# An undefined target still raises, as before.
+Crinja.filter({old: Crinja::UNDEFINED, new: Crinja::UNDEFINED, count: nil}, :replace) do
+  search = arguments["old"].to_s
+  replace = arguments["new"]
+  count = arguments["count"]
+
+  if count.raw.nil?
+    source = target.raw.is_a?(String | Crinja::SafeString | Crinja::Undefined) ? target.as_s_or_safe : target.to_s
+    source.gsub(search, replace)
+  else
+    string = target.to_s
+    count.to_i.times do
+      running = false
+      string = string.sub(search) { running = true; replace }
+      break unless running
+    end
+    string
+  end
+end
+
 # `float` / `int` convert numbers and booleans as Python does. Upstream only
 # knew strings (and floats, for `int`), so `{{ 3 | float }}` printed `0.0`
 # and `{{ true | int }}` printed `0`.

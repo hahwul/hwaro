@@ -69,6 +69,13 @@ describe "Crinja built-in filter fixes" do
     end
   end
 
+  describe "replace" do
+    it "replaces in the text of a number" do
+      render_filter("{{ 13.5 | replace('.', ',') }}|{{ 1000 | replace('0', 'x', 2) }}|{{ 'aaa' | replace('a', 'b') }}")
+        .should eq("13,5|1xx0|bbb")
+    end
+  end
+
   describe "float and int" do
     it "converts numbers and booleans" do
       render_filter("{{ 3 | float }}|{{ 1.5 | float }}|{{ true | float }}|{{ '2.5' | float }}|{{ 'x' | float }}")
