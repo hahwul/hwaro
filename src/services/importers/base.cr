@@ -651,6 +651,9 @@ module Hwaro
         # Obsidian Properties template writes a bare `title:`), so callers can
         # fall back to a filename or heading title instead of storing "".
         protected def yaml_title(value : YAML::Any) : String?
+          # `title: {{title}}` (an unfilled template placeholder) parses as a
+          # nested mapping; its inspect form is not a title.
+          return if value.as_h? || value.as_a?
           title = yaml_string(value)
           title.blank? ? nil : title
         end

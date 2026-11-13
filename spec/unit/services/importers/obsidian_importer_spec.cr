@@ -3,6 +3,19 @@ require "../../../../src/services/importers/obsidian_importer"
 
 describe Hwaro::Services::Importers::ObsidianImporter do
   describe "#run" do
+    it "ignores an unfilled template placeholder title and falls back to the file name" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "daily.md"), "---\ntitle: {{title}}\n---\nTemplate body\n")
+
+        output_dir = File.join(dir, "output")
+        Hwaro::Services::Importers::ObsidianImporter.new.run(Hwaro::Config::Options::ImportOptions.new(
+          source_type: "obsidian", path: dir, output_dir: output_dir))
+
+        file = Dir.glob(File.join(output_dir, "**", "daily.md")).first
+        File.read(file).should contain(%(title = "daily"))
+      end
+    end
+
     it "imports a basic Obsidian note with YAML frontmatter" do
       Dir.mktmpdir do |dir|
         post_content = <<-OBSIDIAN
