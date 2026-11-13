@@ -76,6 +76,19 @@ describe "Crinja built-in filter fixes" do
     end
   end
 
+  describe "undefined targets" do
+    it "are empty to join, reverse, list, batch, slice and replace" do
+      render_filter("[{{ u | join(', ') }}][{{ u | reverse | list }}][{{ u | list }}][{{ u | batch(2) | list }}][{{ u | replace('a', 'b') }}]")
+        .should eq("[][[]][[]][[]][]")
+      # (Jinja2 slices an empty list into `[[], []]`; Crinja into `[]`.)
+      render_filter("{{ u | slice(2) | list }}").should eq(render_filter("{{ [] | slice(2) | list }}"))
+    end
+
+    it "leave none and other non-sequences an error" do
+      expect_raises(Crinja::TypeError) { render_filter("{{ none | join(',') }}") }
+    end
+  end
+
   describe "float and int" do
     it "converts numbers and booleans" do
       render_filter("{{ 3 | float }}|{{ 1.5 | float }}|{{ true | float }}|{{ '2.5' | float }}|{{ 'x' | float }}")

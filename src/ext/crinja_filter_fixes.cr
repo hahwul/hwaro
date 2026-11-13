@@ -183,3 +183,33 @@ end
 Crinja.filter({case_sensitive: false, attribute: nil}, :max) do
   Crinja::Filter.__extreme(target, arguments, 1)
 end
+
+# An undefined value is an empty sequence (and empty text) to `join`,
+# `reverse`, `list`, `batch`, `slice` and `replace`, as in Jinja2. They
+# raised instead, so `{{ page.extra.authors | join(", ") }}` failed the
+# build on every page without that field (with a nameless
+# " must be a sequence to join it"). Undefined targets only: `none` and
+# other non-sequences still raise.
+module Crinja::Filter
+  UNDEFINED_AS_EMPTY = {"join", "reverse", "list", "batch", "slice", "replace"}
+
+  def self.__undefined_as_empty(filter : Callable::Instance) : Callable::Instance
+    inner = filter.proc
+    empty = filter.name == "replace" ? Value.new("") : Value.new([] of Value)
+    proc = ->(arguments : Arguments) do
+      if arguments.target.try(&.undefined?)
+        arguments = Arguments.new(arguments.env, arguments.varargs, arguments.kwargs, arguments.defaults, empty)
+      end
+      inner.call(arguments)
+    end
+    Callable::Instance.new(proc, filter.defaults, filter.name)
+  end
+end
+
+Crinja::Filter::Library.defaults.map! do |filter|
+  if filter.is_a?(Crinja::Callable::Instance) && Crinja::Filter::UNDEFINED_AS_EMPTY.includes?(filter.name)
+    Crinja::Filter.__undefined_as_empty(filter)
+  else
+    filter
+  end
+end
