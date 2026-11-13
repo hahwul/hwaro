@@ -110,6 +110,11 @@ module Hwaro
           yaml = nil unless yaml.try(&.as_h?)
 
           if yaml
+            # A front matter `slug` replaces the file name's slug in the URL.
+            if (custom = yaml["slug"]?.try(&.as_s?)) && !(custom_slug = file_slug(safe_filename_component(custom))).empty?
+              slug = custom_slug
+            end
+
             # Title
             if (title = yaml["title"]?) && (title_text = yaml_title(title))
               fields["title"] = title_text
@@ -290,15 +295,19 @@ module Hwaro
         MAPPED_KEYS = Set{
           "title", "date", "last_modified_at", "permalink", "redirect_from",
           "layout", "categories", "category", "tags", "published", "excerpt",
-          "description", "image",
+          "description", "image", "slug",
         }
 
         # Jekyll exposes every other front matter key to templates as
         # `page.<key>`; hwaro's home for such fields is `[extra]`, as the Hugo
         # importer does for page params (hwaro's own keys, CARRIED_KEYS, stay
         # top-level). They were silently dropped.
+        # hwaro keys `tool export jekyll` writes top-level; Jekyll gives them
+        # no meaning, so they come back as they went out.
+        EXPORTED_KEYS = CARRIED_KEYS | Set{"authors", "weight", "series", "translation_key"}
+
         private def extra_fields(yaml : YAML::Any, mapped : Hash(String, FieldValue)) : Hash(String, YAML::Any)
-          unmapped_fields(yaml, mapped, MAPPED_KEYS)
+          unmapped_fields(yaml, mapped, MAPPED_KEYS, EXPORTED_KEYS)
         end
 
         # The filename without its extension and `YYYY-MM-DD-` prefix.

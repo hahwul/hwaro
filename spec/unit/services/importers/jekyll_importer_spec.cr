@@ -931,3 +931,26 @@ describe "Importers: unimported assets" do
     end
   end
 end
+
+describe "Jekyll import: slug and exported front matter" do
+  # Regression: a front matter `slug` replaces the file name's slug in the
+  # post's URL, and the `[extra]` table / hwaro keys `tool export jekyll`
+  # writes came back nested as `extra.extra` / buried in `[extra]`.
+  it "uses the front matter slug and restores exported keys" do
+    Dir.mktmpdir do |dir|
+      posts = File.join(dir, "_posts")
+      FileUtils.mkdir_p(posts)
+      File.write(File.join(posts, "2024-01-15-file-name.md"),
+        "---\ntitle: T\nslug: url-slug\nweight: 5\nseries: S\nauthors: [Jane]\nextra:\n  custom: v\n---\nBody\n")
+      out_dir = import_jekyll(dir)
+      File.exists?(File.join(out_dir, "posts", "file-name.md")).should be_false
+      text = File.read(File.join(out_dir, "posts", "url-slug.md"))
+      text.should contain("weight = 5\n")
+      text.should contain(%(series = "S"))
+      text.should contain(%(authors = ["Jane"]))
+      text.should contain(%(custom = "v"))
+      text.should_not contain("extra.extra")
+      text.should_not contain(%(slug =))
+    end
+  end
+end

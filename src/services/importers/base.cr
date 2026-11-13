@@ -250,14 +250,18 @@ module Hwaro
         # goes to an `[extra]` table where templates read it as
         # `page.extra.<key>`. `consumed` lists the source keys the importer
         # handled itself; null values are dropped.
-        protected def unmapped_fields(yaml : YAML::Any, mapped : Hash(String, FieldValue), consumed : Set(String)) : Hash(String, YAML::Any)
+        protected def unmapped_fields(yaml : YAML::Any, mapped : Hash(String, FieldValue), consumed : Set(String), carry : Set(String) = CARRIED_KEYS) : Hash(String, YAML::Any)
           carried = {} of String => YAML::Any
           extra = {} of YAML::Any => YAML::Any
           yaml.as_h.each do |key, value|
             name = key.as_s? || ""
             next if value.raw.nil? || consumed.includes?(name)
-            if CARRIED_KEYS.includes?(name) && !mapped.has_key?(name)
+            if carry.includes?(name) && !mapped.has_key?(name)
               carried[name] = value
+            elsif name == "extra" && (table = value.as_h?)
+              # An `[extra]` table (what `tool export` writes) is merged, not
+              # nested one level deeper as `extra.extra`.
+              table.each { |k, v| extra[k] = v }
             else
               extra[key] = value
             end
