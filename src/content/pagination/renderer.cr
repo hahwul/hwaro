@@ -24,7 +24,7 @@ module Hwaro
           String.build(paginated_page.pages.size * 100) do |str|
             paginated_page.pages.each do |page|
               escaped_url = HTML.escape("#{@base_url}#{page.url}")
-              escaped_title = HTML.escape(page.title)
+              escaped_title = HTML.escape(page.title.empty? ? @config.title : page.title)
               str << "<li><a href=\"#{escaped_url}\">#{escaped_title}</a></li>\n"
             end
           end

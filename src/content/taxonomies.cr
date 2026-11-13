@@ -514,7 +514,7 @@ module Hwaro
         template_content = template_name.try { |n| templates[n] }
 
         paginated_pages.each do |paginated_page|
-          list_html = build_page_list(paginated_page.pages, site.config.base_url)
+          list_html = build_page_list(paginated_page.pages, site.config.base_url, site.config.title)
           renderer = Content::Pagination::Renderer.new(site.config)
           pagination_html = renderer.render_pagination_nav(paginated_page)
           seo_links = renderer.render_seo_links(paginated_page)
@@ -727,12 +727,12 @@ module Hwaro
         end
       end
 
-      private def self.build_page_list(pages : Array(Models::Page), base_url : String) : String
+      private def self.build_page_list(pages : Array(Models::Page), base_url : String, site_title : String) : String
         String.build do |str|
           str << "<ul class=\"taxonomy-pages\">\n"
           pages.each do |page|
             term_url = join_url(base_url, page.url)
-            str << "  <li><a href=\"#{HTML.escape(term_url)}\">#{HTML.escape(page.title)}</a></li>\n"
+            str << "  <li><a href=\"#{HTML.escape(term_url)}\">#{HTML.escape(page.title.empty? ? site_title : page.title)}</a></li>\n"
           end
           str << "</ul>\n"
         end

@@ -36,6 +36,25 @@ describe Hwaro::Content::Pagination::Renderer do
       html.should contain("<li><a href=\"https://example.com/wiki/second/\">Second Page</a></li>")
     end
 
+    it "names the link after the site title when a page has no title" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      config.title = "My Site"
+
+      page = Hwaro::Models::Page.new("wiki/untitled.md")
+      page.title = ""
+      page.url = "/wiki/untitled/"
+
+      paginated_page = Hwaro::Content::Pagination::PaginatedPage.new(
+        pages: [page], page_number: 1, total_pages: 1, per_page: 10, total_items: 1,
+        has_prev: false, has_next: false, prev_url: nil, next_url: nil,
+        first_url: "/wiki/", last_url: "/wiki/", base_url: "/wiki/page/"
+      )
+
+      html = Hwaro::Content::Pagination::Renderer.new(config).render_section_list(paginated_page)
+      html.should contain("<li><a href=\"https://example.com/wiki/untitled/\">My Site</a></li>")
+    end
+
     it "HTML-escapes title and url" do
       config = Hwaro::Models::Config.new
       config.base_url = "https://example.com"

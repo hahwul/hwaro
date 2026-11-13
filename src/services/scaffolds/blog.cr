@@ -1104,8 +1104,8 @@ module Hwaro
                   <header class="post-header">
                     <h1>{{ page.title | e }}</h1>
                     <div class="post-meta">
-                      <time datetime="{{ page.date }}">{{ page.date }}</time>
-                      {% if page.reading_time %}<span class="post-meta-sep">·</span> <span class="post-reading-time">{{ page.reading_time }} min read</span>{% endif %}
+                      {% if page.date %}<time datetime="{{ page.date }}">{{ page.date }}</time>{% endif %}
+                      {% if page.reading_time %}{% if page.date %}<span class="post-meta-sep">·</span> {% endif %}<span class="post-reading-time">{{ page.reading_time }} min read</span>{% endif %}
                     </div>#{tags_block}
                   </header>
                   <div class="post-content">
