@@ -199,7 +199,7 @@ john-doe:
     <h4>Recent Posts</h4>
     <ul>
     {% for p in author.pages %}
-      <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+      <li><a href="{{ base_url }}{{ p.url }}">{{ p.title }}</a></li>
     {% endfor %}
     </ul>
   </div>
@@ -273,7 +273,7 @@ john-doe:
 ```jinja
 {% for p in section.pages %}
 <article>
-  <h2><a href="{{ p.url }}">{{ p.title }}</a></h2>
+  <h2><a href="{{ base_url }}{{ p.url }}">{{ p.title }}</a></h2>
   <time>{{ p.date }}</time>
   {% if p.description %}
   <p>{{ p.description }}</p>
@@ -287,7 +287,7 @@ john-doe:
 ```jinja
 {% for sub in section.subsections %}
 <div class="category">
-  <a href="{{ sub.url }}">{{ sub.title }}</a>
+  <a href="{{ base_url }}{{ sub.url }}">{{ sub.title }}</a>
   <span>({{ sub.pages_count }} articles)</span>
 </div>
 {% endfor %}
@@ -307,7 +307,7 @@ john-doe:
 <ul>
 {% for p in section.pages %}
   <li>
-    <a href="{{ p.url }}">{{ p.title }}</a>
+    <a href="{{ base_url }}{{ p.url }}">{{ p.title }}</a>
     {% if p.date %}<time>{{ p.date }}</time>{% endif %}
   </li>
 {% endfor %}
@@ -326,7 +326,7 @@ john-doe:
 |----------|------|-------------|
 | page.title | String | 페이지 제목 |
 | page.description | String? | 페이지 설명 |
-| page.url | String | 상대 URL 경로 |
+| page.url | String | 사이트 기준 상대 URL 경로(`/blog/my-post/`). `base_url`의 경로는 들어 있지 않으므로 하위 경로 배포에서도 동작하도록 `{{ base_url }}{{ page.url }}` 형태로 링크합니다 |
 | page.permalink | String? | base_url을 포함한 절대 URL |
 | page.section | String | 부모 섹션 이름 |
 | page.date | String? | 발행일(YYYY-MM-DD) |
@@ -440,11 +440,11 @@ john-doe:
 ```jinja
 <nav class="post-nav">
   {% if page.lower %}
-  <a href="{{ page.lower.url }}">← {{ page.lower.title }}</a>
+  <a href="{{ base_url }}{{ page.lower.url }}">← {{ page.lower.title }}</a>
   {% endif %}
   
   {% if page.higher %}
-  <a href="{{ page.higher.url }}">{{ page.higher.title }} →</a>
+  <a href="{{ base_url }}{{ page.higher.url }}">{{ page.higher.title }} →</a>
   {% endif %}
 </nav>
 ```
@@ -457,9 +457,9 @@ john-doe:
 
 ```jinja
 <nav class="breadcrumbs">
-  <a href="/">Home</a>
+  <a href="{{ base_url }}/">Home</a>
   {% for ancestor in page.ancestors %}
-  / <a href="{{ ancestor.url }}">{{ ancestor.title }}</a>
+  / <a href="{{ base_url }}{{ ancestor.url }}">{{ ancestor.title }}</a>
   {% endfor %}
   / <span>{{ page.title }}</span>
 </nav>
@@ -717,7 +717,7 @@ pros = ["Fast", "Reliable"]
 
 ## Paginator
 
-섹션·택소노미 항목 템플릿에서 페이지네이션이 활성화된 경우([섹션 프론트 매터](/ko/writing/sections/#프론트-매터)의 `paginate`, 택소노미는 `paginate_by`) 사용할 수 있습니다. 1페이지는 섹션 URL에, 이후 페이지는 `{url}/{paginate_path}/{n}/`에 생성됩니다.
+섹션·택소노미 항목 템플릿에서 페이지네이션이 활성화된 경우([섹션 프론트 매터](/ko/writing/sections/#프론트-매터)의 `paginate`, 택소노미는 `paginate_by`) 사용할 수 있습니다. 1페이지는 섹션 URL에, 이후 페이지는 `{url}/{paginate_path}/{n}/`에 생성됩니다. 이 URL은 `page.url`처럼 사이트 기준 상대 경로이므로 링크에서는 `{{ base_url }}`을 앞에 붙입니다.
 
 | 속성 | 타입 | 설명 |
 |----------|------|-------------|
@@ -737,9 +737,9 @@ pros = ["Fast", "Reliable"]
 ```jinja
 {% if paginator is defined and paginator.number_pagers > 1 %}
 <nav>
-  {% if paginator.previous %}<a href="{{ paginator.previous }}">Prev</a>{% endif %}
+  {% if paginator.previous %}<a href="{{ base_url }}{{ paginator.previous }}">Prev</a>{% endif %}
   <span>{{ paginator.current_index }} / {{ paginator.number_pagers }}</span>
-  {% if paginator.next %}<a href="{{ paginator.next }}">Next</a>{% endif %}
+  {% if paginator.next %}<a href="{{ base_url }}{{ paginator.next }}">Next</a>{% endif %}
 </nav>
 {% endif %}
 ```

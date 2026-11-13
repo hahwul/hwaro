@@ -16,7 +16,7 @@ toc = true
 ```jinja
 {% set about = get_page(path="about.md") %}
 {% if about %}
-<a href="{{ about.url }}">{{ about.title }}</a>
+<a href="{{ base_url }}{{ about.url }}">{{ about.title }}</a>
 {% endif %}
 ```
 
@@ -53,7 +53,7 @@ toc = true
 <h2>{{ blog.title }}</h2>
 <ul>
 {% for p in blog.pages %}
-  <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+  <li><a href="{{ base_url }}{{ p.url }}">{{ p.title }}</a></li>
 {% endfor %}
 </ul>
 {% endif %}
@@ -115,7 +115,7 @@ toc = true
 <ul class="tag-cloud">
 {% for term in tags.items %}
   <li>
-    <a href="/tags/{{ term.slug }}/">
+    <a href="{{ get_taxonomy_url(kind='tags', term=term.name) }}">
       {{ term.name }} ({{ term.count }})
     </a>
   </li>

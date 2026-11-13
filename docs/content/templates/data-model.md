@@ -199,7 +199,7 @@ The `site.authors` object contains every author referenced by a listed page, key
     <h4>Recent Posts</h4>
     <ul>
     {% for p in author.pages %}
-      <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+      <li><a href="{{ base_url }}{{ p.url }}">{{ p.title }}</a></li>
     {% endfor %}
     </ul>
   </div>
@@ -273,7 +273,7 @@ The section objects in `section.subsections`, `site.sections` and `get_section()
 ```jinja
 {% for p in section.pages %}
 <article>
-  <h2><a href="{{ p.url }}">{{ p.title }}</a></h2>
+  <h2><a href="{{ base_url }}{{ p.url }}">{{ p.title }}</a></h2>
   <time>{{ p.date }}</time>
   {% if p.description %}
   <p>{{ p.description }}</p>
@@ -287,7 +287,7 @@ The section objects in `section.subsections`, `site.sections` and `get_section()
 ```jinja
 {% for sub in section.subsections %}
 <div class="category">
-  <a href="{{ sub.url }}">{{ sub.title }}</a>
+  <a href="{{ base_url }}{{ sub.url }}">{{ sub.title }}</a>
   <span>({{ sub.pages_count }} articles)</span>
 </div>
 {% endfor %}
@@ -307,7 +307,7 @@ For custom markup, iterate `section.pages` directly:
 <ul>
 {% for p in section.pages %}
   <li>
-    <a href="{{ p.url }}">{{ p.title }}</a>
+    <a href="{{ base_url }}{{ p.url }}">{{ p.title }}</a>
     {% if p.date %}<time>{{ p.date }}</time>{% endif %}
   </li>
 {% endfor %}
@@ -326,7 +326,7 @@ An individual content file (`.md`).
 |----------|------|-------------|
 | page.title | String | Page title |
 | page.description | String? | Page description |
-| page.url | String | Relative URL path |
+| page.url | String | Site-relative URL path (`/blog/my-post/`), without the path of `base_url`: link to it as `{{ base_url }}{{ page.url }}` so subpath deployments work |
 | page.permalink | String? | Absolute URL with base_url |
 | page.section | String | Parent section name |
 | page.date | String? | Publication date (YYYY-MM-DD) |
@@ -440,11 +440,11 @@ Both are full page objects, the same shape as the entries of `section.pages`, so
 ```jinja
 <nav class="post-nav">
   {% if page.lower %}
-  <a href="{{ page.lower.url }}">← {{ page.lower.title }}</a>
+  <a href="{{ base_url }}{{ page.lower.url }}">← {{ page.lower.title }}</a>
   {% endif %}
   
   {% if page.higher %}
-  <a href="{{ page.higher.url }}">{{ page.higher.title }} →</a>
+  <a href="{{ base_url }}{{ page.higher.url }}">{{ page.higher.title }} →</a>
   {% endif %}
 </nav>
 ```
@@ -457,9 +457,9 @@ here and in the JSON-LD `BreadcrumbList`:
 
 ```jinja
 <nav class="breadcrumbs">
-  <a href="/">Home</a>
+  <a href="{{ base_url }}/">Home</a>
   {% for ancestor in page.ancestors %}
-  / <a href="{{ ancestor.url }}">{{ ancestor.title }}</a>
+  / <a href="{{ base_url }}{{ ancestor.url }}">{{ ancestor.title }}</a>
   {% endfor %}
   / <span>{{ page.title }}</span>
 </nav>
@@ -720,7 +720,7 @@ Only available when `toc = true` in front matter.
 
 ## Paginator
 
-Available in section and taxonomy term templates when pagination is enabled (`paginate` in [section front matter](/writing/sections/#front-matter), `paginate_by` for taxonomies). Page 1 lives at the section URL; later pages at `{url}/{paginate_path}/{n}/`.
+Available in section and taxonomy term templates when pagination is enabled (`paginate` in [section front matter](/writing/sections/#front-matter), `paginate_by` for taxonomies). Page 1 lives at the section URL; later pages at `{url}/{paginate_path}/{n}/`. Like `page.url`, these URLs are site-relative: prefix them with `{{ base_url }}` in links.
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -740,9 +740,9 @@ A `pagination_obj` variant exposes the same data as `previous_url`, `next_url`, 
 ```jinja
 {% if paginator is defined and paginator.number_pagers > 1 %}
 <nav>
-  {% if paginator.previous %}<a href="{{ paginator.previous }}">Prev</a>{% endif %}
+  {% if paginator.previous %}<a href="{{ base_url }}{{ paginator.previous }}">Prev</a>{% endif %}
   <span>{{ paginator.current_index }} / {{ paginator.number_pagers }}</span>
-  {% if paginator.next %}<a href="{{ paginator.next }}">Next</a>{% endif %}
+  {% if paginator.next %}<a href="{{ base_url }}{{ paginator.next }}">Next</a>{% endif %}
 </nav>
 {% endif %}
 ```

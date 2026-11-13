@@ -73,7 +73,7 @@ paginate_path = "page"
 
 ### paginator
 
-커스텀 렌더링을 위한 페이지네이션 객체:
+커스텀 렌더링을 위한 페이지네이션 객체입니다. URL은 `page.url`처럼 사이트 기준 상대 경로이므로 링크에서는 `{{ base_url }}`을 앞에 붙입니다:
 
 | 속성 | 타입 | 설명 |
 |----------|------|-------------|
@@ -108,11 +108,11 @@ paginate_path = "page"
 
 ```jinja
 {% if pagination_obj.has_previous %}
-  <a href="{{ pagination_obj.previous_url }}">← Newer</a>
+  <a href="{{ base_url }}{{ pagination_obj.previous_url }}">← Newer</a>
 {% endif %}
 <span>Page {{ pagination_obj.current_page }} of {{ pagination_obj.total_pages }}</span>
 {% if pagination_obj.has_next %}
-  <a href="{{ pagination_obj.next_url }}">Older →</a>
+  <a href="{{ base_url }}{{ pagination_obj.next_url }}">Older →</a>
 {% endif %}
 ```
 
@@ -130,7 +130,7 @@ paginate_path = "page"
 
 <ul>
 {% for p in section.pages %}
-  <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+  <li><a href="{{ base_url }}{{ p.url }}">{{ p.title }}</a></li>
 {% endfor %}
 </ul>
 
@@ -146,11 +146,11 @@ paginate_path = "page"
 {% if paginator.number_pagers > 1 %}
 <nav class="pagination">
   {% if paginator.current_index > 1 %}
-  <a href="{{ paginator.first }}">« First</a>
+  <a href="{{ base_url }}{{ paginator.first }}">« First</a>
   {% endif %}
 
   {% if paginator.previous %}
-  <a href="{{ paginator.previous }}" class="prev">‹ Prev</a>
+  <a href="{{ base_url }}{{ paginator.previous }}" class="prev">‹ Prev</a>
   {% endif %}
 
   <span class="current">
@@ -158,11 +158,11 @@ paginate_path = "page"
   </span>
 
   {% if paginator.next %}
-  <a href="{{ paginator.next }}" class="next">Next ›</a>
+  <a href="{{ base_url }}{{ paginator.next }}" class="next">Next ›</a>
   {% endif %}
 
   {% if paginator.current_index < paginator.number_pagers %}
-  <a href="{{ paginator.last }}">Last »</a>
+  <a href="{{ base_url }}{{ paginator.last }}">Last »</a>
   {% endif %}
 </nav>
 {% endif %}
