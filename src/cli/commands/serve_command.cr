@@ -44,7 +44,6 @@ module Hwaro
           NO_OPEN_BROWSER_FLAG,
           FlagInfo.new(short: nil, long: "--access-log", description: "Show HTTP access log (e.g. GET requests)"),
           FlagInfo.new(short: nil, long: "--no-error-overlay", description: "Disable error overlay in browser"),
-          FlagInfo.new(short: nil, long: "--live-reload", description: "Enable live reload on file changes (default: enabled)"),
           FlagInfo.new(short: nil, long: "--no-live-reload", description: "Disable live reload on file changes"),
           FlagInfo.new(short: nil, long: "--header", description: "Add custom response header (repeatable, e.g. --header 'X-Frame-Options: SAMEORIGIN')", takes_value: true, value_hint: "NAME: VALUE"),
 
@@ -210,7 +209,6 @@ module Hwaro
             CLI.register_flag(parser, NO_OPEN_BROWSER_FLAG) { |_| open_browser = false }
             parser.on("--access-log", "Show HTTP access log (e.g. GET requests)") { access_log = true }
             parser.on("--no-error-overlay", "Disable error overlay in browser") { error_overlay = false }
-            parser.on("--live-reload", "Enable live reload on file changes (default: enabled; kept for backwards compatibility)") { live_reload = true }
             parser.on("--no-live-reload", "Disable live reload on file changes") { live_reload = false }
             parser.on("--header NAME:VALUE", "Add custom response header (repeatable)") do |h|
               key, value = parse_header(h)

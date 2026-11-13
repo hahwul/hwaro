@@ -123,10 +123,11 @@ describe Hwaro::CLI::Commands::ServeCommand do
       options.live_reload.should be_true
     end
 
-    it "keeps live_reload true when --live-reload is passed (backwards compat no-op)" do
+    it "rejects the removed --live-reload flag" do
       cmd = Hwaro::CLI::Commands::ServeCommand.new
-      _, options = cmd.test_parse_options(["--live-reload"])
-      options.live_reload.should be_true
+      expect_raises(OptionParser::InvalidOption, /--live-reload/) do
+        cmd.test_parse_options(["--live-reload"])
+      end
     end
 
     it "sets live_reload to false when --no-live-reload is passed" do
@@ -469,23 +470,10 @@ describe Hwaro::CLI::Commands::ServeCommand do
       flag_longs.should contain("--skip-image-processing")
     end
 
-    it "has live-reload flag" do
-      meta = Hwaro::CLI::Commands::ServeCommand.metadata
-      flag_longs = meta.flags.map(&.long)
-      flag_longs.should contain("--live-reload")
-    end
-
     it "has no-live-reload flag" do
       meta = Hwaro::CLI::Commands::ServeCommand.metadata
       flag_longs = meta.flags.map(&.long)
       flag_longs.should contain("--no-live-reload")
-    end
-
-    it "live-reload flag does not take a value" do
-      meta = Hwaro::CLI::Commands::ServeCommand.metadata
-      flag = meta.flags.find { |f| f.long == "--live-reload" }
-      flag.should_not be_nil
-      flag.not_nil!.takes_value.should be_false
     end
 
     it "no-live-reload flag does not take a value" do

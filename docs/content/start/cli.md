@@ -382,8 +382,7 @@ hwaro serve -i /path/to/my-site -p 8080
 | --debug | Print debug information after each rebuild |
 | --access-log | Show HTTP access log (e.g. GET requests). Each line reports the path the browser requested (`/`, not the `/index.html` the dev server resolves it to) |
 | --no-error-overlay | Disable in-browser error overlay (default: enabled) |
-| --live-reload | Enable browser live reload on file changes (default: enabled; kept for backwards compatibility) |
-| --no-live-reload | Disable browser live reload on file changes |
+| --no-live-reload | Disable browser live reload on file changes (default: enabled) |
 | --header "NAME: VALUE" | Add custom response header (repeatable). Merged with `[serve.headers]` from `config.toml` (CLI wins). Only affects `hwaro serve`. |
 | --cache | Enable build caching (skip unchanged files); kept in `.hwaro/serve_cache.json`, separate from `hwaro build --cache` |
 | --stream | Enable streaming build to reduce memory usage |
@@ -418,7 +417,7 @@ Live reload is **enabled by default**. The server injects a small WebSocket clie
 
 When a save changes **only stylesheets** (a `.css` file under `static/`, a Sass source, or a CSS asset-bundle source), the browser swaps the affected `<link rel="stylesheet">` tags in place instead of reloading, so scroll position and page state survive. Plain static CSS is matched by path; Sass and bundle output refresh every same-origin stylesheet. Anything else in the same save (HTML, JS, images, a bundle fingerprint that moves its filename) still triggers a full reload, and a build error still shows the overlay.
 
-Pass `--no-live-reload` to disable this behaviour (useful for testing production-like delivery locally). The `--live-reload` flag is kept as a no-op alias for backwards compatibility with existing invocations.
+Pass `--no-live-reload` to disable this behaviour (useful for testing production-like delivery locally).
 
 When `-i` is specified, the server operates as if you had `cd`-ed into the given directory, watching and serving from that project root.
 
