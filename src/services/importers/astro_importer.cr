@@ -49,6 +49,8 @@ module Hwaro
             )
           end
 
+          warn_unimported_assets(path, ["public", "src/assets"])
+
           import_each(files, "Astro", wrapped_note: "contained MDX components. Imports kept the raw markup — each will render as literal text until you hand-convert them.") do |file_path|
             import_file(file_path, content_dir, output_dir, options.drafts, options.verbose, options.force)
           end

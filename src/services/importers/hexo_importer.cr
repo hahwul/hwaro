@@ -42,6 +42,8 @@ module Hwaro
             )
           end
 
+          warn_unimported_assets(path, ["source"])
+
           import_each(files, "Hexo", wrapped_note: "contained Hexo tag plugins. Imports kept the raw syntax — each will render as literal text until you hand-convert them.") do |file_info|
             import_file(file_info, output_dir, options.verbose, options.force)
           end

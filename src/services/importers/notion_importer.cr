@@ -48,6 +48,7 @@ module Hwaro
           end
 
           assign_slugs(files)
+          warn_unimported_assets(path, [""])
 
           import_each(files, "Notion") do |file_path|
             import_file(file_path, path, output_dir, options.verbose, options.force)

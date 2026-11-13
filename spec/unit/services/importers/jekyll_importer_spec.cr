@@ -909,3 +909,25 @@ describe "Hwaro::Services::Importers::JekyllImporter symlink boundary" do
     end
   end
 end
+
+describe "Importers: unimported assets" do
+  # Regression: only Markdown is imported, so `![](/assets/img/a.png)` 404ed
+  # after a migration with nothing in the output saying why.
+  it "warns when the source holds images that were not carried over" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "assets", "img"))
+      File.write(File.join(dir, "assets", "img", "a.png"), "PNG")
+      File.write(File.join(dir, "about.md"), "---\ntitle: About\n---\n![a](/assets/img/a.png)\n")
+      log = with_captured_log { import_jekyll(dir) }
+      log.should contain("1 image/asset file(s) in assets were not imported")
+    end
+  end
+
+  it "stays quiet for a source with no assets" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "about.md"), "---\ntitle: About\n---\nHi\n")
+      log = with_captured_log { import_jekyll(dir) }
+      log.should_not contain("image/asset")
+    end
+  end
+end

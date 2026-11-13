@@ -142,6 +142,35 @@ module Hwaro
           end
         end
 
+        # File types a page can embed or link that `tool import` does not carry
+        # over unless they sit beside a page bundle.
+        ASSET_EXTENSIONS = Set{
+          ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".avif", ".ico",
+          ".bmp", ".pdf", ".mp4", ".webm", ".mp3", ".ogg", ".wav", ".zip",
+          ".woff", ".woff2", ".css", ".js",
+        }
+
+        # Warn once when `dirs` (relative to the source root: Hugo `static/`,
+        # Jekyll `assets/`, an Obsidian attachments folder, …) hold images or
+        # downloads. Importers write Markdown only, so every `![](/img/a.png)`
+        # in the imported pages would 404 with nothing in the output saying why.
+        protected def warn_unimported_assets(source_root : String, dirs : Array(String), skip_dir : Proc(String, Bool)? = nil) : Nil
+          saved = @outside_source_skips
+          count = 0
+          dirs.each do |name|
+            dir = File.join(source_root, name)
+            next if File.symlink?(dir) || !Dir.exists?(dir)
+            walk_files(dir, [""], skip_dir, source_root: source_root).each do |file|
+              base = File.basename(file)
+              count += 1 if !base.starts_with?('.') && ASSET_EXTENSIONS.includes?(File.extname(base).downcase)
+            end
+          end
+          @outside_source_skips = saved
+          return if count == 0
+          where = dirs.map { |d| d.empty? ? "the source" : d }.join(", ")
+          Logger.warn "#{count} image/asset file(s) in #{where} were not imported (only Markdown is). Copy them into your hwaro site's static/ directory, or beside the pages that use them, so image and file links keep working."
+        end
+
         # Split a file's path (relative to base_path) into {section, filename},
         # where section is the parent-directory chain joined with "/" (or
         # `default` for a top-level file) and filename is the last path segment.

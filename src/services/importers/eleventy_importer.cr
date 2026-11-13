@@ -61,6 +61,8 @@ module Hwaro
           # Load directory data files (11ty convention)
           dir_data = load_directory_data(path)
 
+          warn_unimported_assets(path, [""], ->(entry : String) { entry.starts_with?(".") || entry == "node_modules" || entry == "_site" })
+
           import_each(files, "Eleventy", wrapped_note: "contained Nunjucks/Liquid template tags. Imports kept the raw syntax — each will render as literal text until you hand-convert them.") do |file_path|
             import_file(file_path, path, output_dir, dir_data, options.drafts, options.verbose, options.force)
           end
