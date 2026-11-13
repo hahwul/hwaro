@@ -33,6 +33,7 @@ module Hwaro
               long: "--force",
               description: "Overwrite existing file without warning"
             ),
+            QUIET_FLAG,
             HELP_FLAG,
           ]
 

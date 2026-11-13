@@ -743,10 +743,9 @@ describe Hwaro::CLI::Commands::CompletionCommand do
       Hwaro::CLI::Commands::CompletionCommand::POSITIONAL_CHOICES.should eq(Hwaro::CLI::Commands::CompletionCommand::SHELLS)
     end
 
-    it "has only help flag" do
+    it "has only the quiet and help flags" do
       flags = Hwaro::CLI::Commands::CompletionCommand::FLAGS
-      flags.size.should eq(1)
-      flags.first.long.should eq("--help")
+      flags.map(&.long).should eq(["--quiet", "--help"])
     end
   end
 

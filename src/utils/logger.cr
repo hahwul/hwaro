@@ -177,6 +177,37 @@ module Hwaro
       @@io.puts paint("[DEBUG] #{message}", Role::Dim)
     end
 
+    # Output a command exists to produce (a listing, a report, help text), as
+    # opposed to status chatter. `--quiet` silences info, not the answer, so
+    # every line the block prints survives it, like `hwaro version -q`.
+    def self.result(&)
+      previous = @@quiet
+      @@quiet = false
+      begin
+        yield
+      ensure
+        @@quiet = previous
+      end
+    end
+
+    # Run the block with info output redirected to stderr: the usage text a
+    # failing command prints next to its error is a diagnostic, not data, so
+    # stdout stays empty for scripts. Nothing prints under `--quiet`/`--json`.
+    def self.to_stderr(&)
+      return if @@quiet
+      previous = @@io
+      @@io = @@err_io
+      begin
+        yield
+      ensure
+        @@io = previous
+      end
+    end
+
+    def self.result(message : String)
+      result { info message }
+    end
+
     def self.info(message : String)
       return if @@level > Level::Info
       return if @@quiet

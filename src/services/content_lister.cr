@@ -494,7 +494,7 @@ module Hwaro
             [status_role, Logger::Role::Dim, Logger::Role::Plain, Logger::Role::Dim]
           )
         end
-        table.emit
+        Logger.result { table.emit }
 
         Logger.info ""
         Logger.outcome("listed", "#{contents.size} #{contents.size == 1 ? "file" : "files"}")

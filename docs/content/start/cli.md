@@ -15,7 +15,7 @@ and AI agents that want clean output.
 
 | Flag / Env var | Description |
 |----------------|-------------|
-| `-q`, `--quiet` | Suppress informational output and the startup banner. Warnings and errors still appear on stderr. |
+| `-q`, `--quiet` | Suppress informational output and the startup banner. Warnings and errors still appear on stderr. The result a command exists to print (`--help`, listings such as `tool list` / `tool stats` / `tool unused-assets` / `--list-*`, the version, completion scripts) is still printed on stdout. |
 | `NO_COLOR` (env) | When set to any non-empty value, suppresses ANSI color codes from every command's output. Follows the [no-color.org](https://no-color.org) cross-tool convention. |
 | `GC_MARKERS` (env) | GC marker-thread count. For `hwaro build` only, Hwaro defaults this to `1` (measured 3-5x faster on allocation-heavy sites); export it to override. Other commands keep the garbage collector's stock behavior. |
 | `GC_INITIAL_HEAP_SIZE` (env) | Initial GC heap size. For `hwaro build` only, Hwaro defaults this to `256M` to avoid repeated grow-collect cycles; export it to override. Skipped automatically when `--memory-limit` / `HWARO_MEMORYLIMIT` is set. |
@@ -598,6 +598,9 @@ their usage. `check-links`, `stats`, `validate`, and `unused-assets` accept no
 positional arguments. Extra positional arguments, including arguments after
 `--`, are rejected with a usage error; use the documented flags for additional
 paths and options.
+
+`tool platform` and `tool agents-md` print a generated file rather than a
+report and do not accept `--json`; every other `tool` subcommand does.
 
 **Subcommands:**
 

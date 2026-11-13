@@ -29,6 +29,7 @@ module Hwaro
             CONTENT_DIR_FLAG,
             DRY_RUN_FLAG,
             JSON_FLAG,
+            QUIET_FLAG,
             HELP_FLAG,
           ]
 
@@ -53,7 +54,8 @@ module Hwaro
               CLI.register_flag(parser, CONTENT_DIR_FLAG) { |v| content_dir = v }
               CLI.register_flag(parser, DRY_RUN_FLAG) { |_| dry_run = true }
               CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
-              CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
+              CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
+              CLI.register_flag(parser, HELP_FLAG) { |_| Logger.result parser.to_s; exit }
               parser.unknown_args do |before_dash, after_dash|
                 unknown = before_dash + after_dash
                 unless unknown.size <= 1

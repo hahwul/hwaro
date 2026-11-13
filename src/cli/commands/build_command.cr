@@ -228,7 +228,7 @@ module Hwaro
             CLI.register_flag(parser, PROFILE_FLAG) { |_| profile = true }
             CLI.register_flag(parser, DEBUG_FLAG) { |_| debug = true }
             CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
-            CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
+            CLI.register_flag(parser, HELP_FLAG) { |_| Logger.result parser.to_s; exit }
             # `hwaro build` takes no positional arguments. Without this the
             # parser dropped them silently, so `hwaro build mysite` (the shape
             # other generators accept) and `hwaro build content/post.md` both

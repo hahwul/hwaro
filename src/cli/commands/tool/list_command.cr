@@ -36,6 +36,7 @@ module Hwaro
             REVERSE_FLAG,
             LIMIT_FLAG,
             JSON_FLAG,
+            QUIET_FLAG,
             HELP_FLAG,
           ]
 
@@ -80,7 +81,8 @@ module Hwaro
                 limit = parsed
               end
               CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
-              CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
+              CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
+              CLI.register_flag(parser, HELP_FLAG) { |_| Logger.result parser.to_s; exit }
               parser.unknown_args do |before_dash, after_dash|
                 unknown = before_dash + after_dash
                 unless unknown.size <= 1

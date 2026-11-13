@@ -160,18 +160,17 @@ module Hwaro
           end
         end
 
-        # Emit the built-in scaffold list to the standard info logger.
-        # Shared by `--help`, `--list-scaffolds`, and the invalid-scaffold
-        # error path so the three outputs stay in sync with the Registry.
+        # Emit the built-in scaffold list (a result, so `--quiet` keeps it).
+        # Shared by `--help` and `--list-scaffolds`.
         private def log_scaffold_list
           default_type = Config::Options::ScaffoldType::Simple
           scaffolds = Services::Scaffolds::Registry.all
           name_width = scaffolds.max_of(&.type.to_s.size)
-          Logger.info "Available scaffolds:"
+          Logger.result "Available scaffolds:"
           scaffolds.each do |scaffold|
             name = scaffold.type.to_s
             suffix = scaffold.type == default_type ? " (default)" : ""
-            Logger.info "  #{name.ljust(name_width)} - #{scaffold.description}#{suffix}"
+            Logger.result "  #{name.ljust(name_width)} - #{scaffold.description}#{suffix}"
           end
         end
 
@@ -221,11 +220,13 @@ module Hwaro
                 rescue ex : ArgumentError
                   # Classify so the Runner emits `Error [HWARO_E_USAGE]: …`
                   # and exits with the documented usage code (2).
-                  log_scaffold_list
-                  Logger.info ""
-                  Logger.info "Remote scaffolds:"
-                  Logger.info "  github:owner/repo[/path] - GitHub repository shorthand"
-                  Logger.info "  https://github.com/...   - Full GitHub URL (with optional subpath)"
+                  Logger.to_stderr do
+                    log_scaffold_list
+                    Logger.result ""
+                    Logger.result "Remote scaffolds:"
+                    Logger.result "  github:owner/repo[/path] - GitHub repository shorthand"
+                    Logger.result "  https://github.com/...   - Full GitHub URL (with optional subpath)"
+                  end
                   raise Hwaro::HwaroError.new(
                     code: Hwaro::Errors::HWARO_E_USAGE,
                     message: ex.message || "Unknown scaffold type",
@@ -289,13 +290,13 @@ module Hwaro
             # Debug & output
             CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
             parser.on("-h", "--help", "Show this help") do
-              Logger.info parser.to_s
-              Logger.info ""
+              Logger.result parser.to_s
+              Logger.result ""
               log_scaffold_list
-              Logger.info ""
-              Logger.info "Remote scaffolds:"
-              Logger.info "  github:owner/repo        - GitHub repository shorthand"
-              Logger.info "  https://github.com/...   - Full GitHub URL"
+              Logger.result ""
+              Logger.result "Remote scaffolds:"
+              Logger.result "  github:owner/repo        - GitHub repository shorthand"
+              Logger.result "  https://github.com/...   - Full GitHub URL"
               exit
             end
             parser.unknown_args do |before_dash, after_dash|

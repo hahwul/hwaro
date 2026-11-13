@@ -94,7 +94,7 @@ module Hwaro
           # `exit(1)` gave scripts the generic exit code and no
           # `HWARO_E_USAGE` line (the same fix `hwaro completion` got).
           if args.empty?
-            print_help
+            Logger.to_stderr { print_help }
             raise Hwaro::HwaroError.new(
               code: Hwaro::Errors::HWARO_E_USAGE,
               message: "missing <subcommand> argument",
@@ -156,21 +156,21 @@ module Hwaro
           name_with_args = ->(sub : CommandInfo) { format_usage(sub) }
           max_len = visible.max_of { |s| name_with_args.call(s).size }
 
-          Logger.info "Usage: hwaro tool <subcommand> [options]"
-          Logger.info ""
-          Logger.info "Available subcommands:"
+          Logger.result "Usage: hwaro tool <subcommand> [options]"
+          Logger.result ""
+          Logger.result "Available subcommands:"
 
           # Bold subcommand names, dim descriptions, dim-bold category labels
           # (pad before paint so escapes never skew the column).
           render_sub = ->(sub : CommandInfo) do
             usage = Logger.paint(name_with_args.call(sub).ljust(max_len + 2), Logger::Role::Plain, bold: true)
-            Logger.info "    #{usage} #{Logger.paint(sub.description, Logger::Role::Dim)}"
+            Logger.result "    #{usage} #{Logger.paint(sub.description, Logger::Role::Dim)}"
           end
 
           categorized = Set(String).new
           CATEGORIES.each do |category, names|
-            Logger.info ""
-            Logger.info "  #{Logger.paint("#{category}:", Logger::Role::Dim, bold: true)}"
+            Logger.result ""
+            Logger.result "  #{Logger.paint("#{category}:", Logger::Role::Dim, bold: true)}"
             names.each do |name|
               if sub = sub_by_name[name]?
                 render_sub.call(sub)
@@ -182,13 +182,13 @@ module Hwaro
           # Show uncategorized commands
           uncategorized = visible.reject { |s| categorized.includes?(s.name) }
           unless uncategorized.empty?
-            Logger.info ""
-            Logger.info "  #{Logger.paint("Other:", Logger::Role::Dim, bold: true)}"
+            Logger.result ""
+            Logger.result "  #{Logger.paint("Other:", Logger::Role::Dim, bold: true)}"
             uncategorized.each { |sub| render_sub.call(sub) }
           end
 
-          Logger.info ""
-          Logger.info Logger.paint("Run 'hwaro tool <subcommand> --help' for more information on a subcommand.", Logger::Role::Dim)
+          Logger.result ""
+          Logger.result Logger.paint("Run 'hwaro tool <subcommand> --help' for more information on a subcommand.", Logger::Role::Dim)
         end
 
         # Render a subcommand's usage signature for the help summary:
