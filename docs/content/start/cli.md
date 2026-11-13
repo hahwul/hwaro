@@ -481,7 +481,7 @@ hwaro deploy --dry-run
 | --dry-run | Show planned changes without writing |
 | --confirm | Ask for confirmation before deploying |
 | --force | Force upload/copy (ignore file comparisons), and allow clearing a destination from an empty source |
-| --max-deletes N | Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables) |
+| --max-deletes N | Maximum number of deletes (default: deployment.max_deletes or 256, -1 disables) |
 | --list-targets | List configured deployment targets and exit |
 | -j, --json | Emit machine-readable JSON output (plan with `--dry-run`, per-target summary otherwise, target list with `--list-targets`) |
 | -e, --env NAME | Config environment to load (also `HWARO_ENV`) |

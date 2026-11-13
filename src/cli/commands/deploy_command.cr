@@ -24,7 +24,7 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--dry-run", description: "Show planned changes without writing"),
           FlagInfo.new(short: nil, long: "--confirm", description: "Ask for confirmation before deploying"),
           FlagInfo.new(short: nil, long: "--force", description: "Force upload/copy (ignore file comparisons)"),
-          FlagInfo.new(short: nil, long: "--max-deletes", description: "Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables)", takes_value: true, value_hint: "N"),
+          FlagInfo.new(short: nil, long: "--max-deletes", description: "Maximum number of deletes (default: deployment.max_deletes or 256, -1 disables)", takes_value: true, value_hint: "N"),
           FlagInfo.new(short: nil, long: "--list-targets", description: "List configured deployment targets and exit"),
           JSON_FLAG,
           ENV_FLAG,
@@ -158,7 +158,7 @@ module Hwaro
             parser.on("--dry-run", "Show planned changes without writing") { dry_run = true }
             parser.on("--confirm", "Ask for confirmation before deploying") { confirm = true }
             parser.on("--force", "Force upload/copy (ignore file comparisons)") { force = true }
-            parser.on("--max-deletes N", "Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables)") do |n|
+            parser.on("--max-deletes N", "Maximum number of deletes (default: deployment.max_deletes or 256, -1 disables)") do |n|
               parsed = n.to_i?
               if parsed.nil?
                 raise Hwaro::HwaroError.new(

@@ -487,7 +487,7 @@ hwaro deploy --dry-run
 | --dry-run | 실제로 쓰지 않고 계획된 변경만 표시 |
 | --confirm | 배포 전 확인 요청 |
 | --force | 강제 업로드/복사 (파일 비교 무시). 빈 소스로 대상을 비우는 것도 허용 |
-| --max-deletes N | 최대 삭제 수 (기본값: deployment.maxDeletes 또는 256, -1이면 제한 없음) |
+| --max-deletes N | 최대 삭제 수 (기본값: deployment.max_deletes 또는 256, -1이면 제한 없음) |
 | --list-targets | 설정된 배포 대상 목록 출력 후 종료 |
 | -j, --json | 기계가 읽을 수 있는 JSON 출력 (`--dry-run`이면 계획, 아니면 대상별 요약, `--list-targets`면 대상 목록) |
 | -e, --env NAME | 불러올 설정 환경 (`HWARO_ENV`로도 지정) |
