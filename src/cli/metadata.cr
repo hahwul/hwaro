@@ -62,6 +62,16 @@ module Hwaro
     DRY_RUN_FLAG               = FlagInfo.new(short: nil, long: "--dry-run", description: "Preview what would be written without changing any file")
     CONTENT_DIR_FLAG           = FlagInfo.new(short: "-c", long: "--content-dir", description: "Content directory (default: content)", takes_value: true, value_hint: "DIR")
 
+    # An unknown flag (`--bogus`) lands in a parser's `unknown_args` along with
+    # the positionals. Call this first in that block so it is reported as
+    # "Invalid option: --bogus" rather than as an "unexpected extra argument".
+    # A bare `-` is a positional, and everything after `--` is one too.
+    def self.reject_unknown_flag!(before_dash : Array(String)) : Nil
+      if flag = before_dash.find { |arg| arg.starts_with?('-') && arg != "-" }
+        raise OptionParser::InvalidOption.new(flag)
+      end
+    end
+
     # Register a FlagInfo on an OptionParser, eliminating manual duplication
     # between FLAGS metadata and OptionParser definitions.
     def self.register_flag(parser : OptionParser, flag : FlagInfo, &block : String ->)

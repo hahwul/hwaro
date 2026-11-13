@@ -26,6 +26,12 @@ describe Hwaro::CLI::Commands::ServeCommand do
       expect_raises(Hwaro::HwaroError) { cmd.test_parse_options(["-p", "3000", "--", "dir"]) }
     end
 
+    it "reports an unknown flag as an invalid option, not an extra argument" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      err = expect_raises(OptionParser::InvalidOption, /--bogus/) { cmd.test_parse_options(["--bogus"]) }
+      err.message.to_s.should_not contain("extra argument")
+    end
+
     it "treats empty HWARO_MEMORYLIMIT / HWARO_ENV as unset" do
       ENV["HWARO_MEMORYLIMIT"] = ""
       ENV["HWARO_ENV"] = ""

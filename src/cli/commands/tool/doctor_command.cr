@@ -102,6 +102,7 @@ module Hwaro
               # default `content/` and exit 0, as if the path had been
               # honoured. Directories are passed with --content-dir.
               parser.unknown_args do |before_dash, after_dash|
+                CLI.reject_unknown_flag!(before_dash)
                 unknown = before_dash + after_dash
                 raise Hwaro::HwaroError.new(
                   code: Hwaro::Errors::HWARO_E_USAGE,

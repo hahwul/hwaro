@@ -238,6 +238,7 @@ module Hwaro
             # `hwaro serve mysite` build and serve the CURRENT directory (and
             # create `.hwaro/serve` in it); see BuildCommand.
             parser.unknown_args do |before_dash, after_dash|
+              CLI.reject_unknown_flag!(before_dash)
               unknown = before_dash + after_dash
               raise Hwaro::HwaroError.new(
                 code: Hwaro::Errors::HWARO_E_USAGE,

@@ -236,6 +236,7 @@ module Hwaro
             # having no effect and no diagnostic. Mirrors the `hwaro tool *`
             # subcommands.
             parser.unknown_args do |before_dash, after_dash|
+              CLI.reject_unknown_flag!(before_dash)
               unknown = before_dash + after_dash
               raise Hwaro::HwaroError.new(
                 code: Hwaro::Errors::HWARO_E_USAGE,

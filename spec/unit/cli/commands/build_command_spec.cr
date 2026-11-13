@@ -269,6 +269,13 @@ describe Hwaro::CLI::Commands::BuildCommand do
       err.message.to_s.should contain("unexpected extra argument(s): 'mysite'")
     end
 
+    it "reports an unknown flag as an invalid option, not an extra argument" do
+      cmd = Hwaro::CLI::Commands::BuildCommand.new
+      expect_raises(OptionParser::InvalidOption, /--bogus-flag/) do
+        cmd.parse_options(["--bogus-flag"])
+      end
+    end
+
     it "names every stray positional argument, flags included" do
       cmd = Hwaro::CLI::Commands::BuildCommand.new
       err = expect_raises(Hwaro::HwaroError) do

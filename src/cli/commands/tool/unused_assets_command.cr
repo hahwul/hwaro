@@ -79,6 +79,7 @@ module Hwaro
               CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
               CLI.register_flag(parser, HELP_FLAG) { |_| Logger.result parser.to_s; exit }
               parser.unknown_args do |before_dash, after_dash|
+                CLI.reject_unknown_flag!(before_dash)
                 unknown = before_dash + after_dash
                 raise Hwaro::HwaroError.new(
                   code: Hwaro::Errors::HWARO_E_USAGE,

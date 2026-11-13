@@ -239,6 +239,15 @@ describe "tool commands positional argument validation" do
     end
   end
 
+  it "reports an unknown flag as an invalid option for stats" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      FileUtils.mkdir_p(content_dir)
+      cmd = Hwaro::CLI::Commands::Tool::StatsCommand.new
+      expect_raises(OptionParser::InvalidOption, /--bogus/) { cmd.run(["-c", content_dir, "--bogus"]) }
+    end
+  end
+
   it "rejects positionals for stats" do
     Dir.mktmpdir do |dir|
       content_dir = File.join(dir, "content")
