@@ -3,6 +3,7 @@ require "../../../src/utils/logger"
 
 describe "Hwaro::Logger.result / to_stderr" do
   it "result prints under --quiet and restores the flag" do
+    previous = Hwaro::Logger.io
     io = IO::Memory.new
     Hwaro::Logger.io = io
     Hwaro::Logger.quiet = true
@@ -16,10 +17,12 @@ describe "Hwaro::Logger.result / to_stderr" do
       io.to_s.should_not contain("chatter")
     ensure
       Hwaro::Logger.quiet = false
+      Hwaro::Logger.io = previous
     end
   end
 
   it "to_stderr sends result lines to err_io and is silent under --quiet" do
+    previous = Hwaro::Logger.io
     out = IO::Memory.new
     err = IO::Memory.new
     Hwaro::Logger.io = out
@@ -34,6 +37,7 @@ describe "Hwaro::Logger.result / to_stderr" do
       err.to_s.should be_empty
     ensure
       Hwaro::Logger.quiet = false
+      Hwaro::Logger.io = previous
     end
   end
 end

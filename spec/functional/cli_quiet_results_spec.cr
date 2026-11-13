@@ -69,7 +69,7 @@ describe "hwaro --quiet keeps a command's result" do
   it "--help still prints the help text" do
     with_site do |dir|
       [["--help"], ["build", "--help"], ["tool", "list", "--help"], ["tool", "platform", "--help"],
-       ["tool", "--help"], ["completion", "--help"], ["help", "build"], ["init", "--help"]].each do |argv|
+       ["tool", "--help"], ["completion", "--help"], ["help", "build"], ["init", "--help"], ["doctor", "--help"]].each do |argv|
         code, out, _ = run(argv + ["-q"], dir)
         code.should eq(0)
         out.should contain("Usage")

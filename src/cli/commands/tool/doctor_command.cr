@@ -97,7 +97,7 @@ module Hwaro
               end
               CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
               CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
-              CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
+              CLI.register_flag(parser, HELP_FLAG) { |_| Logger.result parser.to_s; exit }
               # `hwaro doctor content/blog` used to run a full check of the
               # default `content/` and exit 0, as if the path had been
               # honoured. Directories are passed with --content-dir.
