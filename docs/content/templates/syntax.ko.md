@@ -329,6 +329,18 @@ Jinja 문법을 그대로 출력합니다.
 {% endif %}
 ```
 
+## Jinja2와 다른 점
+
+Jinja2용으로 작성한 템플릿은 대부분 그대로 동작합니다. 알아 둘 차이는 다음과 같습니다.
+
+- **출력되는 값.** 불리언과 none은 `true`, `false`, `none`으로 출력되고(Jinja2는 `True`, `False`, `None`), 맵은 `{'a' => 1}`로 출력됩니다. 리스트나 맵을 그대로 출력하지 말고 `| tojson`, `| join` 등으로 형식을 정하세요.
+- **Python 메서드 없음.** `s.upper()`, `s.split(",")`, `d.items()`, `list.append(x)`는 정의되지 않습니다. 필터(`| upper`, `| split(pat=",")`, `| dictsort`)를 쓰세요. 맵을 두 이름으로 순회하면(`{% for k, v in d %}`) 키와 값을 얻습니다.
+- **지원하지 않는 것:** `namespace()`, `{% set a, b = ... %}`, `{% set x | filter %}...{% endset %}`, 호출의 `*args` / `**kwargs`, `self.<블록>()`, `{%+`, 연쇄 비교(`a < b < c`), 문자열 반복(`"-" * 3`), 지수 표기 숫자(`1e3`), `items` 필터, `true` / `false` / `boolean` / `integer` / `float` 테스트. 모두 위치를 알려 주는 템플릿 오류가 되며, 조용히 잘못 출력되지는 않습니다.
+- **연산자.** `**`는 오른쪽부터 묶이고(`2 ** 3 ** 2`는 `512`, Jinja2는 `64`), 앞의 마이너스는 그 뒤에 적용됩니다(`-2 ** 2`는 `-4`, Jinja2는 `4`). 결과가 중요하면 괄호를 쓰세요.
+- **hwaro의 `default`와 `unique`.** `default`는 `none`과 빈 문자열도 바꾸고, 비어 있지 않은 스칼라는 문자열로 반환합니다([필터 › 기본값](/ko/templates/filters/#기본값) 참고). `unique`는 `case_sensitive=false`가 아니면 문자열의 대소문자를 구분합니다.
+- **너그러운 호출.** 매크로는 남는 인자를 오류 없이 무시하고, `attr`는 맵의 키도 읽으며, 가져온 매크로는 `with context` 없이도 가져온 템플릿의 변수를 봅니다.
+- Jinja2처럼 쓸 수 있는 것: `range()`, `dict()`, `cycler()`, `joiner()` 함수, `forceescape` 필터, `divisibleby`, `sameas`, `mapping`, `sequence`, `lower`, `upper`, `undefined`, `in` 테스트.
+
 ## 함께 보기
 
 - [데이터 모델](/ko/templates/data-model/) — 사용할 수 있는 변수
