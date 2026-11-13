@@ -572,6 +572,11 @@ describe "MiscFilters" do
       render_crinja("{{ items | default(value='') }}", vars).should_not contain("Crinja::Value")
     end
 
+    # Jinja2 3.1 renders the same string.
+    it "accepts Jinja2's default_value= name" do
+      render_crinja("{{ missing | default(default_value='D') }}|{{ '' | default(boolean=true, default_value='E') }}|{{ missing | default('P') }}").should eq("D|E|P")
+    end
+
     it "returns default value for undefined variable" do
       result = render_crinja("{{ undefined_var | default(value='fallback') }}")
       result.strip.should eq("fallback")
@@ -1076,6 +1081,17 @@ describe "CollectionFilters (extended)" do
       vars = {"items" => items}
       result = render_crinja("{% for i in items | unique %}{{ i }},{% endfor %}", vars)
       result.should eq("a,b,c,")
+    end
+
+    # Jinja2 3.1 renders the same strings (its default is case-insensitive).
+    it "honours attribute= and case_sensitive=false" do
+      users = Hwaro::Utils::CrinjaUtils.parse_data_string(%([{"g":"b","n":1,"x":{"k":"A"}},{"g":"a","n":2,"x":{"k":"a"}},{"g":"b","n":3,"x":{"k":"B"}}]), "json").not_nil!
+      vars = {"u" => users}
+      render_crinja("{{ u | unique(attribute='g') | map(attribute='n') | join(',') }}", vars).should eq("1,2")
+      render_crinja("{{ u | unique(attribute='x.k', case_sensitive=false) | map(attribute='n') | join(',') }}", vars).should eq("1,3")
+      render_crinja("{{ u | unique(attribute='x.k') | map(attribute='n') | join(',') }}", vars).should eq("1,2,3")
+      render_crinja("{{ ['a', 'A', 'b'] | unique(case_sensitive=false) | join(',') }}").should eq("a,b")
+      render_crinja("{{ ['a', 'A', 'b'] | unique | join(',') }}").should eq("a,A,b")
     end
 
     it "returns empty array for empty input" do
