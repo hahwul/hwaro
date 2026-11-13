@@ -72,7 +72,7 @@ contract over scraping human text.**
 - **`-j` / `--json`** — available on every top-level command (`init`, `new`,
   `build`, `serve`, `doctor`, `deploy`) and on the tool subcommands `list`,
   `stats`, `validate`, `unused-assets`, `check-links`, `convert`, `import`,
-  `export`, `doctor`. It implies `--quiet`, and errors become the JSON error
+  `export`. It implies `--quiet`, and errors become the JSON error
   payload below. Discovery flags pair with it: `init --list-scaffolds`,
   `new --list-archetypes`, `deploy --list-targets`. Parse the JSON; do not
   regex the pretty output.

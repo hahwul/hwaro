@@ -56,10 +56,8 @@ module Hwaro
             )
           end
 
-          # `invocation` lets the top-level `hwaro doctor` alias and the
-          # canonical `hwaro tool doctor` form each show their own usage
-          # banner, even though both share this single implementation.
-          def run(args : Array(String), invocation : String = "hwaro tool doctor")
+          # The implementation behind the top-level `hwaro doctor` command.
+          def run(args : Array(String))
             content_dir = "content"
             config_path = "config.toml"
             env_name = ENV["HWARO_ENV"]?.presence
@@ -72,7 +70,7 @@ module Hwaro
             max_warnings = -1 # < 0 means "unlimited"
 
             OptionParser.parse(args) do |parser|
-              parser.banner = "Usage: #{invocation} [options]"
+              parser.banner = "Usage: hwaro doctor [options]"
               CLI.register_flag(parser, CONTENT_DIR_FLAG) { |v| content_dir = v }
               CLI.register_flag(parser, ENV_FLAG) { |v| env_name = v }
               parser.on("--fix", "Perform real fixes (normalize values like base_url trailing slash, sitemap priority, etc.)") { fix_mode = true }
@@ -107,7 +105,7 @@ module Hwaro
                 raise Hwaro::HwaroError.new(
                   code: Hwaro::Errors::HWARO_E_USAGE,
                   message: "unexpected extra argument(s): '#{unknown.join("', '")}'",
-                  hint: "#{invocation} accepts options only; pass a content directory with --content-dir DIR.",
+                  hint: "hwaro doctor accepts options only; pass a content directory with --content-dir DIR.",
                 ) unless unknown.empty?
               end
             end
@@ -163,7 +161,7 @@ module Hwaro
                 # (an inline-table priority, a placeholder title) used to end
                 # the run on "Config is up to date" with nothing else said.
                 if outstanding > 0
-                  Logger.warn "#{outstanding} issue(s) remain — run '#{invocation}' for details."
+                  Logger.warn "#{outstanding} issue(s) remain — run 'hwaro doctor' for details."
                 end
               end
               exit(code)

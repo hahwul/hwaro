@@ -296,8 +296,8 @@ describe "CLI Tool Commands" do
     end
   end
 
-  describe "hwaro tool doctor (alias)" do
-    it "still works via tool subcommand" do
+  describe "hwaro tool doctor (removed)" do
+    it "is an unknown tool subcommand" do
       temp_dir = File.tempname("hwaro_test")
       Dir.mkdir(temp_dir)
       begin
@@ -306,11 +306,11 @@ describe "CLI Tool Commands" do
 
         Process.run(hwaro_binary, ["init", project_dir], output: IO::Memory.new, error: IO::Memory.new)
 
-        output_io = IO::Memory.new
         error_io = IO::Memory.new
-        status = Process.run(hwaro_binary, ["tool", "doctor"], chdir: project_dir, output: output_io, error: error_io)
+        status = Process.run(hwaro_binary, ["tool", "doctor"], chdir: project_dir, output: IO::Memory.new, error: error_io)
 
-        status.success?.should be_true
+        status.success?.should be_false
+        error_io.to_s.should contain("unknown command 'tool doctor'")
       ensure
         FileUtils.rm_rf(temp_dir) if Dir.exists?(temp_dir)
       end

@@ -123,11 +123,9 @@ describe "hwaro doctor argument contract" do
   it "rejects a stray positional argument with a usage error" do
     Dir.mktmpdir do |dir|
       fix_project(dir, templates: true)
-      {["doctor", "content/blog"], ["tool", "doctor", "content/blog"]}.each do |args|
-        code, _, err = doctor_run(dir, args)
-        code.should eq(Hwaro::Errors::EXIT_USAGE)
-        err.should contain("unexpected extra argument(s): 'content/blog'")
-      end
+      code, _, err = doctor_run(dir, ["doctor", "content/blog"])
+      code.should eq(Hwaro::Errors::EXIT_USAGE)
+      err.should contain("unexpected extra argument(s): 'content/blog'")
     end
   end
 

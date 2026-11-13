@@ -20,9 +20,9 @@ describe Hwaro::CLI::Commands::ToolCommand do
   end
 
   describe ".subcommands" do
-    it "returns 11 subcommands" do
+    it "returns 10 subcommands" do
       subs = Hwaro::CLI::Commands::ToolCommand.subcommands
-      subs.size.should eq(11)
+      subs.size.should eq(10)
     end
 
     it "includes convert subcommand" do
@@ -40,9 +40,9 @@ describe Hwaro::CLI::Commands::ToolCommand do
       subs.any? { |s| s.name == "check-links" }.should be_true
     end
 
-    it "includes doctor subcommand" do
+    it "no longer includes the removed doctor subcommand (use hwaro doctor)" do
       subs = Hwaro::CLI::Commands::ToolCommand.subcommands
-      subs.any? { |s| s.name == "doctor" }.should be_true
+      subs.any? { |s| s.name == "doctor" }.should be_false
     end
 
     it "includes platform subcommand" do

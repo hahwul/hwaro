@@ -222,7 +222,7 @@ module Hwaro
           Commands::ToolCommand.new.run(args)
         end
 
-        # Register doctor command (top-level alias for `tool doctor`)
+        # Register doctor command
         CommandRegistry.register(Commands::DoctorCommand.metadata) do |args|
           Commands::DoctorCommand.new.run(args)
         end

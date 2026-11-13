@@ -30,8 +30,6 @@ hwaro doctor --full --dry-run
 hwaro doctor --json
 ```
 
-> `hwaro tool doctor`도 하위 호환 별칭으로 동작합니다.
-
 ## 옵션
 
 | 플래그 | 설명 |

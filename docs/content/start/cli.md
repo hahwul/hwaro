@@ -569,7 +569,6 @@ hwaro tool platform cloudflare    # Generate Cloudflare Pages config
 hwaro tool platform github-pages  # Generate GitHub Pages deploy workflow
 hwaro tool platform gitlab-ci     # Generate GitLab CI config
 hwaro tool platform codeberg-pages # Generate Codeberg Pages (Forgejo Actions) workflow
-hwaro tool doctor                 # Diagnose config/template/structure issues
 hwaro tool import hugo /path      # Import from Hugo
 hwaro tool import jekyll /path    # Import from Jekyll
 hwaro tool export hugo            # Export to Hugo format
@@ -582,7 +581,6 @@ hwaro tool convert to-yaml --json
 hwaro tool stats --json
 hwaro tool validate --json
 hwaro tool unused-assets --json
-hwaro tool doctor --json
 hwaro tool check-links --json
 hwaro tool import jekyll /path --json
 hwaro tool export hugo --json
@@ -613,7 +611,6 @@ report and do not accept `--json`; every other `tool` subcommand does.
 | Content | [validate](/start/tools/validate/) | Validate content frontmatter and markup |
 | Content | [unused-assets](/start/tools/unused-assets/) | Find unreferenced static files |
 | Site | [platform](/start/tools/platform/) | Generate platform config and CI/CD workflow files |
-| Site | [doctor](/start/tools/doctor/) | Diagnose config, template, and structure issues |
 | Site | [import](/start/tools/import/) | Import content from WordPress, Jekyll, Hugo, Notion, Obsidian, Hexo, Astro, or Eleventy |
 | Site | [export](/start/tools/export/) | Export content to Hugo or Jekyll |
 | Site | [agents-md](/start/tools/agents-md/) | Generate or update AGENTS.md file |

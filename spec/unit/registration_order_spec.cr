@@ -69,7 +69,7 @@ describe "registration order" do
       ["build", "completion", "deploy", "doctor", "help", "init", "new", "serve", "tool", "version"]
     )
     Hwaro::CLI::Commands::ToolCommand.subcommands.map(&.name).should eq([
-      "convert", "list", "check-links", "doctor", "platform",
+      "convert", "list", "check-links", "platform",
       "import", "export", "stats", "validate", "unused-assets", "agents-md",
     ])
   end

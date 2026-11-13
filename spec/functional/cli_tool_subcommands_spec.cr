@@ -3,7 +3,7 @@ require "../spec_helper"
 # =============================================================================
 # Functional CLI integration tests for `hwaro tool` subcommands that were
 # previously uncovered by `cli_commands_spec.cr` (which already covers
-# tool list, tool convert, tool doctor, and the top-level doctor).
+# tool list, tool convert, and the top-level doctor).
 #
 # Each test spawns the built binary at bin/hwaro and asserts on exit status
 # plus filesystem side effects. CI builds the binary via `shards build`

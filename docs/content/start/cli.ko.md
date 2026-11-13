@@ -572,7 +572,6 @@ hwaro tool platform cloudflare    # Cloudflare Pages 설정 생성
 hwaro tool platform github-pages  # GitHub Pages 배포 워크플로 생성
 hwaro tool platform gitlab-ci     # GitLab CI 설정 생성
 hwaro tool platform codeberg-pages # Codeberg Pages(Forgejo Actions) 워크플로 생성
-hwaro tool doctor                 # 설정/템플릿/구조 문제 진단
 hwaro tool import hugo /path      # Hugo에서 가져오기
 hwaro tool import jekyll /path    # Jekyll에서 가져오기
 hwaro tool export hugo            # Hugo 형식으로 내보내기
@@ -585,7 +584,6 @@ hwaro tool convert to-yaml --json
 hwaro tool stats --json
 hwaro tool validate --json
 hwaro tool unused-assets --json
-hwaro tool doctor --json
 hwaro tool check-links --json
 hwaro tool import jekyll /path --json
 hwaro tool export hugo --json
@@ -615,7 +613,6 @@ hwaro tool export hugo --dry-run
 | 콘텐츠 | [validate](/ko/start/tools/validate/) | 콘텐츠 프론트 매터와 마크업 검증 |
 | 콘텐츠 | [unused-assets](/ko/start/tools/unused-assets/) | 참조되지 않는 정적 파일 찾기 |
 | 사이트 | [platform](/ko/start/tools/platform/) | 플랫폼 설정과 CI/CD 워크플로 파일 생성 |
-| 사이트 | [doctor](/ko/start/tools/doctor/) | 설정, 템플릿, 구조 문제 진단 |
 | 사이트 | [import](/ko/start/tools/import/) | WordPress, Jekyll, Hugo, Notion, Obsidian, Hexo, Astro, Eleventy에서 콘텐츠 가져오기 |
 | 사이트 | [export](/ko/start/tools/export/) | 콘텐츠를 Hugo 또는 Jekyll로 내보내기 |
 | 사이트 | [agents-md](/ko/start/tools/agents-md/) | AGENTS.md 파일 생성 또는 갱신 |
