@@ -382,13 +382,6 @@ Cache-Control = "no-store"
 | `[versions]` / `[[versions.list]]` | [버전별 문서](/ko/features/versioned-docs/) | 여러 문서 버전을 나란히 게시 |
 | `[[menus.*]]` | [메뉴](/ko/features/menus/) | 이름을 붙인 내비게이션 메뉴 |
 
-## 플러그인
-
-```toml
-[plugins]
-processors = ["markdown"]
-```
-
 ## 전체 예시
 
 핵심 섹션을 모두 담은 완전한 `config.toml`입니다. 복사해서 필요에 맞게 고치면 됩니다.
@@ -417,9 +410,6 @@ task_lists = true
 [permalinks]
 "old/posts" = "posts"
 "posts" = "/:year/:month/:day/:slug/"
-
-[plugins]
-processors = ["markdown"]
 
 [[taxonomies]]
 name = "tags"

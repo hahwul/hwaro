@@ -24,14 +24,6 @@ language_name = "한국어"
 weight = 2
 
 # =============================================================================
-# Plugins
-# =============================================================================
-# Configure content processors and extensions
-
-[plugins]
-processors = ["markdown"]
-
-# =============================================================================
 # Content Files
 # =============================================================================
 # Publish non-Markdown files from `content/` into the output directory.

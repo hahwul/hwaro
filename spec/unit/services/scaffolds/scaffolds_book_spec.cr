@@ -319,12 +319,11 @@ describe Hwaro::Services::Scaffolds::Base do
   end
 
   describe "#minimal_config_content" do
-    it "renders title, base_url, and processors plugin entries" do
+    it "renders title and base_url, without the removed [plugins] section" do
       out = TestBaseScaffold.new.config_content
       out.should contain(%(title = "My Hwaro Site"))
       out.should contain("base_url")
-      out.should contain("[plugins]")
-      out.should contain(%(processors = ["markdown"]))
+      out.should_not contain("[plugins]")
     end
 
     it "includes taxonomies block by default" do

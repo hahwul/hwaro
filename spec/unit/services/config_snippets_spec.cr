@@ -22,25 +22,13 @@ describe Hwaro::Services::ConfigSnippets do
     end
 
     it "returns commented TOML for known sections" do
-      snippet = Hwaro::Services::ConfigSnippets.doctor_snippet_for("plugins")
+      snippet = Hwaro::Services::ConfigSnippets.doctor_snippet_for("highlight")
       snippet.should_not be_nil
-      snippet.not_nil!.should contain("# [plugins]")
+      snippet.not_nil!.should contain("# [highlight]")
     end
   end
 
   describe "commented vs uncommented variants" do
-    it "plugins: commented version has all values commented out" do
-      commented = Hwaro::Services::ConfigSnippets.plugins(commented: true)
-      commented.should contain("# [plugins]")
-      commented.should contain("# processors")
-    end
-
-    it "plugins: uncommented version has active values" do
-      uncommented = Hwaro::Services::ConfigSnippets.plugins(commented: false)
-      uncommented.should contain("[plugins]")
-      uncommented.should contain("processors = [\"markdown\"]")
-    end
-
     it "highlight: commented version has all values commented out" do
       commented = Hwaro::Services::ConfigSnippets.highlight(commented: true)
       commented.should contain("# [highlight]")
@@ -142,7 +130,7 @@ describe Hwaro::Services::ConfigSnippets do
   end
 
   describe "all snippets are non-empty strings" do
-    {% for method in ["plugins", "highlight", "og", "sitemap", "robots", "llms",
+    {% for method in ["highlight", "og", "sitemap", "robots", "llms",
                       "build", "permalinks", "auto_includes", "series",
                       "related", "search", "pagination", "markdown", "assets",
                       "image_processing", "deployment", "pwa", "amp", "doctor"] %}

@@ -108,7 +108,7 @@ describe "registration order" do
     # the deployment source-dir resolver after build + deployment); pinning
     # the whole sequence is simpler than pinning the constraints.
     Hwaro::Models::Config::SECTION_LOADERS.map(&.keys.join(",")).should eq(%w[
-      sitemap robots llms feeds search plugins content content content content
+      sitemap robots llms feeds search content content content content
       pagination highlight auto_includes og menus taxonomies search languages
       versions build serve markdown series related git permalinks assets
       sass pwa amp image_processing doctor static deployment
@@ -117,7 +117,7 @@ describe "registration order" do
 
   it "keeps the config snippet registry" do
     Hwaro::Services::ConfigSnippets::SECTION_REGISTRY.keys.should eq(%w[
-      plugins highlight og search serve pagination series related git markdown
+      highlight og search serve pagination series related git markdown
       sitemap robots llms feeds build links permalinks auto_includes assets sass
       deployment image_processing pwa amp menus
     ])
@@ -128,7 +128,7 @@ describe "registration order" do
       title description base_url default_language
       amp assets auto_includes build content csp data deployment doctor feeds
       git highlight image_processing languages links llms markdown menus og
-      outputs pagination permalinks plugins privacy pwa related robots sass search
+      outputs pagination permalinks privacy pwa related robots sass search
       series serve sitemap static taxonomies versions
     ])
   end

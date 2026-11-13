@@ -270,9 +270,6 @@ def generate_content_public(site_dir : String, count : Int32)
     description = "Benchmark site for testing SSG performance"
     base_url = "http://example.com"
 
-    [plugins]
-    processors = ["markdown"]
-
     [highlight]
     enabled = false
 

@@ -25,7 +25,6 @@ describe "bare scaffold feature opt-out" do
 
       config.should contain("title = ")
       config.should contain("base_url = ")
-      config.should contain("[plugins]")
       config.should contain("[content.files]")
       config.should contain("[sitemap]")
       config.should contain("[feeds]")

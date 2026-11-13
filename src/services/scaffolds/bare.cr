@@ -71,7 +71,6 @@ module Hwaro
             # Only the enabled block: the commented placeholder the other
             # scaffolds carry is a feature ad, which bare opts out of.
             str << multilingual_config(multilingual_languages, skip_taxonomies) if multilingual_languages.size > 1
-            str << ConfigSnippets.plugins
             str << content_files_config
             str << ConfigSnippets.sitemap
             str << feeds_config(feed_sections)
@@ -96,7 +95,7 @@ module Hwaro
         def minimal_config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
           String.build do |str|
             str << minimal_site_toml(skip_taxonomies, multilingual_languages)
-            str << minimal_plugins_toml
+            str << minimal_content_files_toml
             str << minimal_sitemap_feeds_toml
           end
         end

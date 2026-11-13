@@ -82,11 +82,6 @@ describe Hwaro do
       config.search.filename.should eq("search.json")
     end
 
-    it "has default plugin configuration" do
-      config = Hwaro::Models::Config.new
-      config.plugins.processors.should eq(["markdown"])
-    end
-
     it "has default pagination configuration" do
       config = Hwaro::Models::Config.new
       config.pagination.enabled.should be_false

@@ -222,7 +222,7 @@ describe Hwaro::CLI::Commands::InitCommand do
       scaffold = Hwaro::Services::Scaffolds::Registry.get(Hwaro::Config::Options::ScaffoldType::Simple)
       config = scaffold.minimal_config_content
       config.should contain("title = \"My Hwaro Site\"")
-      config.should contain("[plugins]")
+      config.should_not contain("[plugins]")
       config.should contain("[sitemap]")
       config.should contain("[feeds]")
       config.should contain("[[taxonomies]]")

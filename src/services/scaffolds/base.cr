@@ -531,7 +531,6 @@ module Hwaro
 
             # Content & Processing
             str << multilingual_config(multilingual_languages, skip_taxonomies)
-            str << ConfigSnippets.plugins
             str << content_files_config
             str << ConfigSnippets.highlight
             str << ConfigSnippets.og
@@ -635,17 +634,15 @@ module Hwaro
                 "  build_search_index = true#{tax_line}"
               end
               str << lang_blocks.join("\n\n")
-              str << "\n\n"
+              str << "\n"
             end
           end
         end
 
-        # `[plugins]` + `[content.files]` — the two sections every scaffold
-        # needs regardless of which features it opts into.
-        protected def minimal_plugins_toml : String
+        # `[content.files]` — the one section every scaffold needs
+        # regardless of which features it opts into.
+        protected def minimal_content_files_toml : String
           String.build do |str|
-            str << "[plugins]\n"
-            str << "processors = [\"markdown\"]\n"
             str << "\n[content.files]\n"
             str << "allow_extensions = [\"jpg\", \"jpeg\", \"png\", \"gif\", \"svg\", \"webp\"]\n"
           end
@@ -736,7 +733,7 @@ module Hwaro
         def minimal_config_content(skip_taxonomies : Bool = false, multilingual_languages : Array(String) = [] of String) : String
           String.build do |str|
             str << minimal_site_toml(skip_taxonomies, multilingual_languages)
-            str << minimal_plugins_toml
+            str << minimal_content_files_toml
             str << minimal_highlight_toml
             str << minimal_taxonomies_toml(skip_taxonomies)
             str << minimal_sitemap_feeds_toml

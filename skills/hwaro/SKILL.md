@@ -266,7 +266,7 @@ section structure; a syntax error fails the build with `HWARO_E_CONFIG` (exit
 
 - **Site & build:** `[build]` (incl. `hooks.pre`/`hooks.post`), `[markdown]`,
   `[content]` (`summary_length`…), `[permalinks]`, `[links]`, `[static]`,
-  `[serve]`, `[plugins]`, `[doctor]`.
+  `[serve]`, `[doctor]`.
 - **Content model:** `[[taxonomies]]`, `[[menus.<name>]]`, `[pagination]`,
   `[series]`, `[related]`, `[content.files]`, `[content.new]`,
   `[[content.schema]]` (per-section front-matter rules),

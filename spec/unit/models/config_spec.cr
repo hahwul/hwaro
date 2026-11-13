@@ -882,35 +882,6 @@ describe Hwaro::Models::Config do
   end
 
   # ---------------------------------------------------------------------------
-  # Plugins
-  # ---------------------------------------------------------------------------
-
-  describe "plugin configuration" do
-    it "has default plugin configuration" do
-      config = Hwaro::Models::Config.new
-      config.plugins.processors.should eq(["markdown"])
-    end
-
-    it "can update plugin settings" do
-      config = Hwaro::Models::Config.new
-      config.plugins.processors = ["markdown", "custom"]
-
-      config.plugins.processors.should eq(["markdown", "custom"])
-    end
-
-    it "loads plugins processors from TOML" do
-      config = load_config(<<-TOML)
-        title = "Test"
-
-        [plugins]
-        processors = ["markdown", "html", "custom"]
-        TOML
-
-      config.plugins.processors.should eq(["markdown", "html", "custom"])
-    end
-  end
-
-  # ---------------------------------------------------------------------------
   # Content files
   # ---------------------------------------------------------------------------
 
@@ -2789,13 +2760,6 @@ describe Hwaro::Models::FeedConfig do
   end
 end
 
-describe Hwaro::Models::PluginConfig do
-  it "has default values" do
-    config = Hwaro::Models::PluginConfig.new
-    config.processors.should eq(["markdown"])
-  end
-end
-
 describe Hwaro::Models::PaginationConfig do
   it "has default values" do
     config = Hwaro::Models::PaginationConfig.new
@@ -3189,8 +3153,6 @@ describe "Hwaro::Models::Config" do
         sections = "posts"
         [auto_includes]
         dirs = "assets"
-        [plugins]
-        processors = "markdown"
         [doctor]
         ignore = "menu-undeclared"
         [content.new]
@@ -3213,7 +3175,6 @@ describe "Hwaro::Models::Config" do
       config.related.taxonomies.should eq(["categories"])
       config.outputs.sections.should eq(["posts"])
       config.auto_includes.dirs.should eq(["assets"])
-      config.plugins.processors.should eq(["markdown"])
       config.doctor.ignore.should eq(["menu-undeclared"])
       config.content_new.default_fields.should eq(["summary"])
       config.languages["ko"].taxonomies.should eq(["tags"])
@@ -3282,7 +3243,6 @@ describe "Hwaro::Models::Config" do
         {"[related]\ntaxonomies = true", "[related] taxonomies", ->(c : Hwaro::Models::Config) { c.related.taxonomies }},
         {"[outputs]\nsections = 1", "[outputs] sections", ->(c : Hwaro::Models::Config) { c.outputs.sections }},
         {"[auto_includes]\ndirs = true", "[auto_includes] dirs", ->(c : Hwaro::Models::Config) { c.auto_includes.dirs }},
-        {"[plugins]\nprocessors = 1", "[plugins] processors", ->(c : Hwaro::Models::Config) { c.plugins.processors }},
         {"[doctor]\nignore = 1", "[doctor] ignore", ->(c : Hwaro::Models::Config) { c.doctor.ignore }},
         {"[content.new]\ndefault_fields = {a = 1}", "[content.new] default_fields", ->(c : Hwaro::Models::Config) { c.content_new.default_fields }},
       }.each do |toml, label, getter|
@@ -3458,6 +3418,15 @@ describe "Hwaro::Models::Config" do
       end
       log.should contain("Unknown key 'zzqxy'")
       log.should_not contain("Did you mean")
+    end
+
+    # `[plugins]` was a dead section (nothing read `processors`); it was
+    # removed before 1.0 and must now warn like any other unknown key.
+    it "warns on the removed [plugins] section" do
+      log = with_captured_log do
+        load_config(%([plugins]\nprocessors = ["markdown"]))
+      end
+      log.should contain("Unknown key 'plugins'")
     end
 
     it "does not warn for any known top-level key" do

@@ -384,13 +384,6 @@ Each feature has its own documentation with full configuration details. Below is
 | `[versions]` / `[[versions.list]]` | [Versioned Docs](/features/versioned-docs/) | Several documentation versions side by side |
 | `[[menus.*]]` | [Menus](/features/menus/) | Named navigation menus |
 
-## Plugins
-
-```toml
-[plugins]
-processors = ["markdown"]
-```
-
 ## Full Example
 
 A complete `config.toml` with all core sections. Copy and adjust to your needs.
@@ -419,9 +412,6 @@ task_lists = true
 [permalinks]
 "old/posts" = "posts"
 "posts" = "/:year/:month/:day/:slug/"
-
-[plugins]
-processors = ["markdown"]
 
 [[taxonomies]]
 name = "tags"
