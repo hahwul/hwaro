@@ -200,7 +200,8 @@ module Hwaro
                 parsed = DateFilters.parse_string(value.to_s)
                 parsed ? DateFilters.format_time(parsed, format, locale) : value.to_s
               else
-                value.to_s
+                # Through Value#to_s: a list prints as `{{ list }}` does.
+                target.to_s
               end
             end
           end

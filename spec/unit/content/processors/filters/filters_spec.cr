@@ -163,6 +163,10 @@ end
 # =============================================================================
 describe "DateFilters" do
   describe "date" do
+    it "prints a list it cannot format as `{{ list }}` does" do
+      render_crinja("{{ [1, 'a'] | date }}|{{ 5 | date }}").should eq("[1, 'a']|5")
+    end
+
     it "formats a date string with default format" do
       vars = {"d" => Crinja::Value.new("2024-06-15")}
       result = render_crinja("{{ d | date }}", vars)
