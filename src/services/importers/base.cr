@@ -147,7 +147,6 @@ module Hwaro
         ASSET_EXTENSIONS = Set{
           ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".avif", ".ico",
           ".bmp", ".pdf", ".mp4", ".webm", ".mp3", ".ogg", ".wav", ".zip",
-          ".woff", ".woff2", ".css", ".js",
         }
 
         # Warn once when `dirs` (relative to the source root: Hugo `static/`,
