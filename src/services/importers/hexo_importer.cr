@@ -11,6 +11,14 @@ module Hwaro
         # Hexo tag plugin pattern: {% tag_name args %}
         HEXO_TAG_PATTERN = /\{%\s*\w+.*?%\}/
 
+        # Keys `import_file` maps (or consumes) itself. `layout` is Hexo's
+        # post/page switch, not page data. Every other key (`mathjax`,
+        # `comments`, `author`, …) goes to `[extra]`.
+        MAPPED_KEYS = Set{
+          "title", "date", "updated", "tags", "categories", "description",
+          "excerpt", "cover", "thumbnail", "permalink", "published", "layout",
+        }
+
         def run(options : Config::Options::ImportOptions) : ImportResult
           path = options.path
           output_dir = options.output_dir
@@ -206,6 +214,7 @@ module Hwaro
           end
 
           frontmatter = generate_frontmatter(fields)
+          frontmatter = append_frontmatter(frontmatter, unmapped_fields(yaml, fields, MAPPED_KEYS)) if yaml
           body = strip_redundant_title_h1(body, fields["title"]?.as?(String))
           written = write_content_file(output_dir, "posts", slug, frontmatter, body.strip, verbose, force)
           return :skipped unless written

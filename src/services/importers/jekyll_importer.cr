@@ -296,19 +296,7 @@ module Hwaro
         # importer does for page params (hwaro's own keys, CARRIED_KEYS, stay
         # top-level). They were silently dropped.
         private def extra_fields(yaml : YAML::Any, mapped : Hash(String, FieldValue)) : Hash(String, YAML::Any)
-          carried = {} of String => YAML::Any
-          extra = {} of YAML::Any => YAML::Any
-          yaml.as_h.each do |key, value|
-            name = key.as_s? || ""
-            next if value.raw.nil? || MAPPED_KEYS.includes?(name)
-            if CARRIED_KEYS.includes?(name) && !mapped.has_key?(name)
-              carried[name] = value
-            else
-              extra[key] = value
-            end
-          end
-          carried["extra"] = YAML::Any.new(extra) unless extra.empty?
-          carried
+          unmapped_fields(yaml, mapped, MAPPED_KEYS)
         end
 
         # The filename without its extension and `YYYY-MM-DD-` prefix.

@@ -216,6 +216,27 @@ module Hwaro
           "#{frontmatter.rchop("+++")}#{toml}+++"
         end
 
+        # Front matter keys no importer mapped, in hwaro's shape: keys hwaro
+        # understands as-is (CARRIED_KEYS) stay top-level, everything else
+        # goes to an `[extra]` table where templates read it as
+        # `page.extra.<key>`. `consumed` lists the source keys the importer
+        # handled itself; null values are dropped.
+        protected def unmapped_fields(yaml : YAML::Any, mapped : Hash(String, FieldValue), consumed : Set(String)) : Hash(String, YAML::Any)
+          carried = {} of String => YAML::Any
+          extra = {} of YAML::Any => YAML::Any
+          yaml.as_h.each do |key, value|
+            name = key.as_s? || ""
+            next if value.raw.nil? || consumed.includes?(name)
+            if CARRIED_KEYS.includes?(name) && !mapped.has_key?(name)
+              carried[name] = value
+            else
+              extra[key] = value
+            end
+          end
+          carried["extra"] = YAML::Any.new(extra) unless extra.empty?
+          carried
+        end
+
         # Convert title to a URL-safe slug
         # If the imported body's first non-blank line is an H1 matching the
         # front-matter title, drop it. Hwaro page templates render
