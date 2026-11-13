@@ -3,6 +3,24 @@ require "../../../../src/services/importers/astro_importer"
 
 describe Hwaro::Services::Importers::AstroImporter do
   describe "#run" do
+    it "keeps a custom slug as the page's file name and carries unmapped keys into [extra]" do
+      Dir.mktmpdir do |dir|
+        blog_dir = File.join(dir, "src", "content", "blog")
+        FileUtils.mkdir_p(blog_dir)
+        File.write(File.join(blog_dir, "original-name.md"), "---\ntitle: T\nslug: custom-url\ncategory: news\norder: 2\n---\nbody\n")
+
+        output_dir = File.join(dir, "output")
+        Hwaro::Services::Importers::AstroImporter.new.run(Hwaro::Config::Options::ImportOptions.new(
+          source_type: "astro", path: dir, output_dir: output_dir))
+
+        File.exists?(File.join(output_dir, "blog", "original-name.md")).should be_false
+        out = File.read(File.join(output_dir, "blog", "custom-url.md"))
+        out.should contain(%(category = "news"))
+        out.should contain("order = 2")
+        out.should_not contain("slug")
+      end
+    end
+
     it "imports a basic Astro content collection post" do
       Dir.mktmpdir do |dir|
         blog_dir = File.join(dir, "src", "content", "blog")
