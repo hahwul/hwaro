@@ -33,11 +33,16 @@ private def render_with_hwaro(name : String) : String
     "from.html"   => %({% from "vars.html" import color, hi %}[{{ color }}][{{ hi() }}]),
     "plain.html"  => %({% import "macros.html" as m %}[{{ m is defined }}][{{ m.hi() }}]),
     "macros.html" => %({% macro hi() %}hi{% endmacro %}),
+    "with.html"   => %({% import "macros.html" as a with context %}{% import "macros.html" as b without context %}{% import "vars.html" with context %}{{ a.hi() }}{{ b.hi() }}),
   })
   env.get_template(name).render
 end
 
 describe "Crinja imported file environment" do
+  it "accepts `with context` / `without context` on an import" do
+    render_with_hwaro("with.html").should eq("hihi")
+  end
+
   it "exposes an imported file's top-level variables on its `as` name" do
     render_with_hwaro("as.html").should eq("[a-b][][hi]")
   end

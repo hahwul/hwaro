@@ -43,7 +43,15 @@ class Crinja::Tag::Import < Crinja::Tag
 
     context_var = parser.if_identifier "as" do
       parser.next_token
-      parser.current_token.value
+      parser.expect_identifier
+    end
+
+    # Jinja2's `with context` / `without context`: an import here always
+    # sees the importing template's variables, so the clause is accepted
+    # and has no effect. It used to be a syntax error.
+    parser.if_identifier ["with", "without"] do
+      parser.next_token
+      parser.expect_identifier "context"
     end
 
     parser.close
