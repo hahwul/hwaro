@@ -79,7 +79,7 @@ templates/
 | `header_html` | 표의 `<thead>...</thead>` 부분 |
 | `body_html` | 표의 `<tbody>...</tbody>` 부분. 헤더만 있는 표는 빈 문자열 |
 
-모든 훅 템플릿은 추가로 표준 `page`(`url`, `title`, `path`, `language`)와 `config`(`base_url`, `title`) 변수도 볼 수 있습니다.
+모든 훅 템플릿은 추가로 표준 `page`(`url`, `title`, `path`, `language`)와 `config`(`base_url`, `title`) 변수, 그리고 `base_url` 자체도 볼 수 있으므로 `get_url()`이나 `absolute_url` 같은 URL 함수와 필터가 페이지 템플릿에서처럼 전체 URL을 만듭니다. `site`는 쓸 수 없습니다.
 
 ## 기본 출력과 동일한 템플릿
 

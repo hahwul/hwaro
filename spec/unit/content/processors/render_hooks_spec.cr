@@ -82,6 +82,16 @@ describe RenderHooks do
       lang = RenderHooks.page_vars(page, config)["page"].raw.as(Hash)["language"]
       lang.to_s.should eq("ko")
     end
+
+    it "gives URL functions and filters in a hook the site's base_url" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com/sub"
+      page = Hwaro::Models::Page.new("about.md")
+      registry = make_registry(link: %({{ destination | absolute_url }}|{{ get_url(path="/z/") }}|{{ "/q/" | relative_url }}))
+      hooks = RenderHooks::HookRenderContext.new(registry, Hwaro::Content::Processors::TemplateEngine.new.env,
+        {} of UInt64 => Crinja::Template, nil, RenderHooks.page_vars(page, config), false, false)
+      SyntaxHighlighter.render("[x](/a/)", hooks: hooks).should contain("https://example.com/sub/a/|https://example.com/sub/z/|/sub/q/")
+    end
   end
 
   describe ".configure" do
