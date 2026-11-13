@@ -19,6 +19,8 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 {{ value | filter1 | filter2 }}
 ```
 
+아래 hwaro 필터가 받지 않는 키워드 인자는 무시되며, 빌드가 그 인자를 짚어 경고를 한 번 남깁니다.
+
 ## 텍스트 필터
 
 | 필터 | 설명 | 예시 |

@@ -19,6 +19,8 @@ Besides the built-ins in the tables below, these Jinja2 filters are available: `
 {{ value | filter1 | filter2 }}
 ```
 
+A keyword argument one of the hwaro filters below does not take is ignored, and the build logs a warning naming it once.
+
 ## Text Filters
 
 | Filter | Description | Example |

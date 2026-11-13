@@ -599,4 +599,26 @@ describe "get_section path forms" do
       File.read("public/about/index.html").should eq("[Blog][Blog][Blog][Blog]")
     end
   end
+
+  describe "unknown keyword arguments" do
+    it "warns once about an argument a hwaro function or filter does not take" do
+      Hwaro::Content::Processors::TemplateEngine.clear_load_data_cache
+      output = ""
+      log = with_captured_log do
+        output = render_crinja("[{{ get_page(pth='a.md') }}][{{ 'a b c' | truncate_words(2, ending='~') }}][{{ get_page(pth='b.md') }}]")
+      end
+      output.should eq("[none][a b...][none]")
+      log.should contain("The get_page function has no argument 'pth'; it is ignored (it takes: path).")
+      log.should contain("The truncate_words filter has no argument 'ending'")
+      log.scan("'pth'").size.should eq(1)
+    end
+
+    it "stays quiet for documented arguments and Crinja's own features" do
+      Hwaro::Content::Processors::TemplateEngine.clear_load_data_cache
+      log = with_captured_log do
+        render_crinja("{{ now(format='%Y') }}{{ 'x' | default(value='y') }}{{ dict(a=1).a }}{{ [2, 1] | sort(reverse=true) }}")
+      end
+      log.should_not contain("has no argument")
+    end
+  end
 end
