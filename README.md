@@ -79,7 +79,7 @@ Hwaro processes Markdown content with TOML, YAML, or JSON front matter and Jinja
 - Scaffolding with built-in themes (`simple`, `bare`, `blog`, `docs`, `book`) — auto light/dark with a built-in theme switcher
 - Deploy to multiple targets with dry-run support
 - Platform config generation (Netlify, Vercel, Cloudflare Pages, GitHub Pages, GitLab CI)
-- Import from WordPress, Jekyll, Hugo
+- Import from WordPress, Jekyll, Hugo, Notion, Obsidian, Hexo, Astro and Eleventy; export to Hugo and Jekyll
 - Link checker, config doctor, and front matter format conversion
 
 </details>
