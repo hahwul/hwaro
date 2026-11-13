@@ -166,7 +166,7 @@ url = "/ko/posts/"
 <a href="{{ item.href }}"{% if item.url | active_path(ancestor=true) %} class="open"{% endif %}>{{ item.name }}</a>
 ```
 
-루트 경로(`/`)는 `ancestor=true`여도 항상 정확히 일치할 때만 매칭됩니다. 그렇지 않으면 홈 내비게이션 항목이 사이트의 모든 페이지에서 활성/펼침으로 보이게 됩니다. 외부 엔트리는 절대 매칭되지 않습니다(외부 URL에는 조상 관계를 따질 "현재 페이지"가 없음). [필터](/ko/templates/filters/#url-필터)의 URL 필터 절을 참고합니다.
+루트 경로(`/`)와, 다국어 사이트라면 현재 페이지 언어의 홈(`/ko/`)은 `ancestor=true`여도 항상 정확히 일치할 때만 매칭됩니다. 그렇지 않으면 홈 내비게이션 항목이 사이트(또는 그 언어)의 모든 페이지에서 활성/펼침으로 보이게 됩니다. 외부 엔트리는 절대 매칭되지 않습니다(외부 URL에는 조상 관계를 따질 "현재 페이지"가 없음). [필터](/ko/templates/filters/#url-필터)의 URL 필터 절을 참고합니다.
 
 ## `href`와 `url`
 

@@ -125,7 +125,7 @@ The `t` filter looks up translation keys from TOML files in the `i18n/` director
 <a href="{{ item.href }}"{% if item.url | active_path(ancestor=true) %} class="open"{% endif %}>{{ item.name }}</a>
 ```
 
-Both sides are normalized to one trailing slash before comparing, so `/posts` and `/posts/` are equal. The root path (`/`) only ever matches exactly, even with `ancestor=true`. An external `item.url` (`http://`, `https://`, `//`) never matches, and neither does the empty `url` of an entry written without one (a group heading).
+Both sides are normalized to one trailing slash before comparing, so `/posts` and `/posts/` are equal. The root path (`/`) and the current page's language home (`/ko/`) only ever match exactly, even with `ancestor=true`. An external `item.url` (`http://`, `https://`, `//`) never matches, and neither does the empty `url` of an entry written without one (a group heading).
 
 ## Data Filters
 

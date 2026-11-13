@@ -18,9 +18,10 @@ module Hwaro
             # render.cr) is always an internal, root-relative URL. Both
             # sides are normalized to exactly one trailing slash before
             # comparing, so `/posts` and `/posts/` compare equal. The root
-            # path (`/`) only ever matches exactly, even under
-            # `ancestor=true` — otherwise every page on the site would show
-            # the home nav item as active/open.
+            # path (`/`) and the current language's home (`/ko/`) only ever
+            # match exactly, even under `ancestor=true` — otherwise every page
+            # of the site (or of that language) would show the home nav item
+            # as active/open.
             env.filters["active_path"] = Crinja.filter({ancestor: false}) do
               value = target.to_s
 
@@ -32,9 +33,10 @@ module Hwaro
                 ancestor = arguments["ancestor"].truthy?
                 current = normalize_path(env.resolve("page_url").to_s)
                 entry_path = normalize_path(value)
+                lang_home = normalize_path(env.resolve("lang_prefix").to_s)
 
-                if entry_path == "/"
-                  current == "/"
+                if entry_path == "/" || entry_path == lang_home
+                  current == entry_path
                 elsif ancestor
                   current.starts_with?(entry_path)
                 else

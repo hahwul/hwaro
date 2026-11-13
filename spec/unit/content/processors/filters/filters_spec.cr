@@ -1472,6 +1472,17 @@ describe "MenuFilters" do
       render_crinja("{{ '/' | active_path(ancestor=true) }}", vars).should eq("true")
     end
 
+    it "does not treat every page of a language as a descendant of that language's home, even with ancestor=true" do
+      vars = {"page_url" => Crinja::Value.new("/ko/posts/first/"), "lang_prefix" => Crinja::Value.new("/ko")}
+      render_crinja("{{ '/ko/' | active_path(ancestor=true) }}", vars).should eq("false")
+      render_crinja("{{ '/ko/posts/' | active_path(ancestor=true) }}", vars).should eq("true")
+    end
+
+    it "matches a language's home entry on that language's homepage" do
+      vars = {"page_url" => Crinja::Value.new("/ko/"), "lang_prefix" => Crinja::Value.new("/ko")}
+      render_crinja("{{ '/ko/' | active_path(ancestor=true) }}", vars).should eq("true")
+    end
+
     it "never matches an empty url, even on the homepage" do
       vars = {"page_url" => Crinja::Value.new("/")}
       render_crinja("{{ '' | active_path }}", vars).should eq("false")
