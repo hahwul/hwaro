@@ -109,6 +109,15 @@ module Crinja::Resolver
       # Raise so the evaluator can label the expression and the
       # template error formatter shows file:line:col.
       raw = object.raw
+      # `title[0]` / `title[-1]` index a string by character, as in
+      # Jinja2 (a miss is undefined); it used to raise.
+      if raw.is_a?(String) || raw.is_a?(Crinja::SafeString)
+        if idx = name.to_s.to_i?
+          char = raw.to_s[idx]?
+          return Crinja::Value.new(Crinja::Undefined.new(name.to_s)) unless char
+          return Crinja::Value.new(raw.is_a?(Crinja::SafeString) ? Crinja::SafeString.new(char.to_s) : char.to_s)
+        end
+      end
       if raw.is_a?(String) || raw.is_a?(Crinja::SafeString) || raw.is_a?(Crinja::Tuple)
         raise Crinja::UndefinedError.new(name.to_s)
       end
