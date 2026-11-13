@@ -13,7 +13,6 @@
 #   unused-assets - Find unreferenced static files
 #   doctor        - Diagnose config, template, and structure issues
 #   platform      - Generate hosting platform config files
-#   ci            - Generate CI/CD workflow files
 #   import        - Import content from other systems
 #   export        - Export content to other platforms
 #   agents-md     - Generate or update AGENTS.md file
@@ -25,7 +24,6 @@ require "./tool/list_command"
 require "./tool/deadlink_command"
 require "./tool/doctor_command"
 require "./tool/platform_command"
-require "./tool/ci_command"
 require "./tool/import_command"
 require "./tool/export_command"
 require "./tool/stats_command"
@@ -66,7 +64,6 @@ module Hwaro
         register_sub(Tool::DeadlinkCommand.metadata) { |args| Tool::DeadlinkCommand.new.run(args) }
         register_sub(Tool::DoctorCommand.metadata) { |args| Tool::DoctorCommand.new.run(args) }
         register_sub(Tool::PlatformCommand.metadata) { |args| Tool::PlatformCommand.new.run(args) }
-        register_sub(Tool::CICommand.metadata) { |args| Tool::CICommand.new.run(args) }
         register_sub(Tool::ImportCommand.metadata) { |args| Tool::ImportCommand.new.run(args) }
         register_sub(Tool::ExportCommand.metadata) { |args| Tool::ExportCommand.new.run(args) }
         register_sub(Tool::StatsCommand.metadata) { |args| Tool::StatsCommand.new.run(args) }
@@ -142,11 +139,8 @@ module Hwaro
           "Site"    => ["platform", "doctor", "import", "export", "agents-md"],
         }
 
-        # Hidden from help but still executable (e.g. deprecated commands)
-        HIDDEN = Set{"ci"}
-
         private def print_help
-          visible = ToolCommand.subcommands.reject { |s| HIDDEN.includes?(s.name) }
+          visible = ToolCommand.subcommands
           sub_by_name = visible.index_by(&.name)
 
           # Render usage syntax inline so mandatory positional args (e.g.

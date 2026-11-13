@@ -1,7 +1,6 @@
 require "../../../../spec_helper"
 
-# `FileGenerator.emit` is the write tail shared by `tool platform` and
-# `tool ci`.
+# `FileGenerator.emit` is the write tail of `tool platform`.
 describe Hwaro::CLI::Commands::Tool::FileGenerator do
   describe ".emit" do
     # Regression: a write failure escaped as an unhandled File::Error

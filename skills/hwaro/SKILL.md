@@ -231,9 +231,8 @@ hwaro tool export jekyll                       # also: hugo (writes to export/ b
 
 `-c, --content-dir DIR` scopes most tools to a subtree; import/export `--json`
 emit a per-file manifest. `--dry-run` previews convert/import/export without
-writing; import skips existing files unless `--force`. `tool ci` is deprecated
-— use `tool platform github-pages`. Run `hwaro tool <name> --help` for
-specifics.
+writing; import skips existing files unless `--force`. Run
+`hwaro tool <name> --help` for specifics.
 
 ### G. Platform config & deploy
 

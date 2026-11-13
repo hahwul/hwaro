@@ -285,37 +285,13 @@ describe "hwaro tool platform" do
   end
 end
 
-describe "hwaro tool ci" do
-  it "generates .github/workflows/deploy.yml for github-actions" do
+describe "hwaro tool ci (removed)" do
+  it "is an unknown subcommand" do
     with_initialized_project do |project_dir|
-      status, _, _ = run_hwaro(
-        ["tool", "ci", "github-actions", "--force"], chdir: project_dir
-      )
-      status.success?.should be_true
-      File.exists?(File.join(project_dir, ".github/workflows/deploy.yml")).should be_true
-    end
-  end
-
-  it "exits 1 when no provider is given" do
-    with_initialized_project do |project_dir|
-      status, _, _ = run_hwaro(["tool", "ci"], chdir: project_dir)
+      status, _, err = run_hwaro(["tool", "ci", "github-actions"], chdir: project_dir)
       status.success?.should be_false
-    end
-  end
-
-  it "warns about deprecation in favor of `tool platform github-pages`" do
-    with_initialized_project do |project_dir|
-      _, output, err = run_hwaro(
-        ["tool", "ci", "github-actions", "--stdout"], chdir: project_dir
-      )
-      # Deprecation notice uses Logger.warn → stderr.
-      err.should contain("DEPRECATED")
-      # Co-signal: the actual workflow content was also generated to stdout,
-      # confirming the deprecation log didn't short-circuit the command.
-      output.should contain("workflow")
-      # The spacer under the notice belongs to stderr too: `--stdout >
-      # deploy.yml` must not start the file with a blank line.
-      output.should_not start_with("\n")
+      err.should contain("unknown command 'tool ci'")
+      File.exists?(File.join(project_dir, ".github/workflows/deploy.yml")).should be_false
     end
   end
 end

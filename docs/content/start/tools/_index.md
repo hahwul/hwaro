@@ -26,8 +26,6 @@ The `hwaro tool` command provides utility subcommands for working with content f
 | [export](/start/tools/export/) | Export content to other platforms |
 | [agents-md](/start/tools/agents-md/) | Generate or update AGENTS.md file |
 
-> **Deprecated:** [ci](/start/tools/ci/) is hidden from help and superseded by [platform](/start/tools/platform/) (e.g. `hwaro tool platform github-pages`).
-
 ---
 
 ## Shell Completion

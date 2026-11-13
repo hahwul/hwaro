@@ -26,8 +26,6 @@ Hwaro는 콘텐츠 관리를 돕는 유틸리티 도구와, CLI를 더 편하게
 | [export](/ko/start/tools/export/) | 다른 플랫폼으로 콘텐츠 내보내기 |
 | [agents-md](/ko/start/tools/agents-md/) | AGENTS.md 파일 생성·갱신 |
 
-> **사용 중단:** [ci (사용 중단)](/ko/start/tools/ci/)는 도움말에서 숨겨졌으며 [platform](/ko/start/tools/platform/)으로 대체되었습니다(예: `hwaro tool platform github-pages`).
-
 ---
 
 ## 셸 자동 완성

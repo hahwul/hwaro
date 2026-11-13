@@ -8,10 +8,8 @@ module Hwaro
   module CLI
     module Commands
       module Tool
-        # Shared by the `tool platform` / `tool ci` generators: the flag set
-        # and the "print it or write it, refusing to clobber" tail. Keeping
-        # one copy means the two commands cannot disagree on how `--force`,
-        # `-o` and `--stdout` behave.
+        # The `tool platform` generator's flag set and its "print it or write
+        # it, refusing to clobber" tail (`--force`, `-o`, `--stdout`).
         module FileGenerator
           extend self
 

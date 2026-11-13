@@ -1,8 +1,7 @@
 module Hwaro
   module Services
-    # The GitHub Actions deploy workflow YAML. Shared by `hwaro tool ci`
-    # (CIConfig) and `hwaro tool platform github-pages` (PlatformConfig) so the
-    # two generators stay byte-for-byte in lockstep — both write the same
+    # The GitHub Actions deploy workflow YAML that
+    # `hwaro tool platform github-pages` (PlatformConfig) writes to
     # `.github/workflows/deploy.yml`.
     module GithubActionsWorkflow
       def self.content : String

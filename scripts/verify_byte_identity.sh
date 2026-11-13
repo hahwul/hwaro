@@ -548,7 +548,7 @@ run_both_here "help:version" "$WORK" -- version
 for cmd in init build serve new deploy doctor tool completion; do
   run_both_here "help:$cmd" "$WORK" -- "$cmd" --help
 done
-for sub in convert list check-links doctor platform ci import export stats validate unused-assets agents-md; do
+for sub in convert list check-links doctor platform import export stats validate unused-assets agents-md; do
   run_both_here "help:tool-$sub" "$WORK" -- tool "$sub" --help
 done
 for shell in bash zsh fish; do
@@ -597,11 +597,9 @@ for s in blog docs; do
   b="$WORK/build/platform-$s.base"; c="$WORK/build/platform-$s.cand"
   copy_tree "$d" "$b"; copy_tree "$d" "$c"
   run_both platform "$b" "$c" -- tool platform github-pages
-  run_both ci "$b" "$c" -- tool ci github-actions
   run_both agents "$b" "$c" -- tool agents-md --write --force
   compare "generators:$s" "$b" "$c"
   compare "generators:$s (platform stdout)" "$b.platform.out" "$c.platform.out"
-  compare "generators:$s (ci stdout)" "$b.ci.out" "$c.ci.out"
   compare "generators:$s (agents-md stdout)" "$b.agents.out" "$c.agents.out"
 done
 fi

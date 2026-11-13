@@ -24,7 +24,7 @@ hwaro tool platform netlify -o deploy/netlify.toml
 hwaro tool platform vercel --stdout
 ```
 
-> **Note:** `hwaro tool ci` is deprecated. Use `hwaro tool platform github-pages` instead.
+> **Note:** `hwaro tool ci` has been removed. `hwaro tool platform github-pages` writes the same `.github/workflows/deploy.yml`.
 
 ## Supported Platforms
 
