@@ -186,6 +186,8 @@ Define reusable snippets with `{% macro %}`, usually in a partial, and import th
 
 The same file can be imported more than once in one render, for example by a base layout and by the child template that extends it, or under two names. Only a real cycle (`a.html` imports `b.html`, which imports `a.html`) is an error.
 
+An imported file's top-level `{% set %}` variables are available too: `{{ v.accent }}` after `{% import "partials/vars.html" as v %}`, or `{{ accent }}` after `{% from "partials/vars.html" import accent %}`. Names starting with `_` are not exported.
+
 ## Setting Variables
 
 Set variables:

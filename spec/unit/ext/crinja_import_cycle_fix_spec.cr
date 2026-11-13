@@ -24,3 +24,29 @@ describe "Crinja import cycle detection" do
     expect_raises(Crinja::Error, /cycle/) { render_import("loop_a.html") }
   end
 end
+
+private def render_with_hwaro(name : String) : String
+  env = Hwaro::Content::Processors::TemplateEngine.new.env
+  env.loader = Crinja::Loader::HashLoader.new({
+    "vars.html"   => %({% set color = "A B" | slugify %}{% set _hidden = 1 %}{% macro hi() %}hi{% endmacro %}),
+    "as.html"     => %({% import "vars.html" as v %}[{{ v.color }}][{{ v._hidden }}][{{ v.hi() }}]),
+    "from.html"   => %({% from "vars.html" import color, hi %}[{{ color }}][{{ hi() }}]),
+    "plain.html"  => %({% import "macros.html" as m %}[{{ m is defined }}][{{ m.hi() }}]),
+    "macros.html" => %({% macro hi() %}hi{% endmacro %}),
+  })
+  env.get_template(name).render
+end
+
+describe "Crinja imported file environment" do
+  it "exposes an imported file's top-level variables on its `as` name" do
+    render_with_hwaro("as.html").should eq("[a-b][][hi]")
+  end
+
+  it "runs a `from` import's top-level code with hwaro's filters" do
+    render_with_hwaro("from.html").should eq("[a-b][hi]")
+  end
+
+  it "leaves the `as` name undefined when the file sets nothing" do
+    render_with_hwaro("plain.html").should eq("[false][hi]")
+  end
+end
