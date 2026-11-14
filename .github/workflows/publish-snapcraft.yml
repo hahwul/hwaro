@@ -11,6 +11,8 @@ on:
         default: warning
       tags:
         description: Test scenario tags
+permissions:
+  contents: read
 jobs:
   snapcraft-releaser:
     runs-on: ubuntu-latest

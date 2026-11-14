@@ -39,6 +39,10 @@ on:
         description: manual run
         required: false
         default: ""
+# Least privilege for every job; the ones that need more (plan, build-snapcraft)
+# declare it themselves.
+permissions:
+  contents: read
 # A PR is superseded by its own next push far more often than a full matrix run
 # is worth. Pushes to main are never cancelled: they are the full-fidelity gate
 # and the only writer of the compiler cache the other jobs read.
@@ -179,7 +183,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Run Ameba linter
-        uses: crystal-ameba/github-action@master
+        uses: crystal-ameba/github-action@v1.0.0
   tests:
     # Also the compile gate. `shards build` here is exactly what a separate
     # build-only job used to run twice over, and spec/functional spawns the
