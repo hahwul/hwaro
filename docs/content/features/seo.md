@@ -48,6 +48,22 @@ exclude = ["/private", "/drafts"]
 </urlset>
 ```
 
+### Large Sites
+
+The sitemap protocol allows at most 50,000 URLs and 50 MB (uncompressed) per file, and search engines reject a larger file. When a site's sitemap would exceed either limit, `sitemap.xml` becomes a sitemap index pointing at numbered parts of up to 50,000 URLs each, named after `filename` (`sitemap-1.xml`, `sitemap-2.xml`, …). `robots.txt` keeps pointing at `sitemap.xml`. At or below the limit the output is a single `<urlset>` as above, and parts from an earlier, larger build are removed.
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>https://example.com/sitemap-1.xml</loc>
+  </sitemap>
+  <sitemap>
+    <loc>https://example.com/sitemap-2.xml</loc>
+  </sitemap>
+</sitemapindex>
+```
+
 ### Excluding Pages
 
 Set `in_sitemap = false` in front matter:

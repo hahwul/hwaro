@@ -12,9 +12,42 @@ module Hwaro
         # the builder claims whether `generate` wrote it or skipped it as
         # unchanged, so a warm `--cache` build or a serve rebuild removes a
         # sitemap an earlier config published (disabled, or renamed).
+        #
+        # A sitemap too large for one file is an index plus the parts it
+        # lists; those are read back from the index on disk, so a skipped
+        # (unchanged) sitemap claims them too.
         def self.published_outputs(config : Models::Config, output_dir : String) : Array(String)
           return [] of String unless config.sitemap.enabled
-          [Path[output_dir, File.basename(config.sitemap.filename)].to_s]
+          filename = File.basename(config.sitemap.filename)
+          main = Path[output_dir, filename].to_s
+          [main] + (1..listed_part_count(main)).map { |i| Path[output_dir, part_name(filename, i)].to_s }
+        end
+
+        # The sitemap protocol's per-file limits: 50,000 URLs and 50 MB
+        # (52,428,800 bytes) uncompressed. Search engines reject a larger
+        # file outright.
+        MAX_URLS  =     50_000
+        MAX_BYTES = 52_428_800
+
+        INDEX_HEADER = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" \
+                       "<sitemapindex xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n"
+
+        # `sitemap.xml` → `sitemap-1.xml`, `sitemap-2.xml`, …
+        def self.part_name(filename : String, index : Int32) : String
+          ext = File.extname(filename)
+          "#{filename.rchop(ext)}-#{index}#{ext}"
+        end
+
+        # How many parts the sitemap index at `path` lists (0 when the file
+        # is missing or a plain urlset). Only a file that starts with the
+        # index header this generator writes counts, so a user's own file is
+        # never taken for one.
+        private def self.listed_part_count(path : String) : Int32
+          head = File.open(path) { |f| f.read_string(Math.min(f.size, INDEX_HEADER.bytesize.to_i64).to_i) }
+          return 0 unless head == INDEX_HEADER
+          File.read(path).scan("<sitemap>").size
+        rescue IO::Error
+          0
         end
 
         def self.generate(pages : Array(Models::Page), site : Models::Site, output_dir : String, verbose : Bool = false, skip_if_unchanged : Bool = false)
@@ -56,10 +89,7 @@ module Hwaro
             empty_xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" \
                         "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n" \
                         "</urlset>\n"
-            filename = File.basename(site.config.sitemap.filename)
-            sitemap_path = Path[output_dir, filename].to_s
-            Hwaro::Utils::FileSafe.atomic_write(sitemap_path, empty_xml)
-            Logger.action :create, sitemap_path if verbose
+            write_files(output_dir, File.basename(site.config.sitemap.filename), [empty_xml], "", verbose)
             return
           end
 
@@ -97,14 +127,19 @@ module Hwaro
           # the namespace when we'll actually use it (#486).
           has_translations = sitemap_pages.any? { |p| p.translations.any? { |t| written_urls.includes?(t.url) } }
 
-          xml_content = String.build(sitemap_pages.size * 256) do |str|
+          header = String.build do |str|
             str << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
             if has_translations
               str << "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\" xmlns:xhtml=\"http://www.w3.org/1999/xhtml\">\n"
             else
               str << "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n"
             end
+          end
+          footer = "</urlset>\n"
 
+          # Every `<url>` entry, back to back; entry i ends at byte `ends[i]`.
+          ends = [] of Int32
+          entries = String.build(sitemap_pages.size * 256) do |str|
             sitemap_pages.each do |page|
               path = page.url.starts_with?('/') ? page.url : "/#{page.url}"
               full_url = base.empty? ? path : base + path
@@ -147,16 +182,68 @@ module Hwaro
               str << priority_str
 
               str << "  </url>\n"
+              ends << str.bytesize
             end
-
-            str << "</urlset>\n"
           end
 
-          filename = File.basename(site.config.sitemap.filename)
-          sitemap_path = Path[output_dir, filename].to_s
-          Hwaro::Utils::FileSafe.atomic_write(sitemap_path, xml_content)
-          Logger.action :create, sitemap_path if verbose
-          Logger.info "  Generated sitemap with #{sitemap_pages.size} URLs." if verbose
+          parts = split(ends, header.bytesize + footer.bytesize).map { |(from, to)| "#{header}#{entries.byte_slice(from, to - from)}#{footer}" }
+          write_files(output_dir, File.basename(site.config.sitemap.filename), parts, base, verbose)
+          Logger.info "  Generated sitemap with #{sitemap_pages.size} URLs#{parts.size > 1 ? " in #{parts.size} files" : ""}." if verbose
+        end
+
+        # Byte ranges of the entries (entry i ends at byte `ends[i]`), one per
+        # file: each holds at most MAX_URLS entries and, with `overhead` bytes
+        # of header and footer, at most MAX_BYTES (an entry larger than that
+        # on its own still gets a file). One range, the whole sitemap, when
+        # everything fits.
+        def self.split(ends : Array(Int32), overhead : Int32) : Array({Int32, Int32})
+          ranges = [] of {Int32, Int32}
+          from = 0
+          count = 0
+          ends.each_with_index do |stop, i|
+            start = i == 0 ? 0 : ends[i - 1]
+            if count > 0 && (count == MAX_URLS || overhead + stop - from > MAX_BYTES)
+              ranges << {from, start}
+              from = start
+              count = 0
+            end
+            count += 1
+          end
+          ranges << {from, ends.last? || 0}
+          ranges
+        end
+
+        # Write `parts.first` as `filename` when there is one part; otherwise
+        # write the parts as `filename-N` and `filename` as the index listing
+        # them. Parts an earlier, larger sitemap listed that this one does
+        # not need are removed, so a site that shrinks back under the limit
+        # stops publishing them.
+        private def self.write_files(output_dir : String, filename : String, parts : Array(String), base : String, verbose : Bool) : Nil
+          main = Path[output_dir, filename].to_s
+          previous = listed_part_count(main)
+          files = parts.size == 1 ? [] of String : parts
+          files.each_with_index do |xml, i|
+            path = Path[output_dir, part_name(filename, i + 1)].to_s
+            Hwaro::Utils::FileSafe.atomic_write(path, xml)
+            Logger.action :create, path if verbose
+          end
+          content = parts.first
+          unless files.empty?
+            content = String.build do |str|
+              str << INDEX_HEADER
+              files.size.times do |i|
+                loc = Utils::TextUtils.escape_xml(Utils::TextUtils.encode_url_path("#{base}/#{part_name(filename, i + 1)}"))
+                str << "  <sitemap>\n    <loc>" << loc << "</loc>\n  </sitemap>\n"
+              end
+              str << "</sitemapindex>\n"
+            end
+          end
+          Hwaro::Utils::FileSafe.atomic_write(main, content)
+          Logger.action :create, main if verbose
+          (files.size + 1..previous).each do |i|
+            path = Path[output_dir, part_name(filename, i)].to_s
+            File.delete(path) if File.file?(path)
+          end
         end
       end
     end

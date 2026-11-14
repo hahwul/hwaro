@@ -48,6 +48,22 @@ exclude = ["/private", "/drafts"]
 </urlset>
 ```
 
+### 대규모 사이트
+
+사이트맵 프로토콜은 파일 하나에 URL 50,000개, 크기 50 MB(압축 전)까지만 허용하며, 이보다 큰 파일은 검색 엔진이 받아들이지 않습니다. 사이트맵이 둘 중 하나라도 넘으면 `sitemap.xml`은 번호가 붙은 파트(각각 URL 최대 50,000개)를 가리키는 사이트맵 인덱스가 됩니다. 파트 이름은 `filename`을 따릅니다(`sitemap-1.xml`, `sitemap-2.xml`, …). `robots.txt`는 계속 `sitemap.xml`을 가리킵니다. 한도 이하이면 위와 같은 `<urlset>` 하나가 출력되고, 이전의 더 큰 빌드가 만든 파트는 지워집니다.
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>https://example.com/sitemap-1.xml</loc>
+  </sitemap>
+  <sitemap>
+    <loc>https://example.com/sitemap-2.xml</loc>
+  </sitemap>
+</sitemapindex>
+```
+
 ### 페이지 제외
 
 프론트 매터에 `in_sitemap = false`를 설정합니다:
