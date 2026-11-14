@@ -441,6 +441,19 @@ url = "/posts/"
 # [series], [related], [git], [llms], [pwa], [amp], [deployment], etc.
 ```
 
+## Security Model
+
+Hwaro separates what the project owner controls from what contributors can change.
+
+**Trusted (can run code):** `config.toml` and its environment overlays, `templates/`, and anything they name: [build hooks](/features/build-hooks/) and [deploy commands](/deploy/config/) run as shell commands with your environment, and templates can call `env()` and `load_data()`. Review a pull request that touches these like a change to CI. After `hwaro init --scaffold github:user/repo`, check the downloaded `config.toml`: Hwaro warns when it contains hooks or deploy commands.
+
+**Untrusted (cannot run code):** `content/`, `data/`, `static/`, and the names of files in them. Markdown and front matter are never evaluated as templates: `{{ env("X") }}` written in a page or passed as a shortcode argument stays literal text, shortcode arguments are plain strings, `template = "…"` can only pick a template that exists in `templates/`, and a build fetches nothing named by content (the opt-in [`[privacy]`](/features/privacy/) mode downloads external assets it finds, and refuses private and loopback addresses). File and Git metadata reach commands only as separate arguments, never through a shell. A pull request limited to those directories can change the published site, but cannot make `hwaro build` run a command or read your environment.
+
+Two things to keep in mind when you build contributed content:
+
+- `include_code` and `include_md` let a page publish any file inside the project root, such as `config.toml`, a `.env` file or a `data/` file. `.git/`, `.hwaro/`, the output directory and anything outside the project are refused. Keep credentials in the environment (`${VAR}`), not in files the site could include.
+- `hwaro tool check-links` requests every external URL found in content (private and loopback addresses are skipped). Run it on contributed content with the same care as any crawler.
+
 ## See Also
 
 - [CLI](/start/cli/) — Command-line options that override config

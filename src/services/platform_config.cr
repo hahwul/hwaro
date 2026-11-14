@@ -264,7 +264,7 @@ module Hwaro
           redirects.each do |from, to|
             # _redirects is space-delimited; an alias with whitespace or a quote
             # would silently corrupt the rule, so skip malformed entries.
-            next if from.matches?(/\s|"/) || to.matches?(/\s|"/)
+            next if from.matches?(/[\s"\p{Cc}]/) || to.matches?(/[\s"\p{Cc}]/)
             lines << "# #{from} #{to} 301"
           end
         end
