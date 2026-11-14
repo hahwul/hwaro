@@ -76,6 +76,9 @@ module Hwaro
             return cached
           end
 
+          # A source that accepts the connection and never answers holds the
+          # build for up to the read timeout; say what it is waiting for.
+          Logger.info "  Fetching site.data.#{entry.key} from #{sanitized_url(entry.url)}..."
           begin
             body, content_type, final_url = RemoteFetch.fetch(entry.url, entry.headers, max_bytes, deadline)
             # The extension fallback reads the url the redirects LANDED on:
