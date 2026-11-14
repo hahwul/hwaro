@@ -191,6 +191,15 @@ describe Hwaro::Assets::Sass do
       end
     end
 
+    it "errors on pathological interpolation nesting instead of overflowing the stack" do
+      expect_raises(Hwaro::Assets::Sass::SyntaxError, /interpolations nested more than/) do
+        compile(".a{x:" + "\#{" * 300 + "1" + "}" * 300 + ";}")
+      end
+      expect_raises(Hwaro::Assets::Sass::SyntaxError, /interpolations nested more than/) do
+        compile(".a{x:" + "\#{" * 100_000 + ";}")
+      end
+    end
+
     # =========================================================================
     # At-rule bubbling
     # =========================================================================

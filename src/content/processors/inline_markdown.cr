@@ -130,9 +130,12 @@ module Hwaro
         # Inline math admits backslash escapes in the body (`$x = \$5$`) and
         # requires an unescaped, non-space-preceded closer. A body *ending*
         # in a literal `\` won't close — meaningless in LaTeX at the end of
-        # a formula.
+        # a formula. A closer can only start where a run of plain characters
+        # stops, so each run is taken whole (possessive): one JIT frame per
+        # character failed a page with a ~100 KB formula on
+        # "JIT stack limit reached".
         DISPLAY_MATH_RE = /\$\$((?:[^\n$]++|\$(?!\$)|\n(?![ \t\r]*\n))*+)\$\$/
-        INLINE_MATH_RE  = /(?<![\\$])\$(?!\s)((?:[^\n$\\]|\\[^\n])+?)(?<![\s\\])\$(?!\d)/
+        INLINE_MATH_RE  = /(?<![\\$])\$(?!\s)((?:[^\n$\\]++|\\[^\n])+?)(?<![\s\\])\$(?!\d)/
 
         # Placeholder comments left by `Core::Build::ShortcodeProcessor` for
         # already-rendered shortcodes (canonical home here, next to the other

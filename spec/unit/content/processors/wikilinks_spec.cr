@@ -33,6 +33,11 @@ describe Hwaro::Content::Processors::Wikilinks do
       wl_rewrite("[[#Local Part]]", src, index).should eq("[Local Part](#local-part)")
     end
 
+    it "rewrites a link inside a 100k-deep blockquote" do
+      quote = ">" * 100_000
+      wl_rewrite("#{quote} [[My Note]]", src, index).should eq("#{quote} [My Note](@/notes/My%20Note.md)")
+    end
+
     it "matches case-insensitively, by content path and with an extension" do
       wl_rewrite("[[my note]]", src, index).should eq("[my note](@/notes/My%20Note.md)")
       wl_rewrite("[[notes/my note]]", src, index).should eq("[notes\\/my note](@/notes/My%20Note.md)")

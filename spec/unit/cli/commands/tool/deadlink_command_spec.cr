@@ -163,6 +163,17 @@ describe Hwaro::CLI::Commands::Tool::DeadlinkCommand do
       end
     end
 
+    it "reads past a large data-URI image to the links after it" do
+      Dir.mktmpdir do |dir|
+        uri = "data:image/png;base64,#{"QUJD" * 50_000}"
+        File.write(File.join(dir, "test.md"), "![shot](#{uri}) [About](/about/) [Ext](https://example.com/x)")
+
+        cmd = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new
+        cmd.find_internal_links_for_test(dir).map(&.url).should contain("/about/")
+        cmd.find_links_for_test(dir).map(&.url).should contain("https://example.com/x")
+      end
+    end
+
     it "skips external links and anchors" do
       Dir.mktmpdir do |dir|
         File.write(File.join(dir, "test.md"), "[External](https://example.com)\n[Anchor](#section)\n[Internal](/page/)")

@@ -64,6 +64,12 @@ describe Hwaro::Core::Build::SummaryReaders do
     end
   end
 
+  it "reads a template holding a long string literal (a data URI)" do
+    uri = "data:image/png;base64,#{"QUJD" * 20_000}"
+    reads?(%({% set logo = "#{uri}" %}<img src="{{ logo }}">{{ page.title }})).should be_false
+    reads?(%({{ '#{uri}' }}{{ page }})).should be_true
+  end
+
   it "keeps the ssg-benchmark heavy sidebar gated" do
     reads?(<<-JINJA).should be_false
       {% set posts_section = get_section(path="posts") %}

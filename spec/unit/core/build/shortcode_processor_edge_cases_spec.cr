@@ -469,6 +469,24 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
       result.should contain("<iframe></iframe>")
     end
 
+    it "survives a stray backtick above a 60k-row table (one frame per line)" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/youtube" => %(<iframe></iframe>)}
+      content = %({{ youtube(id="x") }}\n\nA stray ` tick.\n#{"|a|b|\n" * 60_000})
+      builder.test_sc_process(content, templates).should contain("<iframe></iframe>")
+    end
+
+    it "masks the same code spans as the per-line pattern it replaced" do
+      per_line = /(`{1,3})((?:[^\n`]++|(?!\1)`|\n(?![ \t]*(?:\r?\n|\r?\z|`{3}|~{3})))+?)\1/
+      spans = ->(text : String, regex : Regex) { text.scan(regex).map { |m| {m.byte_begin, m.byte_end} } }
+      rng = Random.new(20261114)
+      alphabet = ["`", "`", "``", "```", "a", "é", " ", "\t", "\n", "\n", "\n\n", "\n ~~~", "\r\n", "x"]
+      100_000.times do
+        text = String.build { |io| rng.rand(0..14).times { io << alphabet.sample(rng) } }
+        spans.call(text, Hwaro::Core::Build::ShortcodeProcessor::INLINE_CODE_RE).should eq(spans.call(text, per_line)), text.inspect
+      end
+    end
+
     # Regression: inline code spans used to SPLIT the content into chunks,
     # so a block shortcode whose body contained `code` had its opener and
     # closer land in different chunks — the pair never matched and both

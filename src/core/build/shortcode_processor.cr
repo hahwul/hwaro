@@ -75,10 +75,12 @@ module Hwaro
         # `<code>`, leaking the escaped placeholder comment into it. The
         # per-line scanners only ever see one line, so for them the span
         # simply has to close there. Runs of non-backtick characters are
-        # possessive: one backtracking frame per backtick/newline instead of
-        # per character, or a stray backtick in a long paragraph overflows
-        # PCRE2's JIT stack ("Regex match error") and fails the page.
-        INLINE_CODE_RE = /(`{1,3})((?:[^\n`]++|(?!\1)`|\n(?![ \t]*(?:\r?\n|\r?\z|`{3}|~{3})))+?)\1/
+        # possessive, wrapped lines included: one backtracking frame per
+        # backtick instead of per character or line, or a stray backtick
+        # before a long paragraph or table (~40k lines) overflows PCRE2's JIT
+        # stack ("Regex match error") and fails the page. Only a backtick
+        # can start the closer, so taking such a run whole matches the same.
+        INLINE_CODE_RE = /(`{1,3})((?:(?:[^\n`]++|\n(?![ \t]*(?:\r?\n|\r?\z|`{3}|~{3})))++|(?!\1)`)+?)\1/
 
         # Fast pre-filter used by the render hot path (see render.cr).
         # Returns true only when {{ or {% appear *outside* fenced code blocks

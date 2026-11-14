@@ -194,6 +194,13 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result.should contain("&lt;")
       result.should contain("&gt;")
     end
+
+    it "keeps math inside a 100k-deep blockquote" do
+      quote = "> " * 100_000
+      content = "#{quote}$$\n#{quote}x\n#{quote}$$\n"
+      result = Hwaro::Content::Processors::MarkdownExtensions.preprocess(content, make_config(math: true))
+      result.should contain("math-display")
+    end
   end
 
   describe "mermaid" do

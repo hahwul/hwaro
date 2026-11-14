@@ -155,6 +155,14 @@ describe Hwaro::Content::Processors::Markdown do
       (Time.instant - t).should be < 10.seconds # quadratic took 35s; slack for a loaded suite
     end
 
+    it "renders a second unclosed raw-text opener after a closed element" do
+      html, _ = Hwaro::Processor::Markdown.render("<style><script</script>:smile:<style\n", emoji: true)
+      html.should contain("<script</script>😄<style")
+      # The reused offset could also land exactly on the cursor: no progress.
+      html, _ = Hwaro::Processor::Markdown.render("x<style>:`c`x<style>\n", emoji: true)
+      html.should contain("x<style>:<code>c</code>x<style>")
+    end
+
     it "stays linear in the number of tags" do
       t = Time.instant
       html, _ = Hwaro::Processor::Markdown.render(":smile: " + "<b>x</b> " * 80_000, emoji: true)

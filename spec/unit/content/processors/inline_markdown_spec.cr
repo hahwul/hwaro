@@ -236,3 +236,24 @@ describe "Hwaro::Content::Processors::InlineMarkdown::DISPLAY_MATH_RE" do
     display.match("$$\n" + "x\n" * 200_000).should be_nil
   end
 end
+
+describe "Hwaro::Content::Processors::InlineMarkdown::INLINE_MATH_RE" do
+  inline = Hwaro::Content::Processors::InlineMarkdown::INLINE_MATH_RE
+  # The per-character form the possessive runs replaced.
+  per_char = /(?<![\\$])\$(?!\s)((?:[^\n$\\]|\\[^\n])+?)(?<![\s\\])\$(?!\d)/
+  spans = ->(text : String, regex : Regex) { text.scan(regex).map { |m| {m.byte_begin, m.byte_end, m[1]} } }
+
+  it "matches exactly what the per-character pattern matched" do
+    rng = Random.new(20261114)
+    alphabet = ["$", "$", "$$", "a", "é", " ", "\t", "\n", "\\", "\\$", "5", "x"]
+    100_000.times do
+      text = String.build { |io| rng.rand(0..14).times { io << alphabet.sample(rng) } }
+      spans.call(text, inline).should eq(spans.call(text, per_char)), text.inspect
+    end
+  end
+
+  it "matches a long formula without a regex error" do
+    formula = "$" + "a" * 200_000 + "$"
+    inline.match(formula).try(&.[0].bytesize).should eq(formula.bytesize)
+  end
+end

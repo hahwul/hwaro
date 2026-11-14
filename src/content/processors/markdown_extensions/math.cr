@@ -49,7 +49,7 @@ module Hwaro
         # stripped before the check: `> $$x$$` is block position too (the
         # div becomes an HTML block inside the blockquote).
         BARE_MATH_LINE_RE     = /\A\x00MATH\d+\x00\z/
-        BLOCKQUOTE_MARKERS_RE = /\A(?:>[ \t]?)+/
+        BLOCKQUOTE_MARKERS_RE = /\A(?:>[ \t]?)++/
         # Markd-active characters inside a math body rendered in normal
         # inline context (see the branch comments in expand_math). Beyond
         # emphasis/code/link chars, `-`, `.`, and both quotes are included
@@ -272,7 +272,7 @@ module Hwaro
               # of its continuation lines: drop them from the formula and put
               # them back after each newline of the emitted HTML, or the
               # escaped `&gt;` lines fall out of the quote (and into KaTeX).
-              quote = line[/\A[ \t]*(?:>[ \t]?)+/]?
+              quote = line[/\A[ \t]*+(?:>[ \t]?)++/]?
               io << line.gsub(MATH_PLACEHOLDER_RE) do |match|
                 span = $~[1].to_i?.try { |idx| store[idx]? }
                 next match unless span
@@ -283,7 +283,7 @@ module Hwaro
                 # author's `&lt;` means `<` there too. Decode once, so the
                 # escape below doesn't hand KaTeX a literal `&lt;`.
                 body = HTML.unescape(body) if raw_context && body.includes?('&')
-                body = body.gsub(/\n[ \t]*(?:>[ \t]?)*/, "\n") if quote && body.includes?('\n')
+                body = body.gsub(/\n[ \t]*+(?:>[ \t]?)*+/, "\n") if quote && body.includes?('\n')
                 escaped = Utils::TextUtils.escape_xml(body)
                 escaped = escaped.gsub("\n", "\n#{quote}") if quote
                 math_html = if span.display && (raw_context || bare_display)

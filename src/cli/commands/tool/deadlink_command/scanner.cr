@@ -104,8 +104,10 @@ module Hwaro
           # so `[x](/docs/foo_(bar))` was scanned as `/docs/foo_(bar` and
           # reported dead — a false positive on a link the build resolves fine.
           # The alternation branches start with disjoint characters, so there
-          # is no backtracking ambiguity.
-          LINK_DEST = /((?:[^()]|\([^()]*\))*)/
+          # is no backtracking ambiguity, and the loops are possessive: one
+          # JIT frame per character aborted the whole command with "JIT
+          # stack limit reached" on a ~60 KB data-URI image.
+          LINK_DEST = /((?:[^()]++|\([^()]*+\))*+)/
 
           # Normalize a Markdown link/image destination to a bare URL.
           #
