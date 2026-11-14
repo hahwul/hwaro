@@ -4,6 +4,7 @@ describe "deploy command output" do
   # A deploy tool printing a long stretch without a newline (a progress bar)
   # used to be buffered whole as one "line" per stream.
   it "never holds more than a bounded chunk of a newline-less stream" do
+    posix_only!("the target command is POSIX shell (head, tr, /dev/zero)")
     Dir.mktmpdir do |dir|
       project = File.join(dir, "project")
       FileUtils.mkdir_p(File.join(project, "public"))
