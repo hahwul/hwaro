@@ -91,66 +91,39 @@ module Hwaro
         nil
       end
 
-      # The zone-bearing forms of CONTENT_FORMATS (the first four), for a
-      # string whose offset is written without RFC 3339's colon or after a
-      # space. nil when none matches, so zone-less input is never claimed.
-      private def parse_written_offset(str : String) : Time?
-        CONTENT_FORMATS.first(4).each do |fmt|
-          return Time.parse(str, fmt, Time::Location::UTC)
-        rescue Time::Format::Error | ArgumentError
-          next
-        end
-        nil
-      end
+      # The shape of a date the build reads: a four-digit year, optionally a
+      # time of day (`T`, `t` or a space, then `HH:MM:SS` and a fraction) and
+      # a zone (`Z`, `+09`, `+0900` or `+09:00`, also after a space). The whole
+      # string must match: `Time.parse` ignores trailing input, so any looser
+      # route dropped a written offset it did not recognise (`+09`,
+      # `.5 +09:00`) and read the value as local time — a different instant
+      # on every machine, with no warning.
+      CONTENT_DATE_SHAPE = /\A(\d{4})-(\d{1,2})-(\d{1,2})(?:[Tt ](\d{1,2}):(\d{1,2}):(\d{1,2})(\.\d+)?\s*(?:([Zz])|([+-])(\d{2})(?::?(\d{2}))?)?)?\z/
 
-      # The build's front-matter date parser. Format selection is based on
-      # the string's shape to avoid exception-based control flow; zone-less
-      # values are interpreted in the machine's local zone.
+      # The build's front-matter date parser (see `CONTENT_DATE_SHAPE`).
+      # A written UTC offset is honoured; a date or time without one is read
+      # in the machine's local zone. nil means "not a usable date" (the
+      # caller warns): a shape mismatch, an impossible value (`2024-02-30`)
+      # or an offset past ±23:59.
       def parse_content_date(time_str : String?) : Time?
         return unless time_str
-        str = time_str.strip
-        return if str.empty?
+        m = CONTENT_DATE_SHAPE.match(time_str.strip) || return
+        day = "%04d-%02d-%02d" % {m[1].to_i, m[2].to_i, m[3].to_i}
+        return Time.parse(day, "%Y-%m-%d", Time::Location.local) unless m[4]?
 
-        # A written UTC offset is honoured, never dropped: `Time.parse` ignores
-        # trailing input, so the zone-less formats below would read
-        # `2024-01-15 10:00:00 +0900` / `…T10:00:00+0900` (no colon, which RFC
-        # 3339 rejects) as local time — a different instant on every machine.
-        # Zone-bearing formats go first, as in CONTENT_FORMATS.
-        fmt = if str.includes?('T')
-                # Could be RFC 3339 (with timezone) or plain ISO
-                if str.includes?('+') || str.includes?('Z') || str.matches?(/T.+-\d{2}:\d{2}$/) || str.matches?(/\d{2}-\d{2}$/)
-                  begin
-                    return Time.parse_rfc3339(str)
-                  rescue Time::Format::Error | ArgumentError
-                    zoned = parse_written_offset(str)
-                    return zoned if zoned
-                    "%Y-%m-%dT%H:%M:%S"
-                  end
-                else
-                  "%Y-%m-%dT%H:%M:%S"
-                end
-              elsif str.size > 10
-                zoned = parse_written_offset(str)
-                return zoned if zoned
-                "%Y-%m-%d %H:%M:%S"
-              else
-                "%Y-%m-%d"
-              end
-
-        begin
-          Time.parse(str, fmt, Time::Location.local)
-        rescue Time::Format::Error | Time::Error | ArgumentError
-          # Time::Format::Error  → string doesn't match the format at all.
-          # ArgumentError        → format matches but the value is out of
-          #   range (e.g. "2024-13-45", "2024-02-30"). Both mean "no usable
-          #   date" — return nil so the caller can treat it as absent.
-          nil
+        clock = "#{day}T%02d:%02d:%02d" % {m[4].to_i, m[5].to_i, m[6].to_i}
+        if m[8]?
+          Time.parse_rfc3339("#{clock}#{m[7]?}Z")
+        elsif sign = m[9]?
+          minutes = (m[11]? || "00").to_i
+          return if m[10].to_i > 23 || minutes > 59
+          Time.parse_rfc3339("#{clock}#{m[7]?}#{sign}#{m[10]}:#{"%02d" % minutes}")
+        else
+          Time.parse(clock, "%Y-%m-%dT%H:%M:%S", Time::Location.local)
         end
-      rescue Time::Error
-        # A written offset past ±24h (`+99:00`) is no instant at all. Falling
-        # through to the zone-less formats would drop it and read the value
-        # as local time, so give up instead (the caller warns, as for any
-        # unrecognised date).
+      rescue Time::Format::Error | Time::Error | ArgumentError
+        # Impossible value ("2024-13-45", "2024-02-30"): no usable date, so
+        # the caller can treat it as absent.
         nil
       end
     end
