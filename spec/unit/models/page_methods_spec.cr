@@ -339,6 +339,15 @@ describe Hwaro::Models::Page do
       Hwaro::Utils::PathUtils.split_safe_segments(page.url.lchop("/"))[0].should eq(["posts", %(say "hi")])
     end
 
+    # A raw `<img …>` in an `href` is valid HTML, but the AMP converter
+    # rewrote it into markup whose own quote ended the attribute.
+    it "percent-encodes angle brackets" do
+      page = Hwaro::Models::Page.new("posts/a.md")
+      page.url = "/posts/x<img src=y>/"
+      page.url.should eq("/posts/x%3Cimg src=y%3E/")
+      Hwaro::Utils::PathUtils.split_safe_segments(page.url.lchop("/"))[0].should eq(["posts", "x<img src=y>"])
+    end
+
     # `%de` decodes to a lone 0xDE byte, which the output path scrubbed to
     # U+FFFD: the page was written where its URL could never reach.
     it "escapes a % whose run does not decode to UTF-8" do
