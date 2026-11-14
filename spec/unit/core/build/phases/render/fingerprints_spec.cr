@@ -646,6 +646,35 @@ describe "warm --cache: listings printing sitemap/search flags" do
   end
 end
 
+# A page turning into a `redirect_to` stub leaves every listing, so the
+# listings must re-render on a warm build, and return when it turns back.
+describe "warm --cache: listings when a page becomes a redirect stub" do
+  it "drops the stub from the section listing and brings it back" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", "title = \"T\"\nbase_url = \"http://localhost\"\n")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("templates/section.html", "{% for p in section.pages %}[{{ p.title }}]{% endfor %}")
+        FileUtils.mkdir_p("content/posts")
+        File.write("content/posts/_index.md", "+++\ntitle = \"Posts\"\nsort_by = \"title\"\n+++\n")
+        File.write("content/posts/a.md", "+++\ntitle = \"A\"\n+++\nA")
+        File.write("content/posts/b.md", "+++\ntitle = \"B\"\n+++\nB")
+        relations_cached_build
+        File.read("public/posts/index.html").should eq("[A][B]")
+
+        File.write("content/posts/b.md", "+++\ntitle = \"B\"\nredirect_to = \"https://elsewhere.example/\"\n+++\nB")
+        relations_cached_build
+        File.read("public/posts/index.html").should eq("[A]")
+
+        File.write("content/posts/b.md", "+++\ntitle = \"B\"\n+++\nB")
+        relations_cached_build
+        File.read("public/posts/index.html").should eq("[A][B]")
+      end
+    end
+  end
+end
+
 # The clock is a template input like env(): a page printing it must follow it
 # on a warm build instead of freezing the first render's value.
 describe "warm --cache: pages printing the clock" do

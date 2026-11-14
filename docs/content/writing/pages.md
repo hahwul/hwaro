@@ -76,7 +76,7 @@ Every `.md` and `.markdown` file under `content/` becomes a page, front matter o
 | in_search_index | bool | Include in search |
 | in_sitemap | bool | Include in sitemap |
 | insert_anchor_links | bool | Add heading anchors |
-| redirect_to | string | Redirect page to this URL, or to a content file given as an `@/` path (`@/blog/post.md`) (the redirect stub is left out of the sitemap, feeds, search index and llms.txt) |
+| redirect_to | string | Redirect page to this URL, or to a content file given as an `@/` path (`@/blog/post.md`) (the redirect stub is left out of the sitemap, feeds, search index and llms.txt, and of every listing: `section.pages` and pagination, previous/next, taxonomy terms, series, related posts, backlinks and `site.authors`; `get_page()` and `site.pages` still return it) |
 | render | bool | Render page to output (default: true) |
 | expires | date | Auto-exclude after this date |
 | series | string | Series name for grouping |

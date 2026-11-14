@@ -46,7 +46,7 @@ Welcome to my blog.
 | paginate_path | string | "page" | Path segment for pager URLs (default produces `/blog/page/2/`) |
 | transparent | bool | false | Pass pages to parent |
 | generate_feeds | bool | false | Generate RSS feed |
-| redirect_to | string | — | Write an HTML redirect page to this URL (or an `@/` content path such as `@/blog/post.md`) instead of rendering the section |
+| redirect_to | string | — | Write an HTML redirect page to this URL (or an `@/` content path such as `@/blog/post.md`) instead of rendering the section. Unlike a redirecting page, the section stays in its parent's listing and in previous/next, and its own pages stay listed |
 | draft | bool | false | Exclude from production |
 | weight | int | 0 | Section sort order |
 | translation_key | string | — | Links section translations whose directory names differ. See [Translation Keys](/features/multilingual/#translation-keys) |

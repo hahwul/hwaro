@@ -529,6 +529,9 @@ module Hwaro::Core::Build::Phases::Render
     # unrelated edit. It belongs to the set's identity for the same reason
     # `draft` does.
     fp_value(digest, p.render ? "1" : "0")
+    # A `redirect_to` stub leaves every listing; folded only when set, so
+    # sites without redirects keep their digest.
+    fp_value(digest, "redirect") if p.has_redirect?
     fp_value(digest, p.toc ? "1" : "0")
     # Exposed to listings (`p.in_sitemap`, `p.in_search_index`) and
     # hand-edited in front matter, so flipping one must refresh them.
