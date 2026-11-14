@@ -13,6 +13,7 @@
 
 require "file_utils"
 require "./errors"
+require "./path_utils"
 
 module Hwaro
   module Utils
@@ -108,6 +109,33 @@ module Hwaro
       # writes one file at a time, so reusing the name sequentially is safe.
       def self.temp_path(target : String | Path) : String
         File.join(File.dirname(target.to_s), "hwaro-#{Process.pid}-#{Fiber.current.object_id}.tmp")
+      end
+
+      # The one pattern `temp_path` produces, capturing the owning pid. A
+      # process killed between the write and the rename leaves such a file
+      # behind: source scans skip the name (it is never content to publish)
+      # and `sweep_dead_temps` removes the orphans a kept output tree holds.
+      TEMP_NAME = /\Ahwaro-(\d+)-\d+\.tmp\z/
+
+      def self.temp_name?(basename : String) : Bool
+        # The prefix test keeps the regex off the per-file hot path.
+        basename.starts_with?("hwaro-") && TEMP_NAME.matches?(basename)
+      end
+
+      # Delete temp files under `dir` whose owner process is gone (never this
+      # process's own, nor a live one's in-flight file). One walk — callers
+      # run it only for a kept tree's first build, never per warm rebuild.
+      def self.sweep_dead_temps(dir : String) : Nil
+        return unless Dir.exists?(dir)
+        match = File::MatchOptions.glob_default | File::MatchOptions::DotFiles
+        Dir.glob(File.join(PathUtils.glob_escape(dir), "**", "hwaro-*.tmp"), match: match) do |path|
+          next unless m = TEMP_NAME.match(File.basename(path))
+          next unless pid = m[1].to_i64?
+          next if pid == Process.pid || Process.exists?(pid)
+          File.delete?(path)
+        end
+      rescue File::Error
+        # Best effort: an unreadable subtree keeps its orphans until the next run.
       end
 
       # Write `content` to `path` atomically: write to a same-directory

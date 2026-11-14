@@ -385,4 +385,29 @@ describe Hwaro::Utils::FileSafe do
       end
     end
   end
+
+  describe "interrupted temp files" do
+    it "recognises exactly the names temp_path produces" do
+      name = File.basename(Hwaro::Utils::FileSafe.temp_path("/x/y.html"))
+      Hwaro::Utils::FileSafe.temp_name?(name).should be_true
+      Hwaro::Utils::FileSafe.temp_name?("hwaro-12-34.tmp").should be_true
+      Hwaro::Utils::FileSafe.temp_name?("hwaro-12-34.tmp.bak").should be_false
+      Hwaro::Utils::FileSafe.temp_name?("my-hwaro-12-34.tmp").should be_false
+      Hwaro::Utils::FileSafe.temp_name?("hwaro-x-34.tmp").should be_false
+    end
+
+    it "sweep_dead_temps removes only temps of processes that are gone" do
+      Dir.mktmpdir do |root|
+        Dir.mkdir_p(File.join(root, "a", "b"))
+        dead = File.join(root, "a", "b", "hwaro-2147483646-1.tmp")
+        own = File.join(root, "a", "hwaro-#{Process.pid}-1.tmp")
+        user = File.join(root, "a", "hwaro-notes.tmp")
+        [dead, own, user].each { |f| File.write(f, "x") }
+        Hwaro::Utils::FileSafe.sweep_dead_temps(root)
+        File.exists?(dead).should be_false
+        File.exists?(own).should be_true
+        File.exists?(user).should be_true
+      end
+    end
+  end
 end

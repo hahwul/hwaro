@@ -361,6 +361,23 @@ describe "RemoteData.parse_body" do
 end
 
 describe "RemoteData.load" do
+  it "says which source it is fetching, and stays quiet on a fresh cache hit" do
+    handler = ->(ctx : HTTP::Server::Context) do
+      ctx.response.content_type = "application/json"
+      ctx.response.print %({"a": 1})
+    end
+
+    with_test_server(handler) do |base|
+      Dir.mktmpdir do |dir|
+        entry = remote_entry("#{base}/team", cache_ttl: 1.hour)
+        cache = File.join(dir, "cache")
+        log = with_captured_log { RemoteData.load(entry, cache_dir: cache) }
+        log.should contain("Fetching site.data.team from #{base}/team")
+        with_captured_log { RemoteData.load(entry, cache_dir: cache) }.should_not contain("Fetching")
+      end
+    end
+  end
+
   it "fetches, sends configured headers, and parses the payload" do
     seen_auth = nil.as(String?)
     seen_ua = nil.as(String?)

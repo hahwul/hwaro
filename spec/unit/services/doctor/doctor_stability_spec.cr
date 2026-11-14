@@ -204,4 +204,16 @@ describe Hwaro::CLI::Commands::Tool::DoctorCommand do
     end
     err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
   end
+
+  it "appends approved sections to a CRLF config.toml with CRLF line endings" do
+    Dir.mktmpdir do |dir|
+      config_path = File.join(dir, "config.toml")
+      File.write(config_path, "title = \"S\"\r\nbase_url = \"https://example.com\"\r\n")
+      doctor = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path)
+      doctor.fix_config(approve_sections: true).sections_added.should_not be_empty
+      text = File.read(config_path)
+      text.count('\n').should be > 2
+      text.scan(/(?<!\r)\n/).should be_empty
+    end
+  end
 end

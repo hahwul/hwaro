@@ -474,6 +474,7 @@ module Hwaro
 
         @assets = Dir.glob(File.join(Utils::PathUtils.glob_escape(page_dir), "**", "*")).sort!.compact_map do |file|
           next unless Utils::PathUtils.file?(file)
+          next if Utils::FileSafe.temp_name?(File.basename(file))
           next if Core::Build::Phases::ReadContent::PAGE_EXTENSIONS.includes?(File.extname(file).downcase)
           next if nested_bundle?(page_dir, file, content_dir, bundle_dirs, content_files)
 
