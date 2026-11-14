@@ -1241,6 +1241,11 @@ module Hwaro
         private def parse_interp : Ast::Interp
           line = @s.line
           column = @s.column
+          # `#{` nests through read_template, so it shares the block guard.
+          @block_depth += 1
+          if @block_depth > MAX_BLOCK_DEPTH
+            @s.error("interpolations nested more than #{MAX_BLOCK_DEPTH} levels deep", line, column)
+          end
           @s.advance # '#'
           @s.advance # '{'
           scan = read_template(stops: "}", value_vars: true)
@@ -1249,6 +1254,8 @@ module Hwaro
           inner = trim_template(scan.template)
           @s.error("empty \"\#{}\"", line, column) if inner.empty?
           Ast::Interp.new(inner, line, column)
+        ensure
+          @block_depth -= 1
         end
 
         # ---------------------------------------------------------------
