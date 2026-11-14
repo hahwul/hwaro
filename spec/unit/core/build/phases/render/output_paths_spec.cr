@@ -175,6 +175,30 @@ describe "Render output paths: authored vs generated collisions" do
     log.should contain(%(`redirect_to` "@/nope.md" in 'missing.md' could not be resolved))
   end
 
+  # A warm build skips the unchanged redirect stub, and with it the report of
+  # its unresolved target: the warning showed once, then never again, while
+  # a cold build and body `@/` links report it on every build.
+  it "reports an unresolved @/ redirect_to target on every --cache build" do
+    rebuild = -> {
+      builder = Hwaro::Core::Build::Builder.new
+      Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+      builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false))
+    }
+    build_site(
+      "title = \"T\"\nbase_url = \"http://localhost\"\n",
+      content_files: {
+        "missing.md" => "+++\ntitle = \"M\"\nredirect_to = \"@/nope.md\"\n+++\n",
+        "b.md"       => "+++\ntitle = \"B\"\n+++\nB",
+      },
+      template_files: {"page.html" => "{{ content }}"},
+      cache: true,
+    ) do
+      File.write("content/b.md", "+++\ntitle = \"B\"\n+++\nB edited")
+      log = with_captured_log { rebuild.call }
+      log.should contain(%(`redirect_to` "@/nope.md" in 'missing.md' could not be resolved))
+    end
+  end
+
   # Regression: get_taxonomy counted a collision loser (and listed a term
   # only it carried, linking an unwritten term page) while the term page
   # left it out.
