@@ -97,6 +97,11 @@ module Hwaro
               # strip the fences and fall through to defaults.
               markdown_content = match[2]
             end
+          elsif !file_path.empty? && raw_content.matches?(/\A\+\+\+[ \t]*\r?\n/)
+            # An opening `+++` with no closing fence: the whole file (fence
+            # and keys included) would be published as body text, title
+            # "Untitled", with no hint why.
+            Logger.warn "#{file_path}: TOML front matter opens with `+++` but is never closed — add a closing `+++` line. The whole file is published as body text."
           elsif raw_content.starts_with?('{') && json_front_matter_start?(raw_content)
             # A leading `{` signals JSON frontmatter intent. If the scanner can
             # locate a balanced object we parse it; if not, the file is almost

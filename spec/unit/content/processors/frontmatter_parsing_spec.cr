@@ -883,6 +883,25 @@ describe Hwaro::Content::Processors::Markdown do
       end
     end
 
+    it "warns when TOML front matter is opened with +++ but never closed" do
+      raw = "+++\ntitle = \"x\"\n\nbody\n"
+
+      result = nil
+      log = with_captured_log do
+        result = processor.parse(raw, "content/open.md")
+      end
+      log.should contain("content/open.md")
+      log.should contain("never closed")
+      result.not_nil![:content].should eq(raw)
+    end
+
+    it "does not warn for closed TOML front matter" do
+      log = with_captured_log do
+        processor.parse("+++\ntitle = \"x\"\n+++\nbody\n", "content/ok.md")
+      end
+      log.should_not contain("never closed")
+    end
+
     it "silently ignores unbalanced JSON when no file_path is provided (library use)" do
       # Without a file_path the parser has no caller context to raise against,
       # so we keep the historic graceful-nil behaviour and treat the file as
