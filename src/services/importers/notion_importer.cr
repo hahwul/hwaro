@@ -48,6 +48,7 @@ module Hwaro
           end
 
           assign_slugs(files)
+          warn_unimported_assets(path, [""])
 
           import_each(files, "Notion") do |file_path|
             import_file(file_path, path, output_dir, options.verbose, options.force)
@@ -104,6 +105,8 @@ module Hwaro
               fields["title"] = title_from_filename(file_path)
             end
           end
+
+          body = apply_properties(body, fields)
 
           # Extract date from file modification time if not in frontmatter
           unless fields.has_key?("date")
@@ -173,6 +176,58 @@ module Hwaro
         private def slug_from_notion_filename(file_path : String) : String
           title = title_from_filename(file_path)
           file_slug(title)
+        end
+
+        # `Key: value` lines Notion's Markdown export writes under a database
+        # page's title, one per property.
+        PROPERTY_LINE      = /\A([A-Za-z][A-Za-z ]{0,30}):[ \t]+(\S.*)\z/
+        DATE_PROPERTIES    = {"date", "created", "created time", "created at", "published", "publish date", "published date"}
+        UPDATED_PROPERTIES = {"last edited", "last edited time", "updated"}
+        TAG_PROPERTIES     = {"tags", "tag", "labels"}
+
+        # Map the leading property block onto front matter: a page's own
+        # date, last-edited time and tags. Left as body text they were lost
+        # as metadata, and every page fell back to the file's mtime — the
+        # moment the export was unzipped. Only mapped lines are removed;
+        # other properties (`Status: Done`) stay in the body.
+        private def apply_properties(body : String, fields : Hash(String, FieldValue)) : String
+          lines = body.lines(chomp: false)
+          first = lines.index { |line| !line.strip.empty? }
+          return body unless first
+          last = first
+          while last < lines.size && lines[last].rstrip.matches?(PROPERTY_LINE)
+            last += 1
+          end
+          return body if last == first || (last < lines.size && !lines[last].strip.empty?)
+
+          consumed = [] of Int32
+          (first...last).each do |i|
+            match = PROPERTY_LINE.match(lines[i].rstrip) || next
+            key = match[1].downcase
+            value = match[2].strip
+            if DATE_PROPERTIES.includes?(key) && !fields.has_key?("date")
+              time = notion_date(value) || next
+              fields["date"] = format_date(time)
+            elsif UPDATED_PROPERTIES.includes?(key) && !fields.has_key?("updated")
+              time = notion_date(value) || next
+              fields["updated"] = format_date(time)
+            elsif TAG_PROPERTIES.includes?(key) && !fields.has_key?("tags")
+              tags = value.split(',').map(&.strip).reject(&.empty?).uniq!
+              next if tags.empty?
+              fields["tags"] = tags
+            else
+              next
+            end
+            consumed << i
+          end
+          consumed.reverse_each { |i| lines.delete_at(i) }
+          lines.join
+        end
+
+        # A Notion date property: `October 10, 2022`, optionally with a time,
+        # an `@` prefix, or a `start → end` range (the start is the date).
+        private def notion_date(value : String) : Time?
+          Utils::DateUtils.parse_import(value.lstrip('@').split('→').first.strip)
         end
 
         # A Notion callout: a blockquote opened by one emoji/pictograph. Any

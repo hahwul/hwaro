@@ -3,6 +3,24 @@ require "../../../../src/services/importers/hexo_importer"
 
 describe Hwaro::Services::Importers::HexoImporter do
   describe "#run" do
+    it "carries custom front matter keys into [extra] instead of dropping them" do
+      Dir.mktmpdir do |dir|
+        posts_dir = File.join(dir, "source", "_posts")
+        FileUtils.mkdir_p(posts_dir)
+        File.write(File.join(posts_dir, "p.md"), "---\ntitle: P\nlayout: post\nmathjax: true\ncomments: false\n---\nbody\n")
+
+        output_dir = File.join(dir, "output")
+        Hwaro::Services::Importers::HexoImporter.new.run(Hwaro::Config::Options::ImportOptions.new(
+          source_type: "hexo", path: dir, output_dir: output_dir))
+
+        out = File.read(File.join(output_dir, "posts", "p.md"))
+        out.should contain("[extra]")
+        out.should contain("mathjax = true")
+        out.should contain("comments = false")
+        out.should_not contain("layout")
+      end
+    end
+
     it "keeps a post's permalink as its path" do
       Dir.mktmpdir do |dir|
         posts_dir = File.join(dir, "source", "_posts")

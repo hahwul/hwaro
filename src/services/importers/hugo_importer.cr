@@ -34,6 +34,8 @@ module Hwaro
             )
           end
 
+          warn_unimported_assets(hugo_path, ["static"])
+
           import_each(scan_markdown_files(content_dir, hugo_path), "Hugo", wrapped_note: "contained Hugo shortcodes. Imports kept the raw syntax — each will render as literal text until you hand-convert them.") do |file_path|
             process_file(file_path, content_dir, output_dir, include_drafts, verbose, force)
           end

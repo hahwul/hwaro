@@ -1,3 +1,4 @@
+require "html"
 require "uri"
 require "xml"
 require "./base"
@@ -48,9 +49,52 @@ module Hwaro
 
           doc = XML.parse(xml_content)
 
-          import_each(find_items(doc), "WordPress") do |item|
+          items = find_items(doc)
+          @attachments = attachment_urls(items)
+
+          import_each(items, "WordPress", wrapped_note: "contained WordPress shortcodes ([gallery], [contact-form-7], …). They were kept as literal text — replace them by hand.") do |item|
             process_item(item, output_dir, include_drafts, verbose, force)
           end
+        end
+
+        # Attachment URL by `wp:post_id`, so a post's `_thumbnail_id` can be
+        # resolved to its featured image.
+        @attachments = Hash(String, String).new
+
+        # A shortcode WordPress expanded at render time and hwaro cannot:
+        # one with attributes (`[gallery ids="1,2"]`) or a closing tag.
+        # `[caption]` is converted by HtmlToMarkdown before this runs.
+        SHORTCODE_RE = /\[[a-z][\w-]*\s+[\w-]+\s*=[^\]]*\]|\[\/[a-z][\w-]*\]/i
+
+        private def attachment_urls(items : Array(XML::Node)) : Hash(String, String)
+          urls = Hash(String, String).new
+          items.each do |item|
+            id = ""
+            url = ""
+            item.children.each do |child|
+              next unless child.element?
+              case child.name
+              when "post_id"        then id = child.content.strip
+              when "attachment_url" then url = child.content.strip
+              end
+            end
+            urls[id] = url unless id.empty? || url.empty?
+          end
+          urls
+        end
+
+        # The path of an item's original `<link>` when the imported page will
+        # not live there, so old inbound links keep working as aliases.
+        private def old_url_alias(link : String, new_path : String) : String?
+          return if link.empty?
+          uri = URI.parse(link)
+          path = uri.path
+          return if uri.query || path.empty? || path == "/"
+          path = URI.decode(path).scrub
+          path = "#{path}/" unless path.ends_with?('/') || File.extname(path) != ""
+          path == new_path ? nil : path
+        rescue URI::Error
+          nil
         end
 
         protected def import_error_message(item : XML::Node, ex : Exception) : String
@@ -153,6 +197,9 @@ module Hwaro
           content_html = ""
           excerpt = ""
           author = ""
+          link = ""
+          modified = ""
+          thumbnail_id = ""
           tags = [] of String
           categories = [] of String
 
@@ -164,6 +211,14 @@ module Hwaro
             case child.name
             when "title"
               title = child.content.strip
+            when "link"
+              link = child.content.strip if ns_href.nil?
+            when "post_modified"
+              modified = child.content.strip
+            when "postmeta"
+              meta_key = child.children.find { |c| c.element? && c.name == "meta_key" }
+              meta_value = child.children.find { |c| c.element? && c.name == "meta_value" }
+              thumbnail_id = meta_value.content.strip if meta_key && meta_value && meta_key.content.strip == "_thumbnail_id"
             when "post_date"
               post_date = child.content.strip
             when "pubDate"
@@ -197,9 +252,9 @@ module Hwaro
               next if value.empty?
               case domain
               when "post_tag"
-                tags << value
+                tags << HTML.unescape(value)
               when "category"
-                categories << value unless value == "Uncategorized"
+                categories << HTML.unescape(value) unless value == "Uncategorized"
               end
             end
           end
@@ -239,6 +294,19 @@ module Hwaro
           fields = {} of String => FieldValue
           fields["title"] = title unless title.empty?
           fields["date"] = date_str
+          # A modification time earlier than (or equal to) the post date is
+          # WordPress's default for an unedited post; only a real edit is
+          # `updated`.
+          if !modified.empty? && !modified.starts_with?("0000") && (changed = Utils::DateUtils.parse_import(modified)) && (published = Utils::DateUtils.parse_import(post_date.empty? ? pub_date : post_date)) && changed > published
+            fields["updated"] = format_date(changed)
+          end
+          if (featured = @attachments[thumbnail_id]?) && !thumbnail_id.empty?
+            fields["image"] = featured
+          end
+          new_path = section.empty? ? "/#{slug}/" : "/#{section}/#{slug}/"
+          if old = old_url_alias(link, new_path)
+            fields["aliases"] = [old]
+          end
           fields["description"] = excerpt unless excerpt.empty?
           fields["draft"] = true if is_draft
           fields["tags"] = tags.uniq unless tags.empty?
@@ -252,7 +320,12 @@ module Hwaro
           body = strip_redundant_title_h1(body, fields["title"]?.as?(String))
 
           written = write_content_file(output_dir, section, slug, frontmatter, body, verbose, force)
-          written ? :imported : :skipped
+          return :skipped unless written
+          if body.matches?(SHORTCODE_RE)
+            Logger.warn "WordPress shortcodes in #{title.empty? ? slug : title.inspect} were kept as literal text — replace them by hand."
+            return :imported_wrapped
+          end
+          :imported
         end
       end
     end

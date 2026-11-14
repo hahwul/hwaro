@@ -142,6 +142,34 @@ module Hwaro
           end
         end
 
+        # File types a page can embed or link that `tool import` does not carry
+        # over unless they sit beside a page bundle.
+        ASSET_EXTENSIONS = Set{
+          ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".avif", ".ico",
+          ".bmp", ".pdf", ".mp4", ".webm", ".mp3", ".ogg", ".wav", ".zip",
+        }
+
+        # Warn once when `dirs` (relative to the source root: Hugo `static/`,
+        # Jekyll `assets/`, an Obsidian attachments folder, …) hold images or
+        # downloads. Importers write Markdown only, so every `![](/img/a.png)`
+        # in the imported pages would 404 with nothing in the output saying why.
+        protected def warn_unimported_assets(source_root : String, dirs : Array(String), skip_dir : Proc(String, Bool)? = nil) : Nil
+          saved = @outside_source_skips
+          count = 0
+          dirs.each do |name|
+            dir = File.join(source_root, name)
+            next if File.symlink?(dir) || !Dir.exists?(dir)
+            walk_files(dir, [""], skip_dir, source_root: source_root).each do |file|
+              base = File.basename(file)
+              count += 1 if !base.starts_with?('.') && ASSET_EXTENSIONS.includes?(File.extname(base).downcase)
+            end
+          end
+          @outside_source_skips = saved
+          return if count == 0
+          where = dirs.map { |d| d.empty? ? "the source" : d }.join(", ")
+          Logger.warn "#{count} image/asset file(s) in #{where} were not imported (only Markdown is). Copy them into your hwaro site's static/ directory, or beside the pages that use them, so image and file links keep working."
+        end
+
         # Split a file's path (relative to base_path) into {section, filename},
         # where section is the parent-directory chain joined with "/" (or
         # `default` for a top-level file) and filename is the last path segment.
@@ -214,6 +242,31 @@ module Hwaro
           toml = Hwaro::Utils::FrontmatterWriter::TomlBuilder.new.build(more)
           toml = "\n#{toml}" if toml.starts_with?('[')
           "#{frontmatter.rchop("+++")}#{toml}+++"
+        end
+
+        # Front matter keys no importer mapped, in hwaro's shape: keys hwaro
+        # understands as-is (CARRIED_KEYS) stay top-level, everything else
+        # goes to an `[extra]` table where templates read it as
+        # `page.extra.<key>`. `consumed` lists the source keys the importer
+        # handled itself; null values are dropped.
+        protected def unmapped_fields(yaml : YAML::Any, mapped : Hash(String, FieldValue), consumed : Set(String), carry : Set(String) = CARRIED_KEYS) : Hash(String, YAML::Any)
+          carried = {} of String => YAML::Any
+          extra = {} of YAML::Any => YAML::Any
+          yaml.as_h.each do |key, value|
+            name = key.as_s? || ""
+            next if value.raw.nil? || consumed.includes?(name)
+            if carry.includes?(name) && !mapped.has_key?(name)
+              carried[name] = value
+            elsif name == "extra" && (table = value.as_h?)
+              # An `[extra]` table (what `tool export` writes) is merged, not
+              # nested one level deeper as `extra.extra`.
+              table.each { |k, v| extra[k] = v }
+            else
+              extra[key] = value
+            end
+          end
+          carried["extra"] = YAML::Any.new(extra) unless extra.empty?
+          carried
         end
 
         # Convert title to a URL-safe slug
@@ -630,6 +683,9 @@ module Hwaro
         # Obsidian Properties template writes a bare `title:`), so callers can
         # fall back to a filename or heading title instead of storing "".
         protected def yaml_title(value : YAML::Any) : String?
+          # `title: {{title}}` (an unfilled template placeholder) parses as a
+          # nested mapping; its inspect form is not a title.
+          return if value.as_h? || value.as_a?
           title = yaml_string(value)
           title.blank? ? nil : title
         end

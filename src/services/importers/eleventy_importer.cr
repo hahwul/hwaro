@@ -12,6 +12,17 @@ module Hwaro
         # Nunjucks/Liquid tag patterns
         TEMPLATE_TAG_PATTERN = /\{[%{].*?[%}]\}/
 
+        # Keys `import_file` maps (or consumes) itself; every other key
+        # (`author`, `eleventyNavigation`, …) goes to `[extra]`.
+        MAPPED_KEYS = Set{
+          "title", "date", "draft", "eleventyExcludeFromCollections", "tags",
+          "description", "excerpt", "summary", "image", "featuredImage",
+          "cover", "layout", "permalink",
+        }
+
+        # Config files that can declare `dir: { input: "…" }`.
+        CONFIG_FILES = {"eleventy.config.js", "eleventy.config.cjs", "eleventy.config.mjs", "eleventy.config.ts", ".eleventy.js"}
+
         # Paths (section/slug) written this run, to disambiguate collisions.
         @used_paths = Set(String).new
 
@@ -33,6 +44,8 @@ module Hwaro
             )
           end
 
+          path = input_dir(path)
+
           # 11ty content can be anywhere; common locations are src/, posts/, content/
           # Also check the root for .md files
           files = collect_content_files(path)
@@ -48,9 +61,32 @@ module Hwaro
           # Load directory data files (11ty convention)
           dir_data = load_directory_data(path)
 
+          warn_unimported_assets(path, [""], ->(entry : String) { entry.starts_with?(".") || entry == "node_modules" || entry == "_site" })
+
           import_each(files, "Eleventy", wrapped_note: "contained Nunjucks/Liquid template tags. Imports kept the raw syntax — each will render as literal text until you hand-convert them.") do |file_path|
             import_file(file_path, path, output_dir, dir_data, options.drafts, options.verbose, options.force)
           end
+        end
+
+        # The project's content root: the `dir.input` its config declares
+        # (`src`, `content`, …), or `path` itself. Reading from the project
+        # root instead made the input folder the first path segment of every
+        # page (`content/content/blog/post.md`).
+        private def input_dir(path : String) : String
+          CONFIG_FILES.each do |name|
+            file = File.join(path, name)
+            next unless File.file?(file)
+            text = File.read(file).scrub
+            next unless match = text.match(/\binput\s*:\s*["'`]([^"'`]+)["'`]/)
+            input = match[1].strip('/')
+            next if input.empty? || input == "." || input.split('/').includes?("..")
+            dir = File.join(path, input)
+            if Dir.exists?(dir) && Utils::PathUtils.resolves_within?(dir, path)
+              Logger.debug "Using Eleventy input directory #{dir}"
+              return dir
+            end
+          end
+          path
         end
 
         private def collect_content_files(path : String) : Array(String)
@@ -320,6 +356,9 @@ module Hwaro
           end
 
           frontmatter = generate_frontmatter(fields)
+          if merged_yaml && (merged = YAML.parse(merged_yaml)).as_h?
+            frontmatter = append_frontmatter(frontmatter, unmapped_fields(merged, fields, MAPPED_KEYS))
+          end
           body = strip_redundant_title_h1(body, fields["title"]?.as?(String))
           written = write_content_file(output_dir, section, slug, frontmatter, body.strip, verbose, force)
           return :skipped unless written
@@ -332,7 +371,16 @@ module Hwaro
           relative_dir : String,
           frontmatter_yaml : String?,
         ) : String?
-          dir_defaults = dir_data[relative_dir]?
+          # 11ty applies a directory's data file to every file below it, the
+          # nearest directory winning: `blog/blog.json` also covers
+          # `blog/2023/post.md`. Merge the chain from the root down.
+          dir_defaults = nil
+          chain = [""]
+          relative_dir.split('/', remove_empty: true).each { |part| chain << (chain.last.empty? ? part : "#{chain.last}/#{part}") }
+          chain.each do |dir|
+            next unless data = dir_data[dir]?
+            (dir_defaults ||= {} of String => YAML::Any).merge!(data)
+          end
 
           if frontmatter_yaml
             if dir_defaults

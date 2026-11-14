@@ -3,6 +3,23 @@ require "../../../../src/services/importers/notion_importer"
 
 describe Hwaro::Services::Importers::NotionImporter do
   describe "#run" do
+    it "maps a database page's Created/Tags properties to front matter and keeps the rest" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "Trip abcdefabcdefabcdefabcdefabcdefab.md"),
+          "# Trip\n\nCreated: October 10, 2022 10:30 AM\nTags: travel, asia\nStatus: Done\n\nBody text\n")
+
+        output_dir = File.join(dir, "output")
+        Hwaro::Services::Importers::NotionImporter.new.run(Hwaro::Config::Options::ImportOptions.new(
+          source_type: "notion", path: dir, output_dir: output_dir))
+
+        out = File.read(File.join(output_dir, "posts", "trip.md"))
+        out.should contain(%(date = "2022-10-10))
+        out.should contain(%(tags = ["travel", "asia"]))
+        out.should contain("Status: Done")
+        out.should_not contain("Created:")
+      end
+    end
+
     it "imports a Notion markdown export with YAML frontmatter" do
       Dir.mktmpdir do |dir|
         post_content = <<-NOTION

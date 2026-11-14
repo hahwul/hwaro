@@ -9,6 +9,14 @@ module Hwaro
         # Astro uses content collections in src/content/ directory
         # Frontmatter is YAML between --- delimiters
 
+        # Keys `import_file` maps (or consumes) itself. Every other key
+        # (`category`, `order`, `sidebar`, …) goes to `[extra]`.
+        MAPPED_KEYS = Set{
+          "title", "pubDate", "date", "publishDate", "updatedDate", "updated",
+          "lastmod", "draft", "description", "tags", "categories", "heroImage",
+          "image", "cover", "author", "slug",
+        }
+
         def run(options : Config::Options::ImportOptions) : ImportResult
           path = options.path
           output_dir = options.output_dir
@@ -40,6 +48,8 @@ module Hwaro
               skipped_count: outside_source_skips,
             )
           end
+
+          warn_unimported_assets(path, ["public", "src/assets"])
 
           import_each(files, "Astro", wrapped_note: "contained MDX components. Imports kept the raw markup — each will render as literal text until you hand-convert them.") do |file_path|
             import_file(file_path, content_dir, output_dir, options.drafts, options.verbose, options.force)
@@ -178,7 +188,16 @@ module Hwaro
           end
           slug = file_slug(base)
 
+          # A `slug` field overrides the id Astro derives from the file name,
+          # which is the page's URL segment; only a leaf bundle keeps its
+          # directory name. Without this the page moved to the file name.
+          if yaml && !bundle && (custom = yaml["slug"]?.try(&.as_s?))
+            custom_slug = file_slug(safe_filename_component(custom))
+            slug = custom_slug unless custom_slug.empty?
+          end
+
           frontmatter = generate_frontmatter(fields)
+          frontmatter = append_frontmatter(frontmatter, unmapped_fields(yaml, fields, MAPPED_KEYS)) if yaml
           body = strip_redundant_title_h1(body, fields["title"]?.as?(String))
 
           # A bundle with co-located files (`cover.png` beside `index.md`) is

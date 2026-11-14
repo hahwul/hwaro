@@ -61,6 +61,8 @@ module Hwaro
           content_cache = {} of String => String
           link_map = build_link_map(files, path, output_dir, options.drafts, content_cache)
 
+          warn_unimported_assets(path, [""], ->(entry : String) { entry.starts_with?(".") })
+
           import_each(files, "Obsidian") do |file_path|
             import_file(file_path, path, output_dir, options.drafts, options.verbose, options.force, link_map, content_cache)
           end

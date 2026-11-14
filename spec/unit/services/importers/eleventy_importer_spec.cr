@@ -3,6 +3,35 @@ require "../../../../src/services/importers/eleventy_importer"
 
 describe Hwaro::Services::Importers::EleventyImporter do
   describe "#run" do
+    it "reads the content root declared by dir.input instead of prefixing it to every page" do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "content", "blog"))
+        File.write(File.join(dir, "eleventy.config.js"), %(module.exports = () => ({ dir: { input: "content" } });\n))
+        File.write(File.join(dir, "content", "blog", "p.md"), "---\ntitle: P\n---\nbody\n")
+
+        output_dir = File.join(dir, "output")
+        Hwaro::Services::Importers::EleventyImporter.new.run(Hwaro::Config::Options::ImportOptions.new(
+          source_type: "eleventy", path: dir, output_dir: output_dir))
+
+        File.exists?(File.join(output_dir, "blog", "p.md")).should be_true
+        Dir.exists?(File.join(output_dir, "content")).should be_false
+      end
+    end
+
+    it "applies directory data to nested directories and keeps unmapped keys in [extra]" do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "blog", "2023"))
+        File.write(File.join(dir, "blog", "blog.json"), %({"author": "Dir Author"}))
+        File.write(File.join(dir, "blog", "2023", "p.md"), "---\ntitle: P\n---\nbody\n")
+
+        output_dir = File.join(dir, "output")
+        Hwaro::Services::Importers::EleventyImporter.new.run(Hwaro::Config::Options::ImportOptions.new(
+          source_type: "eleventy", path: dir, output_dir: output_dir))
+
+        File.read(File.join(output_dir, "blog", "p.md")).should contain(%(author = "Dir Author"))
+      end
+    end
+
     it "imports a basic Eleventy post" do
       Dir.mktmpdir do |dir|
         posts_dir = File.join(dir, "posts")

@@ -106,6 +106,11 @@ hwaro tool import hugo path/to/site --verbose
 - Hugo: 번역 파일(`about.ko.md`, `index.ko.md`)은 `slug`가 있어도 언어 접미사를 유지하고, 번역된 번들은 기본 언어 번들의 디렉터리를 따릅니다. `index.<lang>.md`와 `_index.md` 옆의 에셋도 함께 복사하며, 리프 번들은 하위 디렉터리(`images/cover.png`)의 파일도 중첩된 번들 전까지 복사합니다. 에셋이 있는 Astro 번들은 파일과 함께 번들(`blog/<name>/index.md`)로 저장됩니다.
 - Notion: 이모지 콜아웃(`> 💡 텍스트`)만 평탄화하고, 일반 인용문·코드 펜스·인라인 코드는 그대로 둡니다.
 - WordPress: `<script>`와 `<style>`은 내용과 함께 제거되고, `<iframe>`, `<video>`, `<audio>` 임베드는 `src`(와 숫자 크기)만 가진 HTML로 유지됩니다.
+- WordPress: 글의 원래 퍼머링크(`<link>`)가 새 주소와 다르면 별칭이 되어 기존 인바운드 링크가 계속 동작합니다. `<wp:post_modified>`는 작성일보다 늦을 때만 `updated`가 되고, `_thumbnail_id` 첨부 파일은 `image`가 되며, 태그·카테고리 이름의 HTML 이스케이프는 풀립니다. hwaro가 변환할 수 없는 숏코드(`[gallery …]`)는 글 제목을 알리는 경고와 함께 문자 그대로 남습니다. 페이지는 부모 페이지와 상관없이 평평하게 저장되고, 옛 중첩 주소는 별칭으로 유지됩니다.
+- Notion: 데이터베이스 페이지 제목 아래의 속성 블록을 프론트 매터로 읽습니다. `Created`, `Date`, `Published`는 `date`(시각은 버림), `Last edited`는 `updated`, `Tags`는 `tags`가 됩니다. 그 밖의 속성(`Status: Done`)은 본문에 남습니다.
+- Hexo, Astro, Eleventy: 매핑이 없는 프론트 매터 키(`mathjax`, `category`, `eleventyNavigation` 등)는 Jekyll·Hugo와 마찬가지로 `[extra]`로 옮겨집니다. Astro는 `slug` 필드를 페이지 파일 이름으로 사용합니다. Eleventy는 설정 파일의 `dir.input`이 가리키는 콘텐츠 루트를 읽고, 디렉터리 데이터 파일(`blog/blog.json`)을 하위 디렉터리에도 적용합니다.
+- Jekyll: 프론트 매터 `slug`가 파일 이름의 슬러그를 대체하고, `tool export jekyll`이 쓴 `[extra]` 테이블과 hwaro 키(`authors`, `weight`, `series`, `translation_key`)는 내보낸 그대로 돌아옵니다.
+- 마크다운만 가져옵니다(페이지 번들 에셋 제외). 소스의 다른 위치(`static/`, `assets/`, `public/`, Obsidian 첨부 폴더, Notion 내보내기의 페이지 폴더)에 이미지나 다운로드 파일이 있으면 개수와 함께 경고합니다. 이미지 링크가 계속 동작하도록 사이트의 `static/` 디렉터리(또는 페이지 옆)로 복사하세요.
 
 ## 출력 예시
 

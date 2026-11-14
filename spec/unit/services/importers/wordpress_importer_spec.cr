@@ -486,3 +486,67 @@ describe Hwaro::Services::Importers::WordPressImporter do
     end
   end
 end
+
+RICH_WXR = <<-XML
+  <?xml version="1.0" encoding="UTF-8"?>
+  <rss version="2.0"
+    xmlns:wp="http://wordpress.org/export/1.2/"
+    xmlns:content="http://purl.org/rss/1.0/modules/content/"
+    xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/">
+  <channel>
+    <item>
+      <title>Hello</title>
+      <link>https://old.example.com/2023/05/10/hello/</link>
+      <wp:post_id>1</wp:post_id>
+      <wp:post_date>2023-05-10 17:00:00</wp:post_date>
+      <wp:post_modified>2023-06-01 10:00:00</wp:post_modified>
+      <wp:post_name>hello</wp:post_name>
+      <wp:status>publish</wp:status>
+      <wp:post_type>post</wp:post_type>
+      <category domain="post_tag" nicename="a-b"><![CDATA[A &amp; B]]></category>
+      <wp:postmeta><wp:meta_key>_thumbnail_id</wp:meta_key><wp:meta_value>5</wp:meta_value></wp:postmeta>
+      <content:encoded><![CDATA[<p>Body</p><p>[gallery ids="1,2"]</p>]]></content:encoded>
+    </item>
+    <item>
+      <title>pic</title>
+      <wp:post_id>5</wp:post_id>
+      <wp:post_type>attachment</wp:post_type>
+      <wp:attachment_url>https://old.example.com/wp-content/uploads/pic.jpg</wp:attachment_url>
+    </item>
+    <item>
+      <title>Home</title>
+      <link>https://old.example.com/?p=9</link>
+      <wp:post_id>9</wp:post_id>
+      <wp:post_date>2023-05-11 17:00:00</wp:post_date>
+      <wp:post_name>plain</wp:post_name>
+      <wp:status>publish</wp:status>
+      <wp:post_type>post</wp:post_type>
+      <content:encoded><![CDATA[<p>Plain</p>]]></content:encoded>
+    </item>
+  </channel>
+  </rss>
+  XML
+
+describe "WordPress import: fields the export declares" do
+  it "keeps the old permalink as an alias, the edit time, the featured image and unescaped term names, and reports shortcodes" do
+    Dir.mktmpdir do |dir|
+      wxr = File.join(dir, "export.xml")
+      File.write(wxr, RICH_WXR)
+      output_dir = File.join(dir, "output")
+      log = with_captured_log do
+        Hwaro::Services::Importers::WordPressImporter.new.run(Hwaro::Config::Options::ImportOptions.new(
+          source_type: "wordpress", path: wxr, output_dir: output_dir))
+      end
+
+      out = File.read(File.join(output_dir, "posts", "hello.md"))
+      out.should contain(%(aliases = ["/2023/05/10/hello/"]))
+      out.should contain(%(updated = "2023-06-01T10:00:00Z"))
+      out.should contain(%(image = "https://old.example.com/wp-content/uploads/pic.jpg"))
+      out.should contain(%(tags = ["A & B"]))
+      log.should contain("WordPress shortcodes in")
+
+      # A `?p=ID` permalink names no path to alias.
+      File.read(File.join(output_dir, "posts", "plain.md")).should_not contain("aliases")
+    end
+  end
+end
