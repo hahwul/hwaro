@@ -18,7 +18,6 @@ module Hwaro
         # When math is also enabled, `preprocess` stashes `$…$`/`$$…$$`
         # spans into opaque placeholders before this pass runs, so `$~~x~~$`
         # reaches KaTeX verbatim instead of being rewritten here.
-        STRIKETHROUGH_RE      = InlineMarkdown::INLINE_STRIKETHROUGH_RE
         STRIKETHROUGH_CODE_RE = /`[^`]+`/
         LINK_DEST_TOKEN_RE    = /\x00LD(\d{1,9})\x00/
         HTML_TAG_TOKEN_RE     = /\x00HT(\d{1,9})\x00/
@@ -50,7 +49,7 @@ module Hwaro
         private def rewrite_strikethrough_line(line : String, *, trusted : Bool = false) : String
           # Stash inline code spans so a `~~` inside backticks is not rewritten.
           transform_outside_code_spans(line) do |stashed|
-            stashed.gsub(STRIKETHROUGH_RE) { "#{trust("<del>", trusted)}#{$1}</del>" }
+            InlineMarkdown.gsub_delimited(stashed, InlineMarkdown::STRIKETHROUGH) { |m| "#{trust("<del>", trusted)}#{m[1]}</del>" }
           end
         end
 
