@@ -455,6 +455,7 @@ Two things to keep in mind when you build contributed content:
 
 - `include_code` and `include_md` let a page publish any file inside the project root, such as `config.toml`, a `.env` file or a `data/` file. `.git/`, `.hwaro/`, the output directory and anything outside the project are refused. Keep credentials in the environment (`${VAR}`), not in files the site could include.
 - `hwaro tool check-links` requests every external URL found in content (private and loopback addresses are skipped). Run it on contributed content with the same care as any crawler.
+- A build writes only inside its output directory. A page URL, alias or redirect stub whose path would leave it (a `..` segment, also when percent-encoded or written with backslashes) is not published, with a warning; taxonomy terms and `[[content.generate]]` slugs are slugified and cannot hold a separator at all. Symlinks in `content/` and `static/` that resolve outside the project are skipped with a warning, and directory symlinks in `static/` are not followed.
 
 ## See Also
 
