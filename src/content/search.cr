@@ -180,6 +180,7 @@ module Hwaro
       # `max <= 0` disables truncation.
       def self.truncate_words(text : String, max : Int32) : String
         return text if max <= 0 || text.size <= max
+        max = Utils::TextUtils.cluster_cut(text, max)
         cut = text[0, max]
         # A cut that already ends on a word boundary (the next character is
         # whitespace) keeps its last word; otherwise back up to the last
@@ -337,7 +338,7 @@ module Hwaro
               # XSS safety is the renderer's job — every bundled search UI
               # escapes via escapeHtml() before innerHTML (like feeds escape
               # via escape_xml), so defense belongs there, not in the data.
-              title = page.title.empty? ? config.title : page.title
+              title = Utils::TextUtils.nfc(page.title.empty? ? config.title : page.title)
               data["title"] = cjk ? Utils::TextUtils.tokenize_cjk(title) : title
             when "content"
               html_content = page_html(page, config)
@@ -349,7 +350,7 @@ module Hwaro
             when "section"
               data["section"] = page.section
             when "description"
-              desc = page.description || ""
+              desc = Utils::TextUtils.nfc(page.description || "")
               data["description"] = cjk ? Utils::TextUtils.tokenize_cjk(desc) : desc
             end
           end
@@ -378,7 +379,7 @@ module Hwaro
           if split
             html_content ||= page_html(page, config)
             title = data["title"]? || begin
-              raw_title = page.title.empty? ? config.title : page.title
+              raw_title = Utils::TextUtils.nfc(page.title.empty? ? config.title : page.title)
               cjk ? Utils::TextUtils.tokenize_cjk(raw_title) : raw_title
             end
             page_url = data["url"].as(String)
@@ -413,7 +414,7 @@ module Hwaro
       # stored string. Truncation runs after CJK tokenization so the cap
       # bounds what actually lands in the file.
       private def self.plain_text(html : String, cjk : Bool, max : Int32) : String
-        text = HTML.unescape(Utils::TextUtils.strip_html(html))
+        text = Utils::TextUtils.nfc(HTML.unescape(Utils::TextUtils.strip_html(html)))
         text = Utils::TextUtils.tokenize_cjk(text) if cjk
         truncate_words(text, max)
       end

@@ -78,6 +78,14 @@ module Hwaro
         "#{message[0, max]}… (truncated, #{message.size} characters)"
       end
 
+      # `text` in Unicode normalization form C (precomposed Hangul and Latin).
+      # ASCII, the common case, is returned as is. Search indexes store NFC
+      # because that is what a keyboard types, whatever form the page was
+      # saved in (macOS tools and copy-paste from file names produce NFD).
+      def nfc(text : String) : String
+        text.ascii_only? ? text : text.unicode_normalize(:nfc)
+      end
+
       # The grapheme-cluster boundary (a CHARACTER index) nearest to `idx` that
       # does not lie after it: a cut there never separates a base from its
       # combining marks, the parts of a ZWJ emoji / flag / skin-tone sequence,

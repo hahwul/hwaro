@@ -145,4 +145,8 @@ describe "Hwaro::Utils::TextUtils grapheme-safe cuts" do
   it "treats CR LF as one cluster" do
     u.cluster_cut("a\r\nb", 2).should eq(1)
   end
+  it "normalises to NFC only when needed" do
+    u.nfc("abc").should eq("abc")
+    u.nfc("\u1112\u1161\u11AB").should eq("한")
+  end
 end

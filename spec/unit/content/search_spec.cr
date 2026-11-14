@@ -676,3 +676,23 @@ describe "CJK tokenization in search" do
     end
   end
 end
+
+describe "search index normalization" do
+  it "stores Hangul saved as NFD in NFC so a typed query finds it" do
+    config = Hwaro::Models::Config.new
+    config.search.enabled = true
+    config.search.fields = ["title", "content"]
+    page = Hwaro::Models::Page.new("test.md")
+    page.title = "\u1112\u1161\u11AB\u1100\u1173\u11AF"
+    page.url = "/test/"
+    page.draft = false
+    page.raw_content = "\u1112\u1161\u11AB\u1100\u1173\u11AF \u1100\u1165\u11B7\u1109\u1162\u11A8"
+
+    Dir.mktmpdir do |output_dir|
+      Hwaro::Content::Search.generate([page], config, output_dir)
+      content = File.read(File.join(output_dir, "search.json"))
+      content.should contain("한글")
+      content.should contain("검색")
+    end
+  end
+end
