@@ -616,6 +616,7 @@ module Hwaro::Core::Build::Phases::Initialize
     # logging it let the build exit 0 and deploy a site missing the file,
     # where an unreadable page-bundle asset fails the build.
     failure : Exception? = nil
+    failure_idx = Int32::MAX
     failure_mutex = Mutex.new
 
     ParallelHelper.each_concurrently(files_to_copy, worker_count) do |(src, dest, src_mtime), _worker_id|
@@ -650,7 +651,15 @@ module Hwaro::Core::Build::Phases::Initialize
         next
       end
       Logger.error "Copy failed #{src} -> #{dest}: #{ex.message}"
-      failure_mutex.synchronize { failure ||= ex }
+      # The failing file that comes first in copy order, not the first to
+      # fail, so the error that ends the build does not depend on scheduling.
+      idx = files_to_copy.index { |entry| entry[0] == src } || Int32::MAX
+      failure_mutex.synchronize do
+        if idx < failure_idx
+          failure_idx = idx
+          failure = ex
+        end
+      end
     end
     failure.try { |ex| raise ex }
   end

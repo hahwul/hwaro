@@ -240,6 +240,50 @@ describe Hwaro::Core::Build::ParallelHelper do
       seen.sort.should eq((1..50).to_a)
       ids.all? { |id| (0...4).includes?(id) }.should be_true
     end
+
+    it "prints what the items log in item order, not completion order" do
+      sink = IO::Memory.new
+      previous_io = Hwaro::Logger.io
+      previous_color = Hwaro::Logger.color_override?
+      Hwaro::Logger.io = Hwaro::Logger::GuardedIO.new(sink)
+      Hwaro::Logger.color_enabled = false
+      begin
+        # Item 0 cannot log until item 1 has logged and finished, so the
+        # completion order is the reverse of the item order.
+        gate = Channel(Nil).new(1)
+        Hwaro::Core::Build::ParallelHelper.each_concurrently([0, 1], 2) do |item, _worker_id|
+          gate.receive if item == 0
+          Hwaro::Logger.warn "item #{item}"
+          gate.send(nil) if item == 1
+        end
+      ensure
+        Hwaro::Logger.io = previous_io
+        Hwaro::Logger.color_enabled = previous_color
+      end
+      sink.to_s.should eq("[WARN] item 0\n[WARN] item 1\n")
+    end
+
+    it "prints live under --verbose (debug level) instead of holding lines back" do
+      sink = IO::Memory.new
+      previous_io = Hwaro::Logger.io
+      previous_color = Hwaro::Logger.color_override?
+      previous_level = Hwaro::Logger.level
+      Hwaro::Logger.io = Hwaro::Logger::GuardedIO.new(sink)
+      Hwaro::Logger.color_enabled = false
+      Hwaro::Logger.level = Hwaro::Logger::Level::Debug
+      seen_live = false
+      begin
+        Hwaro::Core::Build::ParallelHelper.each_concurrently([0], 1) do |_item, _worker_id|
+          Hwaro::Logger.warn "live"
+          seen_live = sink.to_s.includes?("live")
+        end
+      ensure
+        Hwaro::Logger.io = previous_io
+        Hwaro::Logger.color_enabled = previous_color
+        Hwaro::Logger.level = previous_level
+      end
+      seen_live.should be_true
+    end
   end
 
   describe ".map" do
@@ -270,6 +314,18 @@ describe Hwaro::Core::Build::ParallelHelper do
   end
 
   describe ".execute" do
+    it "raises the failure of the first task in the list, not the first to fail" do
+      gate = Channel(Nil).new(1)
+      tasks = [
+        -> : Nil { gate.receive; raise "first task failed" },
+        -> : Nil { gate.send(nil); raise "second task failed" },
+      ]
+      ex = expect_raises(Hwaro::HwaroError) do
+        Hwaro::Core::Build::ParallelHelper.execute(tasks, parallel: true)
+      end
+      ex.message.to_s.should contain("first task failed")
+    end
+
     it "executes all tasks" do
       counter = Atomic(Int32).new(0)
       tasks = [

@@ -19,6 +19,10 @@ class Fiber
   # Warnings this fiber has printed for the page it renders; see
   # `Logger.dedupe_warnings`.
   property hwaro_warned : Set(String)? = nil
+
+  # While set, `Logger::GuardedIO` collects this fiber's writes here instead
+  # of printing them; see `Logger.capturing` / `Logger.replay`.
+  property hwaro_log_capture : Array(Tuple(IO, Bytes))? = nil
 end
 
 module Hwaro
@@ -51,6 +55,10 @@ module Hwaro
       end
 
       def write(slice : Bytes) : Nil
+        if capture = Fiber.current.hwaro_log_capture
+          capture << {self.as(IO), slice.dup}
+          return
+        end
         @mutex.synchronize do
           return if @gone
           @io.write(slice)
@@ -237,6 +245,36 @@ module Hwaro
         @@err_io.puts "#{glyph(:warn)} #{paint(message, Role::Warn)}"
       else
         @@err_io.puts "[WARN] #{message}"
+      end
+    end
+
+    # Lines a fiber printed while `capturing`, in print order.
+    alias Captured = Array(Tuple(IO, Bytes))
+
+    # Run the block with this fiber's terminal output held in `into` instead
+    # of printed. A parallel fan-out captures each item separately and replays
+    # the captures in item order, so warnings read the same at every worker
+    # count rather than in completion order.
+    #
+    # Not under `--verbose` (debug level): that is the live trace read to see
+    # where a build stopped, and held-back lines would never print if the
+    # build hung or was killed.
+    def self.capturing(into : Captured, &)
+      return yield if @@level.debug?
+      previous = Fiber.current.hwaro_log_capture
+      Fiber.current.hwaro_log_capture = into
+      begin
+        yield
+      ensure
+        Fiber.current.hwaro_log_capture = previous
+      end
+    end
+
+    # Print captured lines (from a fiber that is not itself capturing).
+    def self.replay(captured : Captured) : Nil
+      captured.each do |io, bytes|
+        clear_active_line
+        io.write(bytes)
       end
     end
 

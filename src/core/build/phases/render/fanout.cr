@@ -43,6 +43,7 @@ module Hwaro::Core::Build::Phases::Render
     # can abort deterministically once every page has been handled.
     published_before = @published_pages.get
     classified_error : Hwaro::HwaroError? = nil
+    classified_idx = Int32::MAX
     error_mutex = Mutex.new
 
     # Accumulate per-page failures rather than logging immediately.
@@ -65,13 +66,21 @@ module Hwaro::Core::Build::Phases::Render
       end
       record_page_cache_entry(page, cache, templates, site, output_dir)
     rescue ex : Hwaro::HwaroError
+      idx = pages.index(&.same?(page)) || Int32::MAX
       error_mutex.synchronize do
-        classified_error ||= ex
+        if idx < classified_idx
+          classified_idx = idx
+          classified_error = ex
+        end
         failures << {page_path: page.path, message: ex.message.to_s}
       end
     rescue ex : IO::Error
+      idx = pages.index(&.same?(page)) || Int32::MAX
       error_mutex.synchronize do
-        classified_error ||= output_write_error(page, ex)
+        if idx < classified_idx
+          classified_idx = idx
+          classified_error = output_write_error(page, ex)
+        end
         failures << {page_path: page.path, message: ex.message.to_s}
         io_signatures[ex.message.to_s] = io_error_signature(ex)
       end
@@ -89,6 +98,15 @@ module Hwaro::Core::Build::Phases::Render
       end
       Logger.debug "  Template: #{template_name}, Section: #{page.section}"
       Logger.debug "  Backtrace: #{ex.backtrace?.try(&.first(3).join("\n    ")) || "unavailable"}"
+    end
+
+    # Which page failed first is a race. Report in page order, and let the
+    # lowest failing page pick the exit code and the final error line, so a
+    # build with several broken pages says the same thing at every worker count.
+    unless failures.empty?
+      order = {} of String => Int32
+      pages.each_with_index { |page, idx| order[page.path] ||= idx }
+      failures.sort_by! { |failure| order[failure[:page_path]]? || Int32::MAX }
     end
 
     finalize_render_failures(failures, classified_error, verbose, io_signatures)
