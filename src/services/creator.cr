@@ -946,7 +946,9 @@ module Hwaro
         # Escape backslash FIRST, then quotes — otherwise a value like `C:\path`
         # or a trailing `\` produces invalid TOML/YAML basic strings (e.g. a
         # trailing `\"` escapes the closing quote).
-        value.gsub("\\", "\\\\").gsub("\"", "\\\"").gsub("\n", " ")
+        # Control characters (a pasted `\r`, ESC, DEL) are escaped too: a raw
+        # one makes the quoted scalar invalid TOML/YAML for every other reader.
+        Utils::FrontmatterWriter.escape_toml_string(value.gsub("\n", " "))
       end
     end
   end
