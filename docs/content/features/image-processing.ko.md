@@ -102,7 +102,7 @@ dimensions = true   # enabled = true가 필요 없습니다
 <img width="512" height="512" src="/hwaro.png" alt="Logo" />
 ```
 
-- 크기는 디코딩하지 않고 파일 헤더에서 읽습니다: JPEG, PNG, BMP, GIF, WebP, SVG(픽셀 단위 `width`/`height`, 없으면 `viewBox`).
+- 크기는 디코딩하지 않고 파일 헤더에서 읽습니다: JPEG, PNG, BMP, GIF, WebP, SVG(픽셀 단위 `width`/`height`, 없으면 `viewBox`). 한쪽이 16,777,216픽셀을 넘는다고 적힌 헤더는 손상된 것으로 보고 속성을 붙이지 않습니다.
 - 로컬 파일로 이어지는 이미지만 다룹니다: 페이지 번들 에셋, `static/` 파일, `[content.files]` 복사본. 외부 URL이나 없거나 읽을 수 없는 파일은 그대로 둡니다.
 - 이미 `width`나 `height`가 있는 태그는 건드리지 않습니다.
 - 반응형 `srcset` 변형이 붙어도 속성 값은 원본 이미지의 크기입니다.

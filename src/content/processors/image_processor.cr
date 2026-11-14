@@ -50,6 +50,11 @@ module Hwaro
         # through to a 150 MB decode and a 1.6 GB resize.
         MAX_BMP_DECODE_RATIO = 64_i64
 
+        # Largest width or height `dimensions` reports: stb refuses anything
+        # bigger (STBI_MAX_DIMENSIONS), so a header claiming more is corrupt
+        # and must not reach a page as `width="2147483647"`.
+        MAX_DIMENSION = 1 << 24
+
         # Files (path + version) already warned about: an OG logo is decoded
         # again for every page, and must not print once per page.
         @@implausible_warned = Set(String).new
@@ -99,14 +104,15 @@ module Hwaro
           return unless File.file?(path)
           header = Bytes.new(30)
           head = header[0, read_header(path, header)]
-          case sniff(head) || File.extname(path).downcase
-          when ".png"          then png_dimensions(head)
-          when ".jpg", ".jpeg" then jpeg_dimensions(path)
-          when ".bmp"          then bmp_dimensions(head)
-          when ".gif"          then gif_dimensions(head)
-          when ".webp"         then webp_dimensions(head)
-          when ".svg"          then svg_dimensions(path)
-          end
+          size = case sniff(head) || File.extname(path).downcase
+                 when ".png"          then png_dimensions(head)
+                 when ".jpg", ".jpeg" then jpeg_dimensions(path)
+                 when ".bmp"          then bmp_dimensions(head)
+                 when ".gif"          then gif_dimensions(head)
+                 when ".webp"         then webp_dimensions(head)
+                 when ".svg"          then svg_dimensions(path)
+                 end
+          size if size && size.max <= MAX_DIMENSION
         rescue ex
           # A best-effort probe: a hostile or truncated header must never
           # fail the page that asked (callers fall back to no size).

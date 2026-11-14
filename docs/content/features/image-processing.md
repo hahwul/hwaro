@@ -102,7 +102,7 @@ dimensions = true   # does not need enabled = true
 <img width="512" height="512" src="/hwaro.png" alt="Logo" />
 ```
 
-- Sizes are read from file headers, not by decoding: JPEG, PNG, BMP, GIF, WebP and SVG (`width`/`height` in pixels, falling back to the `viewBox`).
+- Sizes are read from file headers, not by decoding: JPEG, PNG, BMP, GIF, WebP and SVG (`width`/`height` in pixels, falling back to the `viewBox`). A header claiming more than 16,777,216 pixels in either direction is treated as corrupt and gets no attributes.
 - Only images that resolve to a local file are touched: page bundle assets, `static/` files and `[content.files]` copies. External URLs and missing or unreadable files are left as they are.
 - A tag that already sets `width` or `height` is left untouched.
 - When responsive `srcset` variants are added, the attributes are still the original image's size.

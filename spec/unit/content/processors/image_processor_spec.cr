@@ -1314,3 +1314,23 @@ describe "ImageProcessor.implausible_size? for BMP" do
     end
   end
 end
+
+describe "ImageProcessor.dimensions on absurd header sizes" do
+  processor = Hwaro::Content::Processors::ImageProcessor
+
+  it "reports nothing for a size stb would refuse" do
+    Dir.mktmpdir do |dir|
+      png = ->(w : UInt32) do
+        bytes = PNG_1X1.dup
+        IO::ByteFormat::BigEndian.encode(w, bytes[16, 4])
+        bytes
+      end
+      processor.dimensions(write_bytes(dir, "ok.png", png.call(16_777_216_u32))).should eq({16_777_216, 1})
+      processor.dimensions(write_bytes(dir, "big.png", png.call(16_777_217_u32))).should be_nil
+      processor.dimensions(write_bytes(dir, "max.png", png.call(Int32::MAX.to_u32))).should be_nil
+      bmp = "BM".bytes + le32(54) + le32(0) + le32(54) + le32(40) + le32(Int32::MAX) + le32(1) + le16(1) + le16(24) + [0_u8] * 24
+      processor.dimensions(write_bytes(dir, "big.bmp", Bytes.new(bmp.size) { |i| bmp[i] })).should be_nil
+      processor.dimensions(write_bytes(dir, "big.svg", %(<svg width="2000000000" height="5"/>).to_slice)).should be_nil
+    end
+  end
+end
