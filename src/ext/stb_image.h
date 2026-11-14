@@ -5124,6 +5124,7 @@ static int stbi__parse_png_file(stbi__png *z, int scan, int req_comp)
                // img_n is # components to decompress/filter.
                s->img_n = 1;
                if ((1 << 30) / s->img_x / 4 < s->img_y) return stbi__err("too large","Corrupt PNG");
+               memset(palette, 0, sizeof(palette)); // hwaro: backport of nothings/stb 298550ab (uninitialized palette leaked stack bytes into pixels)
             }
             // even with SCAN_header, have to scan to see if we have a tRNS
             break;
@@ -5599,6 +5600,7 @@ static void *stbi__bmp_load(stbi__context *s, int *x, int *y, int *comp, int req
    if (info.bpp < 16) {
       int z=0;
       if (psize == 0 || psize > 256) { STBI_FREE(out); return stbi__errpuc("invalid", "Corrupt BMP"); }
+      memset(pal, 0, sizeof(pal)); // hwaro: backport of nothings/stb f88444a1 (uninitialized palette entries)
       for (i=0; i < psize; ++i) {
          pal[i][2] = stbi__get8(s);
          pal[i][1] = stbi__get8(s);
