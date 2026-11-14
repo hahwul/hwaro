@@ -66,12 +66,12 @@ build already reads a null custom value as an empty string.
 }
 ```
 
-A run that fails before converting any file (a missing content directory, or
-every file failing) prints the standard error envelope
+A run that fails before reading any file (a missing content directory) prints
+the standard error envelope
 (`{"status": "error", "error": {"code", "category", "message", "hint"}}`)
-instead, with the same exit code as the human output. When some files were
-converted and others failed, the payload above is printed with
-`"success": false` and the counts, and the exit code is non-zero.
+instead. When individual files fail, the payload above is printed with
+`"success": false` and an `error_count` above zero. Both exit non-zero, with
+the same code as the human output.
 
 ## Skipped Files
 

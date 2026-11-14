@@ -68,12 +68,12 @@ full manifest before writing.
 }
 ```
 
-A run that fails before exporting any file (a missing content directory, or
-every file failing) prints the standard error envelope
+A run that fails before reading any file (no content files found) prints the
+standard error envelope
 (`{"status": "error", "error": {"code", "category", "message", "hint"}}`)
-instead, with the same exit code as the human output. When some files were
-exported and others failed, the manifest above is printed with
-`"success": false` and the counts, and the exit code is non-zero.
+instead. When individual files fail, the manifest above is printed with
+`"success": false` and an `error_count` above zero. Both exit non-zero, with
+the same code as the human output.
 
 `files` lists every destination written, content assets included,
 while the counts cover content documents only.

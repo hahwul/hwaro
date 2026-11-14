@@ -460,7 +460,7 @@ describe "hwaro tool convert" do
     end
   end
 
-  it "keeps the result payload for a partial --json failure and the envelope when nothing converted" do
+  it "keeps the result payload for per-file --json failures, even when nothing converted" do
     with_initialized_project do |project_dir|
       File.write(File.join(project_dir, "content", "bad.md"), "+++\ntitle = \"a\n+++\nhi\n")
       status, output, _ = run_hwaro(["tool", "convert", "to-yaml", "--json"], chdir: project_dir)
@@ -474,8 +474,9 @@ describe "hwaro tool convert" do
       status, output, _ = run_hwaro(["tool", "convert", "to-yaml", "--json"], chdir: project_dir)
       status.exit_code.should eq(Hwaro::Errors::EXIT_CONTENT)
       parsed = JSON.parse(output.strip)
-      parsed["status"].as_s.should eq("error")
-      parsed["error"]["code"].as_s.should eq("HWARO_E_CONTENT")
+      parsed["success"].as_bool.should be_false
+      parsed["converted_count"].as_i.should eq(0)
+      parsed["error_count"].as_i.should eq(1)
     end
   end
 

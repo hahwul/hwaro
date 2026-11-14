@@ -104,12 +104,11 @@ module Hwaro
                          hint: "Supported: #{POSITIONAL_CHOICES.join(", ")}.",
                        )
                      end
-            # A run that failed before converting anything is a plain error:
-            # the standard envelope. A PARTIAL failure (some files already
-            # rewritten) keeps the result payload, whose counts say how far
-            # it got, and still exits with the failure's class.
-            fail_conversion(result, json_output) if !result.success && result.converted_count == 0
-            puts result.to_json if json_output
+            # A run that failed before looking at any file (no content
+            # directory) has no result to report: `fail_conversion` prints
+            # the standard error envelope instead. Per-file failures keep the
+            # result payload, whose counts say how far the run got.
+            puts result.to_json if json_output && (result.success || result.error_count > 0)
             fail_conversion(result, json_output) unless result.success
           end
 
@@ -119,7 +118,8 @@ module Hwaro
           # `--json`.
           #
           # `--json` prints the standard error envelope (see
-          # `Runner.exit_with_error_payload`) when nothing was converted.
+          # `Runner.exit_with_error_payload`) when the run failed before
+          # processing any file (`error_count == 0`).
           #
           # BOTH modes exit with the same class: `HWARO_E_CONTENT` when every
           # failure was unparseable front matter (as `build` and `tool
@@ -131,7 +131,7 @@ module Hwaro
           private def fail_conversion(result : Services::ConversionResult, json_output : Bool) : NoReturn
             error = Hwaro::Errors.per_file_failure(result.message, result.error_count, result.content_error_count)
             if json_output
-              Runner.exit_with_error_payload(error) if result.converted_count == 0
+              Runner.exit_with_error_payload(error) if result.error_count == 0
               exit(error.exit_code)
             end
             raise error
