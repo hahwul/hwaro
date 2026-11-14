@@ -276,3 +276,22 @@ describe "summary shortcodes reading another page's summary" do
     end
   end
 end
+
+# The summary gets the body's subpath prefixing, including for a link that
+# only resolves site-relative under a base path a section shares.
+describe "marker summary under a base path a section shares" do
+  it "prefixes a link only its site-relative reading resolves" do
+    build_site(
+      %(title = "T"\nbase_url = "https://example.com/docs"\n),
+      content_files: {
+        "post.md"        => "+++\ntitle = \"P\"\n+++\nSee [only](/docs/only/).\n\n<!-- more -->\n\nRest.\n",
+        "docs/_index.md" => "+++\ntitle = \"Docs\"\n+++\n",
+        "docs/only.md"   => "+++\ntitle = \"Only\"\n+++\no",
+      },
+      template_files: {"page.html" => "SUM=[{{ page.summary }}]END", "section.html" => "{{ content }}"},
+    ) do |dir|
+      summary = File.read(File.join(dir, "public", "post", "index.html"))[/SUM=\[(.*?)\]END/m, 1]
+      summary.should contain(%(<a href="/docs/docs/only/">only</a>))
+    end
+  end
+end

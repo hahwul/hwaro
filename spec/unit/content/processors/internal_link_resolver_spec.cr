@@ -271,6 +271,14 @@ describe Hwaro::Content::Processors::InternalLinkResolver do
       ).should eq html
     end
 
+    it "prefixes an already-prefixed link only when its site-relative reading alone is a route" do
+      routes = Set{"/docs/only/", "/docs/both/", "/both/", "/about/", "/docs/f.pdf/"}
+      html = %(<a href="/docs/only/#x">s</a> <a href="/docs/both/">b</a> <a href="/docs/about/">p</a> <a href="/docs/none/">n</a> <img srcset="/docs/f.pdf 1x, /docs/about/ 2x">)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, "https://ex.io/docs", "/docs", ->(key : String) { routes.includes?(key) })
+        .should eq %(<a href="/docs/docs/only/#x">s</a> <a href="/docs/both/">b</a> <a href="/docs/about/">p</a> <a href="/docs/none/">n</a> <img srcset="/docs/docs/f.pdf 1x, /docs/about/ 2x">)
+      Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, "https://ex.io/docs", "/docs").should eq html
+    end
+
     it "prefixes a multi-segment nested base path" do
       html = %(<a href="/guide/intro/">Intro</a>)
       Hwaro::Content::Processors::InternalLinkResolver.prefix_root_relative_links(

@@ -134,6 +134,41 @@ module Hwaro::Core::Build::Phases::Render
     html
   end
 
+  # The `route` prefix_root_relative_links judges a `<base_path>/…` content
+  # link with (InternalLinkResolver.route_key form): every URL and alias of
+  # `link_targets`, the files published beside them, and the generated pages
+  # a hand-prefixed link most often names (the home and language homes,
+  # every taxonomy page). nil unless an authored route lives under
+  # `<base_path>/` itself (a `content/docs/` section under a `…/docs`
+  # base_url), so every other site keeps today's reading of such a link
+  # without walking its files. Once per pass, like pass_get_page_index.
+  private def pass_link_routes(site : Models::Site, link_targets : Hash(String, Models::Page)) : Proc(String, Bool)?
+    base_path = site.config.base_path
+    return if base_path.empty?
+    @page_template_hash_mutex.synchronize do
+      memo = @link_routes
+      return memo[1] if memo && memo[0].same?(link_targets)
+      prefix = "#{base_path}/"
+      pages = link_targets.values.uniq!
+      routes = Set(String).new
+      pages.each do |p|
+        routes << Content::Processors::InternalLinkResolver.route_key(p.url)
+        p.aliases.each { |a| routes << Content::Processors::InternalLinkResolver.route_key(a) }
+      end
+      if routes.any?(&.starts_with?(prefix)) || Dir.exists?(File.join("static", base_path)) || Dir.exists?(File.join("content", base_path))
+        published_embed_files(pages, site.config).each { |file| routes << Content::Processors::InternalLinkResolver.route_key(file[1]) }
+      end
+      route = if routes.any?(&.starts_with?(prefix))
+                homes = [""] + site.config.languages.keys.map { |code| "/#{code}" }
+                generated = homes.flat_map { |home| site.config.taxonomies.map { |t| "#{home}/#{t.name}/" } }
+                homes.each { |home| routes << "#{home}/" }
+                ->(key : String) { routes.includes?(key) || generated.any? { |dir| key.starts_with?(dir) } }
+              end
+      @link_routes = {link_targets, route}
+      route
+    end
+  end
+
   private def render_page_content(
     page : Models::Page,
     site : Models::Site,
@@ -219,7 +254,8 @@ module Hwaro::Core::Build::Phases::Render
       # base_url path so they resolve under a subpath deploy. No-op on root deploys;
       # also keeps RSS `<content:encoded>` and the search index subpath-correct
       # because both reuse `page.content` set below.
-      html_content = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html_content, site.config.base_url, site.config.base_path)
+      html_content = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html_content, site.config.base_url, site.config.base_path,
+        @pages_by_path.try { |map| pass_link_routes(site, map) })
 
       # Make content images responsive: when image_processing generated width
       # variants for an <img>, add srcset/sizes so browsers pick an appropriate

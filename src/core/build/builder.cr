@@ -332,6 +332,9 @@ module Hwaro
         # `link_targets` map (fresh per pass; holding it keeps its address
         # from being reused). Guarded by @page_template_hash_mutex.
         @get_page_index : {Hash(String, Models::Page), {Hash(String, Models::Page), Hash(String, Models::Page)}}? = nil
+        # pass_link_routes of one pass, keyed the same way. Guarded by
+        # @page_template_hash_mutex.
+        @link_routes : {Hash(String, Models::Page), Proc(String, Bool)?}? = nil
         # `[markdown] wikilinks` lookup over the current published page set;
         # rebuilt whenever that set may have changed (refresh_wikilink_index).
         @wikilink_index : Content::Processors::Wikilinks::Index? = nil

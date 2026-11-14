@@ -95,6 +95,8 @@ Subdirectories nest (`data/users/alice.yml` → `site.data.users.alice`). `hwaro
 
 Keep the leading `/` even when you deploy to a sub-path such as `example.com/my-site/`. Hwaro rewrites root-relative `src` and `href` values to include the `base_url` sub-path at build time, so the same content works in both places.
 
+A value that already starts with the sub-path (`/my-site/about/`) is left as written. The exception is a top-level section named like the sub-path: with `base_url = "https://example.com/docs"` and `content/docs/intro.md`, `/docs/intro/` is rewritten to `/docs/docs/intro/`, the only page it can name. When `/intro/` exists too, the link is kept as written; link with `@/docs/intro.md` to leave no doubt.
+
 You can also keep an asset next to the page that uses it, inside `content/`, but that is opt-in. Enable [Content Files](/features/content-files/) first:
 
 ```toml
