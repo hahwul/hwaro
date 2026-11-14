@@ -536,7 +536,7 @@ module Hwaro
         private def obtain(url : String) : {String, String?, String}?
           entry = @index[url]?
           cached = entry.try { |e| read_blob(e.file) }
-          if entry && cached && @now - Time.unix(entry.fetched_at) < @privacy.cache_ttl
+          if entry && cached && Time.unix(entry.fetched_at) <= @now && @now - Time.unix(entry.fetched_at) < @privacy.cache_ttl
             return {cached, entry.content_type, entry.final_url}
           end
 

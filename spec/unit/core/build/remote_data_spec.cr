@@ -494,6 +494,30 @@ describe "RemoteData.load" do
     end
   end
 
+  it "does not treat a cache stamped in the future as fresh" do
+    hits = Atomic(Int32).new(0)
+    handler = ->(ctx : HTTP::Server::Context) do
+      hits.add(1)
+      ctx.response.content_type = "application/json"
+      ctx.response.print %({"n": #{hits.get}})
+    end
+
+    with_test_server(handler) do |base|
+      Dir.mktmpdir do |dir|
+        cache_dir = File.join(dir, "cache")
+        entry = remote_entry("#{base}/team", cache_ttl: 1.hour)
+        t0 = Time.utc
+        # Written by a machine whose clock ran ahead (or before a clock step).
+        RemoteData.load(entry, cache_dir: cache_dir, now: t0 + 30.days)
+        hits.get.should eq(1)
+
+        # Less than the TTL "since" the stamp, but the stamp is ahead of now.
+        RemoteData.load(entry, cache_dir: cache_dir, now: t0)
+        hits.get.should eq(2)
+      end
+    end
+  end
+
   it "does not serve a fresh cache entry fetched with different headers" do
     handler = ->(ctx : HTTP::Server::Context) do
       ctx.response.content_type = "application/json"
