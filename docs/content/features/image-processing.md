@@ -16,7 +16,9 @@ Hwaro can automatically generate resized image variants during build. This is us
 | BMP (.bmp) | Yes | Yes |
 | WebP (.webp) | No (copied as is) | Yes, as extra variants (`formats`) |
 
-A file that cannot be decoded is still copied, but gets no variants. The same goes for a truncated or corrupt file whose header claims far more pixels than the file can hold (for example a few hundred bytes that say 26000x26000). Hwaro skips it with a warning instead of allocating gigabytes for it. This check also covers OG `logo` and `background_image` files.
+An animated PNG (an `acTL` chunk before the first `IDAT`) is copied as is, like a GIF or an animated WebP, and gets no variants: a resized copy would lose the animation. It keeps its `width` and `height` attributes. Formats are recognised by the file's content, not its extension, so a PNG saved as `photo.jpg` is measured as the PNG it is.
+
+A file that cannot be decoded is still copied, but gets no variants. The same goes for a truncated or corrupt file whose header claims far more pixels than the file can hold (for example a few hundred bytes that say 26000x26000). Hwaro skips it with a warning instead of allocating gigabytes for it. An image with a side longer than 1,048,576 pixels is skipped the same way, because the resizer cannot scale it safely. This check also covers OG `logo` and `background_image` files.
 
 ## Configuration
 
@@ -100,7 +102,7 @@ dimensions = true   # does not need enabled = true
 <img width="512" height="512" src="/hwaro.png" alt="Logo" />
 ```
 
-- Sizes are read from file headers, not by decoding: JPEG, PNG, BMP, GIF, WebP and SVG (`width`/`height` in pixels, falling back to the `viewBox`).
+- Sizes are read from file headers, not by decoding: JPEG, PNG, BMP, GIF, WebP and SVG (`width`/`height` in pixels, falling back to the `viewBox`). A header claiming more than 16,777,216 pixels in either direction is treated as corrupt and gets no attributes.
 - Only images that resolve to a local file are touched: page bundle assets, `static/` files and `[content.files]` copies. External URLs and missing or unreadable files are left as they are.
 - A tag that already sets `width` or `height` is left untouched.
 - When responsive `srcset` variants are added, the attributes are still the original image's size.

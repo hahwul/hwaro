@@ -1218,3 +1218,162 @@ describe "ImageProcessor EXIF orientation" do
     end
   end
 end
+
+# 1x1 RGB PNG, and the same file with an `acTL` chunk ahead of IDAT (APNG).
+private PNG_1X1  = "89504e470d0a1a0a0000000d4948445200000001000000010802000000907753de0000000c49444154789c63606060000000040001f61738550000000049454e44ae426082".hexbytes
+private APNG_1X1 = "89504e470d0a1a0a0000000d4948445200000001000000010802000000907753de000000086163544c0000000200000000f38d93700000000c49444154789c63606060000000040001f61738550000000049454e44ae426082".hexbytes
+
+describe "ImageProcessor content sniffing" do
+  processor = Hwaro::Content::Processors::ImageProcessor
+
+  it "measures an image by its bytes, not its extension" do
+    Dir.mktmpdir do |dir|
+      processor.dimensions(write_bytes(dir, "png_as.jpg", PNG_1X1)).should eq({1, 1})
+      processor.dimensions(write_bytes(dir, "gif_as.png", Bytes.new(10) { |i| ("GIF89a".bytes + le16(300) + le16(70))[i] })).should eq({300, 70})
+      # SOI + SOF0 (8-bit, 2 high, 3 wide)
+      jpeg = "ffd8ffc0000b0800020003".hexbytes
+      processor.dimensions(write_bytes(dir, "jpg_as.png", jpeg)).should eq({3, 2})
+      processor.dimensions(write_bytes(dir, "webp_as.gif", webp_header("VP8X", [0_u8] * 4 + le24(639) + le24(479)))).should eq({640, 480})
+    end
+  end
+
+  it "still measures SVG text by extension" do
+    Dir.mktmpdir do |dir|
+      processor.dimensions(write_bytes(dir, "a.svg", %(<svg width="12" height="7"/>).to_slice)).should eq({12, 7})
+    end
+  end
+
+  it "applies the EXIF orientation of a JPEG whatever it is named" do
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "photo.png")
+      write_quadrant_jpeg(path, 6)
+      processor.orientation(path).should eq(6)
+      processor.dimensions(path).should eq({16, 32})
+    end
+  end
+end
+
+describe "ImageProcessor animated PNG" do
+  processor = Hwaro::Content::Processors::ImageProcessor
+
+  it "tells an APNG from a still PNG by its acTL chunk" do
+    Dir.mktmpdir do |dir|
+      processor.animated_png?(write_bytes(dir, "a.png", APNG_1X1)).should be_true
+      processor.animated_png?(write_bytes(dir, "b.png", PNG_1X1)).should be_false
+      processor.animated_png?(write_bytes(dir, "c.png", Bytes.new(5))).should be_false
+      processor.animated_png?(File.join(dir, "missing.png")).should be_false
+      processor.dimensions(File.join(dir, "a.png")).should eq({1, 1})
+    end
+  end
+
+  it "does not cut variants or a crop from an APNG" do
+    Dir.mktmpdir do |dir|
+      still = File.join(dir, "still.png")
+      pixels = Bytes.new(100 * 80 * 3, 150_u8)
+      LibStb.stbi_write_png(still, 100, 80, 3, pixels.to_unsafe.as(Void*), 100 * 3)
+      png = File.open(still, &.getb_to_end)
+      actl = "000000086163544c0000000200000000f38d9370".hexbytes
+      apng = Bytes.new(png.size + actl.size)
+      apng.copy_from(png[0, 33])
+      (apng + 33).copy_from(actl)
+      (apng + 33 + actl.size).copy_from(png + 33)
+      anim = write_bytes(dir, "anim.png", apng)
+
+      processor.animated_png?(anim).should be_true
+      map, lqip, _ = processor.resize_and_lqip(anim, File.join(dir, "out"), [20, 50], 85, 16, 20)
+      map.should be_empty
+      lqip.should be_nil
+      processor.transform(anim, File.join(dir, "crop.png"), 10, 10, "crop", "center").should be_nil
+      processor.resize_and_lqip(still, File.join(dir, "out"), [20], 85, 0, 20)[0].size.should eq(1)
+    end
+  end
+end
+
+describe "ImageProcessor.implausible_size? by format" do
+  processor = Hwaro::Content::Processors::ImageProcessor
+
+  # A 24-bit BMP header claiming `w`x`h` in a file of `size` bytes.
+  bmp = ->(w : Int32, h : Int32, size : Int32) do
+    head = "BM".bytes + le32(size) + le32(0) + le32(54) + le32(40) + le32(w) + le32(h) + le16(1) + le16(24) + le32(0) + le32(0) + le32(2835) + le32(2835) + le32(0) + le32(0)
+    Bytes.new(size) { |i| head[i]? || 0_u8 }
+  end
+
+  it "rejects a BMP that claims more than uncompressed pixels can account for" do
+    Dir.mktmpdir do |dir|
+      # 6 KB claiming 36 MB: far past what a BMP holds, well inside the PNG ratio
+      processor.implausible_size?(write_bytes(dir, "t.bmp", bmp.call(4000, 3000, 6000))).should be_true
+      # the same bytes saved under another name are still a BMP to stb
+      processor.implausible_size?(write_bytes(dir, "t.png", bmp.call(4000, 3000, 6000))).should be_true
+    end
+  end
+
+  it "rejects a JPEG that claims far more pixels than a JPEG can code" do
+    Dir.mktmpdir do |dir|
+      # SOI + SOF0 (8-bit, 16383 high, 32767 wide, 3 components), zero padded to 31 KB
+      sof = "ffd8ffc00011083fff7fff0301220002110103110100".hexbytes
+      jpeg = Bytes.new(31_358) { |i| i < sof.size ? sof[i] : 0_u8 }
+      processor.implausible_size?(write_bytes(dir, "t.jpg", jpeg)).should be_true
+      # a real photo-sized JPEG is fine
+      real = File.join(dir, "real.jpg")
+      LibStb.stbi_write_jpg(real, 100, 80, 3, Bytes.new(100 * 80 * 3, 150_u8).to_unsafe.as(Void*), 85)
+      processor.implausible_size?(real).should be_false
+    end
+  end
+
+  it "keeps a complete BMP and a lightly truncated one" do
+    Dir.mktmpdir do |dir|
+      processor.implausible_size?(write_bytes(dir, "ok.bmp", bmp.call(40, 30, 54 + 40 * 30 * 3))).should be_false
+      processor.implausible_size?(write_bytes(dir, "cut.bmp", bmp.call(400, 300, 54 + 400 * 300 * 3 // 2))).should be_false
+    end
+  end
+end
+
+describe "ImageProcessor.dimensions on absurd header sizes" do
+  processor = Hwaro::Content::Processors::ImageProcessor
+
+  it "reports nothing for a size stb would refuse" do
+    Dir.mktmpdir do |dir|
+      png = ->(w : UInt32) do
+        bytes = PNG_1X1.dup
+        IO::ByteFormat::BigEndian.encode(w, bytes[16, 4])
+        bytes
+      end
+      processor.dimensions(write_bytes(dir, "ok.png", png.call(16_777_216_u32))).should eq({16_777_216, 1})
+      processor.dimensions(write_bytes(dir, "big.png", png.call(16_777_217_u32))).should be_nil
+      processor.dimensions(write_bytes(dir, "max.png", png.call(Int32::MAX.to_u32))).should be_nil
+      bmp = "BM".bytes + le32(54) + le32(0) + le32(54) + le32(40) + le32(Int32::MAX) + le32(1) + le16(1) + le16(24) + [0_u8] * 24
+      processor.dimensions(write_bytes(dir, "big.bmp", Bytes.new(bmp.size) { |i| bmp[i] })).should be_nil
+      processor.dimensions(write_bytes(dir, "big.svg", %(<svg width="2000000000" height="5"/>).to_slice)).should be_nil
+    end
+  end
+end
+
+describe "ImageProcessor.implausible_size? for very long images" do
+  processor = Hwaro::Content::Processors::ImageProcessor
+
+  # PNG_1X1 with `w` in its IHDR (the rest of the file is untouched)
+  png_wide = ->(w : UInt32) do
+    bytes = PNG_1X1.dup
+    IO::ByteFormat::BigEndian.encode(w, bytes[16, 4])
+    bytes
+  end
+
+  it "refuses a side stb_image_resize2 cannot scale" do
+    Dir.mktmpdir do |dir|
+      processor.implausible_size?(write_bytes(dir, "ok.png", png_wide.call(1_048_576_u32))).should be_false
+      processor.implausible_size?(write_bytes(dir, "long.png", png_wide.call(1_048_577_u32))).should be_true
+    end
+  end
+
+  it "builds no variants from a valid 8-million-pixel strip instead of aborting the process" do
+    Dir.mktmpdir do |dir|
+      # stb_image_resize2 asserts on this size at a scale of 1 pixel or so
+      src = File.join(dir, "strip.png")
+      pixels = Bytes.new(8_006_708 * 3, 200_u8)
+      LibStb.stbi_write_png(src, 8_006_708, 1, 3, pixels.to_unsafe.as(Void*), 0)
+      map, lqip, _ = processor.resize_and_lqip(src, File.join(dir, "out"), [1, 3, 16], 85, 32, 20)
+      map.should be_empty
+      lqip.should be_nil
+    end
+  end
+end
