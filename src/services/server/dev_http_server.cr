@@ -41,6 +41,11 @@ module Hwaro
           Logger.debug "Malformed request answered with 400: #{ex.message}"
           respond_bad_request(io)
         end
+      rescue HTTP::Server::ClientError
+        # The peer went away while the response was being flushed (a browser
+        # navigating on, a reset): the stdlib raises it from `Response#close`,
+        # outside the processor's own rescue, so it would otherwise surface as
+        # an "Unhandled exception in spawn" backtrace in the developer's terminal.
       ensure
         begin
           io.close
