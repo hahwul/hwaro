@@ -183,7 +183,7 @@ john-doe:
 
 #### 템플릿에서 사용
 
-`site.authors` 객체는 목록에 나오는 페이지가 참조하는 모든 작성자를 소문자 ID를 키로 담습니다. 초안, 헤드리스(`render = false`) 페이지, 생성된 페이지는 `/authors/` 택소노미와 마찬가지로 건너뛰며, 어느 페이지도 참조하지 않는 `data/authors.yml` 항목은 추가되지 않습니다. 각 작성자 객체는 다음을 갖습니다.
+`site.authors` 객체는 목록에 나오는 페이지가 참조하는 모든 작성자를 소문자 ID를 키로 담습니다. 초안, 헤드리스(`render = false`) 페이지, 생성된 페이지, `redirect_to` 리다이렉트 페이지는 `/authors/` 택소노미와 마찬가지로 건너뛰며, 어느 페이지도 참조하지 않는 `data/authors.yml` 항목은 추가되지 않습니다. 각 작성자 객체는 다음을 갖습니다.
 - `key`: 소문자로 바꾼 작성자 ID(예: "john-doe")
 - `name`: 작성자 이름(데이터에서 가져오거나, 없으면 처음 쓰인 그대로의 ID)
 - `pages`: 이 작성자가 쓴 페이지 목록(최신순). 각 항목에는 `title`, `url`, `date`, `description`, `image`, `summary`, `summary_truncated`, `tags`, `reading_time`, `word_count`, `language`가 있습니다

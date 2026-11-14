@@ -135,6 +135,9 @@ module Hwaro
       # written, so nothing links a 404, and it is the "data section" pattern
       # (`team/_index.md` with `render = false` and a cascade, iterated through
       # `get_section(path="team/_index.md").pages`). Filtering there emptied it.
+      #
+      # A `redirect_to` stub page is left out everywhere: it is a bounce, not
+      # content. A section with `redirect_to` stays, like any subsection.
       def pages_for_section(section_name : String, language : String?, items : Array(Page)? = nil, visited : Set(String)? = nil) : Array(Page)
         # Normalize section name: remove leading/trailing slashes and handle root
         normalized_name = section_name.strip.strip('/')
@@ -160,7 +163,7 @@ module Hwaro
           # 1. Add direct pages
           if pages = @pages_by_section[normalized_name]?
             pages.each do |p|
-              result << p if p.language == language && (p.render || keep_headless)
+              result << p if p.language == language && (p.render || keep_headless) && !p.has_redirect?
             end
           end
 
@@ -230,7 +233,7 @@ module Hwaro
           else
             # Regular Page (not a Section)
             # p.section is already normalized by the builder (e.g., "blog" or "blog/archive")
-            if p.section == normalized_name && (p.render || keep_headless)
+            if p.section == normalized_name && (p.render || keep_headless) && !p.has_redirect?
               result << p
             end
           end

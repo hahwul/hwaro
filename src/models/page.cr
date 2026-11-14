@@ -384,10 +384,12 @@ module Hwaro
 
       # True when a page should be omitted from generated listings (taxonomy
       # indexes, related posts, …): drafts, preview-only unpublished pages,
-      # headless (`render = false`) pages that are never written, and
-      # synthetic generated pages.
+      # headless (`render = false`) pages that are never written, synthetic
+      # generated pages, and `redirect_to` stub pages (a bounce, not content).
+      # A section with `redirect_to` stays listed: it is the index that
+      # bounces to its own content, not an entry of its own.
       def excluded_from_listings? : Bool
-        draft || unpublished || !render || generated
+        draft || unpublished || !render || generated || (has_redirect? && !is_a?(Section))
       end
 
       # True when a page is eligible for the search index / llms.txt: it emits

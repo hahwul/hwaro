@@ -183,7 +183,7 @@ john-doe:
 
 #### Usage in Templates
 
-The `site.authors` object contains every author referenced by a listed page, keyed by the lowercased ID. Drafts, headless (`render = false`) and generated pages are skipped, the same pages the `/authors/` taxonomy leaves out, and a `data/authors.yml` entry no page references is not added. Each author object has:
+The `site.authors` object contains every author referenced by a listed page, keyed by the lowercased ID. Drafts, headless (`render = false`), generated and `redirect_to` stub pages are skipped, the same pages the `/authors/` taxonomy leaves out, and a `data/authors.yml` entry no page references is not added. Each author object has:
 - `key`: The author ID, lowercased (e.g., "john-doe")
 - `name`: The author name (from data, else the ID as first written)
 - `pages`: List of pages by this author, newest first. Each entry carries `title`, `url`, `date`, `description`, `image`, `summary`, `summary_truncated`, `tags`, `reading_time`, `word_count` and `language`

@@ -31,7 +31,7 @@ taxonomies = ["tags"]
 4. Results are filtered by language (multilingual sites only show same-language posts) and by version ([versioned docs](/features/versioned-docs/) never cross a version boundary)
 5. The top N results (up to `limit`) are assigned as related posts
 
-Draft pages, the home page, section index pages (`_index.md`), headless pages (`render = false`), and generated pages are excluded from related post computation. Page bundles (`post/index.md`) are ordinary posts and take part.
+Draft pages, the home page, section index pages (`_index.md`), headless pages (`render = false`), generated pages and `redirect_to` stubs are excluded from related post computation. Page bundles (`post/index.md`) are ordinary posts and take part.
 
 ## Template Variable
 

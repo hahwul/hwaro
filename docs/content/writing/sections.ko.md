@@ -46,7 +46,7 @@ Welcome to my blog.
 | paginate_path | string | "page" | 페이저 URL의 경로 세그먼트(기본값이면 `/blog/page/2/` 형태) |
 | transparent | bool | false | 페이지를 상위 섹션으로 넘김 |
 | generate_feeds | bool | false | RSS 피드 생성 |
-| redirect_to | string | — | 섹션을 렌더링하는 대신 이 URL(또는 `@/blog/post.md` 같은 `@/` 콘텐츠 경로)로 가는 HTML 리다이렉트 페이지 생성 |
+| redirect_to | string | — | 섹션을 렌더링하는 대신 이 URL(또는 `@/blog/post.md` 같은 `@/` 콘텐츠 경로)로 가는 HTML 리다이렉트 페이지 생성. 리다이렉트 페이지와 달리 섹션은 상위 섹션 목록과 이전/다음에 남고, 섹션의 페이지도 계속 목록에 나옴 |
 | draft | bool | false | 프로덕션에서 제외 |
 | weight | int | 0 | 섹션 정렬 순서 |
 | translation_key | string | — | 디렉터리 이름이 다른 섹션 번역을 연결. [번역 키](/ko/features/multilingual/#번역-키) 참고 |

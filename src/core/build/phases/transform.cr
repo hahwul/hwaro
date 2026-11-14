@@ -111,9 +111,10 @@ module Hwaro::Core::Build::Phases::Transform
     # parent section. Headless (`render = false`) pages are never written,
     # so they are no one's prev/next — the rule flatten_section_tree already
     # applies to section indexes and Site#pages_for_section to listings.
+    # A `redirect_to` stub only bounces elsewhere, so it is skipped over too.
     pages_by_section = {} of String => Array(Models::Page)
     pages.each do |page|
-      next unless page.render
+      next if !page.render || page.has_redirect?
       section = page.section
       pages_by_section[section] ||= [] of Models::Page
       pages_by_section[section] << page
@@ -614,7 +615,7 @@ module Hwaro::Core::Build::Phases::Transform
     groups = {} of {String, String, String} => Array(Models::Page)
     losers = site_output_losers(site)
     site.pages.each do |page|
-      next if page.draft || page.unpublished || !page.render || losers.includes?(page.path)
+      next if page.draft || page.unpublished || !page.render || page.has_redirect? || losers.includes?(page.path)
       if (key = series_group_key(page, default_lang)) && affected_series.includes?(key[0])
         (groups[key] ||= [] of Models::Page) << page
       end
@@ -871,7 +872,7 @@ module Hwaro::Core::Build::Phases::Transform
     losers = site_output_losers(site)
 
     site.pages.each do |page|
-      next if page.draft || page.unpublished || !page.render || losers.includes?(page.path)
+      next if page.draft || page.unpublished || !page.render || page.has_redirect? || losers.includes?(page.path)
       if key = series_group_key(page, default_lang)
         (groups[key] ||= [] of Models::Page) << page
       end
@@ -882,9 +883,10 @@ module Hwaro::Core::Build::Phases::Transform
 
   # Related-post candidates. A page bundle (`post/index.md`) is `is_index`
   # too, but it is an ordinary post; only home pages and section indexes
-  # (`_index.md`) are left out with drafts, headless and generated pages.
+  # (`_index.md`) are left out with drafts, headless, generated and
+  # `redirect_to` stub pages.
   private def related_candidate?(page : Models::Page) : Bool
-    return false if page.draft || page.unpublished || page.generated || !page.render || page.home?
+    return false if page.excluded_from_listings? || page.home?
     !(page.is_index && File.basename(page.path).starts_with?("_index"))
   end
 
@@ -1045,7 +1047,8 @@ module Hwaro::Core::Build::Phases::Transform
     pages.each { |p| by_url[p.url] ||= p unless losers.includes?(p.path) }
     incoming = {} of String => Array(Models::Page)
     pages.each do |source|
-      next if !source.render || losers.includes?(source.path)
+      # A `redirect_to` stub publishes no body, so it links nowhere.
+      next if !source.render || source.has_redirect? || losers.includes?(source.path)
       outbound_link_targets(source, pages_by_path, by_url, site.config.base_path).each do |target|
         next if target.same?(source) || target.language != source.language
         (incoming[target.path] ||= [] of Models::Page) << source
