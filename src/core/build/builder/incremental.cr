@@ -682,6 +682,9 @@ module Hwaro
 
           all.select do |page|
             next false if paths.includes?(page.path)
+            # `redirect_to = "@/…"` resolves like a body link
+            # (generate_redirect_page), so the stub names the target too.
+            next true if (target = page.redirect_to) && link_names_moved_page?(target, names, paths, urls, base_path)
             hit = false
             page_scan_texts(page).each do |text|
               Content::Processors::Wikilinks.each_link(text, math: site_math?) do |link|

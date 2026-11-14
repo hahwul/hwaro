@@ -483,6 +483,30 @@ describe "Builder#run_incremental moved link targets" do
       end
     end
   end
+
+  it "rewrites a redirect_to = \"@/…\" stub when its target page is re-slugged" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content/posts")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}")
+        File.write("content/posts/b.md", "+++\ntitle = \"B\"\n+++\nB\n")
+        File.write("content/posts/old.md", "+++\ntitle = \"Old\"\nredirect_to = \"@/posts/b.md\"\n+++\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/posts/b.md"], options)
+        File.read("public/posts/old/index.html").should contain(%(url=/posts/b/"))
+
+        File.write("content/posts/b.md", "+++\ntitle = \"B\"\nslug = \"bee\"\n+++\nB\n")
+        builder.run_incremental(["content/posts/b.md"], options)
+        File.read("public/posts/old/index.html").should contain(%(url=/posts/bee/"))
+      end
+    end
+  end
 end
 
 describe "Builder#run_incremental collision loser" do
