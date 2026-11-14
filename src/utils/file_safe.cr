@@ -118,7 +118,8 @@ module Hwaro
       TEMP_NAME = /\Ahwaro-(\d+)-\d+\.tmp\z/
 
       def self.temp_name?(basename : String) : Bool
-        TEMP_NAME.matches?(basename)
+        # The prefix test keeps the regex off the per-file hot path.
+        basename.starts_with?("hwaro-") && TEMP_NAME.matches?(basename)
       end
 
       # Delete temp files under `dir` whose owner process is gone (never this
