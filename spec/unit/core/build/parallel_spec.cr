@@ -262,6 +262,28 @@ describe Hwaro::Core::Build::ParallelHelper do
       end
       sink.to_s.should eq("[WARN] item 0\n[WARN] item 1\n")
     end
+
+    it "prints live under --verbose (debug level) instead of holding lines back" do
+      sink = IO::Memory.new
+      previous_io = Hwaro::Logger.io
+      previous_color = Hwaro::Logger.color_override?
+      previous_level = Hwaro::Logger.level
+      Hwaro::Logger.io = Hwaro::Logger::GuardedIO.new(sink)
+      Hwaro::Logger.color_enabled = false
+      Hwaro::Logger.level = Hwaro::Logger::Level::Debug
+      seen_live = false
+      begin
+        Hwaro::Core::Build::ParallelHelper.each_concurrently([0], 1) do |_item, _worker_id|
+          Hwaro::Logger.warn "live"
+          seen_live = sink.to_s.includes?("live")
+        end
+      ensure
+        Hwaro::Logger.io = previous_io
+        Hwaro::Logger.color_enabled = previous_color
+        Hwaro::Logger.level = previous_level
+      end
+      seen_live.should be_true
+    end
   end
 
   describe ".map" do

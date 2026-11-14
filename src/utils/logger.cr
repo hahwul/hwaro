@@ -255,7 +255,12 @@ module Hwaro
     # of printed. A parallel fan-out captures each item separately and replays
     # the captures in item order, so warnings read the same at every worker
     # count rather than in completion order.
+    #
+    # Not under `--verbose` (debug level): that is the live trace read to see
+    # where a build stopped, and held-back lines would never print if the
+    # build hung or was killed.
     def self.capturing(into : Captured, &)
+      return yield if @@level.debug?
       previous = Fiber.current.hwaro_log_capture
       Fiber.current.hwaro_log_capture = into
       begin
