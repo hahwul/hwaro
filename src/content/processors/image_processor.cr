@@ -44,11 +44,15 @@ module Hwaro
         # variants, one such file per image worker.
         MAX_DECODE_RATIO = 100_000_i64
 
-        # A BMP is stored uncompressed (stb rejects RLE), so the most a real
-        # one decodes to is a 1-bit palette image as RGBA: 32 bytes per byte.
+        # Tighter ceilings for the formats that cannot compress that far. A
+        # BMP is stored uncompressed (stb rejects RLE), so the most a real one
+        # decodes to is a 1-bit palette image as RGBA: 32 bytes per byte. A
+        # JPEG of one flat colour (the best case) decodes to ~700 per byte.
         # The PNG-sized ratio above let a 6 KB BMP claiming 16777216x3 pixels
-        # through to a 150 MB decode and a 1.6 GB resize.
-        MAX_BMP_DECODE_RATIO = 64_i64
+        # and a 31 KB JPEG claiming 32767x16383 through to a 1.6 GB and a
+        # 3.7 GB build.
+        DECODE_RATIOS    = {".bmp" => 64_i64, ".jpg" => 5_000_i64}
+        MIN_DECODE_RATIO = 64_i64 # the smallest of the above: below it no format needs a look
 
         # Longest side a source may have. stb_image_resize2 asserts (aborting
         # the whole build) once a side runs into the millions: a valid 72 KB
@@ -80,11 +84,11 @@ module Hwaro
           too_long = w > MAX_RESIZE_SIDE || h > MAX_RESIZE_SIDE
           unless too_long
             claimed = w.to_i64 * h * (desired > 0 ? desired : comp)
-            return false unless claimed > info.size * MAX_BMP_DECODE_RATIO
-            unless claimed > info.size * MAX_DECODE_RATIO
-              head = Bytes.new(2)
-              return false unless read_header(path, head) == 2 && head[0] == 0x42 && head[1] == 0x4D
-            end
+            return false unless claimed > info.size * MIN_DECODE_RATIO
+            head = Bytes.new(8)
+            kind = sniff(head[0, read_header(path, head)])
+            limit = (kind && DECODE_RATIOS[kind]?) || MAX_DECODE_RATIO
+            return false unless claimed > info.size * limit
           end
           if @@implausible_mutex.synchronize { @@implausible_warned.add?("#{path}:#{info.size}:#{info.modification_time.to_unix_ms}") }
             Logger.warn(too_long ? "#{path}: not processed, #{w}x#{h} is past the #{MAX_RESIZE_SIDE} pixels a side that can be resized" : "#{path}: not processed, its header claims #{w}x#{h} pixels but the file is only #{info.size} bytes (truncated or corrupt)")

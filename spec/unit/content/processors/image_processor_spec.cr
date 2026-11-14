@@ -1289,7 +1289,7 @@ describe "ImageProcessor animated PNG" do
   end
 end
 
-describe "ImageProcessor.implausible_size? for BMP" do
+describe "ImageProcessor.implausible_size? by format" do
   processor = Hwaro::Content::Processors::ImageProcessor
 
   # A 24-bit BMP header claiming `w`x`h` in a file of `size` bytes.
@@ -1304,6 +1304,19 @@ describe "ImageProcessor.implausible_size? for BMP" do
       processor.implausible_size?(write_bytes(dir, "t.bmp", bmp.call(4000, 3000, 6000))).should be_true
       # the same bytes saved under another name are still a BMP to stb
       processor.implausible_size?(write_bytes(dir, "t.png", bmp.call(4000, 3000, 6000))).should be_true
+    end
+  end
+
+  it "rejects a JPEG that claims far more pixels than a JPEG can code" do
+    Dir.mktmpdir do |dir|
+      # SOI + SOF0 (8-bit, 16383 high, 32767 wide, 3 components), zero padded to 31 KB
+      sof = "ffd8ffc00011083fff7fff0301220002110103110100".hexbytes
+      jpeg = Bytes.new(31_358) { |i| i < sof.size ? sof[i] : 0_u8 }
+      processor.implausible_size?(write_bytes(dir, "t.jpg", jpeg)).should be_true
+      # a real photo-sized JPEG is fine
+      real = File.join(dir, "real.jpg")
+      LibStb.stbi_write_jpg(real, 100, 80, 3, Bytes.new(100 * 80 * 3, 150_u8).to_unsafe.as(Void*), 85)
+      processor.implausible_size?(real).should be_false
     end
   end
 
