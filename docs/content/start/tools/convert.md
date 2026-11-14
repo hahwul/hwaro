@@ -66,6 +66,13 @@ build already reads a null custom value as an empty string.
 }
 ```
 
+A run that fails before converting any file (a missing content directory, or
+every file failing) prints the standard error envelope
+(`{"status": "error", "error": {"code", "category", "message", "hint"}}`)
+instead, with the same exit code as the human output. When some files were
+converted and others failed, the payload above is printed with
+`"success": false` and the counts, and the exit code is non-zero.
+
 ## Skipped Files
 
 The human summary breaks the skip count down by reason: `already TOML`,

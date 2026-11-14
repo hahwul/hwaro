@@ -104,6 +104,11 @@ module Hwaro
                          hint: "Supported: #{POSITIONAL_CHOICES.join(", ")}.",
                        )
                      end
+            # A run that failed before converting anything is a plain error:
+            # the standard envelope. A PARTIAL failure (some files already
+            # rewritten) keeps the result payload, whose counts say how far
+            # it got, and still exits with the failure's class.
+            fail_conversion(result, json_output) if !result.success && result.converted_count == 0
             puts result.to_json if json_output
             fail_conversion(result, json_output) unless result.success
           end
@@ -113,17 +118,22 @@ module Hwaro
           # at all in human mode, with the reason only ever reachable via
           # `--json`.
           #
+          # `--json` prints the standard error envelope (see
+          # `Runner.exit_with_error_payload`) when nothing was converted.
+          #
           # BOTH modes exit with the same class: `HWARO_E_CONTENT` when every
           # failure was unparseable front matter (as `build` and `tool
           # validate` classify it), `HWARO_E_IO` otherwise. The `--json` payload was already
           # printed by the caller, so this path only needs the status code —
           # but it has to be the SAME code, or a machine consumer branching on
           # exit status gets a different (and less classified) answer for the
-          # identical failure purely because it asked for JSON. The payload
-          # shape is untouched; only the process exit code changes.
+          # identical failure purely because it asked for JSON.
           private def fail_conversion(result : Services::ConversionResult, json_output : Bool) : NoReturn
             error = Hwaro::Errors.per_file_failure(result.message, result.error_count, result.content_error_count)
-            exit(error.exit_code) if json_output
+            if json_output
+              Runner.exit_with_error_payload(error) if result.converted_count == 0
+              exit(error.exit_code)
+            end
             raise error
           end
         end
