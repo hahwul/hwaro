@@ -442,7 +442,7 @@ describe "hwaro tool convert" do
     end
   end
 
-  it "exits HWARO_E_IO and emits a failing ConversionResult JSON for a missing content dir" do
+  it "exits HWARO_E_IO and emits the standard error envelope for a missing content dir" do
     with_initialized_project do |project_dir|
       status, output, _ = run_hwaro(
         ["tool", "convert", "to-yaml", "-c", "does-not-exist", "--json"],
@@ -450,11 +450,33 @@ describe "hwaro tool convert" do
       )
       # Same code as the human path below: an exit status that depends on the
       # output format hands machine consumers a different answer for the
-      # identical failure. The payload shape is unchanged.
+      # identical failure.
       status.exit_code.should eq(Hwaro::Errors::EXIT_IO)
       parsed = JSON.parse(output.strip)
+      parsed["status"].as_s.should eq("error")
+      parsed["error"]["code"].as_s.should eq("HWARO_E_IO")
+      parsed["error"]["message"].as_s.should contain("not found")
+      parsed.as_h.has_key?("success").should be_false
+    end
+  end
+
+  it "keeps the result payload for per-file --json failures, even when nothing converted" do
+    with_initialized_project do |project_dir|
+      File.write(File.join(project_dir, "content", "bad.md"), "+++\ntitle = \"a\n+++\nhi\n")
+      status, output, _ = run_hwaro(["tool", "convert", "to-yaml", "--json"], chdir: project_dir)
+      status.exit_code.should eq(Hwaro::Errors::EXIT_CONTENT)
+      parsed = JSON.parse(output.strip)
       parsed["success"].as_bool.should be_false
-      parsed["message"].as_s.should contain("not found")
+      parsed["converted_count"].as_i.should be > 0
+      parsed["error_count"].as_i.should eq(1)
+
+      Dir.glob(File.join(project_dir, "content", "**", "*.md")).each { |f| File.delete(f) unless f.ends_with?("bad.md") }
+      status, output, _ = run_hwaro(["tool", "convert", "to-yaml", "--json"], chdir: project_dir)
+      status.exit_code.should eq(Hwaro::Errors::EXIT_CONTENT)
+      parsed = JSON.parse(output.strip)
+      parsed["success"].as_bool.should be_false
+      parsed["converted_count"].as_i.should eq(0)
+      parsed["error_count"].as_i.should eq(1)
     end
   end
 
@@ -907,6 +929,20 @@ describe "hwaro tool export (--json / --dry-run / classified errors)" do
       parsed["exported_count"].as_i.should be > 0
       parsed["files"].as_a.should_not be_empty
       Dir.exists?(out_dir).should be_false
+    end
+  end
+
+  it "emits the standard error envelope under --json when the export fails" do
+    with_initialized_project do |project_dir|
+      status, output, _ = run_hwaro(
+        ["tool", "export", "jekyll", "-c", "no-such-dir", "-o", "exported", "--json"],
+        chdir: project_dir
+      )
+      status.exit_code.should eq(Hwaro::Errors::EXIT_IO)
+      parsed = JSON.parse(output.strip)
+      parsed["status"].as_s.should eq("error")
+      parsed["error"]["code"].as_s.should eq("HWARO_E_IO")
+      parsed.as_h.has_key?("success").should be_false
     end
   end
 

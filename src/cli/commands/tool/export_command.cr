@@ -89,11 +89,11 @@ module Hwaro
             result = exporter.run(options)
 
             if json_output
-              # The manifest is printed for failed runs too (success=false,
-              # error_count set), then the process exits with the same
-              # classified IO status the human path raises — mirroring
-              # `tool convert`, so a machine consumer branching on exit
-              # status gets the identical answer in both modes.
+              # A run that failed before looking at any file (no content
+              # files) is a plain error: the standard envelope. Per-file
+              # failures keep the manifest (it lists what was written) and
+              # exit with the same classified status the human path raises.
+              Runner.exit_with_error_payload(failure(result)) if !result.success && result.error_count == 0
               puts({
                 "success"        => result.success,
                 "dry_run"        => options.dry_run,

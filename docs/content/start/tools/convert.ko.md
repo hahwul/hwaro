@@ -65,6 +65,12 @@ TOML에는 null이 없으므로 `to-toml`은 YAML/JSON의 null 값을 빌드가 
 }
 ```
 
+파일을 읽기도 전에 실패한 경우(콘텐츠 디렉터리 없음)에는 위 페이로드 대신 표준 오류
+envelope(`{"status": "error", "error": {"code", "category", "message", "hint"}}`)가
+출력됩니다. 개별 파일이 실패한 경우에는 `"success": false`와 0보다 큰 `error_count`가
+담긴 위 페이로드가 출력됩니다. 두 경우 모두 종료 코드는 0이 아니며, 사람이 읽는 출력과
+같은 코드입니다.
+
 ## 건너뛴 파일
 
 사람이 읽는 요약에는 건너뛴 개수가 이유별(`already TOML`,

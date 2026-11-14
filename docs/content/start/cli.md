@@ -348,7 +348,7 @@ When specified, Hwaro changes its working directory to the given path before bui
 
 ### serve
 
-Start a development server with live reload (enabled by default):
+Start a development server with live reload (enabled by default). Like `hwaro build`, it needs a `config.toml` in the project directory: without one it exits with the config error (code 3) and creates nothing.
 
 ```bash
 hwaro serve

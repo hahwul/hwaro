@@ -68,6 +68,12 @@ hwaro tool export hugo --verbose
 }
 ```
 
+파일을 읽기도 전에 실패한 경우(콘텐츠 파일 없음)에는 위 매니페스트 대신 표준 오류
+envelope(`{"status": "error", "error": {"code", "category", "message", "hint"}}`)가
+출력됩니다. 개별 파일이 실패한 경우에는 `"success": false`와 0보다 큰 `error_count`가
+담긴 위 매니페스트가 출력됩니다. 두 경우 모두 종료 코드는 0이 아니며, 사람이 읽는 출력과
+같은 코드입니다.
+
 `files`에는 콘텐츠 에셋을 포함해 기록된 모든 대상 경로가 나열되며,
 카운트는 콘텐츠 문서만 셉니다.
 

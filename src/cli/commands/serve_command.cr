@@ -109,8 +109,11 @@ module Hwaro
               options.skip_og_image ||= true
               options.skip_image_processing ||= true
             end
-          rescue Hwaro::HwaroError
-            # Missing/invalid config — proceed with CLI-provided values only.
+          rescue ex : Hwaro::HwaroError
+            # An absent config.toml fails exactly like `hwaro build` (exit 3,
+            # nothing created). An existing but invalid one is reported by
+            # the first build with its own diagnostics, so just proceed.
+            raise ex unless File.exists?("config.toml")
           end
 
           Services::Server.new.run(options)

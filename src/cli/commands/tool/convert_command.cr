@@ -104,7 +104,11 @@ module Hwaro
                          hint: "Supported: #{POSITIONAL_CHOICES.join(", ")}.",
                        )
                      end
-            puts result.to_json if json_output
+            # A run that failed before looking at any file (no content
+            # directory) has no result to report: `fail_conversion` prints
+            # the standard error envelope instead. Per-file failures keep the
+            # result payload, whose counts say how far the run got.
+            puts result.to_json if json_output && (result.success || result.error_count > 0)
             fail_conversion(result, json_output) unless result.success
           end
 
@@ -113,17 +117,23 @@ module Hwaro
           # at all in human mode, with the reason only ever reachable via
           # `--json`.
           #
+          # `--json` prints the standard error envelope (see
+          # `Runner.exit_with_error_payload`) when the run failed before
+          # processing any file (`error_count == 0`).
+          #
           # BOTH modes exit with the same class: `HWARO_E_CONTENT` when every
           # failure was unparseable front matter (as `build` and `tool
           # validate` classify it), `HWARO_E_IO` otherwise. The `--json` payload was already
           # printed by the caller, so this path only needs the status code —
           # but it has to be the SAME code, or a machine consumer branching on
           # exit status gets a different (and less classified) answer for the
-          # identical failure purely because it asked for JSON. The payload
-          # shape is untouched; only the process exit code changes.
+          # identical failure purely because it asked for JSON.
           private def fail_conversion(result : Services::ConversionResult, json_output : Bool) : NoReturn
             error = Hwaro::Errors.per_file_failure(result.message, result.error_count, result.content_error_count)
-            exit(error.exit_code) if json_output
+            if json_output
+              Runner.exit_with_error_payload(error) if result.error_count == 0
+              exit(error.exit_code)
+            end
             raise error
           end
         end
