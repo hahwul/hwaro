@@ -33,11 +33,14 @@ module Hwaro::Core::Build::SummaryReaders
   PAGE_CALLS    = %w[get_page get_section get_taxonomy get_taxonomy_term]
   PAGE_CALLS_RE = /\b(?:#{PAGE_CALLS.join('|')})\s*\(/
 
+  # STRING_RE is possessive, as in ShortcodeProcessor: a string reads one way
+  # only, and backtracking kept one JIT frame per character, so a ~50 KB
+  # literal (a data URI) failed every build with "JIT stack limit reached".
   FOR_RE       = /\{%-?\s*for\s+([\w\s,]+?)\s+in\s+(.+?)-?%\}/m
   ASSIGN_RE    = /\{%-?\s*(?:set|with)\s+(\w+)\s*=\s*(.+?)-?%\}/m
   PRINT_RE     = /\{\{-?(.*?)-?\}\}/m
   TAG_RE       = /\{%-?(.*?)-?%\}/m
-  STRING_RE    = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/
+  STRING_RE    = /"(?:[^"\\]++|\\.)*+"|'(?:[^'\\]++|\\.)*+'/
   REFERENCE_RE = /(?<![\w.])(\w+)((?:\s*\.\s*\w+)*)/
   CALL_REF_RE  = /(?<![\w.])(?:#{PAGE_CALLS.join('|')})\s*\([^()]*\)((?:\s*\.\s*\w+)*)/
   # What may follow a page value without printing it: a field access, a
