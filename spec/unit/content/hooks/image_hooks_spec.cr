@@ -755,6 +755,20 @@ describe "ImageHooks render-time lookups (review fixes)" do
     end
   end
 
+  # The static copy skips a symlink loop with a warning; resolving it as an
+  # image source raised "Too many levels of symbolic links" and failed every
+  # page that referenced it (with `dimensions = true`, or via resize_image).
+  it "resolves no source for a static symlink loop instead of raising" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        Dir.mkdir_p("static")
+        File.symlink("loop.png", "static/loop.png")
+        config = Hwaro::Models::Config.new
+        Hwaro::Content::Hooks::ImageHooks.resolve_source("/loop.png", config).should be_nil
+      end
+    end
+  end
+
   it "writes a fill variant of a ../ path at its canonical place, with no stray directory" do
     build_site(
       %(title = "t"\nbase_url = "https://example.com"\n),
