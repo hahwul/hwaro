@@ -101,6 +101,7 @@ module Hwaro
         private def process_parallel(items : Array(T), worker_count : Int32, &block : T, Int32 -> R) : Array(WorkResult(R))
           results = Channel(WorkResult(R)).new(items.size)
           work_queue = Channel({T, Int32}).new(items.size)
+          logs = Array.new(items.size) { Logger::Captured.new }
 
           # Enqueue all work items
           items.each_with_index { |item, idx| work_queue.send({item, idx}) }
@@ -116,7 +117,7 @@ module Hwaro
                 # always runs. A skipped send would leave the items.size-times
                 # collector below short and hang the build.
                 result = begin
-                  WorkResult(R).success(block.call(item, idx), idx)
+                  Logger.capturing(logs[idx]) { WorkResult(R).success(block.call(item, idx), idx) }
                 rescue ex
                   WorkResult(R).failure(ex.message || "Unknown error", idx)
                 end
@@ -131,6 +132,7 @@ module Hwaro
           items.size.times do
             collected << results.receive
           end
+          logs.each { |captured| Logger.replay(captured) }
           collected.sort_by(&.index)
         end
       end
@@ -151,16 +153,20 @@ module Hwaro
         # can use per-worker state. Returns once every item has been handled.
         # Callers rescue inside the block: an exception that escapes it still
         # signals its item (from an `ensure`) but ends that worker fiber.
+        # What the block logs is held back and printed in item order once every
+        # item has finished, so the output does not depend on which worker won.
         def each_concurrently(items : Array(T), workers : Int32, &block : T, Int32 ->) : Nil forall T
-          queue = Channel(T).new(items.size)
-          items.each { |item| queue.send(item) }
+          queue = Channel({T, Int32}).new(items.size)
+          items.each_with_index { |item, idx| queue.send({item, idx}) }
           queue.close
           done = Channel(Nil).new(items.size)
+          logs = Array.new(items.size) { Logger::Captured.new }
           workers.times do |worker_id|
             spawn do
-              while item = queue.receive?
+              while entry = queue.receive?
+                item, idx = entry
                 begin
-                  block.call(item, worker_id)
+                  Logger.capturing(logs[idx]) { block.call(item, worker_id) }
                 ensure
                   done.send(nil)
                 end
@@ -168,6 +174,7 @@ module Hwaro
             end
           end
           items.size.times { done.receive }
+          logs.each { |captured| Logger.replay(captured) }
         end
 
         @@wake_idle_threads = false
@@ -224,18 +231,30 @@ module Hwaro
 
           done = Channel(Nil).new(tasks.size)
           first_error : Exception? = nil
+          first_error_idx = Int32::MAX
           error_mutex = Mutex.new
-          tasks.each do |task|
+          logs = Array.new(tasks.size) { Logger::Captured.new }
+          tasks.each_with_index do |task, idx|
             spawn do
-              task.call
-            rescue ex
-              error_mutex.synchronize { first_error ||= ex }
-              Logger.warn "ParallelHelper: task failed: #{ex.message}"
+              Logger.capturing(logs[idx]) do
+                task.call
+              rescue ex
+                # The lowest task index, not the first to fail: which task
+                # fails first is a race, and the one reported is the exit code.
+                error_mutex.synchronize do
+                  if idx < first_error_idx
+                    first_error_idx = idx
+                    first_error = ex
+                  end
+                end
+                Logger.warn "ParallelHelper: task failed: #{ex.message}"
+              end
             ensure
               done.send(nil)
             end
           end
           tasks.size.times { done.receive }
+          logs.each { |captured| Logger.replay(captured) }
 
           return unless raise_on_error
           if err = first_error

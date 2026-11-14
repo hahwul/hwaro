@@ -1191,13 +1191,21 @@ module Hwaro::Core::Build::Phases::ParseContent
     # Track the first classified frontmatter error seen by any worker so
     # the build can abort deterministically after draining the queue.
     classified_error : Hwaro::HwaroError? = nil
+    classified_idx = Int32::MAX
     error_mutex = Mutex.new
 
     ParallelHelper.each_concurrently(pages, worker_count) do |page, _worker_id|
       parse_single_page(page)
     rescue ex : Hwaro::HwaroError
+      # The failing page that comes first in content order, not the first to
+      # finish: with several broken files the one reported (and its exit
+      # code) must not depend on scheduling.
+      idx = pages.index(&.same?(page)) || Int32::MAX
       error_mutex.synchronize do
-        classified_error ||= ex
+        if idx < classified_idx
+          classified_idx = idx
+          classified_error = ex
+        end
       end
       page.parse_failed = true
     rescue ex
