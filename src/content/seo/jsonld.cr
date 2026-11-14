@@ -30,9 +30,12 @@ module Hwaro
         # machine's offset: the same post claimed `T00:00:00+09:00` on one
         # laptop and `+00:00` in CI — a different instant each time, and not
         # the UTC midnight the feeds publish for it. A date-only value is
-        # written as the date it was authored (schema.org accepts a Date).
+        # written as the date it was authored (schema.org accepts a Date). A
+        # midnight written with `Z` is the same: on a UTC machine it is
+        # indistinguishable from a date-only value, so it prints as a date
+        # everywhere and the bytes do not depend on the build zone.
         private def iso_date(time : Time) : String
-          if time.location == Time::Location.local &&
+          if (time.location == Time::Location.local || time.utc?) &&
              time.hour == 0 && time.minute == 0 && time.second == 0 && time.nanosecond == 0
             time.to_s("%Y-%m-%d")
           else

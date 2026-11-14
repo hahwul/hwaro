@@ -54,7 +54,7 @@ Every `.md` and `.markdown` file under `content/` becomes a page, front matter o
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| date | string | — | Publication date: `YYYY-MM-DD`, optionally with time (`YYYY-MM-DD HH:MM:SS` or RFC 3339 datetime); unquoted TOML/YAML dates also work. A date without an offset is read in the build machine's local time zone, in TOML, YAML and JSON alike. A written UTC offset (`+09:00`, also `+0900` or after a space: `2024-01-15 10:00:00 +0900`) is kept, so the date prints as written in both TOML and YAML. A TOML offset date also feeds date permalink tokens (`:year`/`:month`/`:day`) and year/month grouping as written, so a URL built in older versions from the UTC day can move (e.g. `/2024/02/29/` → `/2024/03/01/`); add the old URL to `aliases` to keep it working |
+| date | string | — | Publication date: `YYYY-MM-DD`, optionally with time (`YYYY-MM-DD HH:MM:SS` or RFC 3339 datetime); unquoted TOML/YAML dates also work. A date without an offset is read in the build machine's local time zone, in TOML, YAML and JSON alike. A written UTC offset (`Z`, `+09:00`, `+0900`, `+09`, also after a space: `2024-01-15 10:00:00 +0900`) is kept, so the date prints as written in both TOML and YAML. A TOML offset date also feeds date permalink tokens (`:year`/`:month`/`:day`) and year/month grouping as written, so a URL built in older versions from the UTC day can move (e.g. `/2024/02/29/` → `/2024/03/01/`); add the old URL to `aliases` to keep it working. Any other form (a time without seconds, `20240115`, a zone name such as `KST`, trailing text) is not a date: the build warns with the file and value and treats the page as undated |
 | description | string | — | SEO description |
 | draft | bool | false | Exclude from production builds |
 | template | string | "page" | Template to use |
@@ -78,7 +78,7 @@ Every `.md` and `.markdown` file under `content/` becomes a page, front matter o
 | insert_anchor_links | bool | Add heading anchors |
 | redirect_to | string | Redirect page to this URL, or to a content file given as an `@/` path (`@/blog/post.md`) (the redirect stub is left out of the sitemap, feeds, search index and llms.txt, and of every listing: `section.pages` and pagination, previous/next, taxonomy terms, series, related posts, backlinks and `site.authors`; `get_page()` and `site.pages` still return it) |
 | render | bool | Render page to output (default: true) |
-| expires | date | Auto-exclude after this date |
+| expires | date | Auto-exclude from this date on |
 | series | string | Series name for grouping |
 | series_weight | int | Sort order within series |
 | translation_key | string | Links translations whose file names differ: pages sharing the key are translations of each other. See [Translation Keys](/features/multilingual/#translation-keys) |
@@ -126,7 +126,7 @@ title = "Limited Time Offer"
 expires = 2025-12-31
 +++
 
-Automatically excluded from builds after the expiry date.
+Automatically excluded from builds once the expiry date has been reached.
 ```
 
 Build with expired content: `hwaro build --include-expired`
@@ -136,6 +136,8 @@ Pages expiring within 7 days generate a build warning.
 ### Future-Dated Content
 
 Pages with a `date` in the future are automatically excluded from builds. This is useful for scheduling content.
+
+The build compares `date` and `expires` with the time the build started, as instants: a page is published when `date` is not after that time, and hidden when `expires` is not after it. A value with an offset (`2024-03-05T09:00:00+09:00`) means exactly that moment; a value without one, including a bare `2024-03-05`, is midnight or the written time in the build machine's local time zone (so on a UTC runner a date-only page dated "today" in Seoul is still in the future until midnight UTC). Set the offset in the front matter when the schedule must not depend on where the site is built.
 
 ```markdown
 +++

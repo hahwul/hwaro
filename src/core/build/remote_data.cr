@@ -190,7 +190,10 @@ module Hwaro
           return unless ttl
           meta = read_meta(cache_dir, entry.key)
           return unless meta && meta[:url_digest] == digest
-          return unless now - meta[:fetched_at] < ttl
+          # A `fetched_at` ahead of the clock (a cache copied from a machine
+          # with a fast clock, or the clock stepped back) is no proof of
+          # freshness: it would answer until the clock caught up plus the TTL.
+          return unless meta[:fetched_at] <= now && now - meta[:fetched_at] < ttl
           result = cached_result(entry, cache_dir, meta)
           if result
             Logger.debug "Remote data site.data.#{entry.key}: disk cache is fresh (fetched #{meta[:fetched_at]}, ttl #{ttl}); skipping fetch"

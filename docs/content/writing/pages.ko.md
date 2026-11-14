@@ -54,7 +54,7 @@ JSON은 파일 맨 앞에서 처음으로 짝이 맞는 `{...}`가 프론트 매
 
 | 필드 | 타입 | 기본값 | 설명 |
 |-------|------|---------|-------------|
-| date | string | — | 발행일. `YYYY-MM-DD`, 시간 포함 가능(`YYYY-MM-DD HH:MM:SS` 또는 RFC 3339 datetime). 따옴표 없는 TOML/YAML 날짜도 허용. 오프셋이 없는 날짜는 TOML·YAML·JSON 모두 빌드 머신의 로컬 시간대로 해석. 적어 둔 UTC 오프셋(`+09:00`, `+0900` 또는 공백 뒤의 `2024-01-15 10:00:00 +0900` 형태도 포함)은 유지되므로 TOML과 YAML 모두 적은 날짜 그대로 표시. TOML 오프셋 날짜는 날짜 퍼머링크 토큰(`:year`/`:month`/`:day`)과 연/월 그룹에도 적은 그대로 쓰이므로, 이전 버전에서 UTC 날짜로 만든 URL이 바뀔 수 있음(예: `/2024/02/29/` → `/2024/03/01/`). 예전 URL을 유지하려면 `aliases`에 추가 |
+| date | string | — | 발행일. `YYYY-MM-DD`, 시간 포함 가능(`YYYY-MM-DD HH:MM:SS` 또는 RFC 3339 datetime). 따옴표 없는 TOML/YAML 날짜도 허용. 오프셋이 없는 날짜는 TOML·YAML·JSON 모두 빌드 머신의 로컬 시간대로 해석. 적어 둔 UTC 오프셋(`Z`, `+09:00`, `+0900`, `+09` 또는 공백 뒤의 `2024-01-15 10:00:00 +0900` 형태도 포함)은 유지되므로 TOML과 YAML 모두 적은 날짜 그대로 표시. TOML 오프셋 날짜는 날짜 퍼머링크 토큰(`:year`/`:month`/`:day`)과 연/월 그룹에도 적은 그대로 쓰이므로, 이전 버전에서 UTC 날짜로 만든 URL이 바뀔 수 있음(예: `/2024/02/29/` → `/2024/03/01/`). 예전 URL을 유지하려면 `aliases`에 추가. 그 밖의 형식(초 없는 시각, `20240115`, `KST` 같은 시간대 이름, 뒤에 붙은 문자)은 날짜가 아니며, 빌드가 파일과 값을 알려 주는 경고를 내고 날짜 없는 페이지로 처리 |
 | description | string | — | SEO 설명 |
 | draft | bool | false | 프로덕션 빌드에서 제외 |
 | template | string | "page" | 사용할 템플릿 |
@@ -78,7 +78,7 @@ JSON은 파일 맨 앞에서 처음으로 짝이 맞는 `{...}`가 프론트 매
 | insert_anchor_links | bool | 헤딩 앵커 추가 |
 | redirect_to | string | 페이지를 이 URL 또는 `@/` 경로로 지정한 콘텐츠 파일(`@/blog/post.md`)로 리다이렉트(리다이렉트 페이지는 사이트맵, 피드, 검색 인덱스, llms.txt와 모든 목록에서 빠짐: `section.pages`와 페이지네이션, 이전/다음, 택소노미 용어, 시리즈, 관련 글, 백링크, `site.authors`. `get_page()`와 `site.pages`에는 그대로 나옴) |
 | render | bool | 페이지를 출력으로 렌더링(기본값: true) |
-| expires | date | 이 날짜 이후 자동 제외 |
+| expires | date | 이 날짜부터 자동 제외 |
 | series | string | 묶음용 시리즈 이름 |
 | series_weight | int | 시리즈 내 정렬 순서 |
 | translation_key | string | 파일 이름이 다른 번역을 연결. 키가 같은 페이지끼리 서로의 번역이 됨. [번역 키](/ko/features/multilingual/#번역-키) 참고 |
@@ -126,7 +126,7 @@ title = "Limited Time Offer"
 expires = 2025-12-31
 +++
 
-Automatically excluded from builds after the expiry date.
+만료 날짜에 도달하면 빌드에서 자동으로 제외됩니다.
 ```
 
 만료된 콘텐츠 포함 빌드: `hwaro build --include-expired`
@@ -136,6 +136,8 @@ Automatically excluded from builds after the expiry date.
 ### 미래 날짜 콘텐츠
 
 `date`가 미래인 페이지는 빌드에서 자동으로 빠집니다. 콘텐츠 예약 발행에 유용합니다.
+
+빌드는 `date`와 `expires`를 빌드 시작 시각과 하나의 시점으로 비교합니다. `date`가 그 시각보다 늦지 않으면 발행되고, `expires`가 그 시각보다 늦지 않으면 제외됩니다. 오프셋이 있는 값(`2024-03-05T09:00:00+09:00`)은 정확히 그 시점이고, 오프셋이 없는 값(`2024-03-05`처럼 날짜만 쓴 경우 포함)은 빌드 머신의 로컬 시간대 기준 자정 또는 적은 시각입니다. 그래서 UTC 러너에서는 서울 기준 "오늘" 날짜의 날짜만 쓴 페이지도 UTC 자정이 될 때까지는 미래입니다. 빌드하는 곳에 따라 일정이 달라지면 안 된다면 front matter에 오프셋을 적으세요.
 
 ```markdown
 +++
