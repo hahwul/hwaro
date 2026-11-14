@@ -1,0 +1,1007 @@
+/* =============================================================================
+   Hwaro Landing — "pixel hearth", dark-locked
+   The page hardcodes data-theme="dark", so every token resolves to its dark
+   side here. The pixel flame from the logo is the page's one motif: a live
+   pixel fire under the hero, a pixel face for small labels and figures, and
+   stepped ("notched") corners on every filled block. All rules stay scoped
+   to landing classes.
+   ============================================================================= */
+
+.landing-body {
+    /* The landing sits a step deeper than the docs, so the fire carries
+       the scene. */
+    --bg: #070709;
+    --bg-subtle: #101014;
+    --bg-code: #121216;
+    --border: #222229;
+    --border-subtle: #17171c;
+    --glass: rgba(7, 7, 9, 0.82);
+    /* Stepped corners: one pixel step of 4px (controls) or 8px (cells). */
+    --notch-sm: polygon(4px 0, calc(100% - 4px) 0, calc(100% - 4px) 4px, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 4px calc(100% - 4px), 0 calc(100% - 4px), 0 4px, 4px 4px);
+    --notch: polygon(8px 0, calc(100% - 8px) 0, calc(100% - 8px) 8px, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 8px calc(100% - 8px), 0 calc(100% - 8px), 0 8px, 8px 8px);
+    background: var(--bg);
+    color: var(--text);
+}
+
+/* clip-path hides an outside outline, so notched controls draw focus inside. */
+.landing-body .btn:focus-visible,
+.landing-body .hero-install:focus-visible,
+.landing-body .showcase-card:focus-visible {
+    outline: 2px solid var(--heading);
+    outline-offset: -5px;
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.lp-wrap {
+    max-width: 1152px;
+    margin: 0 auto;
+    padding-inline: var(--space-5);
+}
+
+/* Copy / check icon swap shared by every clipboard control on the page. */
+.landing-body .check-icon {
+    display: none;
+}
+
+.landing-body .is-copied .copy-icon {
+    display: none;
+}
+
+.landing-body .is-copied .check-icon {
+    display: block;
+    color: var(--ok);
+}
+
+/* =============================================================================
+   Header
+   ============================================================================= */
+
+.landing-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: transparent;
+    border-bottom: 1px solid transparent;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--space-5);
+    z-index: 100;
+    transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+/* Once the page scrolls, the header picks up its glass. Without JS the
+   is-scrolled hook never lands, so keep the glass as the no-JS default. */
+html:not(.js) .landing-header,
+.landing-header.is-scrolled {
+    background: var(--glass);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom-color: var(--border-subtle);
+}
+
+.landing-header .logo {
+    display: flex;
+    align-items: center;
+}
+
+.landing-header .logo img {
+    height: 30px;
+    width: auto;
+}
+
+.landing-header nav {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.landing-header nav a {
+    font-size: 0.88rem;
+    font-weight: 450;
+    color: var(--text-secondary);
+    padding: 0.35rem 0.8rem;
+    border-radius: var(--radius-sm);
+    transition: color var(--transition), background var(--transition);
+}
+
+.landing-header nav a:hover {
+    color: var(--heading);
+    background: var(--bg-subtle);
+}
+
+.landing-header .github-link {
+    display: flex;
+    padding: 0.35rem 0.5rem;
+}
+
+/* The landing nav's generous link padding would bloat the language menu —
+   restore the compact dropdown rows from 03-layout.css. */
+.landing-header nav .lang-switch-menu a {
+    font-size: 0.82rem;
+    padding: 0.4rem 0.6rem;
+}
+
+/* =============================================================================
+   Buttons
+   ============================================================================= */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    padding: 0 1.4rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1;
+    clip-path: var(--notch-sm);
+    transition: background var(--transition), transform 0.1s ease;
+}
+
+.btn:active {
+    transform: translateY(1px);
+}
+
+.btn-primary,
+.btn-primary:hover {
+    color: #160a07;
+}
+
+.btn-primary {
+    background: var(--primary);
+}
+
+.btn-primary:hover {
+    background: var(--primary-strong);
+}
+
+/* =============================================================================
+   Hero — centered copy over the pixel hearth
+   ============================================================================= */
+
+/* .landing prefix: must outweigh the `.landing section` rhythm below. */
+.landing .hero {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    text-align: center;
+    /* Exactly one screen tall, so the hearth's base rests on the bottom edge
+       of the viewport; the copy centers in what is left above the fire. */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 100vh;
+    min-height: 100svh;
+    padding: calc(64px + clamp(1.5rem, 6vh, 6.5rem)) 0 clamp(230px, 34vh, 300px);
+}
+
+/* The fire's light on the floor: present without JS and under the pixels. */
+.hero::before {
+    content: "";
+    position: absolute;
+    inset: auto 0 0;
+    height: 340px;
+    z-index: -2;
+    background: radial-gradient(
+        ellipse 46% 100% at 50% 100%,
+        color-mix(in srgb, var(--primary) 20%, transparent),
+        transparent 72%
+    );
+}
+
+/* Sized by the page script to a whole number of 9px cells. */
+.hero-fire {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    z-index: -1;
+    max-width: none;
+    image-rendering: pixelated;
+    -webkit-mask-image: linear-gradient(180deg, transparent, #000 30%);
+    mask-image: linear-gradient(180deg, transparent, #000 30%);
+}
+
+.hero-content {
+    padding: 0 var(--space-5);
+    max-width: 960px;
+    margin: 0 auto;
+}
+
+.hero-eyebrow {
+    margin: 0;
+    font-family: var(--font-pixel);
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--primary);
+}
+
+.hero-eyebrow [lang="ko"] {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    letter-spacing: 0;
+}
+
+.hero-content h1 {
+    font-size: clamp(2.5rem, 6.4vw, 5rem);
+    font-weight: 700;
+    letter-spacing: -0.045em;
+    line-height: 1;
+    color: var(--heading);
+    margin: 1.1rem 0 1.4rem;
+    text-wrap: balance;
+}
+
+/* Hangul wants more leading and none of the Latin tightening. */
+:lang(ko) .hero-content h1 {
+    font-size: clamp(2.2rem, 5.4vw, 4.2rem);
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+}
+
+.hero-content .highlight {
+    color: var(--primary);
+}
+
+.hero-sub {
+    font-size: 1.08rem;
+    line-height: 1.65;
+    color: var(--text-secondary);
+    max-width: 46ch;
+    margin: 0 auto 1.9rem;
+    text-wrap: pretty;
+}
+
+.hero-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+}
+
+.hero-install {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-height: 44px;
+    padding: 0 1rem;
+    background: #131317;
+    border: 1px solid #34343c;
+    clip-path: var(--notch-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color var(--transition), color var(--transition);
+}
+
+.hero-install code {
+    background: transparent;
+    padding: 0;
+    font-size: 0.85rem;
+    color: var(--text);
+}
+
+.hero-install:hover {
+    border-color: var(--text-muted);
+    color: var(--text);
+}
+
+/* Entry — the copy rises once, only when motion is welcome. */
+@media (prefers-reduced-motion: no-preference) {
+    .hero-content > * {
+        animation: lp-rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    }
+
+    .hero-content > h1 {
+        animation-delay: 0.06s;
+    }
+
+    .hero-content > .hero-sub {
+        animation-delay: 0.14s;
+    }
+
+    .hero-content > .hero-actions {
+        animation-delay: 0.22s;
+    }
+}
+
+@keyframes lp-rise {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+}
+
+/* =============================================================================
+   Section rhythm + scroll reveal
+   ============================================================================= */
+
+.landing section {
+    padding-block: var(--space-8);
+    /* anchor targets must clear the fixed header */
+    scroll-margin-top: 64px;
+}
+
+.section-header {
+    margin-bottom: var(--space-6);
+    max-width: 60ch;
+}
+
+.section-header h2,
+.speed-header h2 {
+    font-size: clamp(1.7rem, 3.4vw, 2.5rem);
+    font-weight: 650;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    color: var(--heading);
+    margin: 0 0 var(--space-3);
+    text-wrap: balance;
+}
+
+:lang(ko) .section-header h2,
+:lang(ko) .speed-header h2,
+:lang(ko) .get-started h2 {
+    letter-spacing: -0.015em;
+    line-height: 1.25;
+}
+
+.section-header p,
+.speed-header p {
+    margin: 0;
+    max-width: 52ch;
+    color: var(--text-secondary);
+    text-wrap: pretty;
+}
+
+html.js .reveal {
+    opacity: 0;
+    transform: translateY(20px);
+    transition:
+        opacity 0.6s ease,
+        transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html.js .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+}
+
+/* Child cascade — cards inside a revealed section rise one after another.
+   The section itself still fades as a unit; children add a second beat.
+   Everything is scoped to :not(.is-settled): once the entrance has played,
+   these rules vanish entirely so hover transforms win again. */
+html.js .reveal:not(.is-settled) .feature,
+html.js .reveal:not(.is-settled) .speed-modes li,
+html.js .reveal:not(.is-settled) .showcase-card,
+html.js .reveal:not(.is-settled) .scaffold-card {
+    opacity: 0;
+    transform: translateY(18px);
+    transition:
+        opacity 0.55s ease,
+        transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+    transition-delay: calc(0.08s + var(--stagger, 0) * 0.07s);
+}
+
+html.js .reveal.is-visible:not(.is-settled) .feature,
+html.js .reveal.is-visible:not(.is-settled) .speed-modes li,
+html.js .reveal.is-visible:not(.is-settled) .showcase-card,
+html.js .reveal.is-visible:not(.is-settled) .scaffold-card {
+    opacity: 1;
+    transform: none;
+}
+
+.feature:nth-child(1), .speed-modes li:nth-child(1),
+.showcase-card:nth-child(1), .scaffold-card:nth-child(1) { --stagger: 0; }
+.feature:nth-child(2), .speed-modes li:nth-child(2),
+.showcase-card:nth-child(2), .scaffold-card:nth-child(2) { --stagger: 1; }
+.feature:nth-child(3), .speed-modes li:nth-child(3),
+.showcase-card:nth-child(3), .scaffold-card:nth-child(3) { --stagger: 2; }
+.feature:nth-child(4), .showcase-card:nth-child(4),
+.scaffold-card:nth-child(4) { --stagger: 3; }
+.feature:nth-child(5), .showcase-card:nth-child(5),
+.scaffold-card:nth-child(5) { --stagger: 4; }
+.feature:nth-child(6), .showcase-card:nth-child(6) { --stagger: 5; }
+
+@media (prefers-reduced-motion: reduce) {
+    html.js .reveal {
+        opacity: 1;
+        transform: none;
+        transition: none;
+    }
+
+    html.js .reveal:not(.is-settled) .feature,
+    html.js .reveal:not(.is-settled) .speed-modes li,
+    html.js .reveal:not(.is-settled) .showcase-card,
+    html.js .reveal:not(.is-settled) .scaffold-card {
+        opacity: 1;
+        transform: none;
+        transition: none;
+    }
+}
+
+/* =============================================================================
+   Speed — the measured build, replayed
+   ============================================================================= */
+
+.speed-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(1.75rem, 6vw, 5rem);
+    align-items: center;
+}
+
+.speed-header {
+    margin-bottom: var(--space-5);
+}
+
+.speed-figure {
+    font-family: var(--font-pixel);
+    font-size: clamp(3.6rem, 9vw, 6.5rem);
+    line-height: 1;
+    color: var(--heading);
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+    transform-origin: left center;
+}
+
+.speed-unit {
+    font-size: 0.5em;
+    color: var(--primary);
+    margin-left: 0.08em;
+}
+
+/* Finish beat — the figure pops when the build lands. */
+@media (prefers-reduced-motion: no-preference) {
+    .speed-stage.is-done .speed-figure {
+        animation: speed-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+}
+
+@keyframes speed-pop {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+/* A segmented meter: unlit cells on the track, lit cells on the fill. The
+   replay script reveals the fill with clip-path so the cells never stretch. */
+.speed-track {
+    height: 22px;
+    margin-top: 1.1rem;
+    background: repeating-linear-gradient(90deg, var(--border) 0 10px, transparent 10px 14px);
+}
+
+.speed-fill {
+    display: block;
+    height: 100%;
+    background: repeating-linear-gradient(90deg, var(--primary) 0 10px, transparent 10px 14px);
+}
+
+/* Only a JS-driven page starts the meter empty; no-JS sees it full. */
+html.js .speed-fill {
+    clip-path: inset(0 100% 0 0);
+}
+
+.speed-caption {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    margin: var(--space-3) 0 0;
+    font-family: var(--font-pixel);
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+:lang(ko) .speed-caption {
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    letter-spacing: 0;
+}
+
+.speed-replay {
+    font: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    padding: 0.25rem 0.6rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color var(--transition), border-color var(--transition);
+}
+
+.speed-replay:hover {
+    color: var(--primary);
+    border-color: var(--primary);
+}
+
+.speed-modes {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.speed-modes li {
+    display: grid;
+    grid-template-columns: 5.2em 12.5em minmax(0, 1fr) 3.4em;
+    gap: var(--space-4);
+    align-items: center;
+    padding: 0.85rem 0;
+    border-top: 1px solid var(--border);
+    font-size: 0.88rem;
+}
+
+.mode-name {
+    font-family: var(--font-mono);
+    color: var(--heading);
+}
+
+.mode-desc {
+    color: var(--text-muted);
+}
+
+.mode-bar {
+    height: 8px;
+}
+
+.mode-bar i {
+    display: block;
+    width: var(--w);
+    height: 100%;
+    background: repeating-linear-gradient(90deg, var(--primary) 0 6px, transparent 6px 8px);
+}
+
+.mode-time {
+    font-family: var(--font-mono);
+    text-align: right;
+    color: var(--heading);
+    font-variant-numeric: tabular-nums;
+}
+
+.speed-scale {
+    margin: var(--space-3) 0 0;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+/* =============================================================================
+   Features — six notched cells, keyed like config
+   ============================================================================= */
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+}
+
+.feature {
+    min-width: 0;
+    padding: 1.5rem 1.4rem 1.6rem;
+    background: var(--bg-subtle);
+    clip-path: var(--notch);
+    transition: background 0.25s ease;
+}
+
+.feature:hover {
+    background: #16161b;
+}
+
+.feature h3 {
+    font-family: var(--font-pixel);
+    font-size: 0.8rem;
+    font-weight: 400;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--primary);
+    margin: 0;
+}
+
+.feature p {
+    margin: 0.75rem 0 0;
+    font-size: 0.92rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+
+/* =============================================================================
+   Scaffolds — scroll-snap rail
+   ============================================================================= */
+
+.scaffolds .section-header {
+    margin-bottom: var(--space-5);
+}
+
+.scaffold-rail {
+    display: flex;
+    gap: var(--space-4);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding: var(--space-1) max(calc((100vw - 1152px) / 2 + var(--space-5)), var(--space-5)) var(--space-4);
+    /* Without this, mandatory snap aligns the first card to the snapport's
+       raw left edge on load, scrolling the inline padding out of view and
+       leaving the rail misaligned with the section header above it. */
+    scroll-padding-inline: max(calc((100vw - 1152px) / 2 + var(--space-5)), var(--space-5));
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+
+.scaffold-card {
+    flex: 0 0 auto;
+    width: min(420px, 78vw);
+    scroll-snap-align: start;
+    margin: 0;
+}
+
+.scaffold-card img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--border);
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease;
+}
+
+.scaffold-card:hover img {
+    transform: translateY(-4px);
+    border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .scaffold-card img {
+        transition: none;
+    }
+
+    .scaffold-card:hover img {
+        transform: none;
+    }
+}
+
+.scaffold-card figcaption {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: var(--space-3);
+}
+
+.scaffold-card figcaption code {
+    background: transparent;
+    padding: 0;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.scaffold-card figcaption span {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* =============================================================================
+   OG marquee — one slow drift of real output; static row under reduced motion
+   ============================================================================= */
+
+.ogband .section-header {
+    margin-bottom: var(--space-5);
+}
+
+.og-marquee {
+    overflow: hidden;
+    mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+}
+
+.og-track {
+    display: flex;
+    gap: var(--space-4);
+    width: max-content;
+}
+
+.og-track img {
+    width: 300px;
+    height: auto;
+    border: 1px solid var(--border);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .og-track {
+        animation: og-drift 80s linear infinite;
+    }
+
+    .og-marquee:hover .og-track {
+        animation-play-state: paused;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .og-marquee {
+        overflow-x: auto;
+        mask-image: none;
+        -webkit-mask-image: none;
+    }
+
+    /* The second copy of the set only exists to make the drift seamless;
+       a static, scrollable band should not repeat all nineteen styles. */
+    .og-track img[aria-hidden="true"] {
+        display: none;
+    }
+}
+
+@keyframes og-drift {
+    to {
+        transform: translateX(-50%);
+    }
+}
+
+/* =============================================================================
+   Showcase — media gallery
+   ============================================================================= */
+
+.showcase-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-4);
+}
+
+.showcase-card {
+    display: block;
+    overflow: hidden;
+    background: var(--bg-subtle);
+    clip-path: var(--notch);
+    transition: transform 0.25s ease, background 0.25s ease;
+}
+
+.showcase-card:hover {
+    transform: translateY(-3px);
+    background: #16161b;
+}
+
+.showcase-preview {
+    display: block;
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+}
+
+.showcase-preview img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top;
+    transition: transform 0.4s ease;
+}
+
+.showcase-card:hover .showcase-preview img {
+    transform: scale(1.03);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .showcase-card,
+    .showcase-preview img {
+        transition: none;
+    }
+}
+
+.showcase-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-4);
+}
+
+.showcase-name {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--heading);
+}
+
+.showcase-tag {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+/* =============================================================================
+   Closer — install and go
+   ============================================================================= */
+
+.get-started {
+    text-align: center;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.get-started h2 {
+    font-size: clamp(1.7rem, 3.4vw, 2.5rem);
+    font-weight: 650;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    color: var(--heading);
+    margin: 0 0 var(--space-3);
+}
+
+.get-started > .lp-wrap > p {
+    margin: 0 0 var(--space-6);
+    color: var(--text-secondary);
+}
+
+.install {
+    max-width: 560px;
+    margin: 0 auto var(--space-6);
+}
+
+.install-tabs {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--border);
+    background: var(--bg-subtle);
+    margin-bottom: var(--space-3);
+}
+
+.install-tabs [role="tab"] {
+    border: none;
+    background: transparent;
+    padding: 0.38rem 0.9rem;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color var(--transition), background var(--transition);
+}
+
+.install-tabs [role="tab"]:hover {
+    color: var(--heading);
+}
+
+.install-tabs [role="tab"][aria-selected="true"] {
+    background: var(--bg);
+    color: var(--heading);
+    font-weight: 550;
+    box-shadow: var(--shadow-sm);
+}
+
+.install-cmd {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: 0.8rem 1rem;
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+}
+
+.install-cmd code {
+    background: transparent;
+    padding: 0;
+    font-size: 0.88rem;
+    color: var(--text);
+    white-space: nowrap;
+    overflow-x: auto;
+}
+
+/* Tab switches swap the command with a quick dissolve. */
+@media (prefers-reduced-motion: no-preference) {
+    .install-cmd code.is-swapping {
+        animation: cmd-swap 0.28s ease;
+    }
+}
+
+@keyframes cmd-swap {
+    0% { opacity: 0; transform: translateY(4px); }
+    100% { opacity: 1; transform: none; }
+}
+
+.install-copy {
+    display: flex;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.3rem;
+    transition: color var(--transition);
+}
+
+.install-copy:hover {
+    color: var(--primary);
+}
+
+.install-more {
+    margin: var(--space-3) 0 0;
+    font-size: 0.82rem;
+}
+
+.install-more a {
+    color: var(--text-muted);
+}
+
+.install-more a:hover {
+    color: var(--primary);
+}
+
+/* Landing footer spacing — the shared partial brings its own top border. */
+.landing-body .site-footer {
+    margin-top: 0;
+}
+
+/* =============================================================================
+   Responsive
+   ============================================================================= */
+
+@media (max-width: 960px) {
+    .speed-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .feature-grid,
+    .showcase-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .landing section {
+        padding-block: var(--space-7);
+    }
+
+    .landing .hero {
+        padding: calc(64px + 2rem) 0 240px;
+    }
+
+    .landing-header {
+        padding: 0 var(--space-4);
+    }
+
+    .landing-header nav a {
+        padding: 0.35rem 0.5rem;
+        font-size: 0.82rem;
+    }
+
+    .feature-grid,
+    .showcase-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .hero-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .hero-install {
+        justify-content: center;
+    }
+
+    /* name + time on one line, the bar beneath; the description would only
+       crowd a phone row. */
+    .speed-modes li {
+        grid-template-columns: 1fr auto;
+        gap: var(--space-2) var(--space-4);
+    }
+
+    .mode-desc {
+        display: none;
+    }
+
+    .mode-time {
+        order: 2;
+    }
+
+    .mode-bar {
+        order: 3;
+        grid-column: 1 / -1;
+    }
+}
