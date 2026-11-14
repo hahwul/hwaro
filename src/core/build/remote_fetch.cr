@@ -70,7 +70,8 @@ module Hwaro
             validate_hop!(current)
             pinned = guard.try(&.call(current))
             credentials &&= same_origin?(original, current)
-            outcome = exchange(current, pinned) do |client|
+            remaining = deadline - (Time.instant - started)
+            outcome = exchange(current, pinned, remaining, deadline) do |client|
               hop_headers = request_headers(headers, credentials, user_agent)
               hop_headers["Host"] = host_header(current) if pinned
               client.get(request_target(current), headers: hop_headers) do |response|
@@ -133,10 +134,10 @@ module Hwaro
         # the original message: HTTP::Client raises a bare `Exception` for a
         # malformed response ("Invalid HTTP response"), which no caller's
         # rescue list could name.
-        private def exchange(uri : URI, pinned : Array(String)?, & : HTTP::Client -> T) : T forall T
+        private def exchange(uri : URI, pinned : Array(String)?, budget : Time::Span, deadline : Time::Span, & : HTTP::Client -> T) : T forall T
           client = build_client(uri, pinned)
           begin
-            yield client
+            with_deadline(client, budget, "exceeded the #{deadline.total_seconds.round.to_i}s fetch deadline") { yield client }
           ensure
             client.close
           end
@@ -149,6 +150,31 @@ module Hwaro
           # "retries" into this. Which one happened is lost, so stay neutral.
           message = "connection closed or reset before a response" if message == "This HTTP::Client cannot be reconnected"
           raise FetchError.new(message, cause: ex)
+        end
+
+        # Runs the block, closing `client` once `budget` is spent. A read
+        # timeout bounds one read; a peer trickling a header byte inside it
+        # (or a body, in the link checker) never trips it. Closing the socket
+        # wakes the blocked read, which is then reported as `IO::TimeoutError`.
+        def with_deadline(client : HTTP::Client, budget : Time::Span, message : String, & : -> T) : T forall T
+          fired = false
+          done = Channel(Nil).new(1)
+          spawn do
+            select
+            when done.receive
+            when timeout(budget)
+              fired = true
+              client.close
+            end
+          end
+          begin
+            yield
+          rescue ex
+            raise IO::TimeoutError.new(message) if fired
+            raise ex
+          ensure
+            done.send(nil)
+          end
         end
 
         private def build_client(uri : URI, pinned : Array(String)?) : HTTP::Client

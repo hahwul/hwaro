@@ -122,17 +122,18 @@ module Hwaro
 
                 begin
                   headers = HTTP::Headers{"User-Agent" => "hwaro-link-checker/1.0"}
-                  response = if method == "HEAD"
-                               client.head(Core::Build::RemoteFetch.request_target(request_uri), headers: headers)
-                             else
-                               client.get(Core::Build::RemoteFetch.request_target(request_uri), headers: headers)
-                             end
-
-                  status_code = response.status_code
+                  # Only status and Location are read, so the block forms keep a
+                  # GET fallback from buffering the whole body; the wall-clock
+                  # budget bounds a peer that trickles bytes inside the read
+                  # timeout (which only bounds one read).
+                  target = Core::Build::RemoteFetch.request_target(request_uri)
+                  status_code, location = Core::Build::RemoteFetch.with_deadline(client, timeout_seconds.seconds, "timed out") do
+                    read = ->(res : HTTP::Client::Response) { {res.status_code, res.headers["Location"]?} }
+                    method == "HEAD" ? client.head(target, headers: headers, &read) : client.get(target, headers: headers, &read)
+                  end
 
                   if {301, 302, 303, 307, 308}.includes?(status_code)
                     if redirects_left > 0
-                      location = response.headers["Location"]?
                       if location
                         if Time.instant > deadline
                           error_message = "Request timed out (#{timeout_seconds}s): redirect chain exceeded the time budget"
