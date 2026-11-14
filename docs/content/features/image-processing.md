@@ -18,7 +18,7 @@ Hwaro can automatically generate resized image variants during build. This is us
 
 An animated PNG (an `acTL` chunk before the first `IDAT`) is copied as is, like a GIF or an animated WebP, and gets no variants: a resized copy would lose the animation. It keeps its `width` and `height` attributes. Formats are recognised by the file's content, not its extension, so a PNG saved as `photo.jpg` is measured as the PNG it is.
 
-A file that cannot be decoded is still copied, but gets no variants. The same goes for a truncated or corrupt file whose header claims far more pixels than the file can hold (for example a few hundred bytes that say 26000x26000). Hwaro skips it with a warning instead of allocating gigabytes for it. This check also covers OG `logo` and `background_image` files.
+A file that cannot be decoded is still copied, but gets no variants. The same goes for a truncated or corrupt file whose header claims far more pixels than the file can hold (for example a few hundred bytes that say 26000x26000). Hwaro skips it with a warning instead of allocating gigabytes for it. An image with a side longer than 1,048,576 pixels is skipped the same way, because the resizer cannot scale it safely. This check also covers OG `logo` and `background_image` files.
 
 ## Configuration
 

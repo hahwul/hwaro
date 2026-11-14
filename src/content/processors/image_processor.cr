@@ -50,6 +50,13 @@ module Hwaro
         # through to a 150 MB decode and a 1.6 GB resize.
         MAX_BMP_DECODE_RATIO = 64_i64
 
+        # Longest side a source may have. stb_image_resize2 asserts (aborting
+        # the whole build) once a side runs into the millions: a valid 72 KB
+        # PNG of 8323327x3 pixels brought down every build, and so does any
+        # 1-pixel-high image wider than about 3 million pixels, when it is
+        # scaled to a few pixels. No real picture is near this.
+        MAX_RESIZE_SIDE = 1 << 20
+
         # Largest width or height `dimensions` reports: stb refuses anything
         # bigger (STBI_MAX_DIMENSIONS), so a header claiming more is corrupt
         # and must not reach a page as `width="2147483647"`.
@@ -61,7 +68,8 @@ module Hwaro
         @@implausible_mutex = Mutex.new
 
         # True (with a warning) when `path`'s header claims far more pixels
-        # than the file could hold, so it must not be handed to `stbi_load`.
+        # than the file could hold, or a side stb cannot resize, so it must
+        # not be handed to `stbi_load`.
         # `desired` is the channel count the caller decodes to (0 = stored).
         def implausible_size?(path : String, desired : Int32 = 0) : Bool
           w = uninitialized LibC::Int
@@ -69,14 +77,17 @@ module Hwaro
           comp = uninitialized LibC::Int
           return false if LibStb.stbi_info(path, pointerof(w), pointerof(h), pointerof(comp)) == 0
           return false unless info = File.info?(path)
-          claimed = w.to_i64 * h * (desired > 0 ? desired : comp)
-          return false unless claimed > info.size * MAX_BMP_DECODE_RATIO
-          unless claimed > info.size * MAX_DECODE_RATIO
-            head = Bytes.new(2)
-            return false unless read_header(path, head) == 2 && head[0] == 0x42 && head[1] == 0x4D
+          too_long = w > MAX_RESIZE_SIDE || h > MAX_RESIZE_SIDE
+          unless too_long
+            claimed = w.to_i64 * h * (desired > 0 ? desired : comp)
+            return false unless claimed > info.size * MAX_BMP_DECODE_RATIO
+            unless claimed > info.size * MAX_DECODE_RATIO
+              head = Bytes.new(2)
+              return false unless read_header(path, head) == 2 && head[0] == 0x42 && head[1] == 0x4D
+            end
           end
           if @@implausible_mutex.synchronize { @@implausible_warned.add?("#{path}:#{info.size}:#{info.modification_time.to_unix_ms}") }
-            Logger.warn "#{path}: not processed, its header claims #{w}x#{h} pixels but the file is only #{info.size} bytes (truncated or corrupt)"
+            Logger.warn(too_long ? "#{path}: not processed, #{w}x#{h} is past the #{MAX_RESIZE_SIDE} pixels a side that can be resized" : "#{path}: not processed, its header claims #{w}x#{h} pixels but the file is only #{info.size} bytes (truncated or corrupt)")
           end
           true
         end

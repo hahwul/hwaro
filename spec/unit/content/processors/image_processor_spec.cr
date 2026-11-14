@@ -1334,3 +1334,33 @@ describe "ImageProcessor.dimensions on absurd header sizes" do
     end
   end
 end
+
+describe "ImageProcessor.implausible_size? for very long images" do
+  processor = Hwaro::Content::Processors::ImageProcessor
+
+  # PNG_1X1 with `w` in its IHDR (the rest of the file is untouched)
+  png_wide = ->(w : UInt32) do
+    bytes = PNG_1X1.dup
+    IO::ByteFormat::BigEndian.encode(w, bytes[16, 4])
+    bytes
+  end
+
+  it "refuses a side stb_image_resize2 cannot scale" do
+    Dir.mktmpdir do |dir|
+      processor.implausible_size?(write_bytes(dir, "ok.png", png_wide.call(1_048_576_u32))).should be_false
+      processor.implausible_size?(write_bytes(dir, "long.png", png_wide.call(1_048_577_u32))).should be_true
+    end
+  end
+
+  it "builds no variants from a valid 8-million-pixel strip instead of aborting the process" do
+    Dir.mktmpdir do |dir|
+      # stb_image_resize2 asserts on this size at a scale of 1 pixel or so
+      src = File.join(dir, "strip.png")
+      pixels = Bytes.new(8_006_708 * 3, 200_u8)
+      LibStb.stbi_write_png(src, 8_006_708, 1, 3, pixels.to_unsafe.as(Void*), 0)
+      map, lqip, _ = processor.resize_and_lqip(src, File.join(dir, "out"), [1, 3, 16], 85, 32, 20)
+      map.should be_empty
+      lqip.should be_nil
+    end
+  end
+end
