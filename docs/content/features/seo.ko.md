@@ -105,6 +105,8 @@ sections = []             # 특정 섹션으로 제한, 예: ["posts"]
 | `sections` | `[]` | 피드를 특정 섹션으로 제한 |
 | `default_language_only` | `true` | 다국어: 메인 피드에 기본 언어만 포함 |
 
+RSS 항목의 `<description>`에는 Hugo, Zola와 마찬가지로 **HTML**이 들어갑니다. 피드 리더는 XML을 해석한 뒤 그 결과를 HTML로 렌더링하기 때문입니다. 그래서 Hwaro는 일반 텍스트인 프론트 매터 description이나 요약의 `&`, `<`, `>`를 먼저 HTML 이스케이프한 다음 XML 이스케이프합니다. `a <b> & c` 같은 설명도 리더에 그대로 표시됩니다. Atom `<content type="text">`와 JSON Feed의 `summary`/`content_text`는 일반 텍스트이고, `<content type="html">`과 `content_html`은 HTML입니다.
+
 ### JSON Feed
 
 `type = "json"`으로 설정하면 [JSON Feed 1.1](https://www.jsonfeed.org/version/1.1/) 문서를 `feed.json`으로 생성합니다 (`filename`을 지정하면 그 이름을 씁니다). RSS·Atom과 같은 위치 모두에 생성됩니다. 메인 피드, 섹션 피드, 언어별 피드, 택소노미 용어 피드가 해당하며, `limit`, `truncate`, `full_content`, `sections`, `default_language_only` 설정도 똑같이 적용됩니다.
@@ -241,7 +243,7 @@ generate_feed = false   # /ja/rss.xml을 생성하지 않음
 
 #### 예시
 
-값은 **미리 이스케이프되지 않습니다.** `xml_escape`를 적용하거나 CDATA로 감싸는 일은 템플릿 작성자의 몫입니다. `feed.json` 템플릿에서는 `tojson` 필터를 쓰세요:
+값은 **미리 이스케이프되지 않습니다.** `xml_escape`를 적용하거나 CDATA로 감싸는 일은 템플릿 작성자의 몫입니다. `summary`는 일반 텍스트이므로 RSS `<description>`처럼 HTML을 담는 요소에는 먼저 `escape`를 적용하세요. `feed.json` 템플릿에서는 `tojson` 필터를 쓰세요:
 
 ```jinja
 <?xml version="1.0" encoding="UTF-8"?>
@@ -257,7 +259,7 @@ generate_feed = false   # /ja/rss.xml을 생성하지 않음
       <title>{{ p.title | xml_escape }}</title>
       <link>{{ p.url | xml_escape }}</link>
       <guid>{{ p.url | xml_escape }}</guid>
-      <description>{{ p.summary | xml_escape }}</description>
+      <description>{{ p.summary | escape | xml_escape }}</description>
       {% if p.date_rfc822 %}<pubDate>{{ p.date_rfc822 }}</pubDate>{% endif %}
       {% for term in p.categories %}<category>{{ term | xml_escape }}</category>{% endfor %}
     </item>

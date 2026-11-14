@@ -1757,6 +1757,37 @@ describe Hwaro::Content::Seo::Feeds do
       rss.should_not contain("<description>&lt;h1&gt;Hello")
     end
 
+    it "HTML-escapes a plain-text description before the XML pass" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Post"
+      page.url = "/post/"
+      page.description = %(a <b> & "c" it's &amp; 한글)
+
+      rss = Hwaro::Content::Seo::Feeds.generate_rss([page], config, "rss.xml", false, "Test", "")
+
+      # Decoded once, a reader sees `a &lt;b&gt; &amp; ...` HTML that renders as the author's text.
+      rss.should contain("<description>a &amp;lt;b&amp;gt; &amp;amp; &quot;c&quot; it&apos;s &amp;amp;amp; 한글</description>")
+    end
+
+    it "keeps Atom text and JSON Feed summary as plain text (escaped once)" do
+      config = Hwaro::Models::Config.new
+      config.base_url = "https://example.com"
+      config.feeds.full_content = false
+
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Post"
+      page.url = "/post/"
+      page.description = "a <b> & c"
+
+      atom = Hwaro::Content::Seo::Feeds.generate_atom([page], config, "atom.xml", true, "T", "")
+      atom.should contain(%(<content type="text">a &lt;b&gt; &amp; c</content>))
+      json = Hwaro::Content::Seo::Feeds.generate_json([page], config, "feed.json", true, "T", "")
+      json.should contain(%("summary": "a <b> & c"))
+    end
+
     it "strips markup from a <!-- more --> summary instead of dumping raw markdown (gh#491)" do
       config = Hwaro::Models::Config.new
       config.base_url = "https://example.com"
