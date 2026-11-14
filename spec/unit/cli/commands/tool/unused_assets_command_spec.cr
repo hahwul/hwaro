@@ -144,3 +144,29 @@ describe Hwaro::CLI::Commands::Tool::UnusedAssetsCommand do
     end
   end
 end
+
+# Regression: `--delete` without `--force` read its confirmation from a piped
+# stdin, so it hung on an open pipe and deleted files on a stray "y".
+describe "tool unused-assets --delete without a terminal" do
+  it "refuses with a usage error and keeps the files" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        Dir.mkdir("static")
+        File.write("static/a.png", "x")
+        Hwaro::CLI::Prompt.interactive = false
+        Hwaro::CLI::Prompt.input = IO::Memory.new("y\n")
+        begin
+          err = expect_raises(Hwaro::HwaroError) do
+            with_captured_log { Hwaro::CLI::Commands::Tool::UnusedAssetsCommand.new.run(["--delete"]) }
+          end
+          err.code.should eq(Hwaro::Errors::HWARO_E_USAGE)
+          err.hint.to_s.should contain("--force")
+          File.exists?("static/a.png").should be_true
+        ensure
+          Hwaro::CLI::Prompt.interactive = nil
+          Hwaro::CLI::Prompt.input = STDIN
+        end
+      end
+    end
+  end
+end

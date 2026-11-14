@@ -106,6 +106,14 @@ module Hwaro
         )
         Runner.emit_hwaro_error(err)
         exit(err.exit_code)
+      rescue ex : IO::Error
+        # A command's own output failed (stdout closed with `>&-`, a vanished
+        # pipe) or a file read/write it did not classify itself. Classify it
+        # instead of dying with a backtrace or the unclassified exit 1; the
+        # report is best-effort because the stream that failed may be ours.
+        err = Hwaro::HwaroError.new(code: Hwaro::Errors::HWARO_E_IO, message: ex.message || "I/O error")
+        Runner.emit_hwaro_error(err)
+        exit(err.exit_code)
       rescue ex : Exception
         Logger.error "Error: #{ex.message}"
         exit(1)
@@ -138,8 +146,15 @@ module Hwaro
       # `--json` itself funnels its HwaroError rescues through here so the
       # envelope cannot drift between commands.
       def self.exit_with_error_payload(err : Hwaro::HwaroError) : NoReturn
-        STDOUT.puts err.to_error_payload.to_json
+        puts_stdout_quietly err.to_error_payload.to_json
         exit(err.exit_code)
+      end
+
+      # One line on STDOUT that tolerates a closed or vanished stdout: the
+      # exit code, not the line, is what survives then.
+      def self.puts_stdout_quietly(line : String) : Nil
+        STDOUT.puts line
+      rescue IO::Error
       end
 
       # Emit a classified error in either the quiet/JSON machine shape or the
@@ -149,7 +164,7 @@ module Hwaro
       def self.emit_hwaro_error(err : Hwaro::HwaroError, io : IO = STDERR)
         json = @@json_mode || json_flag?(ARGV)
         if json
-          STDOUT.puts err.to_error_payload.to_json
+          puts_stdout_quietly err.to_error_payload.to_json
         else
           msg = "Error [#{err.code}]: #{err.message}"
           Logger.error msg

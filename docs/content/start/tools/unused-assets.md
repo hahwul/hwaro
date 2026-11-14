@@ -88,7 +88,9 @@ found: 4 unused assets
 In a color terminal this renders as an `hwaro unused-assets` receipt with aligned
 rows and a `✦ found` outcome line (`found: no unused assets` when everything is
 referenced). With `--delete` the outcome becomes `deleted: N files` after
-confirmation, or `cancelled: no files deleted`.
+confirmation, or `cancelled: no files deleted`. The prompt needs a terminal: when
+stdin or stdout is piped or redirected (CI, scripts), `--delete` without `--force`
+refuses with a usage error (exit 2) instead of waiting for an answer.
 
 ## JSON Output
 
