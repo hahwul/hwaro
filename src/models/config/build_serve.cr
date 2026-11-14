@@ -61,9 +61,15 @@ module Hwaro
       # CLI flags can still override this.
       property fast : Bool = false
 
+      # Extra `Host` names the dev server answers (see `HostCheckHandler`),
+      # for a tunnel, Codespaces-style forwarder or reverse proxy that serves
+      # the site under its own hostname. "*" turns the check off.
+      property allowed_hosts : Array(String)
+
       def initialize
         @headers = {} of String => String
         @fast = false
+        @allowed_hosts = [] of String
       end
     end
 
@@ -287,6 +293,10 @@ module Hwaro
 
         # Fast dev mode default (can be overridden by CLI flags like --fast or explicit --skip-*)
         config.serve.fast = bool_value(s["fast"]?, config.serve.fast)
+
+        if hosts = string_list?(s["allowed_hosts"]?, "[serve] allowed_hosts")
+          config.serve.allowed_hosts = hosts
+        end
       end
 
       private def self.load_doctor(config : Config)

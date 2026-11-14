@@ -340,6 +340,7 @@ Options for `hwaro serve` only. They never affect `hwaro build` output.
 ```toml
 [serve]
 fast = true                          # always serve in fast dev mode
+allowed_hosts = ["myapp.example.dev"] # extra Host names to answer (tunnel / proxy)
 
 [serve.headers]
 X-Frame-Options = "SAMEORIGIN"
@@ -349,6 +350,7 @@ Cache-Control = "no-store"
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | fast | bool | false | Serve as if `--fast` was passed (skips OG image generation and image processing); explicit CLI skip flags still apply |
+| allowed_hosts | array | [] | Extra `Host` names the dev server answers besides loopback, IP literals, this machine's hostname and the base URL host (a leading `*.` matches a suffix; `"*"` disables the check). Merged with CLI `--allow-host` |
 | headers | table | {} | Custom HTTP response headers added to every dev-server response; CLI `--header` values win on duplicate keys |
 
 See the [serve command](/start/cli/#serve) for the matching CLI flags.

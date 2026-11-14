@@ -1006,6 +1006,7 @@ module Hwaro
 
           # [serve]
           # fast = true                    # Default to fast dev mode (skip heavy OG + image processing)
+          # allowed_hosts = ["myapp.example.dev"]  # Extra Host names to answer (tunnel/proxy); "*" disables the Host check
           #
           # (response headers live under the [serve.headers] table below)
 

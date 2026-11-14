@@ -201,7 +201,7 @@ module Hwaro
         if options.base_url.nil? && Config::Options::ServeOptions.wildcard_host?(options.host)
           Logger.info "Listening on all interfaces; links use localhost. To preview from another device, pass --base-url http://<this-machine's-ip>:#{options.port}"
         end
-        run_with_options(options.host, options.port, options.open_browser, options.access_log, options.live_reload, serve_build_options(options), options.json, options.headers)
+        run_with_options(options.host, options.port, options.open_browser, options.access_log, options.live_reload, serve_build_options(options), options.json, options.headers, options.allow_hosts)
       end
 
       # The effective BuildOptions a serve session runs with. Extracted so
@@ -232,7 +232,7 @@ module Hwaro
         build_options
       end
 
-      private def run_with_options(host : String, port : Int32, open_browser : Bool, access_log : Bool, live_reload : Bool, build_options : Config::Options::BuildOptions, json_output : Bool = false, headers : Hash(String, String) = {} of String => String)
+      private def run_with_options(host : String, port : Int32, open_browser : Bool, access_log : Bool, live_reload : Bool, build_options : Config::Options::BuildOptions, json_output : Bool = false, headers : Hash(String, String) = {} of String => String, allow_hosts : Array(String) = [] of String)
         # The env-specific config overlay (config.<env>.toml) feeds every
         # rebuild via Models::Config.load, so the watcher must see its edits
         # — scan_mtimes stats it alongside config.toml.
@@ -274,7 +274,7 @@ module Hwaro
         # back without a restart.
         base_path = base_path_for(build_options.base_url)
 
-        handlers = build_handlers(output_dir, host, access_log, live_reload, headers, base_path)
+        handlers = build_handlers(output_dir, host, access_log, live_reload, headers, base_path, allow_hosts + [base_host_for(build_options.base_url)])
 
         # DevHTTPServer, not HTTP::Server: see the class comment — a malformed
         # Content-Length must answer 400 instead of killing the connection
@@ -597,6 +597,15 @@ module Hwaro
         )
       end
 
+      # Host part of `--base-url`/the derived base_url: the name pages link to,
+      # so it must be answered (see HostCheckHandler). "" when absent.
+      protected def base_host_for(base_url : String?) : String
+        return "" unless base_url
+        URI.parse(base_url).host || ""
+      rescue URI::Error
+        ""
+      end
+
       # Path component of `base_url`, mirroring `Models::Config#base_path`
       # (trailing slashes stripped, domain-root deploys yield ""). Kept here so
       # the mount point never depends on a config load that may have failed.
@@ -654,6 +663,7 @@ module Hwaro
         live_reload : Bool,
         headers : Hash(String, String),
         base_path : String,
+        allow_hosts : Array(String) = [] of String,
       ) : Array(HTTP::Handler)
         # Loopback literals plus the concrete bound host (a 0.0.0.0/:: wildcard
         # bind has no single host, so it contributes nothing here). The
@@ -671,6 +681,9 @@ module Hwaro
           backend = ::Log::IOBackend.new(Logger::GuardedIO.new(STDOUT))
           handlers << HTTP::LogHandler.new(::Log.new("http.server", backend, :info))
         end
+        # Outermost after the log: a refused request must not reach any
+        # handler that reads the build output (see HostCheckHandler).
+        handlers << HostCheckHandler.new(allow_hosts + [host])
         # Dev cache-busting (see NoCacheHandler). A user-supplied
         # Cache-Control from [serve.headers]/--header wins outright.
         handlers << NoCacheHandler.new unless headers.keys.any? { |k| k.downcase == "cache-control" }
