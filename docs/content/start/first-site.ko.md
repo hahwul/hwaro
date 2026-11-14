@@ -95,6 +95,8 @@ my-site/
 
 `example.com/my-site/`처럼 하위 경로에 배포할 때도 앞의 `/`를 그대로 두세요. Hwaro가 빌드 시점에 루트 상대 `src`와 `href`에 `base_url`의 하위 경로를 붙여 주기 때문에, 같은 콘텐츠가 양쪽에서 모두 동작합니다.
 
+이미 하위 경로로 시작하는 값(`/my-site/about/`)은 쓴 그대로 둡니다. 예외는 하위 경로와 이름이 같은 최상위 섹션입니다. `base_url = "https://example.com/docs"`에 `content/docs/intro.md`가 있으면 `/docs/intro/`가 가리킬 수 있는 페이지는 그것뿐이므로 `/docs/docs/intro/`로 바뀝니다. `/intro/`도 함께 있으면 링크를 쓴 그대로 두니, 헷갈리지 않게 하려면 `@/docs/intro.md`로 링크하세요.
+
 에셋을 그 파일을 쓰는 페이지 옆, 즉 `content/` 안에 두는 것도 가능하지만 이는 선택 기능입니다. 먼저 [콘텐츠 파일](/ko/features/content-files/)을 활성화하세요.
 
 ```toml

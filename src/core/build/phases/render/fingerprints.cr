@@ -850,8 +850,9 @@ module Hwaro::Core::Build::Phases::Render
     latest = page.version.try { |v| v.latest ? nil : page.version_links.find(&.latest) }
     backlinks = rel.backlinks && site.config.backlinks
     wikilinks = wikilink_resolutions(page)
+    prefixed = base_path_link_decisions(page, site, link_targets)
     parent = rel.section_meta && !page.is_a?(Models::Section) && !page.section.empty? ? site.section_for(page.section, page.language) : nil
-    return "" if !rel.reads_any? && links.empty? && !backlinks && wikilinks.empty? && latest.nil? && parent.nil?
+    return "" if !rel.reads_any? && links.empty? && !backlinks && wikilinks.empty? && prefixed.empty? && latest.nil? && parent.nil?
 
     digest = Digest::MD5.new
     if latest
@@ -933,6 +934,10 @@ module Hwaro::Core::Build::Phases::Render
       fp_value(digest, "w#{wikilinks.size}")
       wikilinks.each { |value| fp_value(digest, value) }
     end
+    unless prefixed.empty?
+      fp_value(digest, "p#{prefixed.size}")
+      prefixed.each { |value| fp_value(digest, value) }
+    end
     digest.final.hexstring
   end
 
@@ -1004,6 +1009,27 @@ module Hwaro::Core::Build::Phases::Render
       @get_page_index = {link_targets, index}
       index
     end
+  end
+
+  # Each `<base_path>/…` path in a page's content (included text counted)
+  # with whether prefix_root_relative_links prefixes it, which flips when a
+  # page or file appears at or leaves either reading. Empty unless a route
+  # lives under the base path (pass_link_routes), so other sites keep
+  # their hashes. A path a shortcode template spells out is not seen.
+  private def base_path_link_decisions(page : Models::Page, site : Models::Site, link_targets : Hash(String, Models::Page)) : Array(String)
+    return [] of String unless route = pass_link_routes(site, link_targets)
+    base_path = site.config.base_path
+    prefix = "#{base_path}/"
+    found = Set(String).new
+    page_scan_texts(page).each do |text|
+      next unless Utils::ByteScan.includes?(text, prefix)
+      text.scan(/(?<![\w.\/-])#{Regex.escape(prefix)}[^\s"'<>()\[\]]*/) do |m|
+        key = Content::Processors::InternalLinkResolver.route_key(m[0])
+        site_only = route.call(key) && !route.call(Content::Processors::InternalLinkResolver.route_key(m[0][base_path.size..]))
+        found << "#{key}=#{site_only ? 1 : 0}"
+      end
+    end
+    found.to_a.sort!
   end
 
   # The `@/` link targets in a page's content (included text counted),

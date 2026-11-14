@@ -265,7 +265,17 @@ module Hwaro
         # `base_path` short-circuits the per-call `URI.parse(base_url)` when
         # the caller already holds the memoized `Config#base_path` (they are
         # the same value by construction).
-        def prefix_root_relative_links(html : String, base_url : String, base_path : String? = nil) : String
+        #
+        # A link that already starts with `<base_path>/` is ambiguous when a
+        # route of the site lives under that path too (`base_url` ending in
+        # `/docs` plus a `content/docs/` section): `/docs/intro/` is either
+        # the hand-prefixed `/intro/` or the site-relative `/docs/intro/`.
+        # `route` (true when a route_key names a route of the site; nil when
+        # no route sits under the base path) settles it: the link is prefixed
+        # only when it names a route and its unprefixed reading does not.
+        # `@/` links and URL helpers emit `<base_path><a route>`, whose
+        # unprefixed reading always resolves, so they are never prefixed twice.
+        def prefix_root_relative_links(html : String, base_url : String, base_path : String? = nil, route : Proc(String, Bool)? = nil) : String
           return html if base_url.empty?
           return html unless Utils::ByteScan.includes?(html, "=\"/") || Utils::ByteScan.includes?(html, "='/") ||
                              Utils::ByteScan.includes?(html, "=/")
@@ -275,12 +285,14 @@ module Hwaro
 
           prefix_slash = "#{base_path}/"
           needs_prefix = ->(value : String) do
-            value.starts_with?('/') && !value.starts_with?("//") &&
-            value != base_path && !value.starts_with?(prefix_slash)
+            value.starts_with?('/') && !value.starts_with?("//") && value != base_path &&
+            (!value.starts_with?(prefix_slash) ||
+             (!route.nil? && route.call(route_key(value)) && !route.call(route_key(value[base_path.size..]))))
           end
 
           # Leave values that already carry the base_path (e.g. links the
-          # InternalLinkResolver pass above already resolved) untouched.
+          # InternalLinkResolver pass above already resolved) untouched,
+          # unless `route` says only the site-relative reading exists.
           # An author's `<img srcset>` / `<picture><source srcset>` names one
           # URL per candidate; the browser prefers them over `src`, so every
           # root-relative candidate needs the prefix too.
@@ -298,6 +310,19 @@ module Hwaro
           end
         rescue URI::Error
           html
+        end
+
+        # The form of a URL the `route` of prefix_root_relative_links judges:
+        # entities and percent-escapes decoded, query and fragment dropped,
+        # a trailing `index.html` dropped, and a trailing slash
+        # (`/docs/a.pdf` → `/docs/a.pdf/`, `/x/index.html#y` → `/x/`).
+        def route_key(url : String) : String
+          url = HTML.unescape(url) if url.includes?('&')
+          url = url[0, url.index(/[?#]/) || url.size]
+          url = URI.decode(url) if url.includes?('%')
+          url = "/#{url}" unless url.starts_with?('/')
+          url = url.rchop("index.html") if url.ends_with?("/index.html")
+          url.ends_with?('/') ? url : "#{url}/"
         end
 
         # Make every relative href/src in `html` absolute against `page_url`

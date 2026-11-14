@@ -112,7 +112,8 @@ module Hwaro::Core::Build::Phases::ParseContent
   private def finish_summary_html(html : String, page : Models::Page, site : Models::Site, pages_by_path : Hash(String, Models::Page), images_ready : Bool) : String
     html = resolve_internal_links(html, pages_by_path, page, site)
     html = Content::Processors::InternalLinkResolver.absolutize_links(html, page.url, document_relative_only: true)
-    html = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, site.config.base_url, site.config.base_path)
+    html = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, site.config.base_url, site.config.base_path,
+      pass_link_routes(site, pages_by_path))
     html = apply_responsive_images(html, page, site.config) if images_ready
     close_open_elements(html)
   end

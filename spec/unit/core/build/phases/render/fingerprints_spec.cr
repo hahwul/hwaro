@@ -730,3 +730,33 @@ describe "warm --cache: version root URLs" do
     end
   end
 end
+
+# Under a `…/docs` base_url a `content/docs/` section makes `/docs/x` in
+# content mean `/docs/docs/x` only while nothing lives at `/x`; a page or file
+# appearing at either reading re-renders the linking page.
+describe "warm --cache: content links under a base path a section shares" do
+  it "re-renders a page whose /docs/ link changes reading" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "https://example.com/docs"\n))
+        FileUtils.mkdir_p("templates")
+        FileUtils.mkdir_p("content/docs")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("templates/section.html", "{{ content }}")
+        File.write("content/docs/_index.md", "+++\ntitle = \"Docs\"\n+++\n")
+        File.write("content/docs/only.md", "+++\ntitle = \"Only\"\n+++\no")
+        File.write("content/linker.md", "+++\ntitle = \"Linker\"\n+++\n[only](/docs/only/) [pdf](/docs/new.pdf)")
+        relations_cached_build
+        File.read("public/linker/index.html").should contain(%(href="/docs/docs/only/"))
+        File.read("public/linker/index.html").should contain(%(href="/docs/new.pdf"))
+
+        File.write("content/only.md", "+++\ntitle = \"Root only\"\n+++\nr")
+        FileUtils.mkdir_p("static/docs")
+        File.write("static/docs/new.pdf", "pdf")
+        relations_cached_build
+        File.read("public/linker/index.html").should contain(%(href="/docs/only/"))
+        File.read("public/linker/index.html").should contain(%(href="/docs/docs/new.pdf"))
+      end
+    end
+  end
+end
