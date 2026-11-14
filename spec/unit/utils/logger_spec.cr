@@ -794,6 +794,14 @@ describe "Hwaro::Logger::GuardedIO terminal neutralising" do
     memory.to_s.should eq("a\\x1b]0;pwn\\x07b\\x1b[2Jc\\x0dd\\u{0085}e\\u{202e}f\n")
   end
 
+  it "passes a relayed command's output through unchanged inside Logger.raw" do
+    memory = IO::Memory.new
+    out = Hwaro::Logger::GuardedIO.new(memory)
+    Hwaro::Logger.raw { out.puts "50%\r100%\e[K" }
+    out.puts "after\e[K"
+    memory.to_s.should eq("50%\r100%\e[K\nafter\\x1b[K\n")
+  end
+
   it "keeps SGR colours, tabs and CRLF line ends" do
     memory = IO::Memory.new
     out = Hwaro::Logger::GuardedIO.new(memory)

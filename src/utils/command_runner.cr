@@ -82,7 +82,7 @@ module Hwaro
 
           unless result.output.empty?
             result.output.each_line do |line|
-              Logger.info "  #{line}"
+              Logger.raw { Logger.info "  #{line}" }
             end
           end
 
@@ -90,7 +90,7 @@ module Hwaro
             Logger.error "Command failed with exit code #{result.exit_code}: #{command}"
             unless result.error.empty?
               result.error.each_line do |line|
-                Logger.error "  #{line}"
+                Logger.raw { Logger.error "  #{line}" }
               end
             end
             return false
@@ -100,7 +100,7 @@ module Hwaro
           # warnings, deprecation notices and most tools' progress lines go
           # there, and they used to vanish without a trace.
           result.error.each_line do |line|
-            Logger.info "  #{line}"
+            Logger.raw { Logger.info "  #{line}" }
           end
         end
 

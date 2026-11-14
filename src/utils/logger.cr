@@ -23,6 +23,10 @@ class Fiber
   # While set, `Logger::GuardedIO` collects this fiber's writes here instead
   # of printing them; see `Logger.capturing` / `Logger.replay`.
   property hwaro_log_capture : Array(Tuple(IO, Bytes))? = nil
+
+  # While true, `Logger::GuardedIO` passes this fiber's writes through
+  # unneutralised; see `Logger.raw`.
+  property hwaro_log_raw : Bool = false
 end
 
 module Hwaro
@@ -59,7 +63,7 @@ module Hwaro
       # `x<ESC>[2J.md`, a front matter value) are neutralised once, for every
       # log method and every caller. Logger's own colours (SGR sequences) pass.
       def write(slice : Bytes) : Nil
-        write_raw(Logger.neutralize(slice))
+        write_raw(Fiber.current.hwaro_log_raw ? slice : Logger.neutralize(slice))
       end
 
       # Bypasses `neutralize`: only for the status spinner, whose `\r\e[K`
@@ -131,6 +135,21 @@ module Hwaro
         i += 1
       end
       io.to_slice
+    end
+
+    # Inside the block this fiber's log lines reach the terminal as they are.
+    # For relaying the output of a command the site's own config runs (a
+    # build hook, a deploy tool): its progress bars and colours are its own,
+    # and the command is trusted in a way a content file name is not.
+    def self.raw(&)
+      fiber = Fiber.current
+      previous = fiber.hwaro_log_raw
+      fiber.hwaro_log_raw = true
+      begin
+        yield
+      ensure
+        fiber.hwaro_log_raw = previous
+      end
     end
 
     # Length of the SGR sequence (`ESC [ [0-9;:]* m`) starting at `i`, or nil.
