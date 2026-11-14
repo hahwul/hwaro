@@ -789,3 +789,36 @@ describe "warm --cache: content links under a base path a section shares" do
     end
   end
 end
+
+# A warm `serve --cache` start skips unchanged pages, so the session never
+# saw what their last render derived (alias stubs, `/page/N/` files,
+# `resize_image` variants). Re-rendering such a page later diffed its new
+# derived set against nothing: a dropped alias kept redirecting.
+describe "serve --cache warm start: derived outputs of a skipped page" do
+  it "removes the alias stub a page stops declaring after a warm start" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}")
+        File.write("content/a.md", "+++\ntitle = \"A\"\naliases = [\"/old-a/\"]\n+++\n")
+        File.write("content/b.md", "+++\ntitle = \"B\"\n+++\n")
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false)
+        options.serve_mode = true
+
+        Hwaro::Core::Build::Builder.new.run(options).should be_true
+        File.exists?("public/old-a/index.html").should be_true
+
+        builder = Hwaro::Core::Build::Builder.new
+        builder.run(options).should be_true
+        options.preserve_output = true
+        File.write("content/a.md", "+++\ntitle = \"A\"\n+++\nedited\n")
+        builder.run_incremental(["content/a.md"], options)
+
+        File.exists?("public/a/index.html").should be_true
+        File.exists?("public/old-a/index.html").should be_false
+      end
+    end
+  end
+end
