@@ -4,6 +4,21 @@ require "../../../src/services/creator"
 
 describe Hwaro::Services::Creator do
   describe "#run" do
+    it "escapes control characters in the title so the front matter stays valid TOML" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          options = Hwaro::Config::Options::NewOptions.new(path: "ctl.md", title: "a\rb\u0001c")
+          Hwaro::Services::Creator.new.run(options)
+
+          content = File.read("content/ctl.md")
+          content.should_not contain("\r")
+          content.should_not contain("\u0001")
+          TOML.parse(content.split("+++\n")[1])["title"].as_s.should eq("a\rb\u0001c")
+        end
+      end
+    end
+
     it "creates a file from a direct path with inferred title (honours user's path)" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

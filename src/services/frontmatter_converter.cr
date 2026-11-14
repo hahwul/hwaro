@@ -430,7 +430,7 @@ module Hwaro
         # find_json_end returns a BYTE offset; slice on bytes so multibyte
         # JSON frontmatter isn't corrupted/truncated mid-codepoint.
         json_str = content.byte_slice(0, end_idx)
-        body = content.byte_slice(end_idx).lchop("\r\n").lchop("\n")
+        body = Utils::FrontmatterScanner.json_body(content.byte_slice(end_idx))
         {json_str, body}
       end
 
@@ -573,7 +573,7 @@ module Hwaro
         when Hash
           hash = {} of String => JSON::Any
           yaml.as_h.each do |k, v|
-            key_str = k.as_s? || k.to_s
+            key_str = Utils::FrontmatterWriter.key_string(k)
             hash[key_str] = yaml_any_to_json_any(v, depth + 1)
           end
           JSON::Any.new(hash)
@@ -643,7 +643,7 @@ module Hwaro
         hash = {} of String => YAML::Any
         if h = yaml_any.as_h?
           h.each do |k, v|
-            key_str = k.as_s? || k.to_s
+            key_str = Utils::FrontmatterWriter.key_string(k)
             hash[key_str] = v
           end
         end

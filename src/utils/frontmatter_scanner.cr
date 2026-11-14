@@ -10,6 +10,14 @@ require "toml"
 module Hwaro
   module Utils
     module FrontmatterScanner
+      # The text after a JSON front-matter object with the object's own line
+      # terminator removed — exactly one, `\r\n` or `\n`. Chaining
+      # `lchop("\r\n").lchop("\n")` also ate a body's first blank line when
+      # the object was followed by CRLF.
+      def self.json_body(rest : String) : String
+        rest.starts_with?("\r\n") ? rest.byte_slice(2) : rest.lchop("\n")
+      end
+
       extend self
 
       # Front-matter block matchers shared by the read-only services

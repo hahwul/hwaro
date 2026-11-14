@@ -171,10 +171,29 @@ module Hwaro
         end
       end
 
-      # Quote a frontmatter key that isn't a bare TOML key (spaces, dots,
-      # non-ASCII — all valid in YAML/JSON source).
+      # A parsed YAML mapping key as the string front matter exposes. An
+      # unquoted `2024-01-01: v` key is a timestamp to the YAML reader, and its
+      # `to_s` ("2024-01-01 00:00:00 +09:00") renamed the key — to a different
+      # string on every machine zone. Render it as `serialize_time` does.
+      def self.key_string(key : YAML::Any) : String
+        if str = key.as_s?
+          str
+        elsif time = key.raw.as?(Time)
+          serialize_time(time)
+        else
+          key.to_s
+        end
+      end
+
+      # Quote a frontmatter key that isn't a safe bare TOML key (spaces, dots,
+      # non-ASCII — all valid in YAML/JSON source). "Safe" is narrower than
+      # the TOML grammar: the bundled reader lexes a bare key that starts with
+      # a digit or `-` as a NUMBER (`0x1` reads back as key `1`, `1_0` as
+      # `10`, `-dash`/`1e3`/`007` fail to parse) and `inf`/`nan` as float
+      # constants, so those are quoted. `\A…\z`, not `^…$`: a key holding a
+      # newline matched line-wise and was written raw.
       def self.format_toml_key(key : String) : String
-        if key =~ /^[A-Za-z0-9_-]+$/
+        if key.matches?(/\A[A-Za-z_][A-Za-z0-9_-]*\z/) && key != "inf" && key != "nan"
           key
         else
           "\"#{escape_toml_string(key)}\""
@@ -214,7 +233,7 @@ module Hwaro
           Nesting.check!(depth)
           return unless hash = yaml.as_h?
           if path.empty? && !@omit_null_keys.empty?
-            hash = hash.reject { |key, value| value.raw.nil? && @omit_null_keys.includes?(key.as_s? || key.to_s) }
+            hash = hash.reject { |key, value| value.raw.nil? && @omit_null_keys.includes?(FrontmatterWriter.key_string(key)) }
           end
 
           # An empty table (`extra: {}`) has no values to force a header out,
@@ -232,7 +251,7 @@ module Hwaro
           array_tables = {} of String => YAML::Any
 
           hash.each do |key, value|
-            key_str = key.as_s? || key.to_s
+            key_str = FrontmatterWriter.key_string(key)
 
             if value.as_h?
               tables[key_str] = value
@@ -368,7 +387,7 @@ module Hwaro
             # A hash reached from inside an array (mixed or nested) can't be
             # a `[table]` section; emit it as an inline table.
             pairs = value.as_h.map do |k, v|
-              "#{format_key(k.as_s? || k.to_s)} = #{to_toml_value(v, depth + 1)}"
+              "#{format_key(FrontmatterWriter.key_string(k))} = #{to_toml_value(v, depth + 1)}"
             end
             "{#{pairs.join(", ")}}"
           when String
