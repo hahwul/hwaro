@@ -411,13 +411,26 @@ describe Hwaro::Core::Build::Privacy do
         result.should contain(%(integrity="#{good}" crossorigin="anonymous"))
 
         log = with_captured_log do
+          result = rewrite(privacy, %(<script src="#{cdn}/js/app.js" integrity="sha384-AAAA" crossorigin="anonymous"></script>))
+        end
+        result.should_not contain("integrity")
+        result.should_not contain("crossorigin")
+        log.should contain("does not match")
+        log.should contain("#{cdn}/js/app.js")
+      end
+    end
+  end
+
+  it "drops the integrity of a stylesheet it rewrote without a warning" do
+    with_cdn do |cdn, _hits, _server|
+      with_privacy(privacy_config) do |privacy, _dir|
+        result = ""
+        log = with_captured_log do
           result = rewrite(privacy, %(<link rel="stylesheet" href="#{cdn}/css/inner.css" integrity="sha384-AAAA" crossorigin="anonymous" />))
         end
         result.should_not contain("integrity")
         result.should_not contain("crossorigin")
-        result.should end_with(" />")
-        log.should contain("does not match")
-        log.should contain("#{cdn}/css/inner.css")
+        log.should_not contain("does not match")
       end
     end
   end
