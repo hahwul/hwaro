@@ -36,6 +36,35 @@ module Hwaro
         # Maximum pixel count to prevent excessive memory allocation (64 megapixels)
         MAX_PIXELS = 64_000_000_i64
 
+        # Most decoded bytes a source may claim per byte of file. No real
+        # image comes close (deflate tops out near 1032:1, so even a 1-bit
+        # palette PNG decoded to RGBA is ~33,000:1), but stb decodes a
+        # truncated JPEG or BMP from zero padding: a 54-byte BMP whose header
+        # says 26000x26000 made the build allocate 2 GB and write black
+        # variants, one such file per image worker.
+        MAX_DECODE_RATIO = 100_000_i64
+
+        # Files (path + version) already warned about: an OG logo is decoded
+        # again for every page, and must not print once per page.
+        @@implausible_warned = Set(String).new
+        @@implausible_mutex = Mutex.new
+
+        # True (with a warning) when `path`'s header claims far more pixels
+        # than the file could hold, so it must not be handed to `stbi_load`.
+        # `desired` is the channel count the caller decodes to (0 = stored).
+        def implausible_size?(path : String, desired : Int32 = 0) : Bool
+          w = uninitialized LibC::Int
+          h = uninitialized LibC::Int
+          comp = uninitialized LibC::Int
+          return false if LibStb.stbi_info(path, pointerof(w), pointerof(h), pointerof(comp)) == 0
+          return false unless info = File.info?(path)
+          return false unless w.to_i64 * h * (desired > 0 ? desired : comp) > info.size * MAX_DECODE_RATIO
+          if @@implausible_mutex.synchronize { @@implausible_warned.add?("#{path}:#{info.size}:#{info.modification_time.to_unix_ms}") }
+            Logger.warn "#{path}: not processed, its header claims #{w}x#{h} pixels but the file is only #{info.size} bytes (truncated or corrupt)"
+          end
+          true
+        end
+
         # Check if a file is a resizable image based on extension
         def image?(path : String) : Bool
           ext = File.extname(path).downcase
@@ -85,6 +114,7 @@ module Hwaro
           src_w = uninitialized LibC::Int
           src_h = uninitialized LibC::Int
           channels = uninitialized LibC::Int
+          return if implausible_size?(source)
           pixels = LibStb.stbi_load(source, pointerof(src_w), pointerof(src_h), pointerof(channels), 0)
           return if pixels.null?
 
@@ -277,6 +307,7 @@ module Hwaro
           dom_color = "#000000"
 
           return {result_map, lqip_uri, dom_color} unless File.exists?(source)
+          return {result_map, lqip_uri, dom_color} if implausible_size?(source)
           quality = quality.clamp(1, 100)
 
           src_w = uninitialized LibC::Int

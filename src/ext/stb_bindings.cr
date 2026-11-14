@@ -28,6 +28,7 @@ require "lib_z"
 lib LibStb
   # --- stb_image ---
   fun stbi_load(filename : LibC::Char*, x : LibC::Int*, y : LibC::Int*, channels_in_file : LibC::Int*, desired_channels : LibC::Int) : UInt8*
+  fun stbi_info(filename : LibC::Char*, x : LibC::Int*, y : LibC::Int*, comp : LibC::Int*) : LibC::Int
   fun stbi_image_free(retval_from_stbi_load : Void*)
   fun stbi_failure_reason : LibC::Char*
 
