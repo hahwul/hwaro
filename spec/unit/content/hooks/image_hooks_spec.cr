@@ -759,6 +759,7 @@ describe "ImageHooks render-time lookups (review fixes)" do
   # image source raised "Too many levels of symbolic links" and failed every
   # page that referenced it (with `dimensions = true`, or via resize_image).
   it "resolves no source for a static symlink loop instead of raising" do
+    posix_only!("symlinks")
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do
         Dir.mkdir_p("static")
