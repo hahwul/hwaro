@@ -7,6 +7,8 @@ toc = true
 
 Built-in functions for retrieving data and generating URLs in templates.
 
+A keyword argument a function does not take (a typo such as `get_page(pth="about.md")`) is ignored, and the build logs a warning naming it once.
+
 ## Data Retrieval
 
 ### get_page()

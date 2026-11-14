@@ -19,6 +19,8 @@ Besides the built-ins in the tables below, these Jinja2 filters are available: `
 {{ value | filter1 | filter2 }}
 ```
 
+A keyword argument one of the hwaro filters below does not take is ignored, and the build logs a warning naming it once.
+
 ## Text Filters
 
 | Filter | Description | Example |
@@ -83,7 +85,7 @@ same text renders in page bodies. The rest of the extension pipeline
 
 | Filter | Description | Example |
 |--------|-------------|---------|
-| unique | Remove duplicates while keeping distinct value types | {{ items \| unique }} |
+| unique | Remove duplicates while keeping distinct value types; strings compare case-sensitively unless `case_sensitive=false`, and `attribute=` (a dotted path) compares by a field | {{ posts \| unique(attribute="section") }} |
 | flatten | Flatten nested arrays one level | {{ nested \| flatten }} |
 | compact | Remove nil/empty values | {{ items \| compact }} |
 
@@ -155,7 +157,7 @@ Always use `safe` for rendered content:
 {{ page.image | default(value="/images/default.png") }}
 ```
 
-`default` returns the fallback when the value is undefined, `none`, or an empty string. The fallback keeps its type, so `default(value=0)` still works in arithmetic; a `none` fallback (`default(value=none)`) renders as an empty string. A value that is not empty is returned as follows: an array, map, or object passes through unchanged, and any other value (a string, number, or boolean) is returned as a string, so string filters such as `length` or `replace` can follow it. Pass `boolean=true` (`default(value="N/A", boolean=true)`) to also replace any falsy value: `false`, `0`, or an empty list or map.
+`default` returns the fallback when the value is undefined, `none`, or an empty string. The fallback keeps its type, so `default(value=0)` still works in arithmetic; a `none` fallback (`default(value=none)`) renders as an empty string. A value that is not empty is returned as follows: an array, map, or object passes through unchanged, and any other value (a string, number, or boolean) is returned as a string, so string filters such as `length` or `replace` can follow it. Pass `boolean=true` (`default(value="N/A", boolean=true)`) to also replace any falsy value: `false`, `0`, or an empty list or map. Jinja2's name for the fallback, `default_value=`, works as well as `value=`.
 
 ### Date Formatting
 

@@ -164,12 +164,16 @@ module Hwaro
             config.markdown.mermaid, config.markdown.admonitions)
         end
 
-        # Shared page/config variable builder — exactly 6 leaf values, used
-        # by both the render-phase context (render.cr#build_hook_render_context)
-        # and this fallback context.
+        # Shared page/config variable builder, used by both the render-phase
+        # context (render.cr#build_hook_render_context) and this fallback
+        # context. The top-level `base_url` is what `get_url()`,
+        # `asset()`, `resize_image()` and the `absolute_url` /
+        # `relative_url` filters read: without it a hook's
+        # `{{ destination | absolute_url }}` came out root-relative.
         def self.page_vars(page : Models::Page, config : Models::Config) : Hash(String, Crinja::Value)
           {
-            "page" => Crinja::Value.new({
+            "base_url" => Crinja::Value.new(config.base_url),
+            "page"     => Crinja::Value.new({
               "url"      => Crinja::Value.new(page.url),
               "title"    => Crinja::Value.new(page.title),
               "path"     => Crinja::Value.new(page.path),

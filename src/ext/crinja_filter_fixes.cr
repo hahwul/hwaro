@@ -105,6 +105,29 @@ Crinja.filter(:format) do
   sprintf target.to_s, arguments.varargs.map { |arg| arg.number? ? arg.as_number : arg }
 end
 
+# `replace` on a number, boolean or none replaces in its text, as Jinja2
+# does. Upstream required a string and raised "Unexpected type in Crinja
+# value", so `{{ page.extra.price | replace(".", ",") }}` failed the page.
+# An undefined target still raises, as before.
+Crinja.filter({old: Crinja::UNDEFINED, new: Crinja::UNDEFINED, count: nil}, :replace) do
+  search = arguments["old"].to_s
+  replace = arguments["new"]
+  count = arguments["count"]
+
+  if count.raw.nil?
+    source = target.raw.is_a?(String | Crinja::SafeString | Crinja::Undefined) ? target.as_s_or_safe : target.to_s
+    source.gsub(search, replace)
+  else
+    string = target.to_s
+    count.to_i.times do
+      running = false
+      string = string.sub(search) { running = true; replace }
+      break unless running
+    end
+    string
+  end
+end
+
 # `float` / `int` convert numbers and booleans as Python does. Upstream only
 # knew strings (and floats, for `int`), so `{{ 3 | float }}` printed `0.0`
 # and `{{ true | int }}` printed `0`.
@@ -159,4 +182,34 @@ end
 
 Crinja.filter({case_sensitive: false, attribute: nil}, :max) do
   Crinja::Filter.__extreme(target, arguments, 1)
+end
+
+# An undefined value is an empty sequence (and empty text) to `join`,
+# `reverse`, `list`, `batch`, `slice` and `replace`, as in Jinja2. They
+# raised instead, so `{{ page.extra.authors | join(", ") }}` failed the
+# build on every page without that field (with a nameless
+# " must be a sequence to join it"). Undefined targets only: `none` and
+# other non-sequences still raise.
+module Crinja::Filter
+  UNDEFINED_AS_EMPTY = {"join", "reverse", "list", "batch", "slice", "replace"}
+
+  def self.__undefined_as_empty(filter : Callable::Instance) : Callable::Instance
+    inner = filter.proc
+    empty = filter.name == "replace" ? Value.new("") : Value.new([] of Value)
+    proc = ->(arguments : Arguments) do
+      if arguments.target.try(&.undefined?)
+        arguments = Arguments.new(arguments.env, arguments.varargs, arguments.kwargs, arguments.defaults, empty)
+      end
+      inner.call(arguments)
+    end
+    Callable::Instance.new(proc, filter.defaults, filter.name)
+  end
+end
+
+Crinja::Filter::Library.defaults.map! do |filter|
+  if filter.is_a?(Crinja::Callable::Instance) && Crinja::Filter::UNDEFINED_AS_EMPTY.includes?(filter.name)
+    Crinja::Filter.__undefined_as_empty(filter)
+  else
+    filter
+  end
 end

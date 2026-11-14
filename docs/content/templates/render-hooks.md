@@ -79,7 +79,7 @@ All values are Crinja `Value`s and, like every other hwaro template, **already H
 | `header_html` | The table's `<thead>...</thead>` section |
 | `body_html` | The table's `<tbody>...</tbody>` section. Empty string for a header-only table |
 
-All hook templates additionally see the standard `page` (`url`, `title`, `path`, `language`) and `config` (`base_url`, `title`) variables.
+All hook templates additionally see the standard `page` (`url`, `title`, `path`, `language`) and `config` (`base_url`, `title`) variables, and `base_url` itself, so URL functions and filters such as `get_url()` and `absolute_url` give full URLs as in page templates. `site` is not available.
 
 ## Default-Equivalent Templates
 

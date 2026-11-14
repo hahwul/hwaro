@@ -75,8 +75,9 @@ module Hwaro
             # `boolean=true` (Jinja's second argument, which the Crinja
             # built-in this replaces honored) also replaces any falsy value:
             # `false`, `0`, an empty list or mapping.
-            env.filters["default"] = Crinja.filter({value: "", boolean: false}) do
-              fallback = arguments["value"]
+            # `default_value=` is Jinja2's name for `value=`; it was ignored.
+            env.filters["default"] = Crinja.filter({value: "", boolean: false, default_value: ""}) do
+              fallback = arguments.is_set?("value") || !arguments.is_set?("default_value") ? arguments["value"] : arguments["default_value"]
               fallback = Crinja::Value.new("") if fallback.none?
               if target.raw.nil? || target.undefined? || (arguments["boolean"].truthy? && !target.truthy?)
                 fallback

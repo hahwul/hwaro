@@ -30,9 +30,42 @@ module Hwaro
           # and many variables contain pre-rendered HTML (og_tags, highlight_css, etc.)
           @env.config.autoescape.enabled_extensions = [] of String
           @env.config.autoescape.default = false
+          stock_filters = @env.filters.each.to_h
+          stock_functions = @env.functions.each.to_h
           register_custom_filters
           register_custom_tests
           register_custom_functions
+          warn_on_unknown_kwargs(@env.filters, stock_filters, "filter")
+          warn_on_unknown_kwargs(@env.functions, stock_functions, "function")
+        end
+
+        # A keyword argument that one of hwaro's own filters or functions
+        # does not take (`get_page(pth=...)`, `truncate_words(9, ending="…")`)
+        # was silently ignored, so the call fell back to its default. Each
+        # one now logs a warning naming it, once per build; the output is
+        # unchanged. Crinja's stock filters (`stock`) are left alone.
+        private def warn_on_unknown_kwargs(library, stock, kind : String) : Nil
+          own = [] of {String, Crinja::Callable::Instance}
+          library.each do |name, feature|
+            own << {name, feature} if feature.is_a?(Crinja::Callable::Instance) && stock[name]? != feature
+          end
+          own.each { |name, feature| library[name] = TemplateEngine.kwargs_checked(name, kind, feature) }
+        end
+
+        def self.kwargs_checked(name : String, kind : String, feature : Crinja::Callable::Instance) : Crinja::Callable::Instance
+          defaults = feature.defaults
+          inner = feature.proc
+          check = ->(arguments : Crinja::Arguments) do
+            arguments.kwargs.each_key do |key|
+              next if defaults.has_key?(key)
+              first = @@load_data_mutex.synchronize { @@load_data_warned.add?("kwarg:#{kind}:#{name}:#{key}") }
+              next unless first
+              takes = defaults.empty? ? "it takes none" : "it takes: #{defaults.keys.join(", ")}"
+              Logger.warn "The #{name} #{kind} has no argument '#{key}'; it is ignored (#{takes})."
+            end
+            inner.call(arguments)
+          end
+          Crinja::Callable::Instance.new(check, defaults, feature.name)
         end
 
         # Register custom filters specific to Hwaro

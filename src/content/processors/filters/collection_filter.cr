@@ -94,18 +94,19 @@ module Hwaro
               end
             end
 
-            # Unique filter — removes duplicate values from an array
-            env.filters["unique"] = Crinja.filter do
+            # Unique filter — removes duplicate values from an array. Jinja2's
+            # `attribute=` (a dotted path) and `case_sensitive=false` were
+            # ignored; strings still compare case-sensitively by default.
+            env.filters["unique"] = Crinja.filter({case_sensitive: true, attribute: nil}) do
               safe_array do
-                arr = target.as_a
+                attribute = arguments["attribute"]
+                by_attribute = !(attribute.none? || attribute.undefined?)
+                fold_case = !arguments["case_sensitive"].truthy?
                 seen = Set(Crinja::Value).new
-                arr.select do |item|
-                  if seen.includes?(item)
-                    false
-                  else
-                    seen << item
-                    true
-                  end
+                target.as_a.select do |item|
+                  key = by_attribute ? Crinja::Filter.__attr_path(attribute, item) : item
+                  key = Crinja::Value.new(key.to_s.downcase) if fold_case && key.string?
+                  seen.add?(key)
                 end
               end
             end

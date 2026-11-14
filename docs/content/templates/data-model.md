@@ -225,8 +225,8 @@ A directory with `_index.md` that groups related content.
 |----------|------|-------------|
 | section.title | String | Section title |
 | section.description | String? | Section description |
-| section.pages | Array<Page> | Pages in this section |
-| section.pages_count | Int | Number of pages |
+| section.pages | Array<Page> | Pages in this section (on a paginated section, the current pager's pages) |
+| section.pages_count | Int | Number of items in `section.pages` |
 | section.list | String | Pre-rendered HTML list (`section_list`) |
 | section.subsections | Array<Section> | Child sections, ordered by `weight` then path |
 | section.assets | Array<String> | Static files in section |
@@ -334,8 +334,8 @@ An individual content file (`.md`).
 | page.language | String | Effective language code |
 | page.translations | Array<TranslationLink> | Language variants |
 | page.translation_key | String | The page's front matter `translation_key`; undefined (prints empty) on pages without one |
-| page.version | Object? | Documentation version (`nil` when unversioned) — see [page.version](#pageversion) |
-| page.version_links | Array<VersionLink> | Version switcher rows (empty when unversioned) |
+| page.version | Object? | Documentation version (`nil` for a page outside every version; undefined on a site without `[[versions.list]]`) — see [page.version](#pageversion) |
+| page.version_links | Array<VersionLink> | Version switcher rows (undefined on a site without `[[versions.list]]`, so a loop over it renders nothing) |
 
 Rendered HTML content is available as the top-level `content` variable.
 

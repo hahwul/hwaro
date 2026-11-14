@@ -186,6 +186,8 @@ Define reusable snippets with `{% macro %}`, usually in a partial, and import th
 
 The same file can be imported more than once in one render, for example by a base layout and by the child template that extends it, or under two names. Only a real cycle (`a.html` imports `b.html`, which imports `a.html`) is an error.
 
+An imported file's top-level `{% set %}` variables are available too: `{{ v.accent }}` after `{% import "partials/vars.html" as v %}`, or `{{ accent }}` after `{% from "partials/vars.html" import accent %}`. Names starting with `_` are not exported.
+
 ## Setting Variables
 
 Set variables:
@@ -326,6 +328,18 @@ Output literal Jinja syntax:
 <p>No articles yet.</p>
 {% endif %}
 ```
+
+## Differences from Jinja2
+
+Templates written for Jinja2 mostly work unchanged. These are the differences to know about:
+
+- **Printed values.** Booleans and none print as `true`, `false` and `none` (Jinja2: `True`, `False`, `None`), and a mapping prints as `{'a' => 1}`. Format values yourself (`| tojson`, `| join`) rather than printing a raw list or mapping.
+- **No Python methods.** `s.upper()`, `s.split(",")`, `d.items()`, `list.append(x)` are undefined; use the filters (`| upper`, `| split(pat=",")`, `| dictsort`). Iterating a mapping with two names (`{% for k, v in d %}`) gives its keys and values.
+- **Not supported:** `namespace()`, `{% set a, b = ... %}`, `{% set x | filter %}...{% endset %}`, `*args` / `**kwargs` in a call, `self.<block>()`, `{%+`, chained comparisons (`a < b < c`), string repetition (`"-" * 3`), number literals in exponent form (`1e3`), the `items` filter and the `true` / `false` / `boolean` / `integer` / `float` tests. Each is a template error that names the spot, never silent output.
+- **Operators.** `**` groups from the right (`2 ** 3 ** 2` is `512`; Jinja2 gives `64`), and a leading minus applies after it (`-2 ** 2` is `-4`; Jinja2 gives `4`). Use parentheses when it matters.
+- **hwaro's own `default` and `unique`.** `default` also replaces `none` and an empty string, and returns a non-empty scalar as a string (see [Filters › Default Values](/templates/filters/#default-values)); `unique` compares strings case-sensitively unless `case_sensitive=false`.
+- **Lenient calls.** A macro ignores extra arguments instead of failing, `attr` also reads mapping keys, and an imported macro sees the importing template's variables even without `with context`.
+- Also available, as in Jinja2: the `range()`, `dict()`, `cycler()` and `joiner()` functions, the `forceescape` filter, and the `divisibleby`, `sameas`, `mapping`, `sequence`, `lower`, `upper`, `undefined` and `in` tests.
 
 ## See Also
 

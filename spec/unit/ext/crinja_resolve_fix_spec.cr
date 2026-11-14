@@ -41,6 +41,13 @@ describe "Crinja resolver patches" do
       template.render({"a" => [10, 20, 30]}).should eq("10")
     end
 
+    # Jinja2 3.1 renders the same, with its `False` spelling.
+    it "indexes a string by character" do
+      env = Crinja.new
+      template = env.from_string("{{ s[0] }}{{ s[-1] }}{{ k[1] }}[{{ s[9] }}]{{ s[9] is defined }}")
+      template.render({"s" => "Hello", "k" => "한글テ"}).should eq("Ho글[]false")
+    end
+
     it "renders an undefined attribute on a hash silently (default Undefined behavior)" do
       env = Crinja.new
       template = env.from_string("[{{ h.missing }}]")

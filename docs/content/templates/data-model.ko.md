@@ -225,8 +225,8 @@ john-doe:
 |----------|------|-------------|
 | section.title | String | 섹션 제목 |
 | section.description | String? | 섹션 설명 |
-| section.pages | Array<Page> | 이 섹션의 페이지 |
-| section.pages_count | Int | 페이지 수 |
+| section.pages | Array<Page> | 이 섹션의 페이지 (페이지네이션된 섹션에서는 현재 페이지에 보이는 페이지) |
+| section.pages_count | Int | `section.pages`의 항목 수 |
 | section.list | String | 미리 렌더링된 HTML 목록(`section_list`) |
 | section.subsections | Array<Section> | 자식 섹션(`weight`, 경로 순으로 정렬) |
 | section.assets | Array<String> | 섹션의 정적 파일 |
@@ -334,8 +334,8 @@ john-doe:
 | page.language | String | 적용된 언어 코드 |
 | page.translations | Array<TranslationLink> | 언어별 번역본 |
 | page.translation_key | String | 페이지 프론트 매터의 `translation_key`. 지정하지 않은 페이지에서는 정의되지 않음(빈 값으로 출력) |
-| page.version | Object? | 문서 버전 (버전이 없으면 `nil`) — [page.version](#pageversion) 참고 |
-| page.version_links | Array<VersionLink> | 버전 전환기 행 (버전이 없으면 빈 배열) |
+| page.version | Object? | 문서 버전 (어느 버전에도 속하지 않는 페이지는 `nil`, `[[versions.list]]`가 없는 사이트에서는 정의되지 않음) — [page.version](#pageversion) 참고 |
+| page.version_links | Array<VersionLink> | 버전 전환기 행 (`[[versions.list]]`가 없는 사이트에서는 정의되지 않으므로 순회해도 아무것도 출력되지 않음) |
 
 렌더링된 HTML 콘텐츠는 최상위 `content` 변수로 제공됩니다.
 
