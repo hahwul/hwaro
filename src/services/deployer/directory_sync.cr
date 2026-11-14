@@ -106,7 +106,7 @@ module Hwaro
           unlink_destination_symlinks!(dest_dir, dest_rel)
           existed_before = File.exists?(dest_path)
           Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
-          FileUtils.cp(src_path, dest_path)
+          Hwaro::Utils::FileSafe.atomic_copy(src_path, dest_path)
           if existed_before
             counts.updated += 1
           else

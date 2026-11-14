@@ -526,7 +526,7 @@ module Hwaro
             if File.exists?(write.path)
               @entries << ScaffoldEntry.new(:exist, write.path, dir: false)
             else
-              File.write(write.path, content)
+              Hwaro::Utils::FileSafe.atomic_write(write.path, content)
               @created_count += 1
               @entries << ScaffoldEntry.new(:create, write.path, dir: false)
             end

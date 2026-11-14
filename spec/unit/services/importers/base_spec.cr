@@ -175,6 +175,21 @@ describe Hwaro::Services::Importers::Base do
       end
     end
 
+    # An interrupted write must never leave a truncated post that the next
+    # run skips as "already exists": a replaced file is written beside it and
+    # renamed, so an old hard link still sees the complete previous bytes.
+    it "replaces an existing file instead of truncating it in place" do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "existing.md")
+        TestImporter.new.test_write_content_file(dir, "", "existing", "+++\n+++", "First")
+        old_link = File.join(dir, "old-inode.md")
+        File.link(path, old_link)
+        TestImporter.new.test_write_content_file(dir, "", "existing", "+++\n+++", "Second", false, true)
+        File.read(path).should contain("Second")
+        File.read(old_link).should contain("First")
+      end
+    end
+
     it "overwrites existing files when force is true" do
       Dir.mktmpdir do |dir|
         TestImporter.new.test_write_content_file(dir, "", "existing", "+++\n+++", "First")

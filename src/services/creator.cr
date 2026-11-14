@@ -523,7 +523,7 @@ module Hwaro
         ensure_dir!(base_dir)
 
         begin
-          File.write(full_path, content)
+          Utils::FileSafe.atomic_write(full_path, content)
         rescue ex : IO::Error
           raise Hwaro::HwaroError.new(
             code: Hwaro::Errors::HWARO_E_IO,
