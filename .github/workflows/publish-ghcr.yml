@@ -26,7 +26,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -100,7 +99,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      id-token: write
     steps:
       - name: Download digests
         uses: actions/download-artifact@v4
@@ -130,8 +128,9 @@ jobs:
       - name: Normalize version
         if: github.event_name == 'workflow_dispatch'
         id: normalize
+        env:
+          RAW_VERSION: ${{ inputs.version }}
         run: |
-          RAW_VERSION="${{ inputs.version }}"
           VERSION="${RAW_VERSION#v}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 

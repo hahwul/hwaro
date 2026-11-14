@@ -19,6 +19,8 @@ on:
   workflow_run:
     workflows: ["Build and Release Binaries"]
     types: [completed]
+permissions:
+  contents: read
 jobs:
   publish-aur:
     if: >-
@@ -34,20 +36,36 @@ jobs:
 
       - name: Get Version
         id: get_version
+        # Event data goes through env, never into the script text. VERSION is
+        # then interpolated (${{ env.VERSION }}) by later steps, so it has to
+        # look like a version before it leaves this one.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_VERSION: ${{ github.event.inputs.version }}
+          RUN_TAG: ${{ github.event.workflow_run.head_branch }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            RAW_VERSION="${{ github.event.inputs.version }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            RAW_VERSION="$DISPATCH_VERSION"
           else
-            RAW_VERSION="${{ github.event.workflow_run.head_branch }}"
+            RAW_VERSION="$RUN_TAG"
           fi
           VERSION="${RAW_VERSION#v}"
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::Invalid release version: '$VERSION'"
+            exit 1
+          fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "Resolved version: $VERSION"
 
       - name: Update PKGBUILD version
+        env:
+          PKGREL: ${{ github.event.inputs.pkgrel || '1' }}
         run: |
+          case "$PKGREL" in
+            ''|*[!0-9]*) echo "::error::pkgrel must be a number, got '$PKGREL'"; exit 1 ;;
+          esac
           sed -i "s/^pkgver=.*/pkgver=${{ env.VERSION }}/" packaging/aur/PKGBUILD
-          sed -i "s/^pkgrel=.*/pkgrel=${{ github.event.inputs.pkgrel || '1' }}/" packaging/aur/PKGBUILD
+          sed -i "s/^pkgrel=.*/pkgrel=$PKGREL/" packaging/aur/PKGBUILD
           cat packaging/aur/PKGBUILD
 
       - name: Publish to AUR
