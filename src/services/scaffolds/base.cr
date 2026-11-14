@@ -798,7 +798,7 @@ module Hwaro
               {{ mermaid_tags }}
               {{ auto_includes_css }}
             </head>
-            <body data-section="{{ page.section }}">
+            <body data-section="{{ page.section | e }}">
               <a class="skip-link" href="#main">Skip to content</a>
               <header class="site-header">
                 <div class="site-header-inner">
