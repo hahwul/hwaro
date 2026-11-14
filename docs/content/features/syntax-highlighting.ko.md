@@ -223,9 +223,11 @@ Hwaro는 [Highlight.js](https://highlightjs.org/) 테마를 사용합니다. 유
 
 ```html
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha384-F/bZzf7p3Joyp5psL90p/p89AZJsndkSoGwRpXcZhleCWhd8SnRuoYo4d0yirjJp" crossorigin="anonymous"></script>
 <script>hljs.highlightAll();</script>
 ```
+
+버전은 고정되어 있고(Highlight.js 11.9.0), 스크립트에는 [서브리소스 무결성(SRI)](https://developer.mozilla.org/ko/docs/Web/Security/Subresource_Integrity) 해시가 붙습니다. CDN이 다른 바이트를 내려주면 브라우저가 스크립트를 거부합니다. 테마 스타일시트는 테마 이름이 임의의 Highlight.js 테마일 수 있고 CSS는 스크립트를 실행할 수 없으므로 해시가 없습니다. `[assets] sri`는 이 CDN 태그에 영향을 주지 않으며 아래의 로컬 파일에만 적용됩니다. 다른 버전이나 직접 만든 사본을 쓰려면 `use_cdn = false`로 두고 파일을 직접 준비하거나, `{{ highlight_js }}`를 빼고 템플릿에 태그를 직접 작성하세요.
 
 `use_cdn = false`이면 로컬 경로에서 로드합니다.
 

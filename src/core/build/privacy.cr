@@ -150,9 +150,11 @@ module Hwaro
         # A localized URL: what to print in its place, its file in the output,
         # every output file it published (itself plus, for a stylesheet, what
         # it pulls in), the remote URL it came from, and whether a stylesheet
-        # kept a reference external because its download failed.
+        # kept a reference external because its download failed. `rewritten`:
+        # the published bytes differ from the download (a stylesheet whose
+        # references were localized), so the tag's own `integrity` cannot match.
         record Localized, url : String, path : String, files : Array(String), source : String,
-          incomplete : Bool = false
+          incomplete : Bool = false, rewritten : Bool = false
 
         # What one rewrite (a page, or a downloaded stylesheet) used: the
         # output files, and whether a reference stayed external because a
@@ -366,8 +368,10 @@ module Hwaro
             relative = "/#{@privacy.output_dir}/#{File.basename(local.path)}"
             changed = append_attrs(changed.gsub(SRI_RE, ""), Models.integrity_attr(sri_root, relative))
           elsif (integrity = parsed["integrity"]?) && !integrity_matches?(integrity, local.path)
-            source = RemoteFetch.sanitized_url(local.source)
-            warn_once("integrity:#{local.source}", "[privacy] #{source}: the integrity attribute does not match the downloaded bytes — dropping integrity and crossorigin (enable [assets] sri to have Hwaro compute its own).")
+            unless local.rewritten
+              source = RemoteFetch.sanitized_url(local.source)
+              warn_once("integrity:#{local.source}", "[privacy] #{source}: the integrity attribute does not match the downloaded bytes — dropping integrity and crossorigin (enable [assets] sri to have Hwaro compute its own).")
+            end
             changed = changed.gsub(SRI_RE, "")
           end
           changed
@@ -450,6 +454,7 @@ module Hwaro
             warn_once("svg:#{url}", "[privacy] #{RemoteFetch.sanitized_url(url)}: published an SVG, which can run script when opened directly on your site. Add its host to [privacy] exclude if you do not trust it.")
           end
           pass = Pass.new
+          downloaded = body
           body = rewrite_css(body, final_url, depth + 1, chain + [url], pass) if ext == ".css"
           name = published_name(url, ext, body)
           path = File.join(@output_root, name)
@@ -458,7 +463,7 @@ module Hwaro
             Utils::FileSafe.atomic_write(path, body)
           end
           host_of(url).try { |h| @localized_hosts << h }
-          Localized.new(public_url(name), path, [path] + pass.files, url, pass.incomplete)
+          Localized.new(public_url(name), path, [path] + pass.files, url, pass.incomplete, body != downloaded)
         end
 
         # The extension to publish under: the Content-Type's, else the URL

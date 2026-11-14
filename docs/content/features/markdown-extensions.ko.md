@@ -161,6 +161,8 @@ $$
 
 `bare`를 제외한 내장 스캐폴드의 헤더에는 `{{ math_tags }}`가 들어 있습니다. 이 변수는 설정한 `math_engine`에 맞는 KaTeX 또는 MathJax 태그를 출력하며, `math = false`이면 아무것도 출력하지 않습니다. 직접 만든 `<head>`에 넣거나, 라이브러리를 직접 불러옵니다.
 
+`{{ math_tags }}`는 KaTeX(0.16.21)와 MathJax(3.2.2)를 정확한 버전으로 고정하고, 불러오는 모든 파일에 [서브리소스 무결성(SRI)](https://developer.mozilla.org/ko/docs/Web/Security/Subresource_Integrity) 해시(`integrity`, `crossorigin="anonymous"`)를 붙입니다. CDN이 다른 바이트를 내려주면 브라우저가 파일을 거부합니다. MathJax는 글꼴과 확장을 같은 CDN 경로에서 필요할 때 불러오며, 이후의 요청에는 해시가 적용되지 않습니다. 다른 버전을 쓰려면 템플릿에서 `{{ math_tags }}`를 빼고 아래처럼 태그를 직접 작성하세요.
+
 #### KaTeX
 
 ```html
@@ -212,7 +214,7 @@ graph TD
 
 ### 클라이언트 사이드 설정
 
-`{{ mermaid_tags }}`는 Mermaid에 대해 같은 역할을 합니다(`mermaid = false`이면 빈 값). 직접 불러오려면 다음과 같이 합니다.
+`{{ mermaid_tags }}`는 Mermaid에 대해 같은 역할을 합니다(`mermaid = false`이면 빈 값). Mermaid는 정확한 버전(10.9.8)으로 고정됩니다. 모듈 `import`에는 무결성 해시를 붙일 수 없으므로 수학 스크립트와 달리 해시가 없습니다. 다른 버전을 쓰려면 태그를 빼고 직접 작성하세요. 직접 불러오려면 다음과 같이 합니다.
 
 ```html
 <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
