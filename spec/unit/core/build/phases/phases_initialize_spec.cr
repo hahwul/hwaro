@@ -666,6 +666,50 @@ describe Hwaro::Core::Build::Phases::Initialize do
         end
       end
     end
+
+    # A template file that cannot be read was skipped with a warning, so the
+    # pages that used it rendered without it and the build exited 0.
+    it "fails the build naming an unreadable template a page uses, not one nothing uses, and recovers once readable" do
+      posix_only!("chmod-based permissions")
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "t"\nbase_url = "http://x"\n))
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("templates/shortcodes")
+          File.write("content/index.md", "+++\ntitle = \"Home\"\n+++\nhi {{ sc() }}\n")
+          File.write("templates/page.html", "<main>{% include \"part.html\" %}{{ content }}</main>")
+          File.write("templates/part.html", "PART")
+          File.write("templates/shortcodes/sc.html", "SC")
+          File.write("templates/unused.html", "UNUSED")
+          builder = Hwaro::Core::Build::Builder.new
+          Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+          options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false)
+
+          File.chmod("templates/unused.html", 0o000)
+          # Root reads it anyway; nothing to assert there.
+          next if File::Info.readable?("templates/unused.html")
+          with_captured_log { builder.run(options).should be_true }
+          File.read("public/index.html").should contain("PART")
+
+          {"templates/page.html", "templates/part.html", "templates/shortcodes/sc.html"}.each do |locked|
+            File.chmod(locked, 0o000)
+            begin
+              error = expect_raises(Hwaro::HwaroError) { with_captured_log { builder.run(options) } }
+              error.code.should eq(Hwaro::Errors::HWARO_E_IO)
+              error.message.should eq("Cannot read template #{locked}: Permission denied")
+            ensure
+              File.chmod(locked, 0o644)
+            end
+          end
+
+          with_captured_log { builder.run(options).should be_true }
+          File.read("public/index.html").should contain("<main>PART")
+          File.read("public/index.html").should contain("SC")
+        ensure
+          File.chmod("templates/unused.html", 0o644) if File.exists?("templates/unused.html")
+        end
+      end
+    end
   end
 
   describe "#load_data_files" do

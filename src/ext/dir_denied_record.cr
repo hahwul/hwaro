@@ -33,3 +33,16 @@ class Dir
     end
   end
 end
+
+# A template FILE that cannot be read stays in the template set as a stub
+# (`Utils::DeniedDirs.unreadable_template`), so page, section, taxonomy,
+# shortcode, include/extends/import, render-hook and feed lookups pick it
+# exactly where they would have picked the file. Every Crinja template is
+# built here, so compiling the stub fails the build naming the file, and a
+# site that never uses the file still builds.
+class Crinja::Template
+  def initialize(@source : String, @env : Crinja = Crinja.new, @name : String = "", @filename : String? = nil, run_parser = true)
+    Hwaro::Utils::DeniedDirs.fail_if_unreadable_template(@source) if run_parser
+    previous_def
+  end
+end
