@@ -136,8 +136,11 @@ module Hwaro
           File.open(tmp_path, "w") do |f|
             f.print('\uFEFF') if had_bom
             f.print(current_text)
-            f.print("\n") unless current_text.ends_with?("\n")
-            snippets.each { |s| f.print(s) }
+            # Appended text follows the file's own line endings: a CRLF
+            # config.toml otherwise ended up with mixed endings.
+            crlf = crlf_dominant?(current_text)
+            f.print(crlf ? "\r\n" : "\n") unless current_text.ends_with?("\n")
+            snippets.each { |s| f.print(crlf ? s.gsub("\n", "\r\n") : s) }
           end
           File.chmod(tmp_path, original_permissions)
           File.rename(tmp_path, target_path)
@@ -159,6 +162,11 @@ module Hwaro
         end
 
         summary
+      end
+
+      # True when most of the file's line breaks are CRLF.
+      private def crlf_dominant?(text : String) : Bool
+        text.scan("\r\n").size * 2 > text.count('\n')
       end
 
       # Remove temp files left behind by runs that are no longer alive.
