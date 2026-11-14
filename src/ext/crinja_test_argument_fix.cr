@@ -209,16 +209,15 @@ class Crinja::Template
     @nodes = AST::NodeList.new([] of AST::TemplateNode, false)
 
     if run_parser
-      found = nil
-      begin
-        parser = Parser::TemplateParser.new(@env, @source)
-        @nodes = parser.parse
-        found = parser.__bare_test_args
+      parser = begin
+        loaded = Parser::TemplateParser.new(@env, @source)
+        @nodes = loaded.parse
+        loaded
       rescue e : TemplateError
         e.template ||= self
         raise e
       end
-      if found
+      if found = parser.__bare_test_args
         where = @filename || @name.presence || "template"
         found.sort_by! { |f| {f.line, f.op} }
         found.each { |f| Hwaro::Content::Processors::TemplateEngine.warn_template_once(f.message(@source, where)) }
