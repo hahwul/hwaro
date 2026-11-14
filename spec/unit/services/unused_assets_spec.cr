@@ -717,5 +717,20 @@ describe Hwaro::Services::UnusedAssets do
         end
       end
     end
+
+    it "counts an NFD-stored asset as referenced by its NFC spelling" do
+      # `--delete` used to remove an image a page shows: the file was stored
+      # decomposed (macOS) and the Markdown typed precomposed.
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(File.join(content_dir, "post"))
+        File.write(File.join(content_dir, "post", "그림.png".unicode_normalize(:nfd)), "png data")
+        File.write(File.join(content_dir, "post", "index.md"), "+++\ntitle = \"P\"\n+++\n![x](그림.png)\n")
+
+        result = Hwaro::Services::UnusedAssets.new(content_dir: content_dir, static_dir: File.join(dir, "static"), templates_dir: File.join(dir, "templates")).run
+        result.total_assets.should eq(1)
+        result.unused_files.should be_empty
+      end
+    end
   end
 end
