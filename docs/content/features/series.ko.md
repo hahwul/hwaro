@@ -61,7 +61,7 @@ series_weight = 1
   <ol>
     {% for p in page.series_pages %}
     <li{% if p.url == page.url %} class="current"{% endif %}>
-      <a href="{{ p.url }}">{{ p.title }}</a>
+      <a href="{{ base_url }}{{ p.url }}">{{ p.title }}</a>
     </li>
     {% endfor %}
   </ol>

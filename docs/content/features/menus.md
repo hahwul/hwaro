@@ -166,7 +166,7 @@ Pass `ancestor=true` to also match descendant pages (useful for keeping a parent
 <a href="{{ item.href }}"{% if item.url | active_path(ancestor=true) %} class="open"{% endif %}>{{ item.name }}</a>
 ```
 
-The root path (`/`) only ever matches exactly, even with `ancestor=true`. Otherwise the home nav item would read as active/open on every page of the site. External entries never match (there's no "current page" for them to be an ancestor of). See [Filters › URL Filters](/templates/filters/#url-filters).
+The root path (`/`) and, on a multilingual site, the current page's language home (`/ko/`) only ever match exactly, even with `ancestor=true`. Otherwise the home nav item would read as active/open on every page of the site (or of that language). External entries never match (there's no "current page" for them to be an ancestor of). See [Filters › URL Filters](/templates/filters/#url-filters).
 
 ## `href` vs `url`
 
