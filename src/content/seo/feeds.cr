@@ -897,7 +897,7 @@ module Hwaro
 
         # Hard-truncate plain text to `limit` characters with an ellipsis.
         private def self.truncate_for_feed(text : String, limit : Int32) : String
-          text.size > limit ? "#{text[0...limit]}..." : text
+          text.size > limit ? "#{Utils::TextUtils.safe_prefix(text, limit)}..." : text
         end
 
         # Full HTML body suitable for `<content:encoded>` / atom
@@ -958,7 +958,7 @@ module Hwaro
             # Mirrors summary_for_feed's HTML.unescape.
             text_content = HTML.unescape(Utils::TextUtils.strip_html(html_content))
             if text_content.size > truncate
-              text_content[0...truncate] + "..."
+              Utils::TextUtils.safe_prefix(text_content, truncate) + "..."
             else
               text_content # Return plain text even if not truncated for consistency
             end

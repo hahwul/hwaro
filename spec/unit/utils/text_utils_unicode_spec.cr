@@ -113,3 +113,36 @@ describe Hwaro::Services::ContentLister do
     end
   end
 end
+
+describe "Hwaro::Utils::TextUtils grapheme-safe cuts" do
+  u = Hwaro::Utils::TextUtils
+
+  it "leaves ASCII alone" do
+    u.cluster_cut("hello world", 5).should eq(5)
+    u.safe_prefix("hello world", 5).should eq("hello")
+  end
+
+  it "does not cut between a base and its combining mark" do
+    u.cluster_cut("ae\u0301b", 2).should eq(1)
+    u.safe_prefix("ae\u0301b", 2).should eq("a")
+  end
+
+  it "does not cut inside conjoining jamo, ZWJ emoji or a flag" do
+    nfd = "\u1112\u1161\u11AB\u1100\u1173\u11AF" # 한글 as jamo
+    u.cluster_cut(nfd, 2).should eq(0 + 3)       # first cluster kept whole
+    u.cluster_cut("ab👨‍👩‍👧x", 4).should eq(2)
+    u.cluster_cut("ab🇰🇷x", 3).should eq(2)
+  end
+
+  it "keeps a first cluster longer than the budget whole" do
+    u.safe_prefix("a" + "\u0301" * 5 + "b", 3).should eq("a" + "\u0301" * 5)
+  end
+
+  it "closes a bidi override the cut left open" do
+    u.safe_prefix("ab\u202Ecdef", 5).should eq("ab\u202Ecd\u202C")
+  end
+
+  it "treats CR LF as one cluster" do
+    u.cluster_cut("a\r\nb", 2).should eq(1)
+  end
+end

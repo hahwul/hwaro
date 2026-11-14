@@ -38,8 +38,12 @@ module Crinja::Util
       if (chunk = chunks.last?) && chunk.size > width
         if break_long_words
           space_left = width - length
-          current << chunk[0, space_left]
-          chunks[-1] = chunk[space_left..]
+          # Break on a grapheme boundary, never between a base and its marks.
+          cut = Hwaro::Utils::TextUtils.cluster_cut(chunk, space_left)
+          # A first cluster wider than the line stays whole on its own line.
+          cut = Hwaro::Utils::TextUtils.cluster_cut(chunk, 1) if cut == 0 && current.empty?
+          current << chunk[0, cut]
+          chunks[-1] = chunk[cut..]
         elsif current.empty?
           current << chunks.pop
         end

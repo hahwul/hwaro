@@ -89,7 +89,7 @@ Crinja.filter({length: 255, killwords: false, end: "...", leeway: nil}, :truncat
   if s.size - leeway <= length
     s
   else
-    trimmed = s[0, length - append.size]
+    trimmed = Hwaro::Utils::TextUtils.safe_prefix(s, length - append.size)
     unless arguments["killwords"].truthy?
       cut = trimmed.rindex(' ')
       trimmed = trimmed[0, cut] if cut

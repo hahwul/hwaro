@@ -1448,8 +1448,9 @@ module Hwaro
 
             # Break long segments (e.g., very long words) at max_chars
             while current_line.size > max_chars
-              lines << current_line[0, max_chars].strip
-              current_line = current_line[max_chars..]
+              cut = Utils::TextUtils.cluster_cut(current_line, max_chars)
+              lines << current_line[0, cut].strip
+              current_line = current_line[cut..]
             end
           end
 
