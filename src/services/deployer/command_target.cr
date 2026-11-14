@@ -13,6 +13,10 @@ module Hwaro
       # Windows adds cmd.exe's `%VAR%` expansion and `^` escape.
       DANGEROUS_SHELL_PATTERNS = {% if flag?(:windows) %} /[|;&`$%^]|\bsudo\b|\brm\s+-rf\b/ {% else %} /[|;&`$]|\bsudo\b|\brm\s+-rf\b/ {% end %}
 
+      # A deploy tool's progress bar can print hundreds of MB without a
+      # newline; `each_line` buffers a whole line, so cap what one read holds.
+      OUTPUT_LINE_LIMIT = 64 * 1024
+
       private def deploy_via_command(
         target : Models::DeploymentTarget,
         source_dir : String,
@@ -136,9 +140,12 @@ module Hwaro
           drained = Channel(Nil).new(1)
           spawn do
             echo = true
-            process.error.each_line do |line|
+            process.error.each_line(limit: OUTPUT_LINE_LIMIT) do |line|
               lock.synchronize do
                 if quiet
+                  # Shown only when the command fails, and a tool prints its
+                  # error last: once over the cap, start over so the tail survives.
+                  captured.clear if captured.bytesize >= OUTPUT_LINE_LIMIT * 16
                   captured.puts line
                 elsif echo
                   begin
@@ -156,7 +163,7 @@ module Hwaro
           end
 
           echo = true
-          process.output.each_line do |line|
+          process.output.each_line(limit: OUTPUT_LINE_LIMIT) do |line|
             next unless echo
             begin
               lock.synchronize { Logger.info "  #{line}" }

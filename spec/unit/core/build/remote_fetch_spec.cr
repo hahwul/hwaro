@@ -130,4 +130,52 @@ describe Hwaro::Core::Build::RemoteFetch do
       server.close
     end
   end
+
+  it "enforces the overall deadline on a peer that trickles response headers" do
+    server = TCPServer.new("127.0.0.1", 0)
+    port = server.local_address.port
+    spawn do
+      if client = server.accept?
+        begin
+          client << "HTTP/1.1 200 OK\r\n"
+          loop do
+            client << "X"
+            client.flush
+            sleep 20.milliseconds
+          end
+        rescue IO::Error
+        ensure
+          client.close
+        end
+      end
+    end
+    started = Time.instant
+    begin
+      expect_raises(Hwaro::Core::Build::RemoteFetch::FetchError, "fetch deadline") do
+        Hwaro::Core::Build::RemoteFetch.fetch("http://127.0.0.1:#{port}/", {} of String => String, 1024_i64, 300.milliseconds)
+      end
+      (Time.instant - started).should be < 5.seconds
+    ensure
+      server.close
+    end
+  end
+
+  it "rejects a body shorter than its Content-Length instead of treating it as complete" do
+    server = TCPServer.new("127.0.0.1", 0)
+    port = server.local_address.port
+    spawn do
+      if client = server.accept?
+        client.gets("\r\n\r\n")
+        client << "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n[1,2]"
+        client.close
+      end
+    end
+    begin
+      expect_raises(Hwaro::Core::Build::RemoteFetch::FetchError, "truncated") do
+        Hwaro::Core::Build::RemoteFetch.fetch("http://127.0.0.1:#{port}/", {} of String => String, 1024_i64, 10.seconds)
+      end
+    ensure
+      server.close
+    end
+  end
 end
