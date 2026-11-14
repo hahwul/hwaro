@@ -84,7 +84,9 @@ module Hwaro
         # read is the literal one, so `a%20b.txt` names that file.
         def relative_path(path : String) : String
           raise Error.new("path is empty") if path.strip.empty?
-          raise Error.new("absolute paths are refused: #{path}") if Utils::PathUtils.absolute?(path) || path.includes?('\0')
+          # NUL first: `absolute?` builds a `Path`, which raises on one.
+          raise Error.new("path contains a NUL byte: #{path.inspect}") if path.includes?('\0')
+          raise Error.new("absolute paths are refused: #{path}") if Utils::PathUtils.absolute?(path)
           literal = path.split('/').reject { |segment| segment.empty? || segment == "." }
           _, refused = Utils::PathUtils.split_safe_segments(literal.join('/'))
           raise Error.new("path escapes the project root: #{path}") if refused || literal.empty?
