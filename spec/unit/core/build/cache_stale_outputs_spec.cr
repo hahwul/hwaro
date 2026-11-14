@@ -573,6 +573,32 @@ describe "warm --cache builds" do
       end
     end
 
+    # The static copy runs before any render. A build that then failed (a
+    # front matter typo anywhere) left the static bytes on the page's output
+    # with the previous cache file still vouching for that page, so the next
+    # warm build skipped it and published the static file instead.
+    it "re-renders a page the static copy overwrote in a build that failed" do
+      with_cached_site do
+        FileUtils.mkdir_p("static/posts/keep")
+        File.write("static/posts/keep/index.html", "<p>STATIC KEEP</p>")
+        cached_build
+        File.read("public/posts/keep/index.html").should contain("keep body")
+
+        File.write("content/posts/typo.md", "+++\ntitle = \"Typo\"\nfoo = [\n+++\nx")
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+        expect_raises(Hwaro::HwaroError, /Invalid TOML frontmatter/) do
+          builder.run(Hwaro::Config::Options::BuildOptions.new(
+            output_dir: "public", parallel: false, cache: true, highlight: false,
+          ))
+        end
+
+        File.delete("content/posts/typo.md")
+        cached_build
+        File.read("public/posts/keep/index.html").should contain("keep body")
+      end
+    end
+
     it "re-renders a section whose pagination page the static copy overwrote" do
       with_cached_site do
         File.write("config.toml", File.read("config.toml") +

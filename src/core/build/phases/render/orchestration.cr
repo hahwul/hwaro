@@ -193,6 +193,16 @@ module Hwaro::Core::Build::Phases::Render
           hydrate_cached_page_content(skipped, site, templates, use_highlight, global_vars, parallel)
         end
         render_term_bodies(site.sections, site, templates, use_highlight, global_vars, parallel)
+        # A cached `redirect_to = "@/…"` stub is not regenerated, so its
+        # unresolved target went unreported after the first warm build, and
+        # `[links] broken_internal = "error"` let it pass, while a cold build
+        # reports it every time (body `@/` links are reported on every build).
+        if cache_enabled && pages_to_build.size < all_pages.size
+          (all_pages - pages_to_build - (@deferred_pages || [] of Models::Page)).each do |page|
+            target = page.redirect_to
+            resolve_redirect_target(page, site, target) if page.render && target && target.starts_with?("@/")
+          end
+        end
         # Strict [links] broken_internal = "error": fail the phase with one
         # aggregated error after the whole fan-out so every offender is
         # listed. The lifecycle manager re-raises HwaroError unchanged
