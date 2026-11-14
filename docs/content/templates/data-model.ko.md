@@ -339,6 +339,12 @@ john-doe:
 
 렌더링된 HTML 콘텐츠는 최상위 `content` 변수로 제공됩니다.
 
+### URL 형태
+
+`page.url`, `page.permalink`, `section.url`, `search.json`의 `url`은 경로를 **작성한 그대로** 유지합니다. `content/posts/C++ Tips.md`는 `/posts/C++ Tips/`가 되고, 디스크의 출력 디렉터리 이름도 같습니다(`public/posts/C++ Tips/`). 반면 엄격한 URI를 요구하는 곳에 쓰는 URL은 **퍼센트 인코딩**됩니다. `<link rel="canonical">`과 `og:url`(`canonical_tag`, `seo.canonical_url`), `sitemap.xml`, RSS/Atom 피드, `llms.txt`, JSON-LD, `aliases`로 생성되는 리다이렉트 페이지가 모두 `/posts/C%2B%2B%20Tips/`로 출력합니다. 한글 등 비ASCII도 마찬가지입니다. `/posts/한글/`은 사이트맵에서 `/posts/%ED%95%9C%EA%B8%80/`가 됩니다.
+
+브라우저는 `href="{{ page.url }}"`처럼 인코딩하지 않은 값도 알아서 인코딩하므로 일반 링크에는 별도 처리가 필요 없습니다. 기계가 읽는 용도로 템플릿에서 URL을 직접 만든다면 경로를 인코딩하세요: `{{ site.base_url }}{{ page.url | urlencode }}`. [`urlencode`](/ko/templates/filters/) 필터는 `/`를 유지하지만 이미 있는 `%XX`를 인식하지 못하므로, `page.permalink`나 이미 인코딩된 값이 아니라 `page.url`에 적용합니다.
+
 ### 메타데이터 속성
 
 | 속성 | 타입 | 설명 |

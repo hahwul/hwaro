@@ -86,7 +86,7 @@ The URL segment is the version **name**, not the directory basename: `name = "2.
 Notes:
 
 - With `latest_at_root = true` do not also author `content/docs/_index.md`: it claims the same `/docs/` URL as the latest version's root and the build reports a duplicate output path (the authored file wins, the version root is not written).
-- `[permalinks]` rules and `slug` apply to the published path (`docs/install.md`), not the source path.
+- `[permalinks]` rules and `slug` apply to the published path (`docs/install.md`), not the source path. A rule keyed on the latest version's source directory (`docs/v2`) therefore never matches; see [Permalinks](/start/config/#permalinks) for how remap rules and token patterns treat versions.
 - An explicit `path = "…"` in front matter wins outright, exactly as it does for languages. A custom path is not prefixed, so keep them distinct across versions.
 - Everything under a version directory is versioned: page bundles, assets, `_index.md` cascades and `[[content.generate]]` output whose target path falls inside it.
 
