@@ -11,7 +11,9 @@
 # `Dir.take_denied(root)` afterwards and warn (or fail) naming the directory.
 # Nothing changes for the glob itself: it still skips the subtree.
 class Dir
-  @@denied = [] of String
+  # A set: a watcher polling an unreadable directory records it once, not
+  # once per poll.
+  @@denied = Set(String).new
   @@denied_mutex = Mutex.new
 
   def initialize(path : Path | String)
@@ -26,8 +28,8 @@ class Dir
     prefix = root.chomp('/') + "/"
     @@denied_mutex.synchronize do
       taken = @@denied.select { |p| p == root || p.starts_with?(prefix) }
-      @@denied.reject! { |p| p == root || p.starts_with?(prefix) }
-      taken.uniq!.sort!
+      @@denied.subtract(taken)
+      taken.sort!
     end
   end
 end
