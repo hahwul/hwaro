@@ -208,6 +208,22 @@ describe Hwaro::Services::PlatformConfig do
           end
         end
       end
+
+      # The note ends up in wrangler.toml as a `#` comment; a control
+      # character (NUL, ESC, DEL) is invalid there and made the file unparseable.
+      it "skips redirect aliases containing control characters" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("content/posts")
+            File.write("content/posts/p.md", "---\ntitle: P\naliases:\n  - \"/a\\0b/\"\n  - \"/c\\x1bd/\"\n  - /clean/\n---\nContent here\n")
+
+            result = Hwaro::Services::PlatformConfig.new(Hwaro::Models::Config.new).generate("cloudflare")
+
+            result.should contain("# /clean/ /posts/p/ 301")
+            result.chars.none? { |char| char.ascii_control? && char != '\n' }.should be_true
+          end
+        end
+      end
     end
 
     describe "aliases" do
