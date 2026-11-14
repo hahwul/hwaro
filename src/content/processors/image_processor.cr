@@ -44,6 +44,12 @@ module Hwaro
         # variants, one such file per image worker.
         MAX_DECODE_RATIO = 100_000_i64
 
+        # A BMP is stored uncompressed (stb rejects RLE), so the most a real
+        # one decodes to is a 1-bit palette image as RGBA: 32 bytes per byte.
+        # The PNG-sized ratio above let a 6 KB BMP claiming 16777216x3 pixels
+        # through to a 150 MB decode and a 1.6 GB resize.
+        MAX_BMP_DECODE_RATIO = 64_i64
+
         # Files (path + version) already warned about: an OG logo is decoded
         # again for every page, and must not print once per page.
         @@implausible_warned = Set(String).new
@@ -58,7 +64,12 @@ module Hwaro
           comp = uninitialized LibC::Int
           return false if LibStb.stbi_info(path, pointerof(w), pointerof(h), pointerof(comp)) == 0
           return false unless info = File.info?(path)
-          return false unless w.to_i64 * h * (desired > 0 ? desired : comp) > info.size * MAX_DECODE_RATIO
+          claimed = w.to_i64 * h * (desired > 0 ? desired : comp)
+          return false unless claimed > info.size * MAX_BMP_DECODE_RATIO
+          unless claimed > info.size * MAX_DECODE_RATIO
+            head = Bytes.new(2)
+            return false unless read_header(path, head) == 2 && head[0] == 0x42 && head[1] == 0x4D
+          end
           if @@implausible_mutex.synchronize { @@implausible_warned.add?("#{path}:#{info.size}:#{info.modification_time.to_unix_ms}") }
             Logger.warn "#{path}: not processed, its header claims #{w}x#{h} pixels but the file is only #{info.size} bytes (truncated or corrupt)"
           end

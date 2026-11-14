@@ -1288,3 +1288,29 @@ describe "ImageProcessor animated PNG" do
     end
   end
 end
+
+describe "ImageProcessor.implausible_size? for BMP" do
+  processor = Hwaro::Content::Processors::ImageProcessor
+
+  # A 24-bit BMP header claiming `w`x`h` in a file of `size` bytes.
+  bmp = ->(w : Int32, h : Int32, size : Int32) do
+    head = "BM".bytes + le32(size) + le32(0) + le32(54) + le32(40) + le32(w) + le32(h) + le16(1) + le16(24) + le32(0) + le32(0) + le32(2835) + le32(2835) + le32(0) + le32(0)
+    Bytes.new(size) { |i| head[i]? || 0_u8 }
+  end
+
+  it "rejects a BMP that claims more than uncompressed pixels can account for" do
+    Dir.mktmpdir do |dir|
+      # 6 KB claiming 36 MB: far past what a BMP holds, well inside the PNG ratio
+      processor.implausible_size?(write_bytes(dir, "t.bmp", bmp.call(4000, 3000, 6000))).should be_true
+      # the same bytes saved under another name are still a BMP to stb
+      processor.implausible_size?(write_bytes(dir, "t.png", bmp.call(4000, 3000, 6000))).should be_true
+    end
+  end
+
+  it "keeps a complete BMP and a lightly truncated one" do
+    Dir.mktmpdir do |dir|
+      processor.implausible_size?(write_bytes(dir, "ok.bmp", bmp.call(40, 30, 54 + 40 * 30 * 3))).should be_false
+      processor.implausible_size?(write_bytes(dir, "cut.bmp", bmp.call(400, 300, 54 + 400 * 300 * 3 // 2))).should be_false
+    end
+  end
+end
