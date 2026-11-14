@@ -391,7 +391,7 @@ module Hwaro
             if h = yaml_data.as_h?
               body = content.sub(YAML_FRONTMATTER_RE, "").lstrip('\n')
               h.each do |key, value|
-                k = key.as_s? || key.to_s
+                k = Utils::FrontmatterWriter.key_string(key)
                 fields[k] = normalize_scalar_times(value)
               end
               return {fields, body}
@@ -455,7 +455,7 @@ module Hwaro
           end
 
           table.each do |key, value|
-            name = key.as_s? || key.to_s
+            name = Utils::FrontmatterWriter.key_string(key)
             next if name.empty?
             existing = flattened[name]?
             # A declared-but-null key (`tags:` with no value) is NOT a

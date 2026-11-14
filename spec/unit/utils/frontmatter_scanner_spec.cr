@@ -1,6 +1,14 @@
 require "../../spec_helper"
 
 describe Hwaro::Utils::FrontmatterScanner do
+  describe ".json_body" do
+    it "removes exactly one line terminator" do
+      Hwaro::Utils::FrontmatterScanner.json_body("\r\n\nlead").should eq("\nlead")
+      Hwaro::Utils::FrontmatterScanner.json_body("\n\nlead").should eq("\nlead")
+      Hwaro::Utils::FrontmatterScanner.json_body("lead").should eq("lead")
+    end
+  end
+
   describe ".find_json_end" do
     it "returns end offset for a simple balanced object" do
       content = %({"title": "hello"}\n\nbody)

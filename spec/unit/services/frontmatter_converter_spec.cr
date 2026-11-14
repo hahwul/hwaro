@@ -438,6 +438,31 @@ describe Hwaro::Services::FrontmatterConverter do
     end
   end
 
+  describe "round-trip fidelity" do
+    it "keeps the body's leading blank line after CRLF JSON front matter" do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "a.md")
+        File.write(path, "{\r\n \"title\": \"x\"\r\n}\r\n\n\nlead\n")
+        Hwaro::Services::FrontmatterConverter.new(dir).convert_to_yaml.converted_count.should eq(1)
+        File.read(path).should end_with("---\n\n\nlead\n")
+      end
+    end
+
+    it "writes keys that read back unchanged (numeric-looking, dash-led, inf/nan, date)" do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "a.md")
+        File.write(path, "---\ntitle: x\n\"-dash\": 1\n\"0x1\": 2\n\"1_0\": 3\ninf: 4\n2024-01-01: v\n---\nb\n")
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        converter.convert_to_toml.converted_count.should eq(1)
+        toml = TOML.parse(File.read(path).split("+++\n")[1])
+        toml.keys.sort!.should eq(["-dash", "0x1", "1_0", "2024-01-01", "inf", "title"])
+        converter.convert_to_yaml.converted_count.should eq(1)
+        yaml = YAML.parse(File.read(path).split("---\n")[1])
+        yaml.as_h.keys.map(&.as_s).sort!.should eq(["-dash", "0x1", "1_0", "2024-01-01", "inf", "title"])
+      end
+    end
+  end
+
   describe "JSON conversions" do
     it "converts YAML file to JSON" do
       Dir.mktmpdir do |dir|

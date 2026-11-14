@@ -121,6 +121,28 @@ describe Hwaro::Utils::FrontmatterWriter do
     it "escapes a quote inside a quoted key" do
       Hwaro::Utils::FrontmatterWriter.format_toml_key(%q(a"b)).should eq(%q("a\"b"))
     end
+
+    it "quotes keys the bundled reader would lex as numbers or float constants" do
+      ["-dash", "-", "1", "0x1", "1_0", "1e3", "007", "inf", "nan"].each do |key|
+        Hwaro::Utils::FrontmatterWriter.format_toml_key(key).should eq(%("#{key}"))
+      end
+      Hwaro::Utils::FrontmatterWriter.format_toml_key("infx").should eq("infx")
+    end
+
+    it "quotes a key containing a newline instead of matching it line-wise" do
+      Hwaro::Utils::FrontmatterWriter.format_toml_key("a\nb").should eq(%q("a\nb"))
+    end
+  end
+
+  describe ".key_string" do
+    it "renders an unquoted YAML date key as the date, not a zone-dependent timestamp" do
+      key = YAML.parse("2024-01-01: v").as_h.keys.first
+      Hwaro::Utils::FrontmatterWriter.key_string(key).should eq("2024-01-01")
+    end
+
+    it "passes string and scalar keys through" do
+      YAML.parse("a: 1\n2: 3").as_h.keys.map { |k| Hwaro::Utils::FrontmatterWriter.key_string(k) }.should eq(["a", "2"])
+    end
   end
 
   describe ".yaml_scalar" do
@@ -330,13 +352,13 @@ describe Hwaro::Utils::FrontmatterWriter do
     # Crystal spells these "Infinity"/"NaN", which TOML cannot reparse.
     it "spells non-finite floats the way TOML does" do
       doc = toml_build({
-        "pos" => YAML::Any.new(Float64::INFINITY),
-        "neg" => YAML::Any.new(-Float64::INFINITY),
-        "nan" => YAML::Any.new(Float64::NAN),
+        "pos"          => YAML::Any.new(Float64::INFINITY),
+        "neg"          => YAML::Any.new(-Float64::INFINITY),
+        "not_a_number" => YAML::Any.new(Float64::NAN),
       })
       doc.should contain("pos = inf")
       doc.should contain("neg = -inf")
-      doc.should contain("nan = nan")
+      doc.should contain("not_a_number = nan")
     end
 
     it "emits a homogeneous array unchanged" do

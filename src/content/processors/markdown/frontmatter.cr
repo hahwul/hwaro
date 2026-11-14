@@ -112,7 +112,7 @@ module Hwaro
               # (CJK/emoji/accented) JSON frontmatter isn't split mid-codepoint.
               result = extract_from_json(raw_content.byte_slice(0, end_idx), file_path, declared_keys)
               body = raw_content.byte_slice(end_idx)
-              markdown_content = body.lchop("\r\n").lchop("\n")
+              markdown_content = Utils::FrontmatterScanner.json_body(body)
             elsif !file_path.empty?
               raise Hwaro::HwaroError.new(
                 code: Hwaro::Errors::HWARO_E_CONTENT,
@@ -743,7 +743,7 @@ module Hwaro
           if h = value.as_h?
             out = {} of String => Models::ExtraValue
             h.each do |k_any, v|
-              key = k_any.as_s? || k_any.to_s
+              key = Utils::FrontmatterWriter.key_string(k_any)
               out[key] = extract_extra_value(v, depth + 1)
             end
             out
