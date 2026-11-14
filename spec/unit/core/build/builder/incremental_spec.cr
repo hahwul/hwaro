@@ -835,6 +835,46 @@ describe "Builder#render_deferred" do
     end
   end
 
+  # The background pass ran the BeforeRender hooks on a context without the
+  # builder, so no `resize_image(op=…)` variant it printed was recorded and
+  # the sweep that ends the pass deleted the one the priority pages had:
+  # every page then pointed at a 404 image until the next save.
+  it "keeps the resize_image(op=...) variants every page still prints" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        FileUtils.mkdir_p("static/img")
+        pixels = Bytes.new(40 * 30 * 3) { |i| (i % 251).to_u8 }
+        LibStb.stbi_write_png("static/img/photo.png", 40, 30, 3, pixels.to_unsafe.as(Void*), 40 * 3).should_not eq(0)
+        # An image saved a moment ago is re-encoded on every pass, which
+        # rewrites the variant and hides the sweep.
+        File.touch("static/img/photo.png", Time.utc(2020, 1, 1))
+        File.write("content/_index.md", "+++\ntitle = \"Home\"\n+++\n")
+        File.write("content/new.md", "+++\ntitle = \"New\"\ndate = 2026-06-01\n+++\n")
+        File.write("content/old.md", "+++\ntitle = \"Old\"\ndate = 2020-01-01\n+++\n")
+        File.write("templates/index.html", "home")
+        File.write("templates/page.html", %({% set f = resize_image(path="/img/photo.png", width=20, height=20, op="fill") %}{{ f.url }}))
+
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, fast_start: true, fast_start_count: 1)
+        options.serve_mode = true
+        builder.run(options).should be_true
+        builder.has_deferred_pages?.should be_true
+        File.exists?("public/img/photo_20x20_fill_center.png").should be_true
+        deferred = options.dup
+        deferred.fast_start = false
+        deferred.preserve_output = true
+        builder.render_deferred(deferred)
+
+        File.read("public/old/index.html").should eq("http://localhost/img/photo_20x20_fill_center.png")
+        File.exists?("public/img/photo_20x20_fill_center.png").should be_true
+      end
+    end
+  end
+
   # A failing hook used to log and carry on here; the deferred pages must
   # not be left unwritten (404 until the next save) when it raises instead.
   it "renders the deferred pages when a BeforeRender hook hits an I/O error" do
