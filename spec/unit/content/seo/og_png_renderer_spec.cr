@@ -635,6 +635,17 @@ describe Hwaro::Content::Seo::OgPngRenderer do
       end
     end
 
+    it "returns nil for a header that claims far more pixels than the file holds" do
+      Dir.mktmpdir do |dir|
+        # 54-byte BMP claiming 3000x3000 with no pixel data
+        path = File.join(dir, "bg.bmp")
+        File.write(path, Base64.decode("Qk02AAAAAAAAADYAAAAoAAAAuAsAALgLAAABABgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"))
+        with_captured_log do
+          Hwaro::Content::Seo::OgPngRenderer.load_image(path, 1200, 630).should be_nil
+        end
+      end
+    end
+
     it "returns nil for a nonexistent path" do
       Hwaro::Content::Seo::OgPngRenderer.load_image("/nonexistent/logo.png", 48, 48).should be_nil
     end

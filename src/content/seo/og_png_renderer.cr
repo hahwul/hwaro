@@ -201,6 +201,7 @@ module Hwaro
           w = uninitialized LibC::Int
           h = uninitialized LibC::Int
           channels = uninitialized LibC::Int
+          return if Processors::ImageProcessor.implausible_size?(path, 4)
           pixels = LibStb.stbi_load(path, pointerof(w), pointerof(h), pointerof(channels), 4)
           return if pixels.null?
           if w <= 0 || h <= 0

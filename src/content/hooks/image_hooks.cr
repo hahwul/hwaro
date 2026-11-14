@@ -250,6 +250,11 @@ module Hwaro
           end
           static = File.join("static", relative)
           static if File.file?(static) && !config.static.excluded?(relative) && safe_source_path?(static, "static")
+        rescue File::Error
+          # `File.file?` raises for a path it cannot stat (a symlink loop,
+          # an unreadable directory). The static copy skips such a file with
+          # a warning; it is not a source either, so no page fails on it.
+          nil
         end
 
         private def self.bundle_source_for(url : String) : String?

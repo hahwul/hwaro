@@ -281,6 +281,23 @@ describe Hwaro::Content::Processors::ImageProcessor do
       result.should be_empty
     end
 
+    it "refuses a header that claims far more pixels than the file holds" do
+      Dir.mktmpdir do |dir|
+        # 54-byte BMP whose header says 3000x3000 24-bit and has no pixel
+        # data: stb would decode it from zero padding into 27 MB.
+        src = File.join(dir, "bomb.bmp")
+        File.write(src, Base64.decode("Qk02AAAAAAAAADYAAAAoAAAAuAsAALgLAAABABgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"))
+        result = nil
+        log = with_captured_log do
+          result = Hwaro::Content::Processors::ImageProcessor.resize_and_lqip(src, dir, [100], 85, 32)
+        end
+        result.not_nil![0].should be_empty
+        result.not_nil![1].should be_nil
+        Hwaro::Content::Processors::ImageProcessor.transform(src, File.join(dir, "out.bmp"), 10, 10, "fill", "center").should be_nil
+        log.should contain("claims 3000x3000 pixels but the file is only 54 bytes")
+      end
+    end
+
     it "returns empty hash for corrupted file" do
       Dir.mktmpdir do |dir|
         src = File.join(dir, "corrupt.png")
