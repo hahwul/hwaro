@@ -255,4 +255,19 @@ describe Hwaro::Content::Processors::Includes do
       end
     end
   end
+
+  it ".read refuses dotenv files but allows the committed samples" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        Dir.mkdir("app")
+        {".env", ".env.local", "app/.env.production", ".env.example", ".env.sample", "env.txt"}.each { |name| File.write(name, "KEY=#{name}") }
+        {".env", ".env.local", "app/.env.production"}.each do |name|
+          expect_raises(Includes::Error, /dotenv/) { Includes.read(name, nil) }
+        end
+        {".env.example", ".env.sample", "env.txt"}.each do |name|
+          Includes.read(name, nil).should eq("KEY=#{name}")
+        end
+      end
+    end
+  end
 end

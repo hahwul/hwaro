@@ -451,7 +451,7 @@ Hwaro separates what the project owner controls from what contributors can chang
 
 Two things to keep in mind when you build contributed content:
 
-- `include_code` and `include_md` let a page publish any file inside the project root, such as `config.toml`, a `.env` file or a `data/` file. `.git/`, `.hwaro/`, the output directory and anything outside the project are refused. Keep credentials in the environment (`${VAR}`), not in files the site could include.
+- `include_code` and `include_md` let a page publish any file inside the project root, such as `config.toml` or a `data/` file. `.git/`, dotenv files (`.env`, `.env.*`), `.hwaro/`, the output directory and anything outside the project are refused. Keep credentials in the environment (`${VAR}`), not in files the site could include.
 - `hwaro tool check-links` requests every external URL found in content (private and loopback addresses are skipped). Run it on contributed content with the same care as any crawler.
 
 ## See Also
