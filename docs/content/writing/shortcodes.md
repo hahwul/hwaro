@@ -226,7 +226,7 @@ Shortcodes inside the included file expand, and its headings take part in the pa
 
 #### Paths and errors
 
-Both shortcodes read files under the project root only. Absolute paths, `..`, symlinks that resolve outside the project, the build output directory, `.hwaro/` and anything under `.git/` are refused. A missing file or region, a line range outside the file, or a refused path fails the build with an error that names the page and the file:
+Both shortcodes read files under the project root only. Absolute paths, `..`, symlinks that resolve outside the project, the build output directory, `.hwaro/`, anything under `.git/` and dotenv files (`.env`, `.env.*` other than `.env.example`, `.env.sample` and `.env.template`) are refused. A missing file or region, a line range outside the file, or a refused path fails the build with an error that names the page and the file:
 
 ```
 Error [HWARO_E_TEMPLATE]: {{ include_code(path="examples/app.cr", region="srv") }} in content/guide.md: region 'srv' not found

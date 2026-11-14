@@ -113,6 +113,8 @@ module Hwaro
           raise Error.new("cannot read #{relative}: #{ex.message}")
         end
 
+        DOTENV_SAMPLES = {".env.example", ".env.sample", ".env.template"}
+
         private def refuse_output(path : String, relative : String, root : String, output_dir : String?) : Nil
           if Utils::PathUtils.within?(path, File.join(root, ".hwaro")) ||
              (output_dir && Utils::PathUtils.within?(path, File.expand_path(output_dir, root)))
@@ -121,8 +123,14 @@ module Hwaro
           # Version-control metadata is never site content and can hold
           # credentials; content must not be able to publish it. Checked on
           # the lexical and the resolved path, case-folded for APFS/NTFS.
-          if (rel = Utils::PathUtils.relative_path(path, root)) && rel.split(/[\/\\]/).any?(&.downcase.==(".git"))
-            raise Error.new("#{relative} is inside .git/ and is refused")
+          if rel = Utils::PathUtils.relative_path(path, root)
+            segments = rel.split(/[\/\\]/).map(&.downcase)
+            raise Error.new("#{relative} is inside .git/ and is refused") if segments.includes?(".git")
+            # Dotenv files hold the credentials a build runs with. The
+            # committed samples (`.env.example`, `.env.sample`) are documentation.
+            if segments.any? { |s| (s == ".env" || s.starts_with?(".env.")) && !DOTENV_SAMPLES.includes?(s) }
+              raise Error.new("#{relative} is a dotenv file and is refused")
+            end
           end
         end
 
