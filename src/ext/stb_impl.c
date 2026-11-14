@@ -15,6 +15,34 @@
 #define STBI_WINDOWS_UTF8
 #define STBIW_WINDOWS_UTF8
 
+/* A failed stb assertion used to abort the whole build (assert -> SIGABRT):
+ * one hostile or corrupt image took every other page down with it. The
+ * decode/resize entry points at the bottom of this file run under a
+ * per-thread guard instead: an assertion inside one of them longjmps back to
+ * its wrapper, which reports the image as undecodable/unresizable (NULL) like
+ * any other failure, and the build skips it. Outside a guard a failed
+ * assertion still aborts, as before.
+ *
+ * The jump never crosses a Crystal frame: wrapper -> stb -> assert -> wrapper.
+ * What stb had allocated for the failing call is leaked (bounded by one image
+ * per failure); the FILE is closed by the wrapper, which owns it. */
+#include <setjmp.h>
+#include <stdio.h>
+#include <stdlib.h>
+#if defined(_MSC_VER)
+#define HWARO_TLS __declspec(thread)
+#else
+#define HWARO_TLS _Thread_local
+#endif
+static HWARO_TLS jmp_buf *hwaro_stb_guard;
+static void hwaro_stb_assert_fail(const char *expr, const char *file, int line) {
+    if (hwaro_stb_guard) longjmp(*hwaro_stb_guard, 1);
+    fprintf(stderr, "%s:%d: stb assertion failed: %s\n", file, line, expr);
+    abort();
+}
+#define STBI_ASSERT(x) ((x) ? (void)0 : hwaro_stb_assert_fail(#x, __FILE__, __LINE__))
+#define STBIR_ASSERT(x) ((x) ? (void)0 : hwaro_stb_assert_fail(#x, __FILE__, __LINE__))
+
 /* Decoders hwaro never needs. Sources are JPEG/PNG/BMP (IMAGE_EXTENSIONS), and
  * the OG renderer decodes a configured logo/background, which may also be a
  * GIF. stb picks a decoder by sniffing the CONTENT, not the extension, so a
@@ -339,4 +367,47 @@ int hwaro_write_jpg_to_mem(const unsigned char *pixels, int w, int h, int comp,
     *out_buf = mb.buf;
     *out_len = mb.len;
     return 1;
+}
+
+/* ---- Guarded entry points (see the assertion note at the top) ---- */
+
+unsigned char *hwaro_stbi_load(const char *filename, int *x, int *y, int *comp, int req_comp) {
+    FILE *f = stbi__fopen(filename, "rb");
+    if (!f) return NULL;
+    jmp_buf jb;
+    jmp_buf *prev = hwaro_stb_guard;
+    unsigned char *volatile result = NULL;
+    hwaro_stb_guard = &jb;
+    if (setjmp(jb) == 0) result = stbi_load_from_file(f, x, y, comp, req_comp);
+    hwaro_stb_guard = prev;
+    fclose(f);
+    return result;
+}
+
+int hwaro_stbi_info(const char *filename, int *x, int *y, int *comp) {
+    FILE *f = stbi__fopen(filename, "rb");
+    if (!f) return 0;
+    jmp_buf jb;
+    jmp_buf *prev = hwaro_stb_guard;
+    volatile int result = 0;
+    hwaro_stb_guard = &jb;
+    if (setjmp(jb) == 0) result = stbi_info_from_file(f, x, y, comp);
+    hwaro_stb_guard = prev;
+    fclose(f);
+    return result;
+}
+
+unsigned char *hwaro_stbir_resize_uint8_srgb(const unsigned char *input_pixels, int input_w, int input_h,
+                                             int input_stride_in_bytes, unsigned char *output_pixels,
+                                             int output_w, int output_h, int output_stride_in_bytes,
+                                             int pixel_layout) {
+    jmp_buf jb;
+    jmp_buf *prev = hwaro_stb_guard;
+    unsigned char *volatile result = NULL;
+    hwaro_stb_guard = &jb;
+    if (setjmp(jb) == 0)
+        result = stbir_resize_uint8_srgb(input_pixels, input_w, input_h, input_stride_in_bytes, output_pixels,
+                                         output_w, output_h, output_stride_in_bytes, (stbir_pixel_layout)pixel_layout);
+    hwaro_stb_guard = prev;
+    return result;
 }

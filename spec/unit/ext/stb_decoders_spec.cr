@@ -54,6 +54,16 @@ describe "stb_image decoders" do
     end
   end
 
+  it "turns a failed stb assertion into a failed call instead of aborting the process" do
+    # A strip this wide scaled down to a few pixels trips an assertion inside
+    # stb_image_resize2 (the build used to die with SIGABRT; the importer's
+    # size cap now keeps real sites away from it, this goes around the cap).
+    w = 8_006_708
+    src = Bytes.new(w * 4, 0x80_u8)
+    dst = Bytes.new(3 * 4)
+    LibStb.stbir_resize_uint8_srgb(src, w, 1, 0, dst, 3, 1, 0, 4).null?.should be_true
+  end
+
   it "does not leak stack bytes through a palette entry the PNG never defines" do
     Dir.mktmpdir do |dir|
       # A 10x10 8-bit palette PNG whose PLTE holds 1 entry while the pixels

@@ -27,8 +27,11 @@ require "lib_z"
 @[Link(ldflags: "`sh -c 'D=\"#{__DIR__}\"; OBJ=\"$D/stb_impl.o\"; STALE=0; if [ ! -f \"$OBJ\" ]; then STALE=1; else for f in \"$D/stb_impl.c\" \"$D/stb_image.h\" \"$D/stb_image_write.h\" \"$D/stb_image_resize2.h\" \"$D/stb_truetype.h\"; do [ \"$f\" -nt \"$OBJ\" ] && STALE=1; done; fi; case $(uname -s) in MINGW*|MSYS*|CYGWIN*) CC=${CC:-clang-cl -Zl}; Q=\\\";; *) CC=${CC:-cc}; Q=;; esac; [ $STALE -eq 1 ] && $CC -c -O2 -o \"$OBJ\" \"$D/stb_impl.c\" >&2; echo \"$Q$OBJ$Q\"'`")]
 lib LibStb
   # --- stb_image ---
-  fun stbi_load(filename : LibC::Char*, x : LibC::Int*, y : LibC::Int*, channels_in_file : LibC::Int*, desired_channels : LibC::Int) : UInt8*
-  fun stbi_info(filename : LibC::Char*, x : LibC::Int*, y : LibC::Int*, comp : LibC::Int*) : LibC::Int
+  # stbi_load, stbi_info and stbir_resize_uint8_srgb bind to the guarded
+  # wrappers in stb_impl.c: an stb assertion inside them returns NULL/0
+  # instead of aborting the process.
+  fun stbi_load = hwaro_stbi_load(filename : LibC::Char*, x : LibC::Int*, y : LibC::Int*, channels_in_file : LibC::Int*, desired_channels : LibC::Int) : UInt8*
+  fun stbi_info = hwaro_stbi_info(filename : LibC::Char*, x : LibC::Int*, y : LibC::Int*, comp : LibC::Int*) : LibC::Int
   fun stbi_image_free(retval_from_stbi_load : Void*)
   fun stbi_failure_reason : LibC::Char*
 
@@ -48,7 +51,7 @@ lib LibStb
   # downscale. The last parameter is stbir_pixel_layout; casting the channel
   # count maps 1→1CHANNEL, 2→2CHANNEL, 3→RGB, 4→RGBA (alpha kept linear and
   # weighted during filtering), matching how these callers decode.
-  fun stbir_resize_uint8_srgb(input_pixels : UInt8*, input_w : LibC::Int, input_h : LibC::Int, input_stride_in_bytes : LibC::Int, output_pixels : UInt8*, output_w : LibC::Int, output_h : LibC::Int, output_stride_in_bytes : LibC::Int, pixel_layout : LibC::Int) : UInt8*
+  fun stbir_resize_uint8_srgb = hwaro_stbir_resize_uint8_srgb(input_pixels : UInt8*, input_w : LibC::Int, input_h : LibC::Int, input_stride_in_bytes : LibC::Int, output_pixels : UInt8*, output_w : LibC::Int, output_h : LibC::Int, output_stride_in_bytes : LibC::Int, pixel_layout : LibC::Int) : UInt8*
 
   # --- stb_truetype (via hwaro C wrappers) ---
   # Font info is an opaque pointer managed by hwaro_font_alloc/free
