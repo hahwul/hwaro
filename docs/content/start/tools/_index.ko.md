@@ -20,13 +20,12 @@ Hwaro는 콘텐츠 관리를 돕는 유틸리티 도구와, CLI를 더 편하게
 | [stats](/ko/start/tools/stats/) | 콘텐츠 통계 표시 |
 | [validate](/ko/start/tools/validate/) | 콘텐츠 프론트 매터와 마크업 검증 |
 | [unused-assets](/ko/start/tools/unused-assets/) | 참조되지 않는 정적 파일 찾기 |
-| [doctor](/ko/start/tools/doctor/) | 설정·템플릿·구조 문제 진단 |
 | [platform](/ko/start/tools/platform/) | 호스팅 플랫폼 설정 파일 생성 |
 | [import](/ko/start/tools/import/) | 다양한 플랫폼에서 콘텐츠 가져오기 |
 | [export](/ko/start/tools/export/) | 다른 플랫폼으로 콘텐츠 내보내기 |
 | [agents-md](/ko/start/tools/agents-md/) | AGENTS.md 파일 생성·갱신 |
 
-> **사용 중단:** [ci (사용 중단)](/ko/start/tools/ci/)는 도움말에서 숨겨졌으며 [platform](/ko/start/tools/platform/)으로 대체되었습니다(예: `hwaro tool platform github-pages`).
+설정·템플릿·구조 점검은 최상위 명령 [`hwaro doctor`](/ko/start/tools/doctor/)로 실행합니다.
 
 ---
 

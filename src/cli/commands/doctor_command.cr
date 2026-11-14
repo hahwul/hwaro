@@ -1,10 +1,8 @@
-# Doctor command - Top-level alias for `hwaro tool doctor`
-#
-# Diagnoses config and content issues.
+# Doctor command - Diagnoses config and content issues.
 # Usage:
 #   hwaro doctor [options]
 #
-# This is a convenience alias; `hwaro tool doctor` also works.
+# The implementation lives in `Tool::DoctorCommand`.
 
 require "./tool/doctor_command"
 
@@ -27,7 +25,7 @@ module Hwaro
         end
 
         def run(args : Array(String))
-          Tool::DoctorCommand.new.run(args, invocation: "hwaro doctor")
+          Tool::DoctorCommand.new.run(args)
         end
       end
     end

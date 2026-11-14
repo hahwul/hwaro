@@ -110,7 +110,7 @@ module Hwaro
         raise Hwaro::HwaroError.new(
           code: Hwaro::Errors::HWARO_E_USAGE,
           message: "Refusing to delete #{count} files (max_deletes: #{effective.max_deletes}).",
-          hint: "Set deployment.maxDeletes = -1 (or pass --max-deletes -1) to disable the limit.",
+          hint: "Set deployment.max_deletes = -1 (or pass --max-deletes -1) to disable the limit.",
         )
       end
 

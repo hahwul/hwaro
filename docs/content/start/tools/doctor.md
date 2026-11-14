@@ -30,8 +30,6 @@ hwaro doctor --full --dry-run
 hwaro doctor --json
 ```
 
-> `hwaro tool doctor` also works as a backward-compatible alias.
-
 ## Options
 
 | Flag | Description |

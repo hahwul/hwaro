@@ -20,13 +20,12 @@ The `hwaro tool` command provides utility subcommands for working with content f
 | [stats](/start/tools/stats/) | Show content statistics |
 | [validate](/start/tools/validate/) | Validate content frontmatter and markup |
 | [unused-assets](/start/tools/unused-assets/) | Find unreferenced static files |
-| [doctor](/start/tools/doctor/) | Diagnose config, template, and structure issues |
 | [platform](/start/tools/platform/) | Generate hosting platform config files |
 | [import](/start/tools/import/) | Import content from various platforms |
 | [export](/start/tools/export/) | Export content to other platforms |
 | [agents-md](/start/tools/agents-md/) | Generate or update AGENTS.md file |
 
-> **Deprecated:** [ci](/start/tools/ci/) is hidden from help and superseded by [platform](/start/tools/platform/) (e.g. `hwaro tool platform github-pages`).
+Configuration, template, and structure checks run through the top-level [`hwaro doctor`](/start/tools/doctor/) command.
 
 ---
 

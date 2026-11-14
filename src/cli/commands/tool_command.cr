@@ -11,9 +11,7 @@
 #   stats         - Show content statistics
 #   validate      - Validate content frontmatter and markup
 #   unused-assets - Find unreferenced static files
-#   doctor        - Diagnose config, template, and structure issues
 #   platform      - Generate hosting platform config files
-#   ci            - Generate CI/CD workflow files
 #   import        - Import content from other systems
 #   export        - Export content to other platforms
 #   agents-md     - Generate or update AGENTS.md file
@@ -23,9 +21,7 @@ require "../metadata"
 require "./tool/convert_command"
 require "./tool/list_command"
 require "./tool/deadlink_command"
-require "./tool/doctor_command"
 require "./tool/platform_command"
-require "./tool/ci_command"
 require "./tool/import_command"
 require "./tool/export_command"
 require "./tool/stats_command"
@@ -42,7 +38,7 @@ module Hwaro
       class ToolCommand
         # Single source of truth for command metadata
         NAME               = "tool"
-        DESCRIPTION        = "Utility tools (stats, validate, export, doctor, ...)"
+        DESCRIPTION        = "Utility tools (stats, validate, export, import, ...)"
         POSITIONAL_ARGS    = [] of String
         POSITIONAL_CHOICES = [] of String
 
@@ -64,9 +60,7 @@ module Hwaro
         register_sub(Tool::ConvertCommand.metadata) { |args| Tool::ConvertCommand.new.run(args) }
         register_sub(Tool::ListCommand.metadata) { |args| Tool::ListCommand.new.run(args) }
         register_sub(Tool::DeadlinkCommand.metadata) { |args| Tool::DeadlinkCommand.new.run(args) }
-        register_sub(Tool::DoctorCommand.metadata) { |args| Tool::DoctorCommand.new.run(args) }
         register_sub(Tool::PlatformCommand.metadata) { |args| Tool::PlatformCommand.new.run(args) }
-        register_sub(Tool::CICommand.metadata) { |args| Tool::CICommand.new.run(args) }
         register_sub(Tool::ImportCommand.metadata) { |args| Tool::ImportCommand.new.run(args) }
         register_sub(Tool::ExportCommand.metadata) { |args| Tool::ExportCommand.new.run(args) }
         register_sub(Tool::StatsCommand.metadata) { |args| Tool::StatsCommand.new.run(args) }
@@ -139,14 +133,11 @@ module Hwaro
         # Category display order and membership for help output
         CATEGORIES = {
           "Content" => ["list", "convert", "check-links", "stats", "validate", "unused-assets"],
-          "Site"    => ["platform", "doctor", "import", "export", "agents-md"],
+          "Site"    => ["platform", "import", "export", "agents-md"],
         }
 
-        # Hidden from help but still executable (e.g. deprecated commands)
-        HIDDEN = Set{"ci"}
-
         private def print_help
-          visible = ToolCommand.subcommands.reject { |s| HIDDEN.includes?(s.name) }
+          visible = ToolCommand.subcommands
           sub_by_name = visible.index_by(&.name)
 
           # Render usage syntax inline so mandatory positional args (e.g.

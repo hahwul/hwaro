@@ -18,7 +18,6 @@ module Hwaro
       alias SectionEntry = NamedTuple(description: String, snippet: -> String)
 
       SECTION_REGISTRY = {
-        "plugins"          => {description: "Content processors and extensions", snippet: -> { plugins(commented: true) }},
         "highlight"        => {description: "Syntax highlighting (Highlight.js)", snippet: -> { highlight(commented: true) }},
         "og"               => {description: "OpenGraph & Twitter Cards", snippet: -> { og(commented: true) }},
         "search"           => {description: "Client-side search index", snippet: -> { search(commented: true) }},
@@ -215,34 +214,6 @@ module Hwaro
 
             [doctor]
             ignore = []
-
-            TOML
-        end
-      end
-
-      def self.plugins(commented : Bool = false) : String
-        if commented
-          <<-TOML
-
-            # =============================================================================
-            # Plugins
-            # =============================================================================
-            # Configure content processors and extensions
-
-            # [plugins]
-            # processors = ["markdown"]
-
-            TOML
-        else
-          <<-TOML
-
-            # =============================================================================
-            # Plugins
-            # =============================================================================
-            # Configure content processors and extensions
-
-            [plugins]
-            processors = ["markdown"]
 
             TOML
         end

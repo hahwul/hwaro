@@ -388,8 +388,7 @@ hwaro serve -i /path/to/my-site -p 8080
 | --debug | 재빌드마다 디버그 정보 출력 |
 | --access-log | HTTP 접근 로그 표시 (예: GET 요청). 각 줄에는 브라우저가 요청한 경로가 그대로 기록됩니다(개발 서버가 내부적으로 찾아가는 `/index.html`이 아니라 `/`) |
 | --no-error-overlay | 브라우저 내 오류 오버레이 끄기 (기본값: 활성화) |
-| --live-reload | 파일 변경 시 브라우저 라이브 리로드 켜기 (기본값: 활성화; 하위 호환용으로 유지) |
-| --no-live-reload | 파일 변경 시 브라우저 라이브 리로드 끄기 |
+| --no-live-reload | 파일 변경 시 브라우저 라이브 리로드 끄기 (기본값: 활성화) |
 | --header "NAME: VALUE" | 커스텀 응답 헤더 추가 (반복 가능). `config.toml`의 `[serve.headers]`와 병합 (CLI 우선). `hwaro serve`에만 적용 |
 | --cache | 빌드 캐시 사용 (변경 없는 파일 생략). `hwaro build --cache`와 별도로 `.hwaro/serve_cache.json`에 저장 |
 | --stream | 메모리 사용을 줄이는 스트리밍 빌드 사용 |
@@ -424,7 +423,7 @@ hwaro serve -i /path/to/my-site -p 8080
 
 저장한 변경이 **스타일시트뿐**이라면(`static/` 아래의 `.css` 파일, Sass 소스, CSS 에셋 번들 소스) 브라우저는 페이지를 새로 고치지 않고 해당 `<link rel="stylesheet">` 태그를 그 자리에서 교체하므로 스크롤 위치와 페이지 상태가 유지됩니다. 일반 정적 CSS는 경로로 대응시키고, Sass와 번들 출력은 같은 출처의 스타일시트를 모두 새로 불러옵니다. 같은 저장에 다른 변경(HTML, JS, 이미지, 파일 이름을 바꾸는 번들 핑거프린트)이 섞여 있으면 기존처럼 전체 새로 고침을 하고, 빌드 오류가 나면 오류 오버레이가 표시됩니다.
 
-이 동작을 끄려면 `--no-live-reload`를 줍니다(프로덕션과 비슷한 전달 방식을 로컬에서 테스트할 때 유용합니다). `--live-reload` 플래그는 기존 호출과의 하위 호환을 위해 아무 동작 없는 별칭으로 남아 있습니다.
+이 동작을 끄려면 `--no-live-reload`를 줍니다(프로덕션과 비슷한 전달 방식을 로컬에서 테스트할 때 유용합니다).
 
 `-i`를 지정하면 서버는 해당 디렉터리로 `cd`한 것처럼 동작하여 그 프로젝트 루트를 감시하고 서빙합니다.
 
@@ -488,7 +487,7 @@ hwaro deploy --dry-run
 | --dry-run | 실제로 쓰지 않고 계획된 변경만 표시 |
 | --confirm | 배포 전 확인 요청 |
 | --force | 강제 업로드/복사 (파일 비교 무시). 빈 소스로 대상을 비우는 것도 허용 |
-| --max-deletes N | 최대 삭제 수 (기본값: deployment.maxDeletes 또는 256, -1이면 제한 없음) |
+| --max-deletes N | 최대 삭제 수 (기본값: deployment.max_deletes 또는 256, -1이면 제한 없음) |
 | --list-targets | 설정된 배포 대상 목록 출력 후 종료 |
 | -j, --json | 기계가 읽을 수 있는 JSON 출력 (`--dry-run`이면 계획, 아니면 대상별 요약, `--list-targets`면 대상 목록) |
 | -e, --env NAME | 불러올 설정 환경 (`HWARO_ENV`로도 지정) |
@@ -572,7 +571,6 @@ hwaro tool platform cloudflare    # Cloudflare Pages 설정 생성
 hwaro tool platform github-pages  # GitHub Pages 배포 워크플로 생성
 hwaro tool platform gitlab-ci     # GitLab CI 설정 생성
 hwaro tool platform codeberg-pages # Codeberg Pages(Forgejo Actions) 워크플로 생성
-hwaro tool doctor                 # 설정/템플릿/구조 문제 진단
 hwaro tool import hugo /path      # Hugo에서 가져오기
 hwaro tool import jekyll /path    # Jekyll에서 가져오기
 hwaro tool export hugo            # Hugo 형식으로 내보내기
@@ -585,7 +583,6 @@ hwaro tool convert to-yaml --json
 hwaro tool stats --json
 hwaro tool validate --json
 hwaro tool unused-assets --json
-hwaro tool doctor --json
 hwaro tool check-links --json
 hwaro tool import jekyll /path --json
 hwaro tool export hugo --json
@@ -615,7 +612,6 @@ hwaro tool export hugo --dry-run
 | 콘텐츠 | [validate](/ko/start/tools/validate/) | 콘텐츠 프론트 매터와 마크업 검증 |
 | 콘텐츠 | [unused-assets](/ko/start/tools/unused-assets/) | 참조되지 않는 정적 파일 찾기 |
 | 사이트 | [platform](/ko/start/tools/platform/) | 플랫폼 설정과 CI/CD 워크플로 파일 생성 |
-| 사이트 | [doctor](/ko/start/tools/doctor/) | 설정, 템플릿, 구조 문제 진단 |
 | 사이트 | [import](/ko/start/tools/import/) | WordPress, Jekyll, Hugo, Notion, Obsidian, Hexo, Astro, Eleventy에서 콘텐츠 가져오기 |
 | 사이트 | [export](/ko/start/tools/export/) | 콘텐츠를 Hugo 또는 Jekyll로 내보내기 |
 | 사이트 | [agents-md](/ko/start/tools/agents-md/) | AGENTS.md 파일 생성 또는 갱신 |

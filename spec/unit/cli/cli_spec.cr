@@ -184,12 +184,12 @@ describe Hwaro::CLI::Commands::ToolCommand do
     subcommand_names.should contain("convert")
     subcommand_names.should contain("list")
     subcommand_names.should contain("check-links")
-    subcommand_names.should contain("doctor")
+    subcommand_names.should_not contain("doctor")
   end
 
   it "subcommands are loaded from subcommand classes" do
     subs = Hwaro::CLI::Commands::ToolCommand.subcommands
-    subs.size.should eq(12)
+    subs.size.should eq(10)
   end
 end
 

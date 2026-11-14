@@ -548,7 +548,7 @@ run_both_here "help:version" "$WORK" -- version
 for cmd in init build serve new deploy doctor tool completion; do
   run_both_here "help:$cmd" "$WORK" -- "$cmd" --help
 done
-for sub in convert list check-links doctor platform ci import export stats validate unused-assets agents-md; do
+for sub in convert list check-links platform import export stats validate unused-assets agents-md; do
   run_both_here "help:tool-$sub" "$WORK" -- tool "$sub" --help
 done
 for shell in bash zsh fish; do
@@ -561,8 +561,8 @@ run_both_here "init:list-scaffolds-json" "$WORK" -- init --list-scaffolds --json
 for s in $SCAFFOLDS; do
   d="$WORK/init/$s-default-mono.base"
   [ -d "$d" ] || continue
-  run_both_here "doctor:$s" "$d" -- tool doctor
-  run_both_here "doctor-json:$s" "$d" -- tool doctor --json
+  run_both_here "doctor:$s" "$d" -- doctor
+  run_both_here "doctor-json:$s" "$d" -- doctor --json
   run_both_here "list:$s" "$d" -- tool list all --sort path
   run_both_here "list-json:$s" "$d" -- tool list all --json
   run_both_here "stats:$s" "$d" -- tool stats
@@ -589,19 +589,17 @@ for s in blog docs; do
   compare "new:$s (stdout)" "$b.new.out" "$c.new.out"
   b="$WORK/build/doctor-fix-$s.base"; c="$WORK/build/doctor-fix-$s.cand"
   copy_tree "$d" "$b"; copy_tree "$d" "$c"
-  run_both fixdry "$b" "$c" -- tool doctor --full --dry-run
-  run_both fix "$b" "$c" -- tool doctor --full
+  run_both fixdry "$b" "$c" -- doctor --full --dry-run
+  run_both fix "$b" "$c" -- doctor --full
   compare "doctor-fix:$s" "$b" "$c"
   compare "doctor-fix:$s (stdout)" "$b.fix.out" "$c.fix.out"
   compare "doctor-fix:$s (dry-run stdout)" "$b.fixdry.out" "$c.fixdry.out"
   b="$WORK/build/platform-$s.base"; c="$WORK/build/platform-$s.cand"
   copy_tree "$d" "$b"; copy_tree "$d" "$c"
   run_both platform "$b" "$c" -- tool platform github-pages
-  run_both ci "$b" "$c" -- tool ci github-actions
   run_both agents "$b" "$c" -- tool agents-md --write --force
   compare "generators:$s" "$b" "$c"
   compare "generators:$s (platform stdout)" "$b.platform.out" "$c.platform.out"
-  compare "generators:$s (ci stdout)" "$b.ci.out" "$c.ci.out"
   compare "generators:$s (agents-md stdout)" "$b.agents.out" "$c.agents.out"
 done
 fi

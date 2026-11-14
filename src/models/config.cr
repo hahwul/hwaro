@@ -60,7 +60,6 @@ module Hwaro
       property llms : LlmsConfig
       property feeds : FeedConfig
       property search : SearchConfig
-      property plugins : PluginConfig
       property content_files : ContentFilesConfig
       property content_new : ContentNewConfig
       property summary : SummaryConfig
@@ -118,7 +117,6 @@ module Hwaro
         @llms = LlmsConfig.new
         @feeds = FeedConfig.new
         @search = SearchConfig.new
-        @plugins = PluginConfig.new
         @content_files = ContentFilesConfig.new
         @content_new = ContentNewConfig.new
         @summary = SummaryConfig.new
@@ -431,7 +429,6 @@ module Hwaro
         SectionLoader.new(%w[llms], ->(c : Config) { load_llms(c) }),
         SectionLoader.new(%w[feeds], ->(c : Config) { load_feeds(c) }),
         SectionLoader.new(%w[search], ->(c : Config) { load_search(c) }),
-        SectionLoader.new(%w[plugins], ->(c : Config) { load_plugins(c) }),
         SectionLoader.new(%w[content], ->(c : Config) { load_content_files(c) }),
         SectionLoader.new(%w[content], ->(c : Config) { load_content_new(c) }),
         SectionLoader.new(%w[content], ->(c : Config) { load_content_summary(c) }),

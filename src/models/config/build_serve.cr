@@ -1,4 +1,4 @@
-# Config section — [build], [serve], [static], [outputs], [doctor], [plugins].
+# Config section — [build], [serve], [static], [outputs], [doctor].
 #
 # One file per config.toml table family: the nested config class(es) plus the
 # `Config.load_*` loader(s) that read them. To add a section: create a file
@@ -7,15 +7,6 @@
 # Parts only reopen Models / Config: no requires, no load-time statements.
 module Hwaro
   module Models
-    # Plugin configuration for extensibility
-    class PluginConfig
-      property processors : Array(String)
-
-      def initialize
-        @processors = ["markdown"] # Default processor
-      end
-    end
-
     # Build hooks configuration for pre/post build commands
     class BuildHooksConfig
       property pre : Array(String)
@@ -209,14 +200,6 @@ end
 module Hwaro
   module Models
     class Config
-      private def self.load_plugins(config : Config)
-        return unless s = config.raw["plugins"]?.try(&.as_h?)
-
-        if processors = string_list?(s["processors"]?, "[plugins] processors")
-          config.plugins.processors = processors
-        end
-      end
-
       # A `[build]` boolean, or nil when the key is absent. A present-but-wrong
       # type warns rather than no-opping: `cache = "true"` (quoting a bool is
       # an easy TOML slip) would otherwise leave caching off with no feedback,

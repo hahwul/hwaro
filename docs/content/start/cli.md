@@ -382,8 +382,7 @@ hwaro serve -i /path/to/my-site -p 8080
 | --debug | Print debug information after each rebuild |
 | --access-log | Show HTTP access log (e.g. GET requests). Each line reports the path the browser requested (`/`, not the `/index.html` the dev server resolves it to) |
 | --no-error-overlay | Disable in-browser error overlay (default: enabled) |
-| --live-reload | Enable browser live reload on file changes (default: enabled; kept for backwards compatibility) |
-| --no-live-reload | Disable browser live reload on file changes |
+| --no-live-reload | Disable browser live reload on file changes (default: enabled) |
 | --header "NAME: VALUE" | Add custom response header (repeatable). Merged with `[serve.headers]` from `config.toml` (CLI wins). Only affects `hwaro serve`. |
 | --cache | Enable build caching (skip unchanged files); kept in `.hwaro/serve_cache.json`, separate from `hwaro build --cache` |
 | --stream | Enable streaming build to reduce memory usage |
@@ -418,7 +417,7 @@ Live reload is **enabled by default**. The server injects a small WebSocket clie
 
 When a save changes **only stylesheets** (a `.css` file under `static/`, a Sass source, or a CSS asset-bundle source), the browser swaps the affected `<link rel="stylesheet">` tags in place instead of reloading, so scroll position and page state survive. Plain static CSS is matched by path; Sass and bundle output refresh every same-origin stylesheet. Anything else in the same save (HTML, JS, images, a bundle fingerprint that moves its filename) still triggers a full reload, and a build error still shows the overlay.
 
-Pass `--no-live-reload` to disable this behaviour (useful for testing production-like delivery locally). The `--live-reload` flag is kept as a no-op alias for backwards compatibility with existing invocations.
+Pass `--no-live-reload` to disable this behaviour (useful for testing production-like delivery locally).
 
 When `-i` is specified, the server operates as if you had `cd`-ed into the given directory, watching and serving from that project root.
 
@@ -482,7 +481,7 @@ hwaro deploy --dry-run
 | --dry-run | Show planned changes without writing |
 | --confirm | Ask for confirmation before deploying |
 | --force | Force upload/copy (ignore file comparisons), and allow clearing a destination from an empty source |
-| --max-deletes N | Maximum number of deletes (default: deployment.maxDeletes or 256, -1 disables) |
+| --max-deletes N | Maximum number of deletes (default: deployment.max_deletes or 256, -1 disables) |
 | --list-targets | List configured deployment targets and exit |
 | -j, --json | Emit machine-readable JSON output (plan with `--dry-run`, per-target summary otherwise, target list with `--list-targets`) |
 | -e, --env NAME | Config environment to load (also `HWARO_ENV`) |
@@ -569,7 +568,6 @@ hwaro tool platform cloudflare    # Generate Cloudflare Pages config
 hwaro tool platform github-pages  # Generate GitHub Pages deploy workflow
 hwaro tool platform gitlab-ci     # Generate GitLab CI config
 hwaro tool platform codeberg-pages # Generate Codeberg Pages (Forgejo Actions) workflow
-hwaro tool doctor                 # Diagnose config/template/structure issues
 hwaro tool import hugo /path      # Import from Hugo
 hwaro tool import jekyll /path    # Import from Jekyll
 hwaro tool export hugo            # Export to Hugo format
@@ -582,7 +580,6 @@ hwaro tool convert to-yaml --json
 hwaro tool stats --json
 hwaro tool validate --json
 hwaro tool unused-assets --json
-hwaro tool doctor --json
 hwaro tool check-links --json
 hwaro tool import jekyll /path --json
 hwaro tool export hugo --json
@@ -613,7 +610,6 @@ report and do not accept `--json`; every other `tool` subcommand does.
 | Content | [validate](/start/tools/validate/) | Validate content frontmatter and markup |
 | Content | [unused-assets](/start/tools/unused-assets/) | Find unreferenced static files |
 | Site | [platform](/start/tools/platform/) | Generate platform config and CI/CD workflow files |
-| Site | [doctor](/start/tools/doctor/) | Diagnose config, template, and structure issues |
 | Site | [import](/start/tools/import/) | Import content from WordPress, Jekyll, Hugo, Notion, Obsidian, Hexo, Astro, or Eleventy |
 | Site | [export](/start/tools/export/) | Export content to Hugo or Jekyll |
 | Site | [agents-md](/start/tools/agents-md/) | Generate or update AGENTS.md file |

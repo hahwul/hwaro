@@ -24,7 +24,7 @@ hwaro tool platform netlify -o deploy/netlify.toml
 hwaro tool platform vercel --stdout
 ```
 
-> **참고:** `hwaro tool ci`는 사용 중단되었습니다. 대신 `hwaro tool platform github-pages`를 사용합니다.
+> **참고:** `hwaro tool ci`는 제거되었습니다. `hwaro tool platform github-pages`가 같은 `.github/workflows/deploy.yml`을 생성합니다.
 
 ## 지원 플랫폼
 

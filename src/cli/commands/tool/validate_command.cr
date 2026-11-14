@@ -129,7 +129,7 @@ module Hwaro
                 puts({"findings" => findings, "defaults" => defaults}.to_json)
               end
               # Exit non-zero on hard errors so CI can gate on broken content
-              # (mirrors `tool doctor`'s exit-code behavior).
+              # (mirrors `hwaro doctor`'s exit-code behavior).
               exit(exit_code_for(issues, strict: strict_mode, max_warnings: max_warnings))
             end
 
@@ -162,7 +162,7 @@ module Hwaro
             Logger.info "" unless Logger.color_enabled?
 
             # Group by file: a dim file label, then one glyph item per issue.
-            # Same severity glyphs as `tool doctor` so findings read the same
+            # Same severity glyphs as `hwaro doctor` so findings read the same
             # everywhere.
             by_file = issues.group_by(&.file)
 
@@ -172,7 +172,7 @@ module Hwaro
               Logger.info ""
             end
 
-            # Summary — one severity-aware outcome line (mirrors `tool doctor`).
+            # Summary — one severity-aware outcome line (mirrors `hwaro doctor`).
             errors = issues.count { |i| i.level == :error }
             warnings = issues.count { |i| i.level == :warning }
             infos = issues.count { |i| i.level == :info }
@@ -183,7 +183,7 @@ module Hwaro
                       "#{infos} info"
             Logger.outcome("checked", summary, worst)
 
-            # Gate CI on hard errors (matches `tool doctor`).
+            # Gate CI on hard errors (matches `hwaro doctor`).
             code = exit_code_for(issues, strict: strict_mode, max_warnings: max_warnings)
             exit(code) if code != Hwaro::Errors::EXIT_SUCCESS
           end
@@ -212,7 +212,7 @@ module Hwaro
             end
           end
 
-          # Mirrors `tool doctor`'s exit policy: hard errors keep their
+          # Mirrors `hwaro doctor`'s exit policy: hard errors keep their
           # category exit code (`EXIT_CONTENT` — everything validate reports
           # is content), while warning-driven failures (`--strict`,
           # `--max-warnings`) exit `EXIT_GENERIC` so a consumer can still

@@ -72,7 +72,7 @@ contract over scraping human text.**
 - **`-j` / `--json`** — available on every top-level command (`init`, `new`,
   `build`, `serve`, `doctor`, `deploy`) and on the tool subcommands `list`,
   `stats`, `validate`, `unused-assets`, `check-links`, `convert`, `import`,
-  `export`, `doctor`. It implies `--quiet`, and errors become the JSON error
+  `export`. It implies `--quiet`, and errors become the JSON error
   payload below. Discovery flags pair with it: `init --list-scaffolds`,
   `new --list-archetypes`, `deploy --list-targets`. Parse the JSON; do not
   regex the pretty output.
@@ -231,9 +231,8 @@ hwaro tool export jekyll                       # also: hugo (writes to export/ b
 
 `-c, --content-dir DIR` scopes most tools to a subtree; import/export `--json`
 emit a per-file manifest. `--dry-run` previews convert/import/export without
-writing; import skips existing files unless `--force`. `tool ci` is deprecated
-— use `tool platform github-pages`. Run `hwaro tool <name> --help` for
-specifics.
+writing; import skips existing files unless `--force`. Run
+`hwaro tool <name> --help` for specifics.
 
 ### G. Platform config & deploy
 
@@ -266,7 +265,7 @@ section structure; a syntax error fails the build with `HWARO_E_CONFIG` (exit
 
 - **Site & build:** `[build]` (incl. `hooks.pre`/`hooks.post`), `[markdown]`,
   `[content]` (`summary_length`…), `[permalinks]`, `[links]`, `[static]`,
-  `[serve]`, `[plugins]`, `[doctor]`.
+  `[serve]`, `[doctor]`.
 - **Content model:** `[[taxonomies]]`, `[[menus.<name>]]`, `[pagination]`,
   `[series]`, `[related]`, `[content.files]`, `[content.new]`,
   `[[content.schema]]` (per-section front-matter rules),
