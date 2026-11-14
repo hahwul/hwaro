@@ -82,6 +82,13 @@ module Hwaro
           {"0.0.0.0", "::", "[::]"}.includes?(host.strip)
         end
 
+        # Whether binding `host` keeps the server reachable from this machine
+        # only. A wildcard or any other address (LAN IP, hostname) does not.
+        def self.loopback_host?(host : String) : Bool
+          h = host.strip.downcase.lstrip('[').rstrip(']')
+          h.empty? || h == "localhost" || h == "::1" || h.starts_with?("127.")
+        end
+
         # Host as it must appear inside a URL. An IPv6 literal has to be
         # bracketed (RFC 3986) — without this `hwaro serve -b ::1` produced
         # `http://::1:3000`, which no browser can resolve, and baked that

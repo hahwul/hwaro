@@ -198,6 +198,9 @@ module Hwaro
       end
 
       def run(options : Config::Options::ServeOptions)
+        unless Config::Options::ServeOptions.loopback_host?(options.host)
+          Logger.warn "Listening on #{options.host}: anyone who can reach this machine on port #{options.port} can read the served site#{options.drafts ? " (drafts included)" : ""}. There is no authentication; use the default 127.0.0.1 bind unless you need other devices."
+        end
         if options.base_url.nil? && Config::Options::ServeOptions.wildcard_host?(options.host)
           Logger.info "Listening on all interfaces; links use localhost. To preview from another device, pass --base-url http://<this-machine's-ip>:#{options.port}"
         end

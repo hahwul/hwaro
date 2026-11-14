@@ -120,6 +120,17 @@ describe Hwaro::Config::Options::ServeOptions do
     end
   end
 
+  describe ".loopback_host?" do
+    it "is true only for addresses that keep the server on this machine" do
+      ["127.0.0.1", "127.1.2.3", "localhost", "::1", "[::1]", ""].each do |host|
+        Hwaro::Config::Options::ServeOptions.loopback_host?(host).should be_true
+      end
+      ["0.0.0.0", "::", "192.168.1.5", "devbox.local"].each do |host|
+        Hwaro::Config::Options::ServeOptions.loopback_host?(host).should be_false
+      end
+    end
+  end
+
   describe ".url_host" do
     it "falls back to the loopback name for a blank host" do
       Hwaro::Config::Options::ServeOptions.url_host("").should eq("localhost")
