@@ -289,6 +289,7 @@ tokenize_cjk = true
 - Enabling this option slightly increases the search index size
 - The bigram approach works well for most CJK search scenarios
 - Korean text with natural spaces (e.g., `"검색 엔진"`) is handled correctly
+- The `title`, `content` and `description` text is stored in Unicode NFC, so a page saved with decomposed Hangul (for example text pasted from a macOS file name) is found by the query a keyboard types
 
 ## Excluding Pages
 

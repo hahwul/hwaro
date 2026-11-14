@@ -50,6 +50,9 @@ describe "Crinja built-in filter fixes" do
       render_filter("{{ 'abcdefghijklmnop' | truncate(10) }}").should eq("abcdefg...")
       render_filter("{{ '안녕하세요반갑습니다여러분안녕하세요반갑습니다' | truncate(10) }}").should eq("안녕하세요반갑...")
       render_filter("{{ 'abcdefghij' | truncate(5, leeway=0) }}").should eq("ab...")
+      # The cut never separates a base from its combining marks or splits conjoining jamo.
+      render_filter("{{ 'abcde\u0301fghijklmnop' | truncate(9, leeway=0, killwords=true) }}").should eq("abcde\u0301...")
+      render_filter("{{ '\u1112\u1161\u11AB\u1100\u1173\u11AF\u1109\u1166\u11A8' | truncate(5, leeway=0, killwords=true) }}").should eq("\u1112\u1161\u11AB...")
     end
 
     it "returns a string within length + leeway whole" do

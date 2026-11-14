@@ -690,7 +690,7 @@ module Hwaro
         return unless text
         return text if text.size <= limit
 
-        truncated = text[0, limit]
+        truncated = Hwaro::Utils::TextUtils.safe_prefix(text, limit)
         if (idx = truncated.rindex(' ')) && idx > limit // 2
           truncated = truncated[0, idx]
         end

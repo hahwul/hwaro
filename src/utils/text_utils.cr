@@ -78,6 +78,72 @@ module Hwaro
         "#{message[0, max]}… (truncated, #{message.size} characters)"
       end
 
+      # `text` in Unicode normalization form C (precomposed Hangul and Latin).
+      # ASCII, the common case, is returned as is. Search indexes store NFC
+      # because that is what a keyboard types, whatever form the page was
+      # saved in (macOS tools and copy-paste from file names produce NFD).
+      def nfc(text : String) : String
+        text.ascii_only? ? text : text.unicode_normalize(:nfc)
+      end
+
+      # The grapheme-cluster boundary (a CHARACTER index) nearest to `idx` that
+      # does not lie after it: a cut there never separates a base from its
+      # combining marks, the parts of a ZWJ emoji / flag / skin-tone sequence,
+      # a variation selector, or Hangul conjoining jamo. Every shortening of
+      # user text (`truncate`, feed/search/meta excerpts, OG lines) goes
+      # through here so the unit is one thing site-wide. When the first
+      # cluster alone is longer than `idx` the cluster is kept whole (one
+      # cluster is the smallest piece that can be shown). ASCII text is
+      # returned untouched without iterating.
+      def cluster_cut(text : String, idx : Int32) : Int32
+        return idx if idx <= 0 || idx >= text.size
+        if text.ascii_only?
+          # CR LF is the one ASCII pair that is a single cluster.
+          return text.byte_at(idx - 1) == 13_u8 && text.byte_at(idx) == 10_u8 ? idx - 1 : idx
+        end
+        chars = 0
+        text.each_grapheme do |g|
+          n = 0
+          g.to_s.each_char { n += 1 }
+          return chars if chars + n > idx && chars > 0
+          return chars + n if chars + n > idx
+          chars += n
+          return chars if chars == idx
+        end
+        idx
+      end
+
+      # `text[0, count]`, moved back to a cluster boundary (`cluster_cut`),
+      # and with any bidi override/embedding/isolate the cut left open closed
+      # again so it cannot reorder the ellipsis or the text that follows.
+      def safe_prefix(text : String, count : Int32) : String
+        return text if count >= text.size
+        head = text[0, cluster_cut(text, count)]
+        head.ascii_only? ? head : close_bidi(head)
+      end
+
+      # Append the terminators for bidi controls still open at the end of `s`.
+      def close_bidi(s : String) : String
+        stack = nil
+        s.each_char do |c|
+          case c
+          when '‪', '‫', '‭', '‮' then (stack ||= [] of Char) << '‬'
+          when '⁦', '⁧', '⁨'      then (stack ||= [] of Char) << '⁩'
+          when '‬'                then stack.try(&.pop?)
+          when '⁩'
+            if st = stack
+              while (top = st.pop?) && top != '⁩'
+              end
+            end
+          end
+        end
+        return s if stack.nil? || stack.empty?
+        String.build do |io|
+          io << s
+          stack.reverse_each { |c| io << c }
+        end
+      end
+
       # Display names for common language codes, used by scaffold configs
       # for `--include-multilingual`. Unknown codes fall back to upcase.
       LANGUAGE_DISPLAY_NAMES = {
@@ -1061,7 +1127,7 @@ module Hwaro
         end
         # Degenerate input (all punctuation before the cut): keep the raw
         # cut rather than emitting a bare ellipsis.
-        cut = text[0, length].rstrip if cut.empty?
+        cut = safe_prefix(text, length).rstrip if cut.empty?
         {"#{cut}#{ellipsis}", true}
       end
 
@@ -1103,7 +1169,7 @@ module Hwaro
           end
           idx = back if back > 0
         end
-        chars[0, idx].join
+        chars[0, cluster_cut(text, idx)].join
       end
 
       private def latin_word_char?(c : Char) : Bool
