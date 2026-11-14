@@ -282,7 +282,10 @@ module Hwaro
             if bytes[pos] == lt && pos + 1 < len
               if m = EMOJI_SKIP_RE.match_at_byte_index(html, pos, skip_opts)
                 close_tag = "</#{m[1]? || m[2]}>"
-                end_pos = html.byte_index(close_tag, pos) unless unclosed.includes?(close_tag)
+                # Assigned on every pass: a `while` keeps a local's value
+                # across iterations, so a skipped assignment would reuse the
+                # previous element's (now behind `pos`) close offset.
+                end_pos = unclosed.includes?(close_tag) ? nil : html.byte_index(close_tag, pos)
                 unclosed << close_tag unless end_pos
                 if end_pos
                   block_end = end_pos + close_tag.bytesize
