@@ -199,6 +199,12 @@ module Hwaro
         @[JSON::Field(key: "output_dir", emit_null: false)]
         property output_dir : String = ""
 
+        # True once a hwaro that spells page URLs in NFC (PermalinkResolver)
+        # wrote this cache; stamped by Cache#save like generator_version, and
+        # false for older caches. See `Cache#pre_nfc_tree?`.
+        @[JSON::Field(key: "nfc_output_names", emit_null: false)]
+        property nfc_output_names : Bool = false
+
         # Output files the last build produced that no cache ENTRY covers: the
         # taxonomy index/term pages, their pagination pages and their feeds.
         # Those have no content file, so nothing else remembers them, and a
@@ -511,6 +517,18 @@ module Hwaro
           return false unless @enabled && @loaded
           key = Cache.output_dir_key(output_dir)
           !key.empty? && @metadata.output_dir == key
+        end
+
+        # The tree was written by a hwaro that spelled page URLs the way the
+        # file system stored the source name, and some of them were not NFC.
+        # Rebuilding into it cannot converge on APFS, which matches names
+        # normalization-insensitively but keeps the spelling it has: the NFC
+        # page lands in the old NFD directory, and pruning the old spelling
+        # deletes the new file. So `load` drops such a cache, and the build
+        # rebuilds the tree from empty, once.
+        private def pre_nfc_tree? : Bool
+          return false if @metadata.nfc_output_names
+          @entries.each_value.any? { |entry| !entry.output_path.ascii_only? && !entry.output_path.unicode_normalized?(:nfc) }
         end
 
         # Write-ahead invalidation: the file on disk stops describing the
@@ -919,6 +937,7 @@ module Hwaro
               # is a struct, so this leaves @metadata itself untouched.
               stamped = @metadata
               stamped.generator_version = Hwaro::VERSION
+              stamped.nfc_output_names = true
               CacheData.new(metadata: stamped, entries: @entries.values.map! { |entry| portable(entry) })
             end
             # SERVE_CACHE_FILE lives under `.hwaro/`, which may not exist yet.
@@ -975,8 +994,13 @@ module Hwaro
             @racy_copies = @metadata.racy_copies.to_set
             data.entries.each { |e| @entries[e.path] = reanchored(e) }
             @loaded = true
-            if foreign_outputs?
-              Logger.info "  Cache: written for another workspace path — rebuilding from scratch."
+            reason = if foreign_outputs?
+                       "written for another workspace path"
+                     elsif pre_nfc_tree?
+                       "written before page URLs were spelled in NFC"
+                     end
+            if reason
+              Logger.info "  Cache: #{reason} — rebuilding from scratch."
               @entries.clear
               @metadata = CacheMetadata.new
               @loaded = false
