@@ -70,6 +70,11 @@ module Hwaro::Core::Build::Phases::Initialize
       # hidden static file) is not mistaken for one.
       dev_marker_found = !ctx.options.serve_mode && Utils::DevMarker.present?(output_dir)
       fresh = setup_output_dir(output_dir, keep_output, ctx.options.parallel)
+      # A kept tree survives a killed process (a cold or `--cache` build
+      # wipes it, and a killed `--cache` build also drops its cache), so a
+      # serve/`--preserve-output` run clears the dead processes' leftovers
+      # of its predecessor once, on its first build.
+      Utils::FileSafe.sweep_dead_temps(output_dir) if keep_output && @kept_output_dir.nil? && (ctx.options.serve_mode || ctx.options.preserve_output)
       @kept_output_dir = keep_output ? output_dir : nil
       # A symlinked output directory is a publish-through-the-link setup: a
       # web server may be serving the tree behind it while this build runs.
@@ -518,6 +523,7 @@ module Hwaro::Core::Build::Phases::Initialize
       info = publishable_static_info(src_path)
       next unless info
 
+      next if Utils::FileSafe.temp_name?(File.basename(src_path))
       relative = Path[src_path].relative_to(src_dir).to_s
       next if static_config.excluded?(relative)
       # SCSS sources compile via the sass:compile hook instead of

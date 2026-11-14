@@ -47,6 +47,8 @@ module Hwaro::Core::Build::Phases::ReadContent
       # ordinary symlink entry here.
       lstat = File.info?(file_path, follow_symlinks: false)
       next if lstat.nil? || lstat.directory?
+      # An interrupted atomic write's leftover, never content.
+      next if Utils::FileSafe.temp_name?(File.basename(file_path))
 
       if lstat.symlink?
         # A content symlink whose target lives outside the project would
