@@ -439,7 +439,7 @@ module Hwaro
         # shape preprocess_footnotes extracts (`FOOTNOTE_DEF_RE` there).
         FOOTNOTE_DEF_RE = /\A {0,3}\[\^[^\]]+\]:[^\n]/
         # The blockquote markers a line opens with.
-        QUOTE_MARKERS_RE = /\A(?: {0,3}>[ \t]?)*/
+        QUOTE_MARKERS_RE = /\A(?: {0,3}>[ \t]?)*+/
 
         # The walk shared by `rewrite` and `each_link`. Fenced and indented
         # code and raw HTML block lines (FenceTracker) pass through; the rest
