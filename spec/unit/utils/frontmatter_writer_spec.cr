@@ -196,6 +196,11 @@ describe Hwaro::Utils::FrontmatterWriter do
       Hwaro::Utils::FrontmatterWriter.yaml_scalar("a\u{E0001}b").should eq(%q("a\U000E0001b"))
     end
 
+    # Crystal calls them printable; YAML's character set does not include them.
+    it "escapes the noncharacters U+FFFE and U+FFFF" do
+      Hwaro::Utils::FrontmatterWriter.yaml_scalar("a\u{FFFE}b\u{FFFF}").should eq(%q("a\uFFFEb\uFFFF"))
+    end
+
     it "never emits the brace escape form YAML cannot read" do
       Hwaro::Utils::FrontmatterWriter.yaml_scalar("a\u{E0001}b").should_not contain("\\u{")
     end
