@@ -1759,6 +1759,19 @@ describe Hwaro::Models::Config do
       config.serve.headers.should eq({} of String => String)
     end
 
+    it "loads [serve] allowed_hosts (empty by default)" do
+      Hwaro::Models::Config.new.serve.allowed_hosts.should be_empty
+      config = load_config(<<-TOML)
+        title = "Test"
+        base_url = "http://localhost"
+
+        [serve]
+        allowed_hosts = ["myapp.example.dev", "*.tunnel.example"]
+        TOML
+
+      config.serve.allowed_hosts.should eq(["myapp.example.dev", "*.tunnel.example"])
+    end
+
     it "loads custom serve headers from TOML" do
       config = load_config(<<-TOML)
         title = "Test"

@@ -389,6 +389,7 @@ hwaro serve -i /path/to/my-site -p 8080
 | --access-log | HTTP 접근 로그 표시 (예: GET 요청). 각 줄에는 브라우저가 요청한 경로가 그대로 기록됩니다(개발 서버가 내부적으로 찾아가는 `/index.html`이 아니라 `/`) |
 | --no-error-overlay | 브라우저 내 오류 오버레이 끄기 (기본값: 활성화) |
 | --no-live-reload | 파일 변경 시 브라우저 라이브 리로드 끄기 (기본값: 활성화) |
+| --allow-host HOST | `Host`가 이 이름인 요청도 응답 (반복 가능; `*.example.dev`는 접미사 일치, `*`는 Host 검사 해제). `[serve] allowed_hosts`와 병합. |
 | --header "NAME: VALUE" | 커스텀 응답 헤더 추가 (반복 가능). `config.toml`의 `[serve.headers]`와 병합 (CLI 우선). `hwaro serve`에만 적용 |
 | --cache | 빌드 캐시 사용 (변경 없는 파일 생략). `hwaro build --cache`와 별도로 `.hwaro/serve_cache.json`에 저장 |
 | --stream | 메모리 사용을 줄이는 스트리밍 빌드 사용 |
@@ -447,6 +448,12 @@ hwaro serve --base-url http://localhost:3000/myblog/
 - 텍스트 응답(`.txt`, `.json`, `.xml`, `.js`, `.css`, `.svg`, …)은 파일 크기와 관계없이 항상 `; charset=utf-8`을 포함합니다.
 - 디렉터리 리디렉션은 퍼센트 인코딩된 `Location`을 보냅니다(`/my%20page/`, `/%ED%95%9C%EA%B8%80/`). 백슬래시나 인코딩된 구분자(`%2F`, `%5C`)가 포함된 경로는 정적 호스트와 동일하게 서빙하지 않습니다.
 - macOS와 Windows에서도 경로는 대소문자를 구분합니다. 페이지가 `/about/`에 있으면 `/About/`은 대소문자를 구분하는 정적 호스트에서처럼 404입니다.
+
+**hwaro serve 보안 모델:**
+
+- `-b`를 주지 않으면 `127.0.0.1`에서만 수신합니다. `-b 0.0.0.0`(또는 LAN 주소)을 쓰면 빌드 결과 전체(`--drafts`를 켰다면 초안 포함)가 해당 네트워크에 노출되며 인증은 없습니다.
+- 방문한 웹 페이지가 DNS 리바인딩으로 사이트를 읽지 못하도록, `Host`가 IP 리터럴, `localhost`/`*.localhost`, 이 머신의 호스트 이름, 바인드 주소, `--base-url`의 호스트, `--allow-host`(또는 `[serve] allowed_hosts`)로 준 이름인 요청에만 응답하고 그 외에는 `403`을 반환합니다. 터널, Codespaces 방식 포트 포워딩, 리버스 프록시 뒤에서는 해당 호스트 이름을 추가하세요. `--allow-host '*'`는 검사를 끕니다.
+- 교차 출처 읽기는 거부되며(CORS는 루프백 출처만), 라이브 리로드 WebSocket은 루프백 또는 동일 호스트 출처만 허용합니다. 상태를 변경하는 엔드포인트는 없습니다.
 
 **커스텀 응답 헤더 (`--header` / `[serve.headers]`):**
 

@@ -338,6 +338,7 @@ exclude = ["*.bak", "drafts/**"]         # 추가로 건너뛸 패턴
 ```toml
 [serve]
 fast = true                          # 항상 빠른 개발 모드로 서빙
+allowed_hosts = ["myapp.example.dev"] # 추가로 응답할 Host 이름 (터널 / 프록시)
 
 [serve.headers]
 X-Frame-Options = "SAMEORIGIN"
@@ -347,6 +348,7 @@ Cache-Control = "no-store"
 | 키 | 타입 | 기본값 | 설명 |
 |-----|------|---------|-------------|
 | fast | bool | false | `--fast`를 준 것처럼 서빙 (OG 이미지 생성과 이미지 처리 생략); 명시적 CLI skip 플래그는 그대로 적용 |
+| allowed_hosts | array | [] | 루프백, IP 리터럴, 이 머신의 호스트 이름, base URL 호스트 외에 개발 서버가 응답할 `Host` 이름 (앞의 `*.`는 접미사 일치, `"*"`는 검사 해제). CLI `--allow-host`와 병합 |
 | headers | table | {} | 모든 개발 서버 응답에 추가하는 커스텀 HTTP 응답 헤더; 키가 겹치면 CLI `--header` 값이 우선 |
 
 대응하는 CLI 플래그는 [CLI](/ko/start/cli/#serve)의 serve 명령을 참고합니다.

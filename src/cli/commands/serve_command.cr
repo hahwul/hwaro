@@ -45,6 +45,7 @@ module Hwaro
           FlagInfo.new(short: nil, long: "--access-log", description: "Show HTTP access log (e.g. GET requests)"),
           FlagInfo.new(short: nil, long: "--no-error-overlay", description: "Disable error overlay in browser"),
           FlagInfo.new(short: nil, long: "--no-live-reload", description: "Disable live reload on file changes"),
+          FlagInfo.new(short: nil, long: "--allow-host", description: "Also answer this Host name (repeatable; '*' disables the Host check)", takes_value: true, value_hint: "HOST"),
           FlagInfo.new(short: nil, long: "--header", description: "Add custom response header (repeatable, e.g. --header 'X-Frame-Options: SAMEORIGIN')", takes_value: true, value_hint: "NAME: VALUE"),
 
           # Fast iteration helpers (very common for local development)
@@ -99,6 +100,7 @@ module Hwaro
             cfg = Models::Config.load(env: options.env)
 
             # Merge headers (CLI wins)
+            options.allow_hosts = cfg.serve.allowed_hosts + options.allow_hosts
             final = cfg.serve.headers.dup
             options.headers.each { |k, v| final[k] = v }
             options.headers = final
@@ -150,6 +152,7 @@ module Hwaro
           # CLI-provided headers only. Config [serve.headers] is merged later in #run
           # (after any -i chdir) so that `hwaro serve -i other/dir` works correctly.
           headers = {} of String => String
+          allow_hosts = [] of String
 
           # Skip options
           skip_og_image = false
@@ -213,6 +216,7 @@ module Hwaro
             parser.on("--access-log", "Show HTTP access log (e.g. GET requests)") { access_log = true }
             parser.on("--no-error-overlay", "Disable error overlay in browser") { error_overlay = false }
             parser.on("--no-live-reload", "Disable live reload on file changes") { live_reload = false }
+            parser.on("--allow-host HOST", "Also answer this Host name (repeatable; '*' disables the Host check)") { |h| allow_hosts << h }
             parser.on("--header NAME:VALUE", "Add custom response header (repeatable)") do |h|
               key, value = parse_header(h)
               headers[key] = value
@@ -276,6 +280,7 @@ module Hwaro
             fast_start: fast_start,
             fast_start_count: fast_start_count,
             headers: headers,
+            allow_hosts: allow_hosts,
           )}
         end
 

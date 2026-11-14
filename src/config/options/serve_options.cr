@@ -39,6 +39,8 @@ module Hwaro
         property fast_start_count : Int32
         # Custom response headers to inject during serve (from config.toml [serve.headers] + CLI --header)
         property headers : Hash(String, String)
+        # Extra `Host` names to answer (CLI --allow-host + [serve] allowed_hosts).
+        property allow_hosts : Array(String)
 
         def initialize(
           @host : String = "127.0.0.1",
@@ -67,6 +69,7 @@ module Hwaro
           @fast_start : Bool = false,
           @fast_start_count : Int32 = 20,
           @headers : Hash(String, String) = {} of String => String,
+          @allow_hosts : Array(String) = [] of String,
         )
         end
 
@@ -77,6 +80,13 @@ module Hwaro
         # empty host, they stand for "localhost" in URLs.
         def self.wildcard_host?(host : String) : Bool
           {"0.0.0.0", "::", "[::]"}.includes?(host.strip)
+        end
+
+        # Whether binding `host` keeps the server reachable from this machine
+        # only. A wildcard or any other address (LAN IP, hostname) does not.
+        def self.loopback_host?(host : String) : Bool
+          h = host.strip.downcase.lstrip('[').rstrip(']')
+          h.empty? || h == "localhost" || h == "::1" || h.starts_with?("127.")
         end
 
         # Host as it must appear inside a URL. An IPv6 literal has to be

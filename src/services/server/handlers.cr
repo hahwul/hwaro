@@ -5,6 +5,78 @@
 # load-time statements (scripts/check_no_toplevel_effects.sh).
 module Hwaro
   module Services
+    # Refuses requests whose `Host` is a name the developer did not choose:
+    # the DNS-rebinding defence every dev server needs. A page on
+    # `attacker.example` can re-point that name at 127.0.0.1 after it loaded;
+    # the browser then treats the dev server as same-origin with the page, so
+    # CORS and the WebSocket Origin check (which compares Origin to Host, both
+    # attacker-chosen) no longer protect unpublished drafts or build errors.
+    # The one thing the attacker cannot choose is that the browser's `Host`
+    # stays their domain name.
+    #
+    # Answered: IP literals (a page cannot make a browser send one for a name
+    # it controls), `localhost` and `*.localhost`, this machine's hostname,
+    # and every name passed in (bind address, base_url host, `--allow-host`,
+    # `[serve] allowed_hosts`; a leading `*.` matches a suffix, `*` anything).
+    # A request without `Host` comes from a script, not a browser: answered.
+    class HostCheckHandler
+      include HTTP::Handler
+
+      def initialize(allowed : Array(String))
+        @any = false
+        @exact = Set(String).new
+        @suffixes = [] of String
+        hostname = System.hostname.downcase
+        [hostname, "#{hostname}.local"].each { |name| @exact << name }
+        allowed.each do |entry|
+          entry = entry.strip.downcase
+          if entry == "*"
+            @any = true
+          elsif entry.starts_with?("*.")
+            @suffixes << entry[1..]
+          else
+            @exact << HostCheckHandler.hostname_of(entry)
+          end
+        end
+      end
+
+      # The name part of a `Host` value: port, brackets, zone id and trailing
+      # dot removed, lowercased.
+      def self.hostname_of(value : String) : String
+        host = value.strip.downcase
+        if host.starts_with?('[')
+          host = host[1...(host.index(']') || host.size)]
+        elsif host.count(':') == 1
+          host = host.split(':', 2).first
+        end
+        host = host.split('%', 2).first
+        host.rchop('.')
+      end
+
+      def allowed?(value : String?) : Bool
+        return true if @any || value.nil?
+        name = HostCheckHandler.hostname_of(value)
+        return true if name == "localhost" || name.ends_with?(".localhost") || @exact.includes?(name)
+        return true if @suffixes.any? { |suffix| name.ends_with?(suffix) }
+        begin
+          Socket::IPAddress.new(name, 0)
+          true
+        rescue Socket::Error
+          false
+        end
+      end
+
+      def call(context)
+        if allowed?(context.request.headers["Host"]?)
+          call_next(context)
+        else
+          context.response.status_code = 403
+          context.response.content_type = "text/plain; charset=utf-8"
+          context.response.print "403 Forbidden: unrecognized Host header. If this is your own hostname, restart `hwaro serve` with --allow-host <name>.\n"
+        end
+      end
+    end
+
     class IndexRewriteHandler
       include HTTP::Handler
 

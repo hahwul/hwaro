@@ -782,3 +782,37 @@ describe Hwaro::Logger do
     end
   end
 end
+
+# A content file named `x<ESC>[2J.md` (or a front matter value) reaches the
+# terminal through log lines; control bytes must be made visible, while the
+# logger's own colours still pass.
+describe "Hwaro::Logger::GuardedIO terminal neutralising" do
+  it "escapes control bytes, C1 controls and bidi overrides in logged text" do
+    memory = IO::Memory.new
+    out = Hwaro::Logger::GuardedIO.new(memory)
+    out.puts "a\e]0;pwn\ab\e[2Jc\rd\u{85}e\u{202e}f"
+    memory.to_s.should eq("a\\x1b]0;pwn\\x07b\\x1b[2Jc\\x0dd\\u{0085}e\\u{202e}f\n")
+  end
+
+  it "passes a relayed command's output through unchanged inside Logger.raw" do
+    memory = IO::Memory.new
+    out = Hwaro::Logger::GuardedIO.new(memory)
+    Hwaro::Logger.raw { out.puts "50%\r100%\e[K" }
+    out.puts "after\e[K"
+    memory.to_s.should eq("50%\r100%\e[K\nafter\\x1b[K\n")
+  end
+
+  it "keeps SGR colours, tabs and CRLF line ends" do
+    memory = IO::Memory.new
+    out = Hwaro::Logger::GuardedIO.new(memory)
+    out.puts "\e[38;2;1;2;3mok\e[0m\tx\r\ny"
+    memory.to_s.should eq("\e[38;2;1;2;3mok\e[0m\tx\ny\n")
+  end
+
+  it "lets the status spinner redraw with write_raw" do
+    memory = IO::Memory.new
+    out = Hwaro::Logger::GuardedIO.new(memory)
+    out.write_raw("\r\e[K".to_slice)
+    memory.to_s.should eq("\r\e[K")
+  end
+end

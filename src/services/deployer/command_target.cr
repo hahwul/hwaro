@@ -91,7 +91,7 @@ module Hwaro
         # A quiet run streamed nothing, so surface the tool's stderr before
         # raising; the classified error itself carries only the summary.
         if Logger.quiet? && !stderr.empty?
-          stderr.each_line { |line| Logger.error "  #{line}" }
+          stderr.each_line { |line| Logger.raw { Logger.error "  #{line}" } }
         end
         # `exit_code` raises for a signal-terminated child (a killed
         # `rsync`, an OOM-killed uploader), which crashed the deploy with
@@ -149,7 +149,7 @@ module Hwaro
                   captured.puts line
                 elsif echo
                   begin
-                    Logger.err_io.puts "  #{line}"
+                    Logger.raw { Logger.err_io.puts "  #{line}" }
                   rescue IO::Error
                     echo = false
                   end
@@ -166,7 +166,7 @@ module Hwaro
           process.output.each_line(limit: OUTPUT_LINE_LIMIT) do |line|
             next unless echo
             begin
-              lock.synchronize { Logger.info "  #{line}" }
+              lock.synchronize { Logger.raw { Logger.info "  #{line}" } }
             rescue IO::Error
               echo = false
             end

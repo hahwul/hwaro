@@ -120,7 +120,7 @@ end
           socket = TCPSocket.new("127.0.0.1", port)
           socket.read_timeout = 5.seconds
           begin
-            socket << "GET #{at.call(path)} HTTP/1.1\r\nHost: h\r\nConnection: close\r\n\r\n"
+            socket << "GET #{at.call(path)} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
             socket.flush
             status = socket.gets || ""
           ensure
@@ -200,8 +200,8 @@ end
         socket = TCPSocket.new("127.0.0.1", port)
         socket.read_timeout = 5.seconds
         begin
-          2.times { socket << "HEAD #{at.call("/missing")} HTTP/1.1\r\nHost: h\r\n\r\n" }
-          socket << "GET #{at.call("/missing")} HTTP/1.1\r\nHost: h\r\nConnection: close\r\n\r\n"
+          2.times { socket << "HEAD #{at.call("/missing")} HTTP/1.1\r\nHost: localhost\r\n\r\n" }
+          socket << "GET #{at.call("/missing")} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
           socket.flush
           raw = socket.gets_to_end
         ensure
@@ -219,9 +219,9 @@ end
           socket = TCPSocket.new("127.0.0.1", port)
           socket.read_timeout = 5.seconds
           begin
-            socket << "HEAD #{at.call("/large.txt")} HTTP/1.1\r\nHost: h\r\n\r\n"
-            socket << "HEAD #{at.call("/guide/")} HTTP/1.1\r\nHost: h\r\n\r\n"
-            socket << "GET #{at.call("/missing")} HTTP/1.1\r\nHost: h\r\nConnection: close\r\n\r\n"
+            socket << "HEAD #{at.call("/large.txt")} HTTP/1.1\r\nHost: localhost\r\n\r\n"
+            socket << "HEAD #{at.call("/guide/")} HTTP/1.1\r\nHost: localhost\r\n\r\n"
+            socket << "GET #{at.call("/missing")} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
             socket.flush
             raw = socket.gets_to_end
           ensure
@@ -438,7 +438,7 @@ describe "hwaro serve malformed request handling" do
   it "answers 400 to a Content-Length the parser refuses" do
     with_dev_server do |port, _|
       ["abc", "0x5", "99999999999999999999999"].each do |value|
-        line = status_line.call(port, "POST / HTTP/1.1\r\nHost: h\r\nContent-Length: #{value}\r\nConnection: close\r\n\r\n")
+        line = status_line.call(port, "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: #{value}\r\nConnection: close\r\n\r\n")
         unless line.includes?("400")
           fail "Content-Length: #{value} should answer 400, got #{line.inspect}"
         end
@@ -448,7 +448,7 @@ describe "hwaro serve malformed request handling" do
 
   it "answers 400 to duplicated, disagreeing Content-Length headers" do
     with_dev_server do |port, _|
-      line = status_line.call(port, "POST / HTTP/1.1\r\nHost: h\r\nContent-Length: 0\r\nContent-Length: 5\r\nConnection: close\r\n\r\n")
+      line = status_line.call(port, "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nContent-Length: 5\r\nConnection: close\r\n\r\n")
       line.should contain("400")
     end
   end

@@ -23,6 +23,10 @@ class Fiber
   # While set, `Logger::GuardedIO` collects this fiber's writes here instead
   # of printing them; see `Logger.capturing` / `Logger.replay`.
   property hwaro_log_capture : Array(Tuple(IO, Bytes))? = nil
+
+  # While true, `Logger::GuardedIO` passes this fiber's writes through
+  # unneutralised; see `Logger.raw`.
+  property hwaro_log_raw : Bool = false
 end
 
 module Hwaro
@@ -54,7 +58,17 @@ module Hwaro
         raise IO::Error.new("GuardedIO is write-only")
       end
 
+      # Everything the logger prints funnels through here, so terminal control
+      # bytes that arrive inside a message (a content file named
+      # `x<ESC>[2J.md`, a front matter value) are neutralised once, for every
+      # log method and every caller. Logger's own colours (SGR sequences) pass.
       def write(slice : Bytes) : Nil
+        write_raw(Fiber.current.hwaro_log_raw ? slice : Logger.neutralize(slice))
+      end
+
+      # Bypasses `neutralize`: only for the status spinner, whose `\r\e[K`
+      # redraws are the logger's own and carry no external text.
+      def write_raw(slice : Bytes) : Nil
         if capture = Fiber.current.hwaro_log_capture
           capture << {self.as(IO), slice.dup}
           return
@@ -83,6 +97,77 @@ module Hwaro
       def tty? : Bool
         @io.tty?
       end
+    end
+
+    # `slice` with terminal-hostile bytes made visible: C0 controls other than
+    # `\n`/`\t` (ESC, BEL, a lone CR, ...), DEL, C1 controls and the Unicode
+    # bidi override/isolate marks become `\x1b` / `\u{202e}` text, so a
+    # file name or front matter value cannot rewrite the developer's terminal.
+    # SGR colour sequences (`ESC [ digits/;/: m`) and CRLF line ends are kept.
+    # Returns `slice` itself when it has nothing to change.
+    def self.neutralize(slice : Bytes, keep_sgr : Bool = true) : Bytes
+      return slice unless slice.any? { |b| (b < 0x20 && b != 0x0a && b != 0x09) || b == 0x7f || b == 0xc2 || b == 0xe2 }
+      io = IO::Memory.new(slice.size + 16)
+      i = 0
+      n = slice.size
+      while i < n
+        b = slice[i]
+        if b == 0x1b && keep_sgr && (len = sgr_length(slice, i))
+          io.write(slice[i, len])
+          i += len
+          next
+        end
+        if b == 0x0d && i + 1 < n && slice[i + 1] == 0x0a
+          i += 1 # CRLF -> LF
+          next
+        end
+        if (b < 0x20 && b != 0x0a && b != 0x09) || b == 0x7f
+          io << "\\x" << (b < 0x10 ? "0" : "") << b.to_s(16)
+        elsif b == 0xc2 && i + 1 < n && slice[i + 1] >= 0x80 && slice[i + 1] <= 0x9f
+          io << "\\u{" << slice[i + 1].to_s(16).rjust(4, '0') << "}"
+          i += 1
+        elsif b == 0xe2 && i + 2 < n && ((slice[i + 1] == 0x80 && slice[i + 2] >= 0xaa && slice[i + 2] <= 0xae) || (slice[i + 1] == 0x81 && slice[i + 2] >= 0xa6 && slice[i + 2] <= 0xa9))
+          io << "\\u{" << (0x2000 + ((slice[i + 1] & 0x3f).to_i << 6) + (slice[i + 2] & 0x3f)).to_s(16) << "}"
+          i += 2
+        else
+          io.write_byte(b)
+        end
+        i += 1
+      end
+      io.to_slice
+    end
+
+    # Inside the block this fiber's log lines reach the terminal as they are.
+    # For relaying the output of a command the site's own config runs (a
+    # build hook, a deploy tool): its progress bars and colours are its own,
+    # and the command is trusted in a way a content file name is not.
+    def self.raw(&)
+      fiber = Fiber.current
+      previous = fiber.hwaro_log_raw
+      fiber.hwaro_log_raw = true
+      begin
+        yield
+      ensure
+        fiber.hwaro_log_raw = previous
+      end
+    end
+
+    # Length of the SGR sequence (`ESC [ [0-9;:]* m`) starting at `i`, or nil.
+    private def self.sgr_length(slice : Bytes, i : Int32) : Int32?
+      j = i + 1
+      return unless j < slice.size && slice[j] == '['.ord
+      j += 1
+      while j < slice.size
+        c = slice[j]
+        if c == 'm'.ord
+          return j + 1 - i
+        elsif (c >= '0'.ord && c <= '9'.ord) || c == ';'.ord || c == ':'.ord
+          j += 1
+        else
+          return
+        end
+      end
+      nil
     end
 
     @@io : IO = GuardedIO.new(STDOUT)
@@ -774,7 +859,7 @@ module Hwaro
           frame = SPINNER[@frame % SPINNER.size]
           @frame += 1
           elapsed = Logger.dur((Time.instant - @start).total_milliseconds)
-          body = @label.empty? ? "working" : @label
+          body = @label.empty? ? "working" : String.new(Logger.neutralize(@label.to_slice, keep_sgr: false))
           "\r\e[K#{Logger.paint(frame, Role::Accent)} " \
           "#{Logger.paint(body, Role::Dim)} " \
           "#{Logger.paint("· #{elapsed}", Role::Dim)}"
@@ -787,7 +872,11 @@ module Hwaro
       # build or spinning uselessly — the receipt still prints afterwards.
       private def write(s : String) : Nil
         @mutex.synchronize do
-          @io.print s
+          if (io = @io).is_a?(GuardedIO)
+            io.write_raw(s.to_slice)
+          else
+            @io.print s
+          end
           @io.flush
         end
       rescue IO::Error

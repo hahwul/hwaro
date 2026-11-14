@@ -383,6 +383,7 @@ hwaro serve -i /path/to/my-site -p 8080
 | --access-log | Show HTTP access log (e.g. GET requests). Each line reports the path the browser requested (`/`, not the `/index.html` the dev server resolves it to) |
 | --no-error-overlay | Disable in-browser error overlay (default: enabled) |
 | --no-live-reload | Disable browser live reload on file changes (default: enabled) |
+| --allow-host HOST | Also answer requests whose `Host` is this name (repeatable; `*.example.dev` matches a suffix, `*` turns the Host check off). Merged with `[serve] allowed_hosts`. |
 | --header "NAME: VALUE" | Add custom response header (repeatable). Merged with `[serve.headers]` from `config.toml` (CLI wins). Only affects `hwaro serve`. |
 | --cache | Enable build caching (skip unchanged files); kept in `.hwaro/serve_cache.json`, separate from `hwaro build --cache` |
 | --stream | Enable streaming build to reduce memory usage |
@@ -441,6 +442,12 @@ The site is built with `/myblog/`-prefixed links and served under that same pref
 - Text responses (`.txt`, `.json`, `.xml`, `.js`, `.css`, `.svg`, …) always carry `; charset=utf-8`, regardless of file size.
 - Directory redirects emit a percent-encoded `Location` (`/my%20page/`, `/%ED%95%9C%EA%B8%80/`). Paths containing a backslash or an encoded separator (`%2F`, `%5C`) are not served, matching static-host behaviour.
 - Paths are case-sensitive even on macOS and Windows: `/About/` is a 404 when the page lives at `/about/`, as it is on a case-sensitive static host.
+
+**Security model of `hwaro serve`:**
+
+- The server listens on `127.0.0.1` only unless you pass `-b`. `-b 0.0.0.0` (or a LAN address) exposes everything the build produced, including drafts when `--drafts` is on, to that network; there is no authentication.
+- To stop a web page you visit from reading your site through DNS rebinding, the server answers only requests whose `Host` is an IP literal, `localhost`/`*.localhost`, this machine's hostname, the bind address, the `--base-url` host, or a name passed with `--allow-host` (or `[serve] allowed_hosts`). Anything else gets `403`. Behind a tunnel, Codespaces-style port forwarding or a reverse proxy, add that hostname; `--allow-host '*'` turns the check off.
+- Cross-origin reads are refused (CORS only for loopback origins), and the live-reload WebSocket accepts only loopback or same-host origins. The server has no endpoint that changes state.
 
 **Custom response headers (`--header` / `[serve.headers]`):**
 
