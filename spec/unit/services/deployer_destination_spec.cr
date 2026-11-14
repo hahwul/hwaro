@@ -145,6 +145,23 @@ describe Hwaro::Services::Deployer do
   end
 
   describe "stale entries in the way of the new tree" do
+    # A deploy killed mid-copy must not leave a truncated page in the
+    # published directory: an updated file is copied beside it and renamed.
+    it "replaces an updated file instead of truncating it in place" do
+      Dir.mktmpdir do |dir|
+        src = dest_spec_site(dir)
+        dest = File.join(dir, "out")
+        options = Hwaro::Config::Options::DeployOptions.new(source_dir: src, targets: ["local"])
+        Hwaro::Services::Deployer.new.run(options, dest_spec_config(dest))
+        old_link = File.join(dir, "old-inode.html")
+        File.link(File.join(dest, "index.html"), old_link)
+        File.write(File.join(src, "index.html"), "home, edited")
+        Hwaro::Services::Deployer.new.run(options, dest_spec_config(dest))
+        File.read(File.join(dest, "index.html")).should eq("home, edited")
+        File.read(old_link).should eq("home")
+      end
+    end
+
     it "replaces foo/ with foo when strip_index_html is turned on" do
       Dir.mktmpdir do |dir|
         src = dest_spec_site(dir)

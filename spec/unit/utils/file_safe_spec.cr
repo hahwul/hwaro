@@ -222,6 +222,32 @@ describe Hwaro::Utils::FileSafe do
     end
   end
 
+  describe ".atomic_write_through_links" do
+    it "writes to the target of a symlink and keeps the link" do
+      posix_only!("symlinks")
+      Dir.mktmpdir do |root|
+        real = File.join(root, "real.md")
+        link = File.join(root, "link.md")
+        File.write(real, "old")
+        File.symlink("real.md", link)
+        Hwaro::Utils::FileSafe.atomic_write_through_links(link, "new")
+        File.symlink?(link).should be_true
+        File.read(real).should eq("new")
+      end
+    end
+
+    it "creates the target of a dangling symlink" do
+      posix_only!("symlinks")
+      Dir.mktmpdir do |root|
+        link = File.join(root, "link.md")
+        File.symlink("missing.md", link)
+        Hwaro::Utils::FileSafe.atomic_write_through_links(link, "made")
+        File.symlink?(link).should be_true
+        File.read(File.join(root, "missing.md")).should eq("made")
+      end
+    end
+  end
+
   describe ".write_new" do
     it "writes content to a new file without a temp sibling" do
       Dir.mktmpdir do |root|

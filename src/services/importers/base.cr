@@ -548,7 +548,7 @@ module Hwaro
 
           unless @dry_run
             content = "#{frontmatter}\n\n#{body}\n"
-            File.write(path, content)
+            Hwaro::Utils::FileSafe.atomic_write(path, content)
           end
 
           # Only now is the rename real. Counting/announcing it at claim time
@@ -596,7 +596,7 @@ module Hwaro
             action = File.exists?(dest) ? "overwritten" : "imported"
             unless @dry_run
               Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest))
-              File.copy(src, dest)
+              Hwaro::Utils::FileSafe.atomic_copy(src, dest)
             end
             @file_actions << FileAction.new(dest, action)
             Logger.debug "#{@dry_run ? "Would copy" : "Copied"} bundle asset: #{dest}" if verbose

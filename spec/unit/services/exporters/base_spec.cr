@@ -225,6 +225,18 @@ describe Hwaro::Services::Exporters::Base do
       end
     end
 
+    it "replaces an existing file instead of truncating it in place" do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "out.md")
+        File.write(path, "old")
+        old_link = File.join(dir, "old-inode.md")
+        File.link(path, old_link)
+        TestExporter.new.test_write_file(path, "new", dir).should be_true
+        File.read(path).should eq("new")
+        File.read(old_link).should eq("old")
+      end
+    end
+
     it "overwrites an existing file" do
       Dir.mktmpdir do |dir|
         path = File.join(dir, "out.md")

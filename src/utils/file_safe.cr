@@ -134,6 +134,20 @@ module Hwaro
         end
       end
 
+      # `atomic_write` for a user-facing file that may be a symlink the user
+      # set up on purpose (`AGENTS.md -> docs/agents.md`): the rename must land
+      # on what the link points at, or it would replace the link itself with a
+      # regular file. A dangling link resolves to its (not yet existing) target.
+      def self.atomic_write_through_links(path : String | Path, content : String) : Nil
+        target = path.to_s
+        40.times do
+          break unless File.symlink?(target)
+          link = File.readlink(target)
+          target = Path[link].absolute? ? link : File.join(File.dirname(target), link)
+        end
+        atomic_write(target, content)
+      end
+
       # `atomic_write` for a target that does not exist yet and that no
       # reader can be watching: a plain create-and-write. Same classified
       # error when a directory stands where the file must go.

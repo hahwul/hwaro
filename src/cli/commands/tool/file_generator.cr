@@ -84,7 +84,7 @@ module Hwaro
             begin
               dir = File.dirname(filename)
               Hwaro::Utils::FileSafe.mkdir_p(dir) unless Dir.exists?(dir)
-              File.write(filename, content)
+              Hwaro::Utils::FileSafe.atomic_write_through_links(filename, content)
             rescue ex : File::Error | IO::Error
               # Classified like the refusal above instead of escaping as an
               # unhandled exception (`Error: Error opening file …`, exit 1).

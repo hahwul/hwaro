@@ -164,7 +164,7 @@ module Hwaro
                 content = merged
               end
 
-              io_classified(filename) { File.write(filename, content) }
+              io_classified(filename) { Hwaro::Utils::FileSafe.atomic_write_through_links(filename, content) }
               mode_name = remote ? "remote" : "local"
               outcome_verb = existed ? "updated" : "created"
               summary = "AGENTS.md · #{mode_name} mode"
