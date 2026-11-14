@@ -17,6 +17,16 @@ feedback. Hwaro warns with a suggestion when one is close to a real key:
 Unknown key 'markdonw' in config.toml — hwaro does not read it. Did you mean 'markdown'?
 ```
 
+A key hwaro read before 1.0 says so instead. Every `config.toml` written by
+an older `hwaro init` has a `[plugins]` section, which 1.0 removed:
+
+```
+Key 'plugins' in config.toml was removed in 1.0 — hwaro does not read it; delete the [plugins] section to silence this warning.
+```
+
+`hwaro doctor --fix` deletes it when it holds only the old default
+(`processors = ["markdown"]`) or nothing.
+
 The check covers top-level keys only: a misspelled key nested inside a
 section (`[markdown] emoij = true`) is not reported, so double-check nested
 keys against the tables below. A known section written in the wrong

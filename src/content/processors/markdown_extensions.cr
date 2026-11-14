@@ -174,13 +174,13 @@ module Hwaro
               # Fixed order: ins, mark, sub, sup.
               if do_ins && transformed.includes?("++")
                 transformed = transform_outside_code_spans(transformed) do |stashed|
-                  stashed.gsub(InlineMarkdown::INLINE_INS_RE) { "#{trust("<ins>", trusted)}#{$1}</ins>" }
+                  InlineMarkdown.gsub_delimited(stashed, InlineMarkdown::INS) { |m| "#{trust("<ins>", trusted)}#{m[1]}</ins>" }
                 end
               end
 
               if do_mark && transformed.includes?("==")
                 transformed = transform_outside_code_spans(transformed) do |stashed|
-                  stashed.gsub(InlineMarkdown::INLINE_MARK_RE) { "#{trust("<mark>", trusted)}#{$1}</mark>" }
+                  InlineMarkdown.gsub_delimited(stashed, InlineMarkdown::MARK) { |m| "#{trust("<mark>", trusted)}#{m[1]}</mark>" }
                 end
               end
 

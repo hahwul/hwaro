@@ -512,9 +512,20 @@ module Hwaro
         end
       end
 
+      # Top-level keys hwaro read before 1.0, with what to do about them. A
+      # config.toml written by an older `hwaro init` still has them, and
+      # "Did you mean …?" is no help there.
+      REMOVED_TOP_LEVEL_KEYS = {
+        "plugins" => "delete the [plugins] section to silence this warning",
+      }
+
       private def self.warn_unknown_top_level_keys(raw : Hash(String, TOML::Any), config_path : String)
         raw.each_key do |key|
           next if KNOWN_TOP_LEVEL_KEYS.includes?(key)
+          if advice = REMOVED_TOP_LEVEL_KEYS[key]?
+            Logger.warn "Key '#{key}' in #{config_path} was removed in 1.0 — hwaro does not read it; #{advice}."
+            next
+          end
           hint = Utils::CommandSuggester.suggest(key, KNOWN_TOP_LEVEL_KEYS).try { |s| " Did you mean '#{s}'?" } || ""
           Logger.warn "Unknown key '#{key}' in #{config_path} — hwaro does not read it.#{hint}"
         end

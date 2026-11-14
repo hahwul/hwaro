@@ -105,6 +105,75 @@ module Hwaro
         # a footnote marker before the footnotes pass gets to it.
         INLINE_SUP_RE = /(?<![\^\[])\^([^\^\s]+)\^(?!\^)/
 
+        # A lazy delimiter pattern above, the literal both of its delimiters
+        # are, and a pattern matching exactly where a closer of it starts (the
+        # closing half of `re`, lookarounds included). See `gsub_delimited`.
+        record Delimited, re : Regex, delimiter : String, closer : Regex
+
+        BOLD_ASTERISK     = Delimited.new(INLINE_BOLD_ASTERISK_RE, "**", /(?<=\S)\*\*/)
+        BOLD_UNDERSCORE   = Delimited.new(INLINE_BOLD_UNDERSCORE_RE, "__", /(?<=\S)__/)
+        ITALIC_ASTERISK   = Delimited.new(INLINE_ITALIC_ASTERISK_RE, "*", /(?<=[^\s*])\*(?!\*)/)
+        ITALIC_UNDERSCORE = Delimited.new(INLINE_ITALIC_UNDERSCORE_RE, "_", /(?<=[^\s_])_(?![a-zA-Z0-9_])/)
+        STRIKETHROUGH     = Delimited.new(INLINE_STRIKETHROUGH_RE, "~~", /(?<=\S)(?<!(?<!\\)\\)~~/)
+        INS               = Delimited.new(INLINE_INS_RE, "++", /(?<=\S)\+\+/)
+        MARK              = Delimited.new(INLINE_MARK_RE, "==", /(?<=[^\s=])==(?!=)/)
+
+        # `text.gsub(d.re) { |_, m| yield m }`, byte for byte, in linear time.
+        #
+        # The lazy body `(.+?)` of an opener that never closes reads to the
+        # end of its line before the match fails, and the search then retries
+        # at the next opener, so a line of N unclosed `~~a ` cost O(N²) (40k
+        # of them: 20 s). A match at an opener needs a closer that starts at
+        # least one byte after the opener and before the next newline (`.`
+        # stops there). Closers depend on the text alone, so they are found
+        # once; the pattern then runs, anchored, only at openers that have
+        # one, where its body stops at the first closer — the match gsub's
+        # search finds there — or fails on the opener's own lookarounds at
+        # once. Invalid UTF-8 keeps the plain gsub, which raises on it.
+        def gsub_delimited(text : String, d : Delimited, & : Regex::MatchData -> String) : String
+          return text unless first = text.byte_index(d.delimiter)
+          return text.gsub(d.re) { |_, m| yield m } unless text.valid_encoding?
+
+          no_check = Regex::MatchOptions::NO_UTF_CHECK
+          anchored = Regex::MatchOptions::ANCHORED | no_check
+          closers = [] of Int32
+          at = first
+          while at
+            closers << at if d.closer.matches_at_byte_index?(text, at, anchored)
+            at = text.byte_index(d.delimiter, at + 1)
+          end
+          return text if closers.empty?
+          newlines = [] of Int32
+          at = text.byte_index('\n', first)
+          while at
+            newlines << at
+            at = text.byte_index('\n', at + 1)
+          end
+
+          width = d.delimiter.bytesize
+          copied = 0
+          String.build(text.bytesize) do |io|
+            at = first
+            while at
+              body = at + width
+              match = nil
+              if closer = closers.bsearch { |c| c > body }
+                line_end = newlines.bsearch { |n| n >= body } || text.bytesize
+                match = d.re.match_at_byte_index(text, at, anchored) if closer < line_end
+              end
+              if match
+                io.write(text.to_slice[copied, at - copied])
+                io << yield match
+                copied = match.byte_end(0)
+                at = text.byte_index(d.delimiter, copied)
+              else
+                at = text.byte_index(d.delimiter, at + 1)
+              end
+            end
+            io.write(text.to_slice[copied, text.bytesize - copied])
+          end
+        end
+
         # Per-call feature flags for `render`. `math` already existed as a
         # positional keyword arg; F10 adds four more opt-in transforms that
         # default OFF, so every existing call site (`Flags.new` == all
@@ -270,14 +339,14 @@ module Hwaro
             "\x00IMTAG#{link_tags.size - 1}\x00"
           end
 
-          result = result.gsub(INLINE_BOLD_ASTERISK_RE) { "<strong>#{$1}</strong>" }
-          result = result.gsub(INLINE_BOLD_UNDERSCORE_RE) { "<strong>#{$1}</strong>" }
-          result = result.gsub(INLINE_ITALIC_ASTERISK_RE) { "<em>#{$1}</em>" }
-          result = result.gsub(INLINE_ITALIC_UNDERSCORE_RE) { "<em>#{$1}</em>" }
-          result = result.gsub(INLINE_STRIKETHROUGH_RE) { "<del>#{$1}</del>" }
+          result = gsub_delimited(result, BOLD_ASTERISK) { |m| "<strong>#{m[1]}</strong>" }
+          result = gsub_delimited(result, BOLD_UNDERSCORE) { |m| "<strong>#{m[1]}</strong>" }
+          result = gsub_delimited(result, ITALIC_ASTERISK) { |m| "<em>#{m[1]}</em>" }
+          result = gsub_delimited(result, ITALIC_UNDERSCORE) { |m| "<em>#{m[1]}</em>" }
+          result = gsub_delimited(result, STRIKETHROUGH) { |m| "<del>#{m[1]}</del>" }
 
-          result = result.gsub(INLINE_INS_RE) { "<ins>#{$1}</ins>" } if flags.ins
-          result = result.gsub(INLINE_MARK_RE) { "<mark>#{$1}</mark>" } if flags.mark
+          result = gsub_delimited(result, INS) { |m| "<ins>#{m[1]}</ins>" } if flags.ins
+          result = gsub_delimited(result, MARK) { |m| "<mark>#{m[1]}</mark>" } if flags.mark
           result = result.gsub(INLINE_SUB_RE) { "<sub>#{$1}</sub>" } if flags.sub
           result = result.gsub(INLINE_SUP_RE) { "<sup>#{$1}</sup>" } if flags.sup
 

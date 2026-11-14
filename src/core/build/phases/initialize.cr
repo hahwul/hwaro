@@ -851,8 +851,11 @@ module Hwaro::Core::Build::Phases::Initialize
     rescue ex : IO::Error
       attempts += 1
       if attempts >= TEMPLATE_READ_RETRIES
-        Logger.warn "Could not read template #{path} (#{ex.message}); skipping it for this build."
-        return
+        # Kept as a stub that fails the build when a page needs it: skipped,
+        # the pages that used it rendered without it and the build said ok.
+        Logger.warn "Could not read template #{path} (#{ex.message}); the build fails if anything uses it."
+        reason = ex.is_a?(File::Error) && (os_error = ex.os_error) ? os_error.message : ex.message
+        return Utils::DeniedDirs.unreadable_template(path, reason || "unreadable")
       end
       sleep TEMPLATE_READ_RETRY_INTERVAL
     end

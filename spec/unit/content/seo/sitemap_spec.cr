@@ -466,3 +466,56 @@ describe Hwaro::Content::Seo::Sitemap do
     end
   end
 end
+
+private def sitemap_pages(count : Int32) : Array(Hwaro::Models::Page)
+  Array.new(count) do |i|
+    page = Hwaro::Models::Page.new("p/#{i}.md")
+    page.url = "/p/#{i}/"
+    page.in_sitemap = true
+    page.render = true
+    page
+  end
+end
+
+# The protocol allows 50,000 URLs and 50 MB per file; a larger sitemap.xml is
+# rejected by search engines, so a large site had no usable sitemap at all.
+describe "Sitemap split" do
+  it "splits by URL count and by size, one range when everything fits" do
+    sm = Hwaro::Content::Seo::Sitemap
+    sm.split(Array.new(50_000) { |i| (i + 1) * 10 }, 100).should eq([{0, 500_000}])
+    sm.split(Array.new(50_001) { |i| (i + 1) * 10 }, 100).should eq([{0, 500_000}, {500_000, 500_010}])
+    sm.split(Array.new(120_000) { |i| i + 1 }, 0).should eq([{0, 50_000}, {50_000, 100_000}, {100_000, 120_000}])
+    mb = 1_048_576
+    # 50 entries of 1 MiB plus a 100-byte header/footer exceed 50 MiB, 49 do not.
+    sm.split(Array.new(60) { |i| (i + 1) * mb }, 100).should eq([{0, 49 * mb}, {49 * mb, 60 * mb}])
+    sm.split([] of Int32, 100).should eq([{0, 0}])
+  end
+
+  it "writes an index of numbered parts above 50,000 URLs, and one urlset again (parts removed) once it fits" do
+    Dir.mktmpdir do |dir|
+      config = Hwaro::Models::Config.new
+      config.sitemap.enabled = true
+      config.base_url = "https://example.com/docs"
+      site = Hwaro::Models::Site.new(config)
+      pages = sitemap_pages(50_001)
+
+      Hwaro::Content::Seo::Sitemap.generate(pages, site, dir)
+      index = File.read(File.join(dir, "sitemap.xml"))
+      index.should eq(%(<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n) +
+                      %(  <sitemap>\n    <loc>https://example.com/docs/sitemap-1.xml</loc>\n  </sitemap>\n) +
+                      %(  <sitemap>\n    <loc>https://example.com/docs/sitemap-2.xml</loc>\n  </sitemap>\n</sitemapindex>\n))
+      File.read(File.join(dir, "sitemap-1.xml")).scan("<url>").size.should eq(50_000)
+      part2 = File.read(File.join(dir, "sitemap-2.xml"))
+      part2.should start_with(%(<?xml version="1.0" encoding="UTF-8"?>\n<urlset ))
+      part2.should contain("<loc>https://example.com/docs/p/50000/</loc>")
+      part2.should end_with("</urlset>\n")
+      Hwaro::Content::Seo::Sitemap.published_outputs(config, dir).map { |p| File.basename(p) }.should eq(["sitemap.xml", "sitemap-1.xml", "sitemap-2.xml"])
+
+      Hwaro::Content::Seo::Sitemap.generate(pages[0, 50_000], site, dir)
+      File.read(File.join(dir, "sitemap.xml")).scan("<url>").size.should eq(50_000)
+      File.exists?(File.join(dir, "sitemap-1.xml")).should be_false
+      File.exists?(File.join(dir, "sitemap-2.xml")).should be_false
+      Hwaro::Content::Seo::Sitemap.published_outputs(config, dir).map { |p| File.basename(p) }.should eq(["sitemap.xml"])
+    end
+  end
+end

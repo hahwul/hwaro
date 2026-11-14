@@ -257,3 +257,33 @@ describe "Hwaro::Content::Processors::InlineMarkdown::INLINE_MATH_RE" do
     inline.match(formula).try(&.[0].bytesize).should eq(formula.bytesize)
   end
 end
+
+# `gsub_delimited` replaces `text.gsub(re)` for the lazy `(.+?)` delimiter
+# patterns; the old call is the oracle here, so the two must agree byte for
+# byte on any input.
+describe "InlineMarkdown.gsub_delimited" do
+  im = Hwaro::Content::Processors::InlineMarkdown
+  all = [Hwaro::Content::Processors::InlineMarkdown::BOLD_ASTERISK, Hwaro::Content::Processors::InlineMarkdown::BOLD_UNDERSCORE,
+         Hwaro::Content::Processors::InlineMarkdown::ITALIC_ASTERISK, Hwaro::Content::Processors::InlineMarkdown::ITALIC_UNDERSCORE,
+         Hwaro::Content::Processors::InlineMarkdown::STRIKETHROUGH, Hwaro::Content::Processors::InlineMarkdown::INS,
+         Hwaro::Content::Processors::InlineMarkdown::MARK]
+
+  it "gives what gsub gives on random lines of delimiters, escapes and text" do
+    alphabet = ["~", "~", "=", "=", "+", "+", "*", "*", "_", "_", "\\", "`", " ", " ", "\n",
+                "a", "b", "x", "<", ">", "é", "한", "\t", "\r"]
+    rng = Random.new(20261114)
+    30_000.times do |i|
+      line = String.build { |io| rng.rand(1..48).times { io << alphabet.sample(rng) } }
+      d = all[i % all.size]
+      expected = line.gsub(d.re) { "[#{$1}]" }
+      actual = im.gsub_delimited(line, d) { |m| "[#{m[1]}]" }
+      fail "#{d.delimiter} on #{line.inspect}: #{actual.inspect} != #{expected.inspect}" unless actual == expected
+    end
+  end
+
+  it "keeps the gsub path (and its error) for invalid UTF-8" do
+    bad = String.new(Bytes[0x7e, 0x7e, 0x61, 0xff, 0x7e, 0x7e])
+    expect_raises(ArgumentError) { bad.gsub(Hwaro::Content::Processors::InlineMarkdown::STRIKETHROUGH.re) { "" } }
+    expect_raises(ArgumentError) { im.gsub_delimited(bad, Hwaro::Content::Processors::InlineMarkdown::STRIKETHROUGH) { "" } }
+  end
+end

@@ -88,6 +88,15 @@ module Hwaro
             current_text = applied[:text]
             value_fixes << applied[:fix]
           end
+
+          if raw.has_key?("plugins")
+            if applied = remove_scaffold_plugins_section(current_text, raw["plugins"])
+              current_text = applied[:text]
+              value_fixes << applied[:fix]
+            else
+              Logger.warn "[plugins] in #{@config_path} holds more than the old scaffold default (processors = [\"markdown\"]), so --fix leaves it; hwaro 1.0 does not read it — delete it by hand."
+            end
+          end
         end
 
         # Phase 2: section appends — only when the user opted in via
@@ -300,6 +309,41 @@ module Hwaro
           return {text: lines.join('\n'), fix: ValueFix.new("sitemap.priority", m[4], after)}
         end
         nil
+      end
+
+      # `[plugins]` was removed in 1.0, and the config.toml every older
+      # `hwaro init` wrote still has it, so every command warns. When the
+      # section holds nothing or only the scaffold's `processors =
+      # ["markdown"]`, delete its header line and that key line; every other
+      # line (comments and blank lines in it, the next header, CRLF endings)
+      # stays as it was. Anything else in it is the user's: returns nil.
+      private def remove_scaffold_plugins_section(text : String, value : TOML::Any) : NamedTuple(text: String, fix: ValueFix)?
+        table = value.as_h?
+        return unless table
+        return unless table.all? { |k, v| k == "processors" && v.as_a?.try(&.map(&.as_s?)) == ["markdown"] }
+
+        lines = text.split('\n', remove_empty: false)
+        in_string = multiline_string_line_states(lines)
+        drop = [] of Int32
+        in_plugins = false
+        lines.each_with_index do |line, idx|
+          next if in_string[idx]
+          if header = line.match(/^\s*(\[\[?)\s*([^\[\]]+?)\s*\]\]?\s*(?:#.*)?$/)
+            in_plugins = header[1] == "[" && header[2] == "plugins"
+            drop << idx if in_plugins
+            next
+          end
+          next unless in_plugins
+          next if line.blank? || line.lstrip.starts_with?('#')
+          return unless line.matches?(/^\s*processors\s*=\s*\[\s*(["'])markdown\1\s*,?\s*\]\s*(?:#.*)?$/)
+          drop << idx
+        end
+        # No `[plugins]` header: the table came from dotted keys or an
+        # inline table, which this line edit does not handle.
+        return if drop.empty?
+
+        drop.reverse_each { |idx| lines.delete_at(idx) }
+        {text: lines.join('\n'), fix: ValueFix.new("plugins", "[plugins]#{table.empty? ? "" : " processors = [\"markdown\"]"}", "(removed)")}
       end
     end
   end

@@ -23,6 +23,25 @@ module Hwaro
           hint: "Restore read and search permission on it (chmod u+rx #{dir}), or remove it."
         )
       end
+
+      # The source a template file that could not be read is loaded as: the
+      # template set keeps the name, and compiling it raises (see
+      # ext/dir_denied_record.cr). A control byte no template text carries.
+      UNREADABLE_TEMPLATE = "\u{1}hwaro:unreadable-template\u{1}"
+
+      def self.unreadable_template(path : String, reason : String) : String
+        "#{UNREADABLE_TEMPLATE}#{path}\u{1}#{reason}"
+      end
+
+      def self.fail_if_unreadable_template(source : String) : Nil
+        return unless source.starts_with?(UNREADABLE_TEMPLATE)
+        path, _, reason = source.lchop(UNREADABLE_TEMPLATE).partition('\u{1}')
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_IO,
+          message: "Cannot read template #{path}: #{reason}",
+          hint: "Restore read permission on it (chmod u+r #{path}), or remove it."
+        )
+      end
     end
   end
 end
