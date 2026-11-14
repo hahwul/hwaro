@@ -143,7 +143,10 @@ module Hwaro
             process.error.each_line(limit: OUTPUT_LINE_LIMIT) do |line|
               lock.synchronize do
                 if quiet
-                  captured.puts line if captured.bytesize < OUTPUT_LINE_LIMIT * 16
+                  # Shown only when the command fails, and a tool prints its
+                  # error last: once over the cap, start over so the tail survives.
+                  captured.clear if captured.bytesize >= OUTPUT_LINE_LIMIT * 16
+                  captured.puts line
                 elsif echo
                   begin
                     Logger.err_io.puts "  #{line}"
