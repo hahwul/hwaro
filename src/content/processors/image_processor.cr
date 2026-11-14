@@ -103,6 +103,31 @@ module Hwaro
           nil
         end
 
+        # True for an animated PNG (an `acTL` chunk ahead of the first `IDAT`),
+        # by content, whatever the extension. stb decodes only its default
+        # frame, so a variant cut from it would be a still: such a file is
+        # published as is, like a GIF.
+        def animated_png?(path : String) : Bool
+          File.open(path) do |io|
+            io.read_buffering = false
+            sig = Bytes.new(8)
+            return false unless io.read(sig) == 8 && sig == PNG_SIGNATURE
+            chunk = Bytes.new(8)
+            # Chunks before IDAT are a handful; the cap bounds a hostile file.
+            256.times do
+              return false unless io.read(chunk) == 8
+              case String.new(chunk[4, 4])
+              when "acTL"         then return true
+              when "IDAT", "IEND" then return false
+              end
+              io.skip(IO::ByteFormat::BigEndian.decode(UInt32, chunk[0, 4]).to_i64 + 4)
+            end
+          end
+          false
+        rescue IO::Error
+          false
+        end
+
         # `resize_image(op=…)` operations and crop anchors.
         RESIZE_OPS = {"fit", "fill", "crop"}
         ANCHORS    = {"center", "top", "bottom", "left", "right", "top_left", "top_right", "bottom_left", "bottom_right"}
@@ -120,7 +145,7 @@ module Hwaro
           src_w = uninitialized LibC::Int
           src_h = uninitialized LibC::Int
           channels = uninitialized LibC::Int
-          return if implausible_size?(source)
+          return if animated_png?(source) || implausible_size?(source)
           pixels = LibStb.stbi_load(source, pointerof(src_w), pointerof(src_h), pointerof(channels), 0)
           return if pixels.null?
 
@@ -313,7 +338,7 @@ module Hwaro
           dom_color = "#000000"
 
           return {result_map, lqip_uri, dom_color} unless File.exists?(source)
-          return {result_map, lqip_uri, dom_color} if implausible_size?(source)
+          return {result_map, lqip_uri, dom_color} if animated_png?(source) || implausible_size?(source)
           quality = quality.clamp(1, 100)
 
           src_w = uninitialized LibC::Int

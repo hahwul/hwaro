@@ -1219,8 +1219,9 @@ describe "ImageProcessor EXIF orientation" do
   end
 end
 
-# 1x1 RGB PNG.
-private PNG_1X1 = "89504e470d0a1a0a0000000d4948445200000001000000010802000000907753de0000000c49444154789c63606060000000040001f61738550000000049454e44ae426082".hexbytes
+# 1x1 RGB PNG, and the same file with an `acTL` chunk ahead of IDAT (APNG).
+private PNG_1X1  = "89504e470d0a1a0a0000000d4948445200000001000000010802000000907753de0000000c49444154789c63606060000000040001f61738550000000049454e44ae426082".hexbytes
+private APNG_1X1 = "89504e470d0a1a0a0000000d4948445200000001000000010802000000907753de000000086163544c0000000200000000f38d93700000000c49444154789c63606060000000040001f61738550000000049454e44ae426082".hexbytes
 
 describe "ImageProcessor content sniffing" do
   processor = Hwaro::Content::Processors::ImageProcessor
@@ -1248,6 +1249,42 @@ describe "ImageProcessor content sniffing" do
       write_quadrant_jpeg(path, 6)
       processor.orientation(path).should eq(6)
       processor.dimensions(path).should eq({16, 32})
+    end
+  end
+end
+
+describe "ImageProcessor animated PNG" do
+  processor = Hwaro::Content::Processors::ImageProcessor
+
+  it "tells an APNG from a still PNG by its acTL chunk" do
+    Dir.mktmpdir do |dir|
+      processor.animated_png?(write_bytes(dir, "a.png", APNG_1X1)).should be_true
+      processor.animated_png?(write_bytes(dir, "b.png", PNG_1X1)).should be_false
+      processor.animated_png?(write_bytes(dir, "c.png", Bytes.new(5))).should be_false
+      processor.animated_png?(File.join(dir, "missing.png")).should be_false
+      processor.dimensions(File.join(dir, "a.png")).should eq({1, 1})
+    end
+  end
+
+  it "does not cut variants or a crop from an APNG" do
+    Dir.mktmpdir do |dir|
+      still = File.join(dir, "still.png")
+      pixels = Bytes.new(100 * 80 * 3, 150_u8)
+      LibStb.stbi_write_png(still, 100, 80, 3, pixels.to_unsafe.as(Void*), 100 * 3)
+      png = File.open(still, &.getb_to_end)
+      actl = "000000086163544c0000000200000000f38d9370".hexbytes
+      apng = Bytes.new(png.size + actl.size)
+      apng.copy_from(png[0, 33])
+      (apng + 33).copy_from(actl)
+      (apng + 33 + actl.size).copy_from(png + 33)
+      anim = write_bytes(dir, "anim.png", apng)
+
+      processor.animated_png?(anim).should be_true
+      map, lqip, _ = processor.resize_and_lqip(anim, File.join(dir, "out"), [20, 50], 85, 16, 20)
+      map.should be_empty
+      lqip.should be_nil
+      processor.transform(anim, File.join(dir, "crop.png"), 10, 10, "crop", "center").should be_nil
+      processor.resize_and_lqip(still, File.join(dir, "out"), [20], 85, 0, 20)[0].size.should eq(1)
     end
   end
 end
