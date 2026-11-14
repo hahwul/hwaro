@@ -243,4 +243,16 @@ describe Hwaro::Content::Processors::Includes do
       end
     end
   end
+  it ".read refuses files under .git/, which content must never publish" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        Dir.mkdir(".git")
+        File.write(".git/config", "MARKER")
+        File.write("ok.txt", "fine")
+        Includes.read("ok.txt", nil).should eq("fine")
+        expect_raises(Includes::Error, /\.git/) { Includes.read(".git/config", nil) }
+        expect_raises(Includes::Error, /\.git/) { Includes.read(".GIT/config", nil) } if File.exists?(".GIT/config")
+      end
+    end
+  end
 end

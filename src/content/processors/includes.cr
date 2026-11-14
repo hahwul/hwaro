@@ -118,6 +118,12 @@ module Hwaro
              (output_dir && Utils::PathUtils.within?(path, File.expand_path(output_dir, root)))
             raise Error.new("#{relative} is inside the build output and is refused")
           end
+          # Version-control metadata is never site content and can hold
+          # credentials; content must not be able to publish it. Checked on
+          # the lexical and the resolved path, case-folded for APFS/NTFS.
+          if (rel = Utils::PathUtils.relative_path(path, root)) && rel.split(/[\/\\]/).any?(&.downcase.==(".git"))
+            raise Error.new("#{relative} is inside .git/ and is refused")
+          end
         end
 
         # Invalid UTF-8 scrubbed, a BOM dropped, and NUL replaced the way
