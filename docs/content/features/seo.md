@@ -105,6 +105,8 @@ sections = []             # Limit to specific sections, e.g., ["posts"]
 | `sections` | `[]` | Limit feed to specific sections |
 | `default_language_only` | `true` | Multilingual: main feed includes default language only |
 
+An RSS item's `<description>` holds **HTML**, as in Hugo and Zola: feed readers decode the XML and then render the result as HTML. Hwaro therefore HTML-escapes the plain-text front matter description or summary (`&`, `<`, `>`) before the XML escaping, so a description such as `a <b> & c` shows up exactly like that in a reader. Atom `<content type="text">` and the JSON Feed `summary` / `content_text` carry plain text, and `<content type="html">` / `content_html` carry HTML.
+
 ### JSON Feed
 
 `type = "json"` writes a [JSON Feed 1.1](https://www.jsonfeed.org/version/1.1/) document named `feed.json` (an explicit `filename` still wins). It is written everywhere RSS and Atom are: the main feed, section feeds, per-language feeds and taxonomy term feeds, and it honors the same `limit`, `truncate`, `full_content`, `sections` and `default_language_only` settings.
@@ -241,7 +243,7 @@ Any template extension works (`.jinja`, `.j2`, `.jinja2`, `.html`). Only the fin
 
 #### Example
 
-Values are **not** pre-escaped. Applying `xml_escape` (or emitting CDATA) is the template author's job; in a `feed.json` template, use the `tojson` filter:
+Values are **not** pre-escaped. Applying `xml_escape` (or emitting CDATA) is the template author's job, and `summary` is plain text, so HTML-escape it (`escape`) first where the element is HTML, such as an RSS `<description>`; in a `feed.json` template, use the `tojson` filter:
 
 ```jinja
 <?xml version="1.0" encoding="UTF-8"?>
@@ -257,7 +259,7 @@ Values are **not** pre-escaped. Applying `xml_escape` (or emitting CDATA) is the
       <title>{{ p.title | xml_escape }}</title>
       <link>{{ p.url | xml_escape }}</link>
       <guid>{{ p.url | xml_escape }}</guid>
-      <description>{{ p.summary | xml_escape }}</description>
+      <description>{{ p.summary | escape | xml_escape }}</description>
       {% if p.date_rfc822 %}<pubDate>{{ p.date_rfc822 }}</pubDate>{% endif %}
       {% for term in p.categories %}<category>{{ term | xml_escape }}</category>{% endfor %}
     </item>

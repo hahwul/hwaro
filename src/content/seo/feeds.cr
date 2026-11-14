@@ -625,6 +625,8 @@ module Hwaro
             str << "  <channel>\n"
             str << "    <title>#{Utils::TextUtils.escape_xml(feed_title)}</title>\n"
             str << "    <link>#{Utils::TextUtils.escape_xml(feed_home_url(config, home_path || base_path))}</link>\n"
+            # The channel description is plain text, escaped once, as in Hugo
+            # and Zola; only an item's description is read as HTML.
             str << "    <description>#{Utils::TextUtils.escape_xml(config.description)}</description>\n"
 
             if language
@@ -648,8 +650,10 @@ module Hwaro
               # `<description>` is meant to be a summary. Prefer the
               # frontmatter description, then the rendered `summary`,
               # then a truncated body (gh#526).
+              # RSS readers decode the XML and then render the value as HTML,
+              # so the plain-text summary is HTML-escaped before the XML pass.
               summary = summary_for_feed(page, config)
-              str << "      <description>#{Utils::TextUtils.escape_xml(summary)}</description>\n"
+              str << "      <description>#{Utils::TextUtils.escape_xml(html_text(summary))}</description>\n"
 
               # Emit the body in `<content:encoded>` when the user opts
               # into full content (default). `feeds.truncate` applies here
@@ -921,6 +925,12 @@ module Hwaro
         # advertises itself.
         private def self.feed_categories(page : Models::Page) : Array(String)
           (page.tags + page.taxonomies.values.flatten).reject!(&.empty?).uniq!
+        end
+
+        # Plain text as HTML text (`&`, `<`, `>` only, so quotes keep their
+        # bytes): an RSS `<description>` is HTML once the XML is decoded.
+        private def self.html_text(text : String) : String
+          text.gsub({'&' => "&amp;", '<' => "&lt;", '>' => "&gt;"})
         end
 
         # Escape `]]>` so a body containing it can't terminate the CDATA
