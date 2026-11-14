@@ -1218,3 +1218,36 @@ describe "ImageProcessor EXIF orientation" do
     end
   end
 end
+
+# 1x1 RGB PNG.
+private PNG_1X1 = "89504e470d0a1a0a0000000d4948445200000001000000010802000000907753de0000000c49444154789c63606060000000040001f61738550000000049454e44ae426082".hexbytes
+
+describe "ImageProcessor content sniffing" do
+  processor = Hwaro::Content::Processors::ImageProcessor
+
+  it "measures an image by its bytes, not its extension" do
+    Dir.mktmpdir do |dir|
+      processor.dimensions(write_bytes(dir, "png_as.jpg", PNG_1X1)).should eq({1, 1})
+      processor.dimensions(write_bytes(dir, "gif_as.png", Bytes.new(10) { |i| ("GIF89a".bytes + le16(300) + le16(70))[i] })).should eq({300, 70})
+      # SOI + SOF0 (8-bit, 2 high, 3 wide)
+      jpeg = "ffd8ffc0000b0800020003".hexbytes
+      processor.dimensions(write_bytes(dir, "jpg_as.png", jpeg)).should eq({3, 2})
+      processor.dimensions(write_bytes(dir, "webp_as.gif", webp_header("VP8X", [0_u8] * 4 + le24(639) + le24(479)))).should eq({640, 480})
+    end
+  end
+
+  it "still measures SVG text by extension" do
+    Dir.mktmpdir do |dir|
+      processor.dimensions(write_bytes(dir, "a.svg", %(<svg width="12" height="7"/>).to_slice)).should eq({12, 7})
+    end
+  end
+
+  it "applies the EXIF orientation of a JPEG whatever it is named" do
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "photo.png")
+      write_quadrant_jpeg(path, 6)
+      processor.orientation(path).should eq(6)
+      processor.dimensions(path).should eq({16, 32})
+    end
+  end
+end

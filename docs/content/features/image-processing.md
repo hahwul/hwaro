@@ -16,6 +16,8 @@ Hwaro can automatically generate resized image variants during build. This is us
 | BMP (.bmp) | Yes | Yes |
 | WebP (.webp) | No (copied as is) | Yes, as extra variants (`formats`) |
 
+Formats are recognised by the file's content, not its extension, so a PNG saved as `photo.jpg` is measured as the PNG it is.
+
 A file that cannot be decoded is still copied, but gets no variants. The same goes for a truncated or corrupt file whose header claims far more pixels than the file can hold (for example a few hundred bytes that say 26000x26000). Hwaro skips it with a warning instead of allocating gigabytes for it. This check also covers OG `logo` and `background_image` files.
 
 ## Configuration

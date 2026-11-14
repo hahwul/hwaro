@@ -80,14 +80,20 @@ module Hwaro
         # the source width from the largest on-disk variant silently ignored
         # newly configured LARGER widths (the variant set "matched" after
         # clamping to the stale inferred width).
+        #
+        # The format comes from the file's leading bytes, the way stb picks a
+        # decoder, so a PNG saved as `x.jpg` is measured like the PNG it is;
+        # the extension only decides what has no magic number (SVG).
         def dimensions(path : String) : {Int32, Int32}?
           return unless File.file?(path)
-          case File.extname(path).downcase
-          when ".png"          then png_dimensions(path)
+          header = Bytes.new(30)
+          head = header[0, read_header(path, header)]
+          case sniff(head) || File.extname(path).downcase
+          when ".png"          then png_dimensions(head)
           when ".jpg", ".jpeg" then jpeg_dimensions(path)
-          when ".bmp"          then bmp_dimensions(path)
-          when ".gif"          then gif_dimensions(path)
-          when ".webp"         then webp_dimensions(path)
+          when ".bmp"          then bmp_dimensions(head)
+          when ".gif"          then gif_dimensions(head)
+          when ".webp"         then webp_dimensions(head)
           when ".svg"          then svg_dimensions(path)
           end
         rescue ex
@@ -444,11 +450,25 @@ module Hwaro
           end
         end
 
+        # The extension (".png", ".jpg", ".gif", ".bmp", ".webp") a file's
+        # leading bytes announce; nil when they match none of those.
+        private def sniff(head : Bytes) : String?
+          if head.size >= 8 && head[0, 8] == PNG_SIGNATURE
+            ".png"
+          elsif head.size >= 2 && head[0] == 0xFF && head[1] == 0xD8
+            ".jpg"
+          elsif head.size >= 6 && (head[0, 6] == "GIF87a".to_slice || head[0, 6] == "GIF89a".to_slice)
+            ".gif"
+          elsif head.size >= 2 && head[0] == 0x42 && head[1] == 0x4D
+            ".bmp"
+          elsif head.size >= 12 && head[0, 4] == "RIFF".to_slice && head[8, 4] == "WEBP".to_slice
+            ".webp"
+          end
+        end
+
         # PNG: width/height are big-endian UInt32s at offsets 16/20 (IHDR).
-        private def png_dimensions(path : String) : {Int32, Int32}?
-          header = Bytes.new(24)
-          read = read_header(path, header)
-          return if read < 24
+        private def png_dimensions(header : Bytes) : {Int32, Int32}?
+          return if header.size < 24
           return unless header[0, 8] == PNG_SIGNATURE
           width = IO::ByteFormat::BigEndian.decode(UInt32, header[16, 4])
           height = IO::ByteFormat::BigEndian.decode(UInt32, header[20, 4])
@@ -470,7 +490,6 @@ module Hwaro
         # EXIF Orientation (1-8) of the picture a decoder returns for `path`:
         # 1 (upright, or no tag) for everything but a JPEG that carries one.
         def orientation(path : String) : Int32
-          return 1 unless {".jpg", ".jpeg"}.includes?(File.extname(path).downcase)
           jpeg_frame(path).try(&.[2]) || 1
         rescue
           1
@@ -577,10 +596,8 @@ module Hwaro
         # little-endian Int32s at 18/22, where the height may be negative
         # (top-down rows) — the magnitude is the pixel height. Any other
         # header size is not measured.
-        private def bmp_dimensions(path : String) : {Int32, Int32}?
-          header = Bytes.new(26)
-          read = read_header(path, header)
-          return if read < 26
+        private def bmp_dimensions(header : Bytes) : {Int32, Int32}?
+          return if header.size < 26
           return unless header[0] == 0x42 && header[1] == 0x4D
           dib_size = IO::ByteFormat::LittleEndian.decode(UInt32, header[14, 4])
           if dib_size == 12
@@ -600,9 +617,8 @@ module Hwaro
 
         # GIF: "GIF87a"/"GIF89a"; logical screen width/height are
         # little-endian UInt16s at offsets 6/8.
-        private def gif_dimensions(path : String) : {Int32, Int32}?
-          header = Bytes.new(10)
-          return if read_header(path, header) < 10
+        private def gif_dimensions(header : Bytes) : {Int32, Int32}?
+          return if header.size < 10
           return unless String.new(header[0, 6]).in?("GIF87a", "GIF89a")
           width = IO::ByteFormat::LittleEndian.decode(UInt16, header[6, 2]).to_i32
           height = IO::ByteFormat::LittleEndian.decode(UInt16, header[8, 2]).to_i32
@@ -614,9 +630,8 @@ module Hwaro
         #   VP8  (lossy):    14-bit LE width/height at 26/28;
         #   VP8L (lossless): 14-bit (value - 1) fields packed from offset 21;
         #   VP8X (extended): 24-bit LE (value - 1) canvas size at 24/27.
-        private def webp_dimensions(path : String) : {Int32, Int32}?
-          header = Bytes.new(30)
-          return if read_header(path, header) < 30
+        private def webp_dimensions(header : Bytes) : {Int32, Int32}?
+          return if header.size < 30
           return unless String.new(header[0, 4]) == "RIFF" && String.new(header[8, 4]) == "WEBP"
           width, height = case String.new(header[12, 4])
                           when "VP8 "
