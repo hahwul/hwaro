@@ -62,8 +62,8 @@ mappings are lossy:
 - Dates and datetimes are written as date strings (`date = "2024-01-15"`),
   which is how the build reads them. A re-read with another tool sees a string,
   not a native date.
-- TOML arrays that mix types, and nested tables inside such arrays, are written
-  as strings (`[1, "a", true]` becomes `["1", "a", "true"]`) because the bundled
+- On `to-toml`, arrays that mix types, and nested tables inside such arrays, are
+  written as strings (`[1, "a", true]` becomes `["1", "a", "true"]`) because the bundled
   TOML writer requires uniform arrays. `-9223372036854775808` (the smallest
   64-bit integer) is written as a quoted string for the same reason.
 - `inf`/`nan` have no JSON spelling: `to-json` refuses such a file and names it.
