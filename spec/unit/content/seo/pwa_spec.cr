@@ -457,6 +457,27 @@ describe Hwaro::Content::Seo::Pwa do
       end
     end
 
+    it "ignores non-GET requests in the fetch handler for every cache strategy" do
+      ["cache-first", "network-first", "stale-while-revalidate"].each do |strategy|
+        Dir.mktmpdir do |dir|
+          site = make_site(<<-TOML)
+            [pwa]
+            enabled = true
+            cache_strategy = "#{strategy}"
+            TOML
+
+          Hwaro::Content::Seo::Pwa.generate(site, dir)
+
+          content = File.read(File.join(dir, "sw.js"))
+          fetch_body = content[content.index!("addEventListener('fetch'")..]
+          guard = fetch_body.index("if (event.request.method !== 'GET') return;")
+          guard.should_not be_nil, "#{strategy}: no GET-only guard"
+          guard = guard.not_nil!
+          guard.should be < fetch_body.index!("respondWith")
+        end
+      end
+    end
+
     it "includes precache_urls in service worker" do
       Dir.mktmpdir do |dir|
         # Precache entries are only emitted when their output file exists

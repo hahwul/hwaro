@@ -207,6 +207,7 @@ module Hwaro
         private def self.cache_first_handler(offline_url : String, root_url : String) : String
           <<-JS
             self.addEventListener('fetch', event => {
+              if (event.request.method !== 'GET') return;
               if (event.request.mode === 'navigate') {
                 event.respondWith(
                   fetch(event.request).catch(() =>
@@ -233,6 +234,7 @@ module Hwaro
         private def self.network_first_handler(offline_url : String, root_url : String) : String
           <<-JS
             self.addEventListener('fetch', event => {
+              if (event.request.method !== 'GET') return;
               event.respondWith(
                 fetch(event.request).then(response => {
                   if (response.ok && response.type === 'basic') {
@@ -258,6 +260,7 @@ module Hwaro
         private def self.stale_while_revalidate_handler(offline_url : String, root_url : String) : String
           <<-JS
             self.addEventListener('fetch', event => {
+              if (event.request.method !== 'GET') return;
               if (event.request.mode === 'navigate') {
                 event.respondWith(
                   fetch(event.request).catch(() =>
