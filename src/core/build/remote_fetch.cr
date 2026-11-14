@@ -268,6 +268,13 @@ module Hwaro
             raise size_cap_error(max_bytes) if total > max_bytes
             buffer.write(chunk[0, read])
           end
+          # The stdlib treats a connection closed before Content-Length is met
+          # as a clean end of body; a truncated payload that still parses
+          # (CSV rows, a shorter JSON array) would be cached as complete. A
+          # decompressed response has no Content-Length left (the stdlib drops it).
+          if declared = response.headers["Content-Length"]?.try(&.to_i64?)
+            raise FetchError.new("response truncated: received #{total} of #{declared} bytes") if total < declared
+          end
           buffer.to_s
         end
 

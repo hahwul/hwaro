@@ -159,4 +159,23 @@ describe Hwaro::Core::Build::RemoteFetch do
       server.close
     end
   end
+
+  it "rejects a body shorter than its Content-Length instead of treating it as complete" do
+    server = TCPServer.new("127.0.0.1", 0)
+    port = server.local_address.port
+    spawn do
+      if client = server.accept?
+        client.gets("\r\n\r\n")
+        client << "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n[1,2]"
+        client.close
+      end
+    end
+    begin
+      expect_raises(Hwaro::Core::Build::RemoteFetch::FetchError, "truncated") do
+        Hwaro::Core::Build::RemoteFetch.fetch("http://127.0.0.1:#{port}/", {} of String => String, 1024_i64, 10.seconds)
+      end
+    ensure
+      server.close
+    end
+  end
 end
