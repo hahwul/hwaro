@@ -70,6 +70,9 @@ module Hwaro
 
         command = ARGV.shift
         args = ARGV.dup
+        # `hwaro tool list` for a bad flag in `tool list --bogus`, so the hint
+        # names the --help that actually documents the option.
+        help_target = command == "tool" && (sub = args.first?) && !sub.starts_with?("-") ? "tool #{sub}" : command
 
         case command
         when "-v", "-V", "--version"
@@ -77,7 +80,9 @@ module Hwaro
           # `--quiet` must not swallow it (Logger.info would).
           Logger.io.puts Hwaro::VERSION
         when "-h", "--help"
-          Runner.print_help
+          # Asked-for help is the result; only the bare `hwaro` courtesy
+          # listing stays quiet-sensitive.
+          Logger.result { Runner.print_help }
         else
           # Try to get command from registry
           if handler = CommandRegistry.get(command)
@@ -97,6 +102,7 @@ module Hwaro
         err = Hwaro::HwaroError.new(
           code: Hwaro::Errors::HWARO_E_USAGE,
           message: ex.message || "invalid option",
+          hint: "Run 'hwaro #{help_target} --help' to see the available options.",
         )
         Runner.emit_hwaro_error(err)
         exit(err.exit_code)
@@ -246,7 +252,7 @@ module Hwaro
           elsif target
             Runner.unknown_command!(target, args)
           else
-            Runner.print_help
+            Logger.result { Runner.print_help }
           end
         end
       end
@@ -299,8 +305,6 @@ module Hwaro
           "  #{Logger.paint("A fast and lightweight static site", Logger::Role::Dim)}",
           "  #{Logger.paint("generator written in Crystal.", Logger::Role::Dim)}",
           "",
-          "  Usage: hwaro <command> [options]",
-          "",
         ]
 
         Logger.info ""
@@ -310,6 +314,8 @@ module Hwaro
           Logger.info "#{art_line}#{right}"
         end
 
+        Logger.info ""
+        Logger.info "Usage: hwaro <command> [options]"
         Logger.info ""
         Logger.info "Commands:"
 

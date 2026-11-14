@@ -58,11 +58,12 @@ private def run_hwaro_no_chdir(args : Array(String))
 end
 
 describe "hwaro tool (router)" do
-  it "exits with HWARO_E_USAGE and prints help when no subcommand is given" do
-    status, output, _ = run_hwaro_no_chdir(["tool"])
+  it "exits with HWARO_E_USAGE and prints help on stderr when no subcommand is given" do
+    status, output, error = run_hwaro_no_chdir(["tool"])
     status.exit_code.should eq(Hwaro::Errors::EXIT_USAGE)
-    output.should contain("Usage")
-    output.should contain("subcommand")
+    output.should be_empty
+    error.should contain("Usage")
+    error.should contain("subcommand")
   end
 
   it "exits with HWARO_E_USAGE on an unknown subcommand" do

@@ -232,12 +232,13 @@ module Hwaro
             CLI.register_flag(parser, PROFILE_FLAG) { |_| profile = true }
             CLI.register_flag(parser, DEBUG_FLAG) { |_| debug = true }
             CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
-            CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
+            CLI.register_flag(parser, HELP_FLAG) { |_| Logger.result parser.to_s; exit }
 
             # Positionals have no meaning here. Dropping them silently made
             # `hwaro serve mysite` build and serve the CURRENT directory (and
             # create `.hwaro/serve` in it); see BuildCommand.
             parser.unknown_args do |before_dash, after_dash|
+              CLI.reject_unknown_flag!(before_dash)
               unknown = before_dash + after_dash
               raise Hwaro::HwaroError.new(
                 code: Hwaro::Errors::HWARO_E_USAGE,

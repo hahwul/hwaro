@@ -47,6 +47,7 @@ module Hwaro
             FlagInfo.new(short: nil, long: "--allow-status", description: "Treat these HTTP status codes as healthy (comma-separated, e.g. 403,429)", takes_value: true, value_hint: "CODES"),
             FlagInfo.new(short: nil, long: "--skip-anchors", description: "Do not check #fragment links against the built HTML"),
             JSON_FLAG,
+            QUIET_FLAG,
             HELP_FLAG,
           ]
 
@@ -163,8 +164,10 @@ module Hwaro
                 end
               end
               CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
-              CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
+              CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
+              CLI.register_flag(parser, HELP_FLAG) { |_| Logger.result parser.to_s; exit }
               parser.unknown_args do |before_dash, after_dash|
+                CLI.reject_unknown_flag!(before_dash)
                 unknown = before_dash + after_dash
                 raise Hwaro::HwaroError.new(
                   code: Hwaro::Errors::HWARO_E_USAGE,

@@ -32,6 +32,7 @@ module Hwaro
             CONTENT_DIR_FLAG,
             TOP_FLAG,
             JSON_FLAG,
+            QUIET_FLAG,
             HELP_FLAG,
           ]
 
@@ -65,8 +66,10 @@ module Hwaro
                 top = parsed
               end
               CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
-              CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
+              CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
+              CLI.register_flag(parser, HELP_FLAG) { |_| Logger.result parser.to_s; exit }
               parser.unknown_args do |before_dash, after_dash|
+                CLI.reject_unknown_flag!(before_dash)
                 unknown = before_dash + after_dash
                 raise Hwaro::HwaroError.new(
                   code: Hwaro::Errors::HWARO_E_USAGE,
@@ -115,61 +118,63 @@ module Hwaro
               return
             end
 
-            if result.total == 0
-              Logger.heading("stats", content_dir)
-              Logger.outcome("counted", "no content found", :info)
-              return
-            end
+            Logger.result do
+              if result.total == 0
+                Logger.heading("stats", content_dir)
+                Logger.outcome("counted", "no content found", :info)
+                return
+              end
 
-            # Context receipt: totals, word counts (published only — matches
-            # what `build` ships), then bar-chart sections and one outcome.
-            receipt = Logger::Receipt.new("stats", content_dir)
-            receipt.row("total", "#{result.total.format} #{result.total == 1 ? "file" : "files"}",
-              emphasis: unpublished_emphasis(result))
-            receipt.row("words", "#{result.words_total.format} total · #{result.words_avg.format} avg")
-            receipt.row("range", "#{result.words_min.format} min · #{result.words_max.format} max")
-            receipt.emit
+              # Context receipt: totals, word counts (published only — matches
+              # what `build` ships), then bar-chart sections and one outcome.
+              receipt = Logger::Receipt.new("stats", content_dir)
+              receipt.row("total", "#{result.total.format} #{result.total == 1 ? "file" : "files"}",
+                emphasis: unpublished_emphasis(result))
+              receipt.row("words", "#{result.words_total.format} total · #{result.words_avg.format} avg")
+              receipt.row("range", "#{result.words_min.format} min · #{result.words_max.format} max")
+              receipt.emit
 
-            # Top tags — bars scale against the most-used tag.
-            unless result.tags.empty?
+              # Top tags — bars scale against the most-used tag.
+              unless result.tags.empty?
+                Logger.info ""
+                Logger.section("tags", result.tags.size > top ? "top #{top}" : nil)
+                # Tag names come from semi-trusted front matter — strip control
+                # bytes so a crafted tag can't inject ANSI into the report.
+                top_tags = result.tags.first(top).map { |tag, count| {Utils::TextUtils.strip_control(tag), count} }
+                max_count = top_tags.max_of { |_, count| count }
+                # Measure and pad in terminal COLUMNS, not codepoints: a CJK or
+                # emoji tag renders wider than its codepoint count, so
+                # `size`/`ljust` misaligned every row after it.
+                label_width = top_tags.max_of { |tag, _| Utils::TextUtils.display_width(tag) }.clamp(0, 20)
+                top_tags.each do |tag, count|
+                  label = Utils::TextUtils.pad_display(truncate_label(tag, label_width), label_width)
+                  Logger.info "    #{label}  #{count.to_s.rjust(4)}  #{Logger.bar(count, max_count)}"
+                end
+                if result.tags.size > top
+                  Logger.info "    … and #{result.tags.size - top} more"
+                end
+              end
+
+              # Monthly publishing frequency.
+              unless result.monthly.empty?
+                Logger.info ""
+                Logger.section("monthly")
+                max_count = result.monthly.max_of { |_, count| count }
+                result.monthly.each do |month, count|
+                  Logger.info "    #{month}  #{count.to_s.rjust(4)}  #{Logger.bar(count, max_count)}"
+                end
+              end
+
               Logger.info ""
-              Logger.section("tags", result.tags.size > top ? "top #{top}" : nil)
-              # Tag names come from semi-trusted front matter — strip control
-              # bytes so a crafted tag can't inject ANSI into the report.
-              top_tags = result.tags.first(top).map { |tag, count| {Utils::TextUtils.strip_control(tag), count} }
-              max_count = top_tags.max_of { |_, count| count }
-              # Measure and pad in terminal COLUMNS, not codepoints: a CJK or
-              # emoji tag renders wider than its codepoint count, so
-              # `size`/`ljust` misaligned every row after it.
-              label_width = top_tags.max_of { |tag, _| Utils::TextUtils.display_width(tag) }.clamp(0, 20)
-              top_tags.each do |tag, count|
-                label = Utils::TextUtils.pad_display(truncate_label(tag, label_width), label_width)
-                Logger.info "    #{label}  #{count.to_s.rjust(4)}  #{Logger.bar(count, max_count)}"
-              end
-              if result.tags.size > top
-                Logger.info "    … and #{result.tags.size - top} more"
-              end
+              summary = "#{result.total.format} #{result.total == 1 ? "file" : "files"} · " \
+                        "#{result.published.format} published · " \
+                        "#{result.drafts.format} #{result.drafts == 1 ? "draft" : "drafts"}"
+              # Future/expired files are dropped by a default build exactly like
+              # drafts, so name them instead of folding them into "published".
+              summary += " · #{result.future.format} future" if result.future > 0
+              summary += " · #{result.expired.format} expired" if result.expired > 0
+              Logger.outcome("counted", summary)
             end
-
-            # Monthly publishing frequency.
-            unless result.monthly.empty?
-              Logger.info ""
-              Logger.section("monthly")
-              max_count = result.monthly.max_of { |_, count| count }
-              result.monthly.each do |month, count|
-                Logger.info "    #{month}  #{count.to_s.rjust(4)}  #{Logger.bar(count, max_count)}"
-              end
-            end
-
-            Logger.info ""
-            summary = "#{result.total.format} #{result.total == 1 ? "file" : "files"} · " \
-                      "#{result.published.format} published · " \
-                      "#{result.drafts.format} #{result.drafts == 1 ? "draft" : "drafts"}"
-            # Future/expired files are dropped by a default build exactly like
-            # drafts, so name them instead of folding them into "published".
-            summary += " · #{result.future.format} future" if result.future > 0
-            summary += " · #{result.expired.format} expired" if result.expired > 0
-            Logger.outcome("counted", summary)
           end
 
           # Receipt emphasis naming everything a default build will NOT ship.

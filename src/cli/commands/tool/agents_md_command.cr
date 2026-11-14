@@ -39,6 +39,7 @@ module Hwaro
               long: "--force",
               description: "Regenerate an existing file without confirmation (the Site-Specific Instructions section is still preserved)"
             ),
+            QUIET_FLAG,
             HELP_FLAG,
           ]
 
@@ -63,8 +64,9 @@ module Hwaro
               parser.on("--local", "Generate full embedded reference (default)") { remote = false }
               parser.on("--write", "Write to AGENTS.md file instead of stdout") { write = true }
               parser.on("-f", "--force", "Regenerate an existing file without confirmation (the Site-Specific Instructions section is still preserved)") { force = true }
+              CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
               CLI.register_flag(parser, HELP_FLAG) do |_|
-                Logger.info parser.to_s
+                Logger.result parser.to_s
                 exit
               end
               # `hwaro tool agents-md AGENTS.md` printed to stdout and wrote

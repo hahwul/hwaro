@@ -43,12 +43,13 @@ module Hwaro
               parser.on("-o PATH", "--output PATH", "Output file path (default: auto-detected)") { |p| output_path = p }
               parser.on("--stdout", "Print to stdout instead of writing file") { stdout_mode = true }
               parser.on("-f", "--force", "Overwrite existing file without warning") { force = true }
+              CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
               CLI.register_flag(parser, HELP_FLAG) do |_|
-                Logger.info parser.to_s
-                Logger.info ""
-                Logger.info "Supported platforms:"
+                Logger.result parser.to_s
+                Logger.result ""
+                Logger.result "Supported platforms:"
                 Services::PlatformConfig::SUPPORTED_PLATFORMS.each do |p|
-                  Logger.info "  #{p}"
+                  Logger.result "  #{p}"
                 end
                 exit
               end

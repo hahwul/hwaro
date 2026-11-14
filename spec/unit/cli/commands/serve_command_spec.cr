@@ -26,6 +26,12 @@ describe Hwaro::CLI::Commands::ServeCommand do
       expect_raises(Hwaro::HwaroError) { cmd.test_parse_options(["-p", "3000", "--", "dir"]) }
     end
 
+    it "reports an unknown flag as an invalid option, not an extra argument" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      err = expect_raises(OptionParser::InvalidOption, /--bogus/) { cmd.test_parse_options(["--bogus"]) }
+      err.message.to_s.should_not contain("extra argument")
+    end
+
     it "treats empty HWARO_MEMORYLIMIT / HWARO_ENV as unset" do
       ENV["HWARO_MEMORYLIMIT"] = ""
       ENV["HWARO_ENV"] = ""
@@ -743,10 +749,9 @@ describe Hwaro::CLI::Commands::CompletionCommand do
       Hwaro::CLI::Commands::CompletionCommand::POSITIONAL_CHOICES.should eq(Hwaro::CLI::Commands::CompletionCommand::SHELLS)
     end
 
-    it "has only help flag" do
+    it "has only the quiet and help flags" do
       flags = Hwaro::CLI::Commands::CompletionCommand::FLAGS
-      flags.size.should eq(1)
-      flags.first.long.should eq("--help")
+      flags.map(&.long).should eq(["--quiet", "--help"])
     end
   end
 

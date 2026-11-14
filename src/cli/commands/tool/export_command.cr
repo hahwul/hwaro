@@ -30,6 +30,7 @@ module Hwaro
             DRY_RUN_FLAG,
             VERBOSE_FLAG,
             JSON_FLAG,
+            QUIET_FLAG,
             HELP_FLAG,
           ]
 
@@ -148,10 +149,11 @@ module Hwaro
               CLI.register_flag(parser, DRY_RUN_FLAG) { |_| dry_run = true }
               CLI.register_flag(parser, VERBOSE_FLAG) { |_| verbose = true }
               CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
+              CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
               CLI.register_flag(parser, HELP_FLAG) do |_|
-                Logger.info parser.to_s
-                Logger.info ""
-                Logger.info "Supported targets: #{POSITIONAL_CHOICES.join(", ")}"
+                Logger.result parser.to_s
+                Logger.result ""
+                Logger.result "Supported targets: #{POSITIONAL_CHOICES.join(", ")}"
                 exit
               end
               parser.unknown_args do |remaining|

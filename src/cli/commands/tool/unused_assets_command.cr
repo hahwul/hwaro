@@ -30,6 +30,7 @@ module Hwaro
             FlagInfo.new(short: nil, long: "--delete", description: "Delete unused files (with confirmation)"),
             FlagInfo.new(short: "-f", long: "--force", description: "Skip confirmation prompt when deleting"),
             JSON_FLAG,
+            QUIET_FLAG,
             HELP_FLAG,
           ]
 
@@ -75,8 +76,10 @@ module Hwaro
               parser.on("--delete", "Delete unused files (with confirmation)") { delete_mode = true }
               parser.on("-f", "--force", "Skip confirmation prompt when deleting") { force = true }
               CLI.register_flag(parser, JSON_FLAG) { |_| json_output = true }
-              CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
+              CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
+              CLI.register_flag(parser, HELP_FLAG) { |_| Logger.result parser.to_s; exit }
               parser.unknown_args do |before_dash, after_dash|
+                CLI.reject_unknown_flag!(before_dash)
                 unknown = before_dash + after_dash
                 raise Hwaro::HwaroError.new(
                   code: Hwaro::Errors::HWARO_E_USAGE,
@@ -165,9 +168,12 @@ module Hwaro
             end
 
             receipt.emit
-            Logger.section("unused files")
-            result.unused_files.each do |file|
-              Logger.item(file, glyph: :bullet)
+            # The file list is the answer, so it survives `--quiet`.
+            Logger.result do
+              Logger.section("unused files")
+              result.unused_files.each do |file|
+                Logger.item(file, glyph: :bullet)
+              end
             end
             Logger.item("dynamic references (e.g. template variables) may cause false positives", glyph: :info)
             Logger.info "" if Logger.color_enabled?

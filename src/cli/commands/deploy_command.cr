@@ -174,19 +174,19 @@ module Hwaro
             CLI.register_flag(parser, ENV_FLAG) { |v| env_name = v }
             CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
             CLI.register_flag(parser, HELP_FLAG) do |_|
-              Logger.info parser.to_s
-              Logger.info ""
-              Logger.info "Target shapes (in [[deployment.targets]]):"
-              Logger.info "  path    = \"/abs/local/dir\"   # copy to a local directory"
-              Logger.info "  url     = \"file:///abs/dir\"  # same, file:// scheme"
-              Logger.info "  url     = \"s3://bucket\"      # auto-runs `aws s3 sync …`"
-              Logger.info "  url     = \"gs://bucket\"      # auto-runs `gsutil rsync …`"
-              Logger.info "  url     = \"az://container\"   # auto-runs `az storage blob sync …`"
-              Logger.info "  command = \"…\"                # arbitrary shell command"
+              Logger.result parser.to_s
+              Logger.result ""
+              Logger.result "Target shapes (in [[deployment.targets]]):"
+              Logger.result "  path    = \"/abs/local/dir\"   # copy to a local directory"
+              Logger.result "  url     = \"file:///abs/dir\"  # same, file:// scheme"
+              Logger.result "  url     = \"s3://bucket\"      # auto-runs `aws s3 sync …`"
+              Logger.result "  url     = \"gs://bucket\"      # auto-runs `gsutil rsync …`"
+              Logger.result "  url     = \"az://container\"   # auto-runs `az storage blob sync …`"
+              Logger.result "  command = \"…\"                # arbitrary shell command"
               hint = configured_targets_hint(env_name)
               unless hint.empty?
-                Logger.info ""
-                Logger.info hint
+                Logger.result ""
+                Logger.result hint
               end
               exit
             end
@@ -216,8 +216,7 @@ module Hwaro
             Models::Config.load(env: env)
           rescue ex : Hwaro::HwaroError
             Runner.exit_with_error_payload(ex) if json
-            Logger.error "Error [#{ex.code}]: #{ex.message}"
-            exit(ex.exit_code)
+            raise ex
           end
 
           deployment = config.deployment
@@ -235,13 +234,15 @@ module Hwaro
           end
 
           if deployment.targets.empty?
-            Logger.info "No deployment targets configured."
+            Logger.result "No deployment targets configured."
             return
           end
 
-          Logger.section("targets")
-          deployment.targets.each do |t|
-            Logger.item("#{t.name.ljust(16)} #{format_target_destination(t)}")
+          Logger.result do
+            Logger.section("targets")
+            deployment.targets.each do |t|
+              Logger.item("#{t.name.ljust(16)} #{format_target_destination(t)}")
+            end
           end
         end
 

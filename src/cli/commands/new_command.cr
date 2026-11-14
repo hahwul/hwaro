@@ -218,13 +218,13 @@ module Hwaro
             STDOUT.puts mapped.to_json
           else
             if entries.empty?
-              Logger.info "No archetypes found."
+              Logger.result "No archetypes found."
               return
             end
 
-            Logger.info "Available archetypes:"
+            Logger.result "Available archetypes:"
             entries.each do |e|
-              Logger.info "  #{e[:name].ljust(16)} #{e[:path]}"
+              Logger.result "  #{e[:name].ljust(16)} #{e[:path]}"
             end
           end
         end
@@ -279,7 +279,7 @@ module Hwaro
             # Introspection (acted on by #run after parsing).
             parser.on("--list-archetypes", "List archetypes available in the current project and exit") { @list_archetypes = true }
             CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
-            CLI.register_flag(parser, HELP_FLAG) { |_| Logger.info parser.to_s; exit }
+            CLI.register_flag(parser, HELP_FLAG) { |_| Logger.result parser.to_s; exit }
             parser.unknown_args do |before_dash, after_dash|
               # Accept the single <path> from either side of `--` (the latter
               # lets authors create leading-dash filenames). Anything beyond

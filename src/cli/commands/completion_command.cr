@@ -25,6 +25,7 @@ module Hwaro
 
         # Flags defined here are used both for OptionParser and completion generation
         FLAGS = [
+          QUIET_FLAG,
           HELP_FLAG,
         ]
 
@@ -48,17 +49,26 @@ module Hwaro
 
           OptionParser.parse(args) do |parser|
             parser.banner = "Usage: hwaro completion <bash|zsh|fish>"
+            CLI.register_flag(parser, QUIET_FLAG) { |_| Logger.quiet = true }
             parser.on("-h", "--help", "Show this help") do
               print_help
               exit
             end
-            parser.unknown_args do |unknown|
+            parser.unknown_args do |before_dash, after_dash|
+              unknown = before_dash + after_dash
+              if unknown.size > 1
+                raise Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_USAGE,
+                  message: "unexpected extra argument(s): '#{unknown[1..].join("', '")}'",
+                  hint: "hwaro completion takes a single <shell> argument (#{SHELLS.join("|")}).",
+                )
+              end
               shell = unknown.first? if unknown.present?
             end
           end
 
           unless shell
-            print_help
+            Logger.to_stderr { print_help }
             raise Hwaro::HwaroError.new(
               code: Hwaro::Errors::HWARO_E_USAGE,
               message: "missing <shell> argument",
@@ -83,24 +93,28 @@ module Hwaro
         end
 
         private def print_help
-          Logger.info "Usage: hwaro completion <bash|zsh|fish>"
-          Logger.info ""
-          Logger.info "Generate shell completion scripts for hwaro."
-          Logger.info ""
-          Logger.info "Supported shells:"
-          Logger.info "  bash   Generate bash completion script"
-          Logger.info "  zsh    Generate zsh completion script"
-          Logger.info "  fish   Generate fish completion script"
-          Logger.info ""
-          Logger.info "Examples:"
-          Logger.info "  # Bash (add to ~/.bashrc)"
-          Logger.info "  eval \"$(hwaro completion bash)\""
-          Logger.info ""
-          Logger.info "  # Zsh (add to ~/.zshrc)"
-          Logger.info "  eval \"$(hwaro completion zsh)\""
-          Logger.info ""
-          Logger.info "  # Fish (add to ~/.config/fish/config.fish)"
-          Logger.info "  hwaro completion fish | source"
+          Logger.result "Usage: hwaro completion <bash|zsh|fish>"
+          Logger.result ""
+          Logger.result "Generate shell completion scripts for hwaro."
+          Logger.result ""
+          Logger.result "Supported shells:"
+          Logger.result "  bash   Generate bash completion script"
+          Logger.result "  zsh    Generate zsh completion script"
+          Logger.result "  fish   Generate fish completion script"
+          Logger.result ""
+          Logger.result "Options:"
+          Logger.result "  -q, --quiet   Suppress info output and banner (errors still shown on stderr)"
+          Logger.result "  -h, --help    Show this help"
+          Logger.result ""
+          Logger.result "Examples:"
+          Logger.result "  # Bash (add to ~/.bashrc)"
+          Logger.result "  eval \"$(hwaro completion bash)\""
+          Logger.result ""
+          Logger.result "  # Zsh (add to ~/.zshrc)"
+          Logger.result "  eval \"$(hwaro completion zsh)\""
+          Logger.result ""
+          Logger.result "  # Fish (add to ~/.config/fish/config.fish)"
+          Logger.result "  hwaro completion fish | source"
         end
 
         private def generate_bash : String
