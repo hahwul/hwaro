@@ -69,7 +69,7 @@ module Hwaro
         return "" unless @enabled
         return copy ? COPY_SNIPPET : "" if server?
         hljs = if @use_cdn
-                 %(<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>\n<script>hljs.highlightAll();</script>)
+                 %(<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha384-F/bZzf7p3Joyp5psL90p/p89AZJsndkSoGwRpXcZhleCWhd8SnRuoYo4d0yirjJp" crossorigin="anonymous"></script>\n<script>hljs.highlightAll();</script>)
                else
                  suffix = Models.cache_bust_suffix(cache_bust)
                  integrity = Models.integrity_attr(sri_root, "assets/js/highlight.min.js")

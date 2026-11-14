@@ -109,21 +109,22 @@ module Hwaro
         case @math_engine
         when "katex"
           # auto-render finds class="math math-{inline,display}" automatically
-          # and replaces the inner TeX with rendered KaTeX. Pinned KaTeX 0.16.x
-          # to avoid surprise major-version churn in build outputs.
+          # and replaces the inner TeX with rendered KaTeX. KaTeX is pinned to an
+          # exact version and every file carries an SRI hash: a CDN that serves
+          # other bytes makes the browser refuse the script.
           if csp
             # Deferred scripts run before DOMContentLoaded fires.
             return <<-HTML.gsub('\n', "")
-              <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css">
-              <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js"></script>
-              <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js"></script>
+              <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" integrity="sha384-zh0CIslj+VczCZtlzBcjt5ppRcsAmDnRem7ESsYwWwg3m/OaJ2l4x7YBZl9Kxxib" crossorigin="anonymous">
+              <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" integrity="sha384-Rma6DA2IPUwhNxmrB/7S3Tno0YY7sFu9WSYMCuulLhIqYSGZ2gKCJWIqhBWqMQfh" crossorigin="anonymous"></script>
+              <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous"></script>
               <script>document.addEventListener("DOMContentLoaded",function(){renderMathInElement(document.body);});</script>
               HTML
           end
           <<-HTML.gsub('\n', "")
-            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css">
-            <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js"></script>
-            <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body);"></script>
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" integrity="sha384-zh0CIslj+VczCZtlzBcjt5ppRcsAmDnRem7ESsYwWwg3m/OaJ2l4x7YBZl9Kxxib" crossorigin="anonymous">
+            <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" integrity="sha384-Rma6DA2IPUwhNxmrB/7S3Tno0YY7sFu9WSYMCuulLhIqYSGZ2gKCJWIqhBWqMQfh" crossorigin="anonymous"></script>
+            <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js" integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh" crossorigin="anonymous" onload="renderMathInElement(document.body);"></script>
             HTML
         when "mathjax"
           # MathJax 3 reads `class="math math-*"` via the `[tex]` extension
@@ -131,7 +132,7 @@ module Hwaro
           # how the markdown processor emits them).
           <<-HTML.gsub('\n', "")
             <script>window.MathJax={tex:{inlineMath:[["\\\\(","\\\\)"]],displayMath:[["\\\\[","\\\\]"]]}};</script>
-            <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+            <script async src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-chtml.js" integrity="sha384-AHAnt9ZhGeHIrydA1Kp1L7FN+2UosbF7RQg6C+9Is/a7kDpQ1684C2iH2VWil6r4" crossorigin="anonymous"></script>
             HTML
         else
           ""
@@ -141,12 +142,12 @@ module Hwaro
       # Generate the Mermaid.js script tag. Mirrors `math_tags`: the markdown
       # processor emits `<div class="mermaid">…</div>`, but without a renderer
       # those blocks ship to the browser as DOT-like source text. Pinned to
-      # 10.x to avoid major-version drift.
+      # an exact version (a module `import` cannot carry an SRI hash).
       def mermaid_tags : String
         return "" unless @mermaid
         <<-HTML.gsub('\n', "")
           <script type="module">
-            import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+            import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10.9.8/dist/mermaid.esm.min.mjs";
             mermaid.initialize({ startOnLoad: true });
           </script>
           HTML
