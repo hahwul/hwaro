@@ -1,7 +1,7 @@
 # Crystal C bindings for stb image libraries
 #
 # Links against stb_impl.c which provides:
-# - stb_image.h        (decode JPG/PNG/BMP/GIF/TGA/PSD/HDR/PIC)
+# - stb_image.h        (decode JPG/PNG/BMP/GIF only; PSD/PIC/PNM/HDR/TGA are compiled out in stb_impl.c)
 # - stb_image_write.h  (encode JPG/PNG/BMP)
 # - stb_image_resize2.h (high-quality resize)
 # - stb_truetype.h     (TrueType font rasterization)

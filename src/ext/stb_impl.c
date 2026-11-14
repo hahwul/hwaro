@@ -1,7 +1,7 @@
 /* stb single-file library implementations for Hwaro image processing
  *
  * Vendored versions (update these when upgrading headers):
- *   stb_image.h        v2.30
+ *   stb_image.h        v2.30 (+ palette-init backports, see stb_image.h "hwaro:")
  *   stb_image_write.h  v1.16
  *   stb_image_resize2.h v2.18
  *   stb_truetype.h     v1.26
@@ -14,6 +14,19 @@
  * can't be read or written. No effect elsewhere. */
 #define STBI_WINDOWS_UTF8
 #define STBIW_WINDOWS_UTF8
+
+/* Decoders hwaro never needs. Sources are JPEG/PNG/BMP (IMAGE_EXTENSIONS), and
+ * the OG renderer decodes a configured logo/background, which may also be a
+ * GIF. stb picks a decoder by sniffing the CONTENT, not the extension, so a
+ * contributed `photo.png` holding PSD/PIC/PNM/HDR bytes — or, for TGA (which
+ * has no magic number and is tried last), arbitrary bytes — would otherwise
+ * reach that decoder. Compiled out, such a file fails to decode and is
+ * skipped like any other corrupt image. */
+#define STBI_NO_PSD
+#define STBI_NO_PIC
+#define STBI_NO_PNM
+#define STBI_NO_HDR
+#define STBI_NO_TGA
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
