@@ -3,7 +3,9 @@ require "../../../spec_helper"
 # `[assets] sri`: the local tags Hwaro emits carry `integrity` (with
 # `crossorigin="anonymous"`, so a cross-origin view of an absolute
 # `base_url` URL can still be checked) over the emitted file under
-# `sri_root` (the output directory); CDN tags never do.
+# `sri_root` (the output directory). The CDN tags Hwaro emits for a pinned,
+# immutable version carry a built-in hash whether or not `[assets] sri` is on
+# (see cdn_assets_spec.cr); `[assets] sri` governs local files only.
 describe "[assets] sri" do
   it "defaults to off and parses from [assets]" do
     Hwaro::Models::Config.new.assets.sri.should be_false
@@ -18,7 +20,7 @@ describe "[assets] sri" do
     config.assets.enabled.should be_false
   end
 
-  it "adds integrity to self-hosted highlight tags only" do
+  it "adds integrity to self-hosted highlight tags; CDN tags keep their built-in hash either way" do
     Dir.mktmpdir do |dir|
       FileUtils.mkdir_p(File.join(dir, "assets/css/highlight"))
       FileUtils.mkdir_p(File.join(dir, "assets/js"))
@@ -27,8 +29,14 @@ describe "[assets] sri" do
       highlight = Hwaro::Models::HighlightConfig.new
       highlight.mode = "client"
 
+      # CDN: the script's hash is built in and does not depend on `sri_root`;
+      # the theme stylesheet (a variable name, CSS cannot run script) has none.
       highlight.use_cdn = true
-      highlight.tags("", dir).should_not contain("integrity")
+      with_root = highlight.tags("", dir)
+      with_root.should eq(highlight.tags(""))
+      with_root.scan("integrity=").size.should eq 1
+      highlight.css_tag("", dir).should_not contain("integrity")
+      highlight.js_tag("", dir).should contain(%(integrity="sha384-))
 
       highlight.use_cdn = false
       css_sri = Hwaro::Utils::DigestUtils.sri("h{}")

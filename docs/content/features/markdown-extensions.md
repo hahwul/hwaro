@@ -164,6 +164,14 @@ KaTeX or MathJax tags for the configured `math_engine` (and renders
 nothing when `math = false`). Put it in your own `<head>`, or load the
 library yourself:
 
+`{{ math_tags }}` pins KaTeX (0.16.21) and MathJax (3.2.2) to exact versions and adds
+[Subresource Integrity](https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity)
+hashes (`integrity` and `crossorigin="anonymous"`) to every file it links, so a CDN that serves
+different bytes makes the browser refuse them. MathJax loads its fonts and extensions
+on demand from the same CDN path; those later requests are not covered by the hash.
+To use another version, leave `{{ math_tags }}` out of your template and write the tags
+yourself, as below.
+
 #### KaTeX
 
 ```html
@@ -216,7 +224,9 @@ graph TD
 ### Client-Side Setup
 
 `{{ mermaid_tags }}` does the same for Mermaid (empty when `mermaid = false`).
-The manual equivalent:
+It pins Mermaid to an exact version (10.9.8). A module `import` cannot carry an integrity
+hash, so unlike the math scripts this one has none. To use another version, leave the tag
+out and write your own. The manual equivalent:
 
 ```html
 <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>

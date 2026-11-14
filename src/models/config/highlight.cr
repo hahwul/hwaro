@@ -47,7 +47,10 @@ module Hwaro
 
       # Generate the CSS link tag for highlighting
       # `sri_root` (the build output directory) adds `integrity` to the
-      # self-hosted tags; CDN tags never get one (their bytes are unknown).
+      # self-hosted tags. The CDN theme stylesheet gets none: its name is any
+      # Highlight.js theme, so there is no fixed byte string to hash, and CSS
+      # cannot run script. The CDN script (js_tag) is a pinned file and always
+      # carries its built-in hash.
       # `base_path` (the path of base_url, `Config#base_path`) prefixes the
       # local files, which are published under it on a subpath deploy.
       def css_tag(cache_bust : String = "", sri_root : String? = nil, base_path : String = "") : String

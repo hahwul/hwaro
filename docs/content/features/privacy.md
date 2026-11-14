@@ -107,6 +107,9 @@ MathJax loads its fonts and extensions relative to its own URL, so it stays
 external. Mermaid (`[markdown] mermaid = true`) is loaded by an inline module
 `import`, which privacy mode does not rewrite. KaTeX and highlight.js are
 localized normally.
+Their `integrity` hashes describe the CDN's bytes, so they stay on scripts
+localized unchanged and are dropped, without a warning, from a stylesheet Hwaro
+rewrote (KaTeX's CSS); enable `[assets] sri` to have Hwaro hash what it serves.
 
 Published files are named `<hash>-<name>.<ext>`, where the hash is the first
 12 hex characters of the SHA-256 of the bytes. Identical files are stored

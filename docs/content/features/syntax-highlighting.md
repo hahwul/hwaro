@@ -312,9 +312,18 @@ When `use_cdn = true` (default), assets are loaded from cdnjs:
 
 ```html
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha384-F/bZzf7p3Joyp5psL90p/p89AZJsndkSoGwRpXcZhleCWhd8SnRuoYo4d0yirjJp" crossorigin="anonymous"></script>
 <script>hljs.highlightAll();</script>
 ```
+
+The versions are pinned (Highlight.js 11.9.0), and the script carries a
+[Subresource Integrity](https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity)
+hash: a CDN that serves different bytes makes the browser refuse it. The theme
+stylesheet has no hash, because the theme name is any Highlight.js theme and
+CSS cannot run script. `[assets] sri` does not change these CDN tags; it covers
+the local files below. To load another version or your own copy, set
+`use_cdn = false` and provide the files, or leave out `{{ highlight_js }}` and
+write the tags in your template.
 
 When `use_cdn = false`, assets are loaded from local paths:
 
