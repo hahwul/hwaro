@@ -17,6 +17,8 @@ Hwaro는 Jinja2 호환 템플릿 엔진인 Crinja를 사용합니다. 이 페이
 {{ content }}
 ```
 
+값은 그대로 출력됩니다. hwaro 템플릿은 HTML을 자동으로 이스케이프하지 않습니다. 콘텐츠나 데이터에서 온 텍스트(제목, 설명, 섹션 이름과 택소노미 이름, `extra` 필드, 데이터 파일)는 요소 텍스트든 속성 값이든 출력하는 곳마다 `| e`를 거치게 하세요. 예: `<meta name="description" content="{{ page.description | e }}">`. hwaro가 HTML로 렌더링한 값(`content`, `toc`, `og_all_tags`와 그 밖의 `*_tags` 변수)은 `| e` 없이 출력합니다.
+
 괄호로 묶은 표현식 뒤에도 속성, 인덱스, 호출 접근을 쓸 수 있으므로 필터나 함수 결과에서 바로 필드를 읽을 수 있습니다.
 
 ```jinja
@@ -297,7 +299,7 @@ Jinja 문법을 그대로 출력합니다.
 ```jinja
 <head>
   {% if page.description %}
-  <meta name="description" content="{{ page.description }}">
+  <meta name="description" content="{{ page.description | e }}">
   {% endif %}
   {{ og_all_tags | safe }}
 </head>
@@ -306,7 +308,7 @@ Jinja 문법을 그대로 출력합니다.
 ### 섹션별 레이아웃
 
 ```jinja
-<body data-section="{{ page.section }}">
+<body data-section="{{ page.section | e }}">
   {% if page.section == "docs" %}
   {% include "partials/sidebar.html" %}
   {% endif %}
