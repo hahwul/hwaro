@@ -156,7 +156,10 @@ module Hwaro
             when '\t' then io << "\\t"
             when '\r' then io << "\\r"
             else
-              if ch.printable?
+              # U+FFFE/U+FFFF count as printable to Crystal, but YAML's
+              # character set excludes them: written raw, one made the whole
+              # front matter unparseable.
+              if ch.printable? && ch.ord != 0xFFFE && ch.ord != 0xFFFF
                 io << ch
               elsif ch.ord <= 0xFF
                 io << "\\x" << ch.ord.to_s(16, upcase: true).rjust(2, '0')

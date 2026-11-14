@@ -594,6 +594,9 @@ module Hwaro
       # `"` is escaped for the same reason from the HTML side: templates print
       # `page.url` into double-quoted attributes unescaped (autoescape is
       # off), so `with"quote.md` cut its own `href` short and linked a 404.
+      # `<` and `>` too (browsers send both encoded anyway): a raw `<img …>`
+      # inside an `href` is valid HTML, but the AMP converter rewrites tags
+      # by pattern and turned it into markup whose quote ended the attribute.
       #
       # A `%` that starts no escape (`100%.md`) is escaped: `/posts/100%/` is
       # not a valid URL, and servers that reject it answer 400. So is every
@@ -606,14 +609,14 @@ module Hwaro
         if value.includes?('%')
           value = URI.decode(value).valid_encoding? ? value.gsub(/%(?![0-9A-Fa-f]{2})/, "%25") : value.gsub('%', "%25")
         end
-        @url = if value.includes?('#') || value.includes?('?') || value.includes?('"')
+        @url = if value.includes?('#') || value.includes?('?') || value.includes?('"') || value.includes?('<') || value.includes?('>')
                  value.gsub(URL_DELIMITER_ESCAPES)
                else
                  value
                end
       end
 
-      private URL_DELIMITER_ESCAPES = {'#' => "%23", '?' => "%3F", '"' => "%22"}
+      private URL_DELIMITER_ESCAPES = {'#' => "%23", '?' => "%3F", '"' => "%22", '<' => "%3C", '>' => "%3E"}
 
       # Generate permalink (absolute URL)
       def generate_permalink(base_url : String) : String

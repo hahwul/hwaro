@@ -17,6 +17,8 @@ Print values with double braces:
 {{ content }}
 ```
 
+Values print as they are: hwaro templates do not escape HTML automatically. Text that comes from content or data (titles, descriptions, section and taxonomy names, `extra` fields, data files) goes through `| e` wherever you print it, in element text and in attribute values alike: `<meta name="description" content="{{ page.description | e }}">`. Values hwaro renders as HTML (`content`, `toc`, `og_all_tags` and the other `*_tags` variables) are printed without it.
+
 Attribute, index and call access also work after a parenthesized expression, so you can read a field straight off a filter or function result:
 
 ```jinja
@@ -297,7 +299,7 @@ Output literal Jinja syntax:
 ```jinja
 <head>
   {% if page.description %}
-  <meta name="description" content="{{ page.description }}">
+  <meta name="description" content="{{ page.description | e }}">
   {% endif %}
   {{ og_all_tags | safe }}
 </head>
@@ -306,7 +308,7 @@ Output literal Jinja syntax:
 ### Section-Based Layout
 
 ```jinja
-<body data-section="{{ page.section }}">
+<body data-section="{{ page.section | e }}">
   {% if page.section == "docs" %}
   {% include "partials/sidebar.html" %}
   {% endif %}
