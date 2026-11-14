@@ -200,7 +200,8 @@ module Hwaro
       private def self.shard_key(page : Models::Page, config : Models::Config) : {id: String, language: String?, section: String?}
         lang = page.language || config.default_language
         lang = "_default" if lang.empty?
-        top = page.section.split('/', remove_empty: true).first? || ""
+        # NFC like the page URLs: the shard is an output name.
+        top = Utils::PathUtils.nfc(page.section.split('/', remove_empty: true).first? || "")
         case config.search.shards
         when "language"
           {id: lang, language: lang, section: nil}

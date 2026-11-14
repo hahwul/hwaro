@@ -343,6 +343,8 @@ Rendered HTML content is available as the top-level `content` variable.
 
 `page.url`, `page.permalink`, `section.url` and the `url` in `search.json` keep the path **as written**: `content/posts/C++ Tips.md` gives `/posts/C++ Tips/`, and the output directory on disk has the same name (`public/posts/C++ Tips/`). The exceptions are the characters that would end the path or break out of an `href="…"`: `#`, `?`, `"`, `<` and `>` are always written as `%23`, `%3F`, `%22`, `%3C` and `%3E` (the directory keeps the raw name). URLs written for strict-URI consumers are **percent-encoded** instead: `<link rel="canonical">` and `og:url` (`canonical_tag`, `seo.canonical_url`), `sitemap.xml`, RSS/Atom feeds, `llms.txt`, JSON-LD and the redirect stubs generated for `aliases` all say `/posts/C%2B%2B%20Tips/`. Non-ASCII behaves the same way: `/posts/한글/` is `/posts/%ED%95%9C%EA%B8%80/` in the sitemap.
 
+Names taken from content paths are spelled in Unicode **NFC** whatever form the file system stored them in (macOS tools often write decomposed, NFD, names): `content/한글.md` publishes `/한글/` from any checkout, and its output directory, page-bundle files, image variants and search shards get NFC names too. `slug` and `path` are folded the same way, while `aliases` are used exactly as written and files under `static/` keep the names they are stored under.
+
 Browsers encode a raw `href="{{ page.url }}"` themselves, so ordinary links need nothing. To build a URL by hand for a machine-read context, encode the path: `{{ site.base_url }}{{ page.url | urlencode }}`. The [`urlencode`](/templates/filters/) filter keeps `/` but does not recognize existing `%XX` escapes, so apply it to `page.url`, never to `page.permalink` or an already-encoded value.
 
 ### Metadata Properties

@@ -235,7 +235,8 @@ module Hwaro
               if synthesis = page.synthesis
                 str << "Source: " << synthesis.origin << "\n"
               else
-                str << "Source: content/" << page.path << "\n"
+                # NFC like the page URLs (the file is read by its own spelling).
+                str << "Source: content/" << Utils::PathUtils.nfc(page.path) << "\n"
               end
 
               if config.multilingual?

@@ -211,6 +211,8 @@ URL(`base_url` + 경로)을 가리키는 `<link rel="canonical">`이 들어가�
 절대 URL(`https://example.com/old/`)이나 프로토콜 상대
 URL(`//example.com/old/`)은 이 빌드가 게시할 수 있는 대상이 아니므로
 경고와 함께 건너뜁니다.
+alias는 유니코드 형태까지 적은 그대로 쓰이므로, 이전 버전의 hwaro가 분해형(NFD)
+파일 이름으로 게시한 옛 URL을 계속 응답하게 할 수 있습니다.
 
 ### 커스텀 메타데이터
 
@@ -229,7 +231,7 @@ pros = ["Fast", "Reliable"]
 
 ### 슬러그
 
-프론트 매터의 `slug`는 URL의 마지막 세그먼트로 **그대로** 쓰입니다. `slug = "My Post"`는 `/posts/My Post/`에 게시되며(URL에 꼭 필요한 곳에서만 퍼센트 인코딩됩니다. [URL 형태](/ko/templates/data-model/#url-형태) 참고), `slug` 안의 `/`는 경로 단계를 추가합니다(`slug = "x/y"`는 `/posts/x/y/`). URL에 안전한 값을 직접 고르세요.
+프론트 매터의 `slug`는 URL의 마지막 세그먼트로 **그대로** 쓰입니다. `slug = "My Post"`는 `/posts/My Post/`에 게시되며(URL에 꼭 필요한 곳에서만 퍼센트 인코딩됩니다. [URL 형태](/ko/templates/data-model/#url-형태) 참고), `slug` 안의 `/`는 경로 단계를 추가합니다(`slug = "x/y"`는 `/posts/x/y/`). URL에 안전한 값을 직접 고르세요. 여기서 *그대로*는 슬러그화하지 않는다는 뜻입니다. 값은 다른 페이지 URL처럼 유니코드 NFC로 맞춰지지만, 눈에 보이는 글자는 바뀌지 않습니다([URL 형태](/ko/templates/data-model/#url-형태) 참고).
 
 반면 택소노미 항목 URL과 [`[[content.generate]]`](/ko/features/content-generation/) 슬러그는 [`slugify`](/ko/templates/filters/) 필터와 같은 규칙으로 **슬러그화**됩니다. ASCII 영문·숫자는 소문자로 바뀌고, 다른 문자 체계의 글자(`한글`, `ü`)는 유지되며, 공백·`-`·`_`·`/`는 하나의 `-`가 되고, 그 외 문장부호는 제거되며, 앞뒤의 `-`는 잘립니다. 그래서 태그 `C++ Tips & Tricks`는 `/tags/c-tips-tricks/`에, 슬러그 필드가 `A/B c_d.e`인 생성 페이지는 `/<section>/a-b-c-de/`에 놓입니다. 기존 URL이 바뀌지 않도록 이 동작은 그대로 유지됩니다.
 

@@ -264,8 +264,11 @@ module Hwaro
       # NFC form of `value` (the identity for ASCII, which is nearly every
       # path). Config patterns are typed precomposed while macOS, zip and
       # Dropbox hand out decomposed (NFD) file names, so every
-      # pattern-versus-path comparison folds both sides first. Comparison
-      # only: never use it to spell an output path or URL.
+      # pattern-versus-path comparison folds both sides first. It is also
+      # the spelling of every URL and output name derived from a content
+      # path (PermalinkResolver, bundle assets, search shards). Never use it
+      # to spell a path that is READ: Linux file systems are
+      # normalization-sensitive, so the source keeps its on-disk spelling.
       def nfc(value : String) : String
         value.ascii_only? ? value : value.unicode_normalize(:nfc)
       end

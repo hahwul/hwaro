@@ -210,6 +210,8 @@ The stub carries `<meta name="robots" content="noindex">` and a
 search engines fold the old URL into the page instead of indexing the stub.
 An absolute (`https://example.com/old/`) or protocol-relative (`//example.com/old/`)
 value is not something this build can publish, so it is skipped with a warning.
+An alias is used exactly as written, Unicode form included, so it can keep an old
+URL that an older hwaro published under a decomposed (NFD) file name answering.
 
 ### Custom Metadata
 
@@ -228,7 +230,7 @@ Access in templates: `{{ page.extra.rating }}`
 
 ### Slugs
 
-A front matter `slug` is used **verbatim** as the last URL segment: `slug = "My Post"` publishes at `/posts/My Post/` (percent-encoded only where a URL has to be, see [URL Forms](/templates/data-model/#url-forms)), and a `/` inside it adds path levels (`slug = "x/y"` gives `/posts/x/y/`). Choose an already URL-safe value.
+A front matter `slug` is used **verbatim** as the last URL segment: `slug = "My Post"` publishes at `/posts/My Post/` (percent-encoded only where a URL has to be, see [URL Forms](/templates/data-model/#url-forms)), and a `/` inside it adds path levels (`slug = "x/y"` gives `/posts/x/y/`). Choose an already URL-safe value. *Verbatim* means not slugified: like every page URL the value is still folded to Unicode NFC, which changes no character you see (see [URL Forms](/templates/data-model/#url-forms)).
 
 Taxonomy term URLs and [`[[content.generate]]`](/features/content-generation/) slugs are **slugified** instead, the same way as the [`slugify`](/templates/filters/) filter: ASCII letters and digits are lowercased, letters of other scripts (`한글`, `ü`) are kept, whitespace, `-`, `_` and `/` become a single `-`, other punctuation is dropped, and leading and trailing `-` are trimmed. So the tag `C++ Tips & Tricks` lives at `/tags/c-tips-tricks/`, and a generated page whose slug field is `A/B c_d.e` lands at `/<section>/a-b-c-de/`. These behaviours are kept as they are so existing URLs do not move.
 

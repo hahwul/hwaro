@@ -1033,7 +1033,7 @@ module Hwaro
           moved.each do |page|
             next unless old_url = before[page.path]?.try(&.[0])
             bundle = File.dirname(page.path)
-            next unless page.assets.any? { |asset| variants.has_key?(File.join(old_url, Path[asset].relative_to(bundle).to_s)) }
+            next unless page.assets.any? { |asset| variants.has_key?(File.join(old_url, Utils::PathUtils.nfc(Path[asset].relative_to(bundle).to_s))) }
             Logger.info "  Image bundle #{page.path} moved or left the build — running full rebuild."
             return true
           end
