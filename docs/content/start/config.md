@@ -222,6 +222,7 @@ Notes:
 - An explicit `path` in front matter always wins over any permalink rule.
 - An empty source key (`""` or `"/"`) makes a pattern rule a catch-all for every page. Declare it last, since first-match ordering means it would shadow any rule after it.
 - For non-default languages the `/lang/` prefix comes first: `/ko/2026/03/05/hello/`.
+- On a [versioned site](/features/versioned-docs/#url-mapping) a rule key names the *published* directory, not the source one. With `latest_at_root`, the latest version is `docs` and an older one is `docs/v1`, so a key for the latest's source directory (`docs/v2`) never matches. A remap `"docs" = "manual"` moves every version together (`/manual/`, `/manual/v1/`), while `"docs/v1" = "legacy"` moves only v1. A token pattern rebuilds the whole URL and drops the version segment unless it uses `:section`: `"docs" = "/ref/:slug/"` sends both versions of `install` to `/ref/install/` (a duplicate output path warning, one page is not written), whereas `"/ref/:section/:slug/"` keeps `/ref/docs/install/` and `/ref/docs/v1/install/`.
 
 ## Links
 

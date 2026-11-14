@@ -220,6 +220,7 @@ ignore = ["README.md", "_templates", "**/*.excalidraw.md"]
 - 프론트 매터의 명시적 `path`는 어떤 퍼머링크 규칙보다 항상 우선합니다.
 - 원본 키가 비어 있으면(`""` 또는 `"/"`) 패턴 규칙이 모든 페이지의 catch-all이 됩니다. 처음 일치하는 규칙이 이기므로 뒤의 규칙을 전부 가리게 되니 반드시 마지막에 선언합니다.
 - 기본 언어가 아닌 언어에서는 `/lang/` 접두사가 먼저 옵니다: `/ko/2026/03/05/hello/`.
+- [버전 문서 사이트](/ko/features/versioned-docs/#url-매핑)에서 규칙 키는 소스 디렉터리가 아니라 *게시되는* 디렉터리를 가리킵니다. `latest_at_root`일 때 최신 버전은 `docs`, 이전 버전은 `docs/v1`이므로, 최신 버전의 소스 디렉터리(`docs/v2`)를 키로 쓰면 절대 일치하지 않습니다. `"docs" = "manual"` 같은 경로 치환은 모든 버전을 함께 옮기고(`/manual/`, `/manual/v1/`), `"docs/v1" = "legacy"`는 v1만 옮깁니다. 토큰 패턴은 URL 전체를 다시 만들기 때문에 `:section`을 쓰지 않으면 버전 세그먼트가 사라집니다. `"docs" = "/ref/:slug/"`는 `install`의 두 버전을 모두 `/ref/install/`로 보내 출력 경로 중복 경고가 나고 한 페이지는 쓰이지 않습니다. `"/ref/:section/:slug/"`는 `/ref/docs/install/`과 `/ref/docs/v1/install/`을 유지합니다.
 
 ## 링크
 

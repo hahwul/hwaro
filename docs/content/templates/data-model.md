@@ -339,6 +339,12 @@ An individual content file (`.md`).
 
 Rendered HTML content is available as the top-level `content` variable.
 
+### URL Forms
+
+`page.url`, `page.permalink`, `section.url` and the `url` in `search.json` keep the path **as written**: `content/posts/C++ Tips.md` gives `/posts/C++ Tips/`, and the output directory on disk has the same name (`public/posts/C++ Tips/`). URLs written for strict-URI consumers are **percent-encoded** instead: `<link rel="canonical">` and `og:url` (`canonical_tag`, `seo.canonical_url`), `sitemap.xml`, RSS/Atom feeds, `llms.txt`, JSON-LD and the redirect stubs generated for `aliases` all say `/posts/C%2B%2B%20Tips/`. Non-ASCII behaves the same way: `/posts/한글/` is `/posts/%ED%95%9C%EA%B8%80/` in the sitemap.
+
+Browsers encode a raw `href="{{ page.url }}"` themselves, so ordinary links need nothing. To build a URL by hand for a machine-read context, encode the path: `{{ site.base_url }}{{ page.url | urlencode }}`. The [`urlencode`](/templates/filters/) filter keeps `/` but does not recognize existing `%XX` escapes, so apply it to `page.url`, never to `page.permalink` or an already-encoded value.
+
 ### Metadata Properties
 
 | Property | Type | Description |

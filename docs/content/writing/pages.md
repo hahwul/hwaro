@@ -68,7 +68,7 @@ Every `.md` and `.markdown` file under `content/` becomes a page, front matter o
 | Field | Type | Description |
 |-------|------|-------------|
 | updated | string | Last updated date |
-| slug | string | Custom URL slug |
+| slug | string | Custom URL slug, used verbatim (not slugified). See [Slugs](#slugs) |
 | path | string | Custom URL path |
 | aliases | array | Redirect URLs to this page |
 | authors | array | Author IDs, matched against `data/authors.*` (see [Site Authors](/templates/data-model/#site-authors)) |
@@ -223,6 +223,12 @@ pros = ["Fast", "Reliable"]
 ```
 
 Access in templates: `{{ page.extra.rating }}`
+
+### Slugs
+
+A front matter `slug` is used **verbatim** as the last URL segment: `slug = "My Post"` publishes at `/posts/My Post/` (percent-encoded only where a URL has to be, see [URL Forms](/templates/data-model/#url-forms)), and a `/` inside it adds path levels (`slug = "x/y"` gives `/posts/x/y/`). Choose an already URL-safe value.
+
+Taxonomy term URLs and [`[[content.generate]]`](/features/content-generation/) slugs are **slugified** instead, the same way as the [`slugify`](/templates/filters/) filter: ASCII letters and digits are lowercased, letters of other scripts (`한글`, `ü`) are kept, whitespace, `-`, `_` and `/` become a single `-`, other punctuation is dropped, and leading and trailing `-` are trimmed. So the tag `C++ Tips & Tricks` lives at `/tags/c-tips-tricks/`, and a generated page whose slug field is `A/B c_d.e` lands at `/<section>/a-b-c-de/`. These behaviours are kept as they are so existing URLs do not move.
 
 ## Full Front Matter Reference
 

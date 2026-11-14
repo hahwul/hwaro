@@ -48,7 +48,7 @@ Every value spec (`slug`, `title`, `body`, `date`, `description`, and each `taxo
 |-----|----------|---------|
 | `source` | yes | Dotted path to an array under `site.data` (`"products"` or `"products.items"`). Anything else (a missing key, a table) is a hard error spelling out what was found. |
 | `section` | yes | Target section. Pages get the path `<section>/<slug>.md`, so an existing `content/<section>/_index.md` lists them and `[permalinks]` patterns for the section apply. |
-| `slug` | yes | Field or template producing each page's slug. The result is slugified; duplicates within or across rules are a hard error naming both records. |
+| `slug` | yes | Field or template producing each page's slug. The result is slugified (unlike an authored front matter `slug`, which is used verbatim; see [Slugs](/writing/pages/#slugs)); duplicates within or across rules are a hard error naming both records. |
 | `title` | yes | Field or template producing the page title. |
 | `body` | no | Field or template producing the page's **markdown** body. Shortcodes, syntax highlighting and every markdown extension run on it. |
 | `body_template` | no | Alternative to `body`: a template file from `templates/`, rendered with the record as `item`. The output is markdown. Mutually exclusive with `body`. |
