@@ -53,6 +53,25 @@ would set an empty title or slug. Keys a section's `[cascade]` can set
 a null there still declares the key, so it keeps blocking the cascade, and the
 build already reads a null custom value as an empty string.
 
+## Values that change type
+
+The three formats do not share a type system, so a conversion can change a
+value's type while keeping its text. Nothing is silently dropped, but these
+mappings are lossy:
+
+- Dates and datetimes are written as date strings (`date = "2024-01-15"`),
+  which is how the build reads them. A re-read with another tool sees a string,
+  not a native date.
+- TOML arrays that mix types, and nested tables inside such arrays, are written
+  as strings (`[1, "a", true]` becomes `["1", "a", "true"]`) because the bundled
+  TOML writer requires uniform arrays. `-9223372036854775808` (the smallest
+  64-bit integer) is written as a quoted string for the same reason.
+- `inf`/`nan` have no JSON spelling: `to-json` refuses such a file and names it.
+- Keys that are not plain words (digits first, a leading `-`, `inf`, `nan`,
+  spaces, dots) are quoted in TOML, and an unquoted YAML date key
+  (`2024-01-01: v`) becomes the string key `"2024-01-01"`.
+- A leading UTF-8 BOM is dropped.
+
 ## JSON Output
 
 ```json
