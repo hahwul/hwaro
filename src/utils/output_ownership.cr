@@ -69,7 +69,8 @@ module Hwaro
       def recorded?(resolved : String, project_root : String) : Bool
         path = File.join(project_root, FILE)
         return false unless File.file?(path)
-        relative = PathUtils.relative_path(resolved, project_root)
+        # `presence`: the project root itself is "" and must never match a blank line.
+        relative = PathUtils.relative_path(resolved, project_root).presence
         File.each_line(path) do |line|
           entry = line.strip
           return true if entry == resolved || (relative && entry == relative)
