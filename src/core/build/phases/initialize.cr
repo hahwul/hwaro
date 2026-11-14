@@ -75,7 +75,8 @@ module Hwaro::Core::Build::Phases::Initialize
       # web server may be serving the tree behind it while this build runs.
       @output_tree_fresh = fresh && !ctx.options.serve_mode && !File.symlink?(output_dir.rstrip(File::SEPARATOR))
       @output_cwd = Dir.current
-      copy_static_files(output_dir, verbose, keep_output)
+      copy_static_files(output_dir, verbose, keep_output,
+        write_ahead: keep_output && !ctx.options.serve_mode ? build_cache : nil)
 
       if ctx.options.serve_mode
         # Serve output is never deployable (dev base_url baked into every
@@ -387,7 +388,7 @@ module Hwaro::Core::Build::Phases::Initialize
     end
   end
 
-  private def copy_static_files(output_dir : String, verbose : Bool, incremental : Bool = false)
+  private def copy_static_files(output_dir : String, verbose : Bool, incremental : Bool = false, write_ahead : Cache? = nil)
     return unless Dir.exists?("static")
 
     # Single source of truth for both cold and incremental builds: walk
@@ -398,6 +399,12 @@ module Hwaro::Core::Build::Phases::Initialize
     files_to_copy = collect_static_files("static", output_dir, static_publish_config, incremental)
     return if files_to_copy.empty?
 
+    # The copy can land on a page's output that only this build's render
+    # puts back (a `static/` path colliding with a page URL). If the build
+    # then fails before rendering, the cache file must not keep vouching for
+    # that page, or the next warm build skips it and ships the static bytes.
+    # Same write-ahead rule as the render phase (Cache#invalidate_on_disk).
+    write_ahead.try(&.invalidate_on_disk)
     copy_static_pairs(files_to_copy)
 
     label = incremental ? "static files (#{files_to_copy.size} updated)" : "static files"
