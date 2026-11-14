@@ -610,7 +610,7 @@ module Hwaro
           return [] of String unless url_path = url_output_path(page.url.lchop("/"))
           bundle_dir = File.dirname(page.path)
           dest_dir = File.join(output_dir, url_path)
-          page.assets.map { |asset| File.join(dest_dir, Path[asset].relative_to(bundle_dir).to_s) }
+          page.assets.map { |asset| File.join(dest_dir, Utils::PathUtils.nfc(Path[asset].relative_to(bundle_dir).to_s)) }
         end
 
         # Start an incremental serve pass: stamp the epoch `written_this_build?`

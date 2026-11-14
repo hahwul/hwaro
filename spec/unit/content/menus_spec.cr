@@ -396,6 +396,14 @@ describe Hwaro::Content::Menus do
       ])
     end
 
+    it "keys an NFD-stored directory by its NFC name, so a config entry overrides it" do
+      config = Hwaro::Models::Config.new
+      config.menus_auto_sections = "main"
+      config.menus = {"main" => [menu_item("글", "/블로그/", identifier: "블로그")]}
+      main = Hwaro::Content::Menus.build(config, [] of Hwaro::Models::Page, [auto_section("블로그".unicode_normalize(:nfd), "B")])["en"]["main"]
+      main.map { |e| {e.identifier, e.name} }.should eq([{"블로그", "글"}])
+    end
+
     it "does not duplicate a section that registers itself into the same menu" do
       config = Hwaro::Models::Config.new
       config.menus_auto_sections = "main"

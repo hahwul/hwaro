@@ -174,7 +174,7 @@ module Hwaro::Core::Build::Phases::Transform
   # links across whole section blocks on serve-mode incremental rebuilds.
   private def compare_sections_by_weight(a : Models::Section, b : Models::Section) : Int32
     cmp = a.weight <=> b.weight
-    cmp.zero? ? (a.path <=> b.path) : cmp
+    cmp.zero? ? Utils::SortUtils.compare_paths(a, b) : cmp
   end
 
   # Append pages that belong to no rendered section to the reading-order list.

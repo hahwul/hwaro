@@ -1957,4 +1957,41 @@ describe Hwaro::Core::Build::Cache, "#compute_file_hash" do
       hash.should_not be_empty
     end
   end
+
+  describe "a cache written before page URLs were spelled in NFC" do
+    # An older hwaro published an NFD-stored page under its NFD spelling.
+    # Rebuilt into, that tree never converges on APFS (the NFC page lands in
+    # the old directory, and pruning the old spelling deletes the new file),
+    # so such a cache is dropped and the build starts from an empty tree.
+    it "is dropped when it records a page output that is not NFC" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        meta = %("template_hash":"","config_hash":"","generator_version":#{Hwaro::VERSION.to_json})
+        entry = ->(output : String) { %({"path":"content/x.md","mtime":0,"hash":"","output_path":#{output.to_json}}) }
+        nfd = "public/한글/index.html".unicode_normalize(:nfd)
+
+        File.write(cache_path, %({"metadata":{#{meta}},"entries":[#{entry.call(nfd)}]}))
+        Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path).stats[:total].should eq(0)
+
+        # Written by a hwaro that spells URLs NFC: kept as it is.
+        File.write(cache_path, %({"metadata":{#{meta},"nfc_output_names":true},"entries":[#{entry.call(nfd)}]}))
+        Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path).stats[:total].should eq(1)
+
+        # An older cache of a site already named NFC needs no rebuild.
+        File.write(cache_path, %({"metadata":{#{meta}},"entries":[#{entry.call("public/한글/index.html")}]}))
+        Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path).stats[:total].should eq(1)
+      end
+    end
+
+    it "is stamped on save" do
+      Dir.mktmpdir do |dir|
+        cache_path = File.join(dir, ".hwaro_cache.json")
+        File.write(File.join(dir, "x.md"), "x")
+        cache = Hwaro::Core::Build::Cache.new(enabled: true, cache_path: cache_path)
+        cache.update(File.join(dir, "x.md"))
+        cache.save
+        File.read(cache_path).should contain(%("nfc_output_names":true))
+      end
+    end
+  end
 end

@@ -119,7 +119,8 @@ module Hwaro
             # Stable, deterministic order: empty section ("Pages") first,
             # then the rest alphabetically. Mirrors how `site.sections`
             # surfaces in templates.
-            section_keys = by_section.keys.sort_by! { |k| k.empty? ? "" : "1#{k}" }
+            # Keyed in NFC so an NFD-stored tree orders like an NFC one.
+            section_keys = by_section.keys.sort_by! { |k| k.empty? ? "" : "1#{Utils::PathUtils.nfc(k)}" }
             section_keys.each do |section_name|
               heading = if section_name.empty?
                           "Pages"
@@ -235,7 +236,8 @@ module Hwaro
               if synthesis = page.synthesis
                 str << "Source: " << synthesis.origin << "\n"
               else
-                str << "Source: content/" << page.path << "\n"
+                # NFC like the page URLs (the file is read by its own spelling).
+                str << "Source: content/" << Utils::PathUtils.nfc(page.path) << "\n"
               end
 
               if config.multilingual?

@@ -36,7 +36,7 @@ module Hwaro::Core::Build::Phases::Render
         bundle = "#{File.dirname(p.path)}/"
         p.assets.each do |asset|
           next if p.language && urls.has_key?(asset)
-          urls[asset] = "#{base}#{asset.lchop(bundle)}"
+          urls[asset] = "#{base}#{Utils::PathUtils.nfc(asset.lchop(bundle))}"
         end
       end
     end

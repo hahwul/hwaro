@@ -397,7 +397,9 @@ module Hwaro
             pixels, src_w, src_h = upright
 
             ext = File.extname(source).downcase
-            basename = File.basename(source, File.extname(source))
+            # A variant is a name hwaro makes up, so it is spelled NFC like
+            # the page URLs whatever form the source name is stored in.
+            basename = Hwaro::Utils::PathUtils.nfc(File.basename(source, File.extname(source)))
             Hwaro::Utils::FileSafe.mkdir_p(dest_dir)
 
             # Resize variants (sorted ascending so smallest is processed first)

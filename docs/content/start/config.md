@@ -318,7 +318,7 @@ auto_sections = "main"
 
 ## Static Files
 
-Everything under `static/` is copied verbatim into the site root, preserving its directory structure, so `static/css/app.css` is served at `/css/app.css`. Hidden entries are included too, so `static/.well-known/security.txt` is published at `/.well-known/security.txt`. By default Hwaro filters out common OS, editor, and VCS cruft so it never ships to production.
+Everything under `static/` is copied verbatim into the site root, preserving its directory structure, so `static/css/app.css` is served at `/css/app.css`. Hidden entries are included too, so `static/.well-known/security.txt` is published at `/.well-known/security.txt`. By default Hwaro filters out common OS, editor, and VCS cruft so it never ships to production. File names are copied as stored, Unicode form included: name static files in NFC (what keyboards type), because a link to `/img/한글.png` 404s on a Linux host when macOS stored that file decomposed (NFD).
 
 ```toml
 [static]

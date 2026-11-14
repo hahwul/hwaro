@@ -135,7 +135,10 @@ module Hwaro
         assets = collect_assets
         return UnusedAssetsResult.new if assets.empty?
 
-        scanned_text = collect_scan_text
+        # Folded to NFC on both sides: a reference is typed precomposed while
+        # macOS may store the file decomposed (NFD), and the two spellings
+        # are one name — without the fold `--delete` removed images in use.
+        scanned_text = Utils::PathUtils.nfc(collect_scan_text)
         referenced = build_referenced_basenames(scanned_text)
 
         unused = [] of String
@@ -150,6 +153,7 @@ module Hwaro
             Logger.warn "Skipping #{asset_path.inspect}: file name is not valid UTF-8"
             next
           end
+          basename = Utils::PathUtils.nfc(basename)
           next if referenced.includes?(basename)
           # Only the copy at the root of the static dir is served at that URL.
           next if basename.matches?(IMPLICIT_ROOT_ASSET) && File.dirname(asset_path) == File.dirname(File.join(@static_dir, basename))
