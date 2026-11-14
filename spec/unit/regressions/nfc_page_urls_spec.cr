@@ -68,6 +68,22 @@ describe "NFC page URLs" do
     end
   end
 
+  it "lists and tie-breaks NFD-stored pages in the NFC order" do
+    # `crème` sorts after `crf`, its NFD spelling `crème` before.
+    config = "title = \"T\"\nbase_url = \"http://localhost\"\n[sitemap]\nenabled = true\n"
+    content = {
+      "_index.md"     => "+++\ntitle = \"H\"\n+++\n",
+      nfd("crème.md") => "+++\ntitle = \"Creme\"\n+++\n",
+      "crf.md"        => "+++\ntitle = \"Crf\"\n+++\n",
+    }
+    templates = {"page.html" => "x", "section.html" => "{% for p in section.pages %}{{ p.title }},{% endfor %}"}
+    build_site(config, content_files: content, template_files: templates) do
+      File.read("public/index.html").should eq("Crf,Creme,")
+      sitemap = File.read("public/sitemap.xml")
+      sitemap.index!("/crf/").should be < sitemap.index!("/cr%C3%A8me/")
+    end
+  end
+
   it "routes two names that differ only in Unicode form through the duplicate-output check" do
     # Only a normalization-sensitive file system (ext4) can hold both; build
     # the pages in memory instead.

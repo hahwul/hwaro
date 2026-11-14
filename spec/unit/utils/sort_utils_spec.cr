@@ -286,6 +286,13 @@ describe Hwaro::Utils::SortUtils do
       sorted = Hwaro::Utils::SortUtils.sort_pages(pages)
       sorted.size.should eq(1)
     end
+
+    it "tie-breaks an NFD-stored path in its NFC order" do
+      # `cr\u00E8me` sorts after `crf`; its decomposed spelling `cre\u0300me`
+      # before it, so a macOS checkout listed the section in another order.
+      pages = [make_page("cr\u00E8me.md".unicode_normalize(:nfd)), make_page("crf.md")]
+      Hwaro::Utils::SortUtils.sort_pages(pages).map(&.path).should eq(["crf.md", "cr\u00E8me.md".unicode_normalize(:nfd)])
+    end
   end
 end
 
