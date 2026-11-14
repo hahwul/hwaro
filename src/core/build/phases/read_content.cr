@@ -34,7 +34,9 @@ module Hwaro::Core::Build::Phases::ReadContent
     # Sorted: glob yields raw readdir order (hash order on APFS/ext4, name
     # order on HFS+), which would otherwise leak into `site.pages`,
     # sitemap.xml and the search index, so one tree built differently per host.
-    Dir.glob("content/**/*").sort!.each do |file_path|
+    content_paths = Dir.glob("content/**/*").sort!
+    Utils::DeniedDirs.warn("content")
+    content_paths.each do |file_path|
       # `[content] ignore` first: a matched path is invisible to the build —
       # no page, section, raw file, and no symlink warning either.
       relative_path = Path[file_path].relative_to("content").to_s

@@ -572,6 +572,7 @@ module Hwaro::Core::Build::Phases::Initialize
 
       files_to_copy << {src_path, dest_path, info.modification_time}
     end
+    Utils::DeniedDirs.warn(src_dir)
 
     files_to_copy
   end
@@ -696,6 +697,7 @@ module Hwaro::Core::Build::Phases::Initialize
       # Priority: html > j2 > jinja2 > jinja > ecr (first loaded wins via ||=)
       extension_priority = {"html" => 0, "j2" => 1, "jinja2" => 2, "jinja" => 3, "ecr" => 4}
       all_template_files = Dir.glob("templates/**/*.{html,j2,jinja2,jinja,ecr}")
+      Utils::DeniedDirs.fail_if_any("templates")
       # Sort by extension priority so higher-priority extensions are loaded
       # first. `[]?` matters: `Hash#[]` raises on a miss, so the intended
       # `|| 99` fallback was unreachable if the glob ever admits a new

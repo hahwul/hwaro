@@ -14,6 +14,7 @@ require "crinja"
 require "../../utils/crinja_utils"
 require "../../utils/text_utils"
 require "../../utils/logger"
+require "../../utils/denied_dirs"
 
 module Hwaro
   module Core
@@ -55,6 +56,7 @@ module Hwaro
             dir_parts = parts[0...-1]
             entries << {dir_parts, stem, path}
           end
+          Utils::DeniedDirs.warn("data")
           entries.sort_by! { |(dir_parts, _, path)| {-dir_parts.size, path} }
 
           entries.each do |(dir_parts, stem, path)|
