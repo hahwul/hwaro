@@ -280,6 +280,29 @@ describe Hwaro::Content::Seo::JsonLd do
       data["dateModified"].as_s.should eq("2026-03-06T00:00:00+09:00")
     end
 
+    # Regression: `date = "2026-03-05T00:00:00Z"` printed as a full timestamp on
+    # a laptop but as a bare date on a UTC machine (it is a UTC-located
+    # midnight, which the local-midnight test matched only when the host zone
+    # was UTC). The same source must give the same bytes in CI and locally.
+    it "writes a midnight with an explicit Z the same in every host zone" do
+      config = Hwaro::Models::Config.new
+      page = Hwaro::Models::Page.new("post.md")
+      page.title = "Hello"
+      page.url = "/hello/"
+      page.date = Time.utc(2026, 3, 5)
+
+      saved = Time::Location.local
+      begin
+        outputs = [Time::Location::UTC, Time::Location.fixed("KST", 9 * 3600)].map do |zone|
+          Time::Location.local = zone
+          JSON.parse(Hwaro::Content::Seo::JsonLd.article(page, config)[/\{.*\}/m])["datePublished"].as_s
+        end
+        outputs.uniq.should eq(["2026-03-05"])
+      ensure
+        Time::Location.local = saved
+      end
+    end
+
     # Regression: the JSON-LD url carried a raw space / non-ASCII path while
     # canonical and og:url were percent-encoded — an invalid URL.
     it "percent-encodes page and breadcrumb URLs like the canonical URL" do
