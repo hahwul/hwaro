@@ -777,6 +777,13 @@ module Hwaro
         # 500-page site is one problem, not 500 lines.
         @@load_data_warned = Set(String).new
 
+        # A notice found while a template parses (src/ext/crinja_test_argument_fix.cr):
+        # every render worker parses its own copy, so print each one once per build.
+        def self.warn_template_once(message : String) : Nil
+          first = @@load_data_mutex.synchronize { @@load_data_warned.add?("template:#{message}") }
+          Logger.warn message if first
+        end
+
         private def warn_load_data_once(path : String, reason : String) : Nil
           first = @@load_data_mutex.synchronize { @@load_data_warned.add?(path) }
           Logger.warn "load_data(#{path.inspect}) #{reason}; the template receives none." if first
