@@ -623,6 +623,8 @@ module Hwaro
           # ...and for the date filter's unknown-locale warning, which a
           # still-wrong `locale=` must repeat on every rebuild.
           Content::Processors::Filters::DateFilters.clear_locale_warnings
+          # ...and for `resize_image(op=…)` variants (see forget_op_variants).
+          Content::Hooks::ImageHooks.forget_op_variants
           @context.try { |ctx| publish_asset_sources(ctx) }
           forget_created_dirs
           # The tree now holds the previous build's files, served live.

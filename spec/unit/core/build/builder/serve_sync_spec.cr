@@ -107,3 +107,44 @@ describe "Builder serve passes and the date filter's locale warning" do
     end
   end
 end
+
+# The `resize_image(op=…)` memo lived for the whole serve process and was
+# only cleared by a full build: a template edit that dropped a variant let
+# the sweep delete it, and the edit that brought it back hit the memo and
+# never wrote the file — every page pointed at a 404 image.
+describe "Builder serve passes and resize_image op variants" do
+  it "writes a variant again after a template edit removed and restored it" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        FileUtils.mkdir_p("static/img")
+        pixels = Bytes.new(40 * 30 * 3) { |i| (i % 251).to_u8 }
+        LibStb.stbi_write_png("static/img/photo.png", 40, 30, 3, pixels.to_unsafe.as(Void*), 40 * 3).should_not eq(0)
+        File.touch("static/img/photo.png", Time.utc(2020, 1, 1))
+        File.write("content/a.md", "+++\ntitle = \"A\"\n+++\n")
+        tpl = ->(op : String) { File.write("templates/page.html", %({% set f = resize_image(path="/img/photo.png", width=10, height=12, op="#{op}") %}{{ f.url }})) }
+        variant = "public/img/photo_10x12_fill_center.png"
+
+        tpl.call("fill")
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hook| builder.register(hook) }
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        builder.run(options).should be_true
+        File.exists?(variant).should be_true
+
+        options.preserve_output = true
+        tpl.call("fit")
+        builder.run_rerender(options)
+        File.exists?(variant).should be_false
+
+        tpl.call("fill")
+        builder.run_rerender(options)
+        File.read("public/a/index.html").should eq("http://localhost/img/photo_10x12_fill_center.png")
+        File.exists?(variant).should be_true
+      end
+    end
+  end
+end

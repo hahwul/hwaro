@@ -808,6 +808,14 @@ module Hwaro::Core::Build::Phases::Render
     fmt_paths = format_output_paths(page, output_dir, effective_output_formats(page, site.config))
     relations_hash = @page_template_hash_mutex.synchronize { @filter_relations_hashes.delete(page.path) } ||
                      page_relations_hash(page, templates, site, @pages_by_path || build_pages_by_path(site))
+    # A page a warm `serve --cache` start skipped has no in-session record of
+    # what its last render derived; its cache entry does. Without it the
+    # serve sweep never learned which alias stub, `/page/N/` file or
+    # `resize_image` variant this render stopped writing.
+    if @context.try(&.options.serve_mode)
+      previous = cache.derived_paths_for(source_path)
+      @page_derived_mutex.synchronize { @rendered_derived_outputs[page.path] ||= previous } unless previous.empty?
+    end
     cache.update(source_path, output_path, page.cascade_fingerprint, page_template_hash(page, templates, site), output_paths: fmt_paths, assets_hash: page_assets_hash(page), git_hash: page_git_hash(page), derived_paths: derived, relations_hash: relations_hash, source_read: page.source_read)
   end
 

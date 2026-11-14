@@ -33,7 +33,9 @@ module Hwaro
     module OutputOwnership
       extend self
 
-      # One resolved absolute path per line.
+      # One path per line: relative to the project root for an output inside
+      # the project (so the record survives moving the project, like the
+      # build cache's output paths), resolved absolute otherwise.
       FILE = File.join(HwaroDir::DIR, "owned_outputs")
 
       # `true` when a cold build may clear `resolved` (a symlink-resolved
@@ -67,8 +69,11 @@ module Hwaro
       def recorded?(resolved : String, project_root : String) : Bool
         path = File.join(project_root, FILE)
         return false unless File.file?(path)
+        # `presence`: the project root itself is "" and must never match a blank line.
+        relative = PathUtils.relative_path(resolved, project_root).presence
         File.each_line(path) do |line|
-          return true if line.strip == resolved
+          entry = line.strip
+          return true if entry == resolved || (relative && entry == relative)
         end
         false
       rescue File::Error
@@ -82,7 +87,8 @@ module Hwaro
         dir = File.join(project_root, HwaroDir::DIR)
         FileSafe.mkdir_p(dir)
         HwaroDir.ensure_self_ignore(dir)
-        File.open(File.join(project_root, FILE), "a") { |f| f.puts resolved }
+        entry = PathUtils.relative_path(resolved, project_root).presence || resolved
+        File.open(File.join(project_root, FILE), "a") { |f| f.puts entry }
       rescue ex : File::Error
         Logger.debug "Could not record output directory ownership for #{resolved}: #{ex.message}"
       end

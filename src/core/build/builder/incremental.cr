@@ -1612,6 +1612,10 @@ module Hwaro
           # the original — the original's priority_pages would short-
           # circuit the very hooks we want to fully execute here.
           deferred_ctx = Lifecycle::BuildContext.new(options)
+          # The hooks record what they publish through the builder: without
+          # it, every `resize_image(op=…)` variant the deferred pages printed
+          # went unrecorded and the sweep below deleted the priority pages'.
+          deferred_ctx.builder = self
           deferred_ctx.site = site
           deferred_ctx.config = site.config
           deferred_ctx.pages = site.pages

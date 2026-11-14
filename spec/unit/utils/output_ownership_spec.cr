@@ -24,5 +24,20 @@ describe Hwaro::Utils::OutputOwnership do
         end
       end
     end
+
+    it "keeps owning an in-project output directory after the project moves" do
+      Dir.mktmpdir do |base|
+        real = ->(p : String) { Hwaro::Utils::PathUtils.resolved_real_path(p) }
+        old_root = File.join(base, "a")
+        Dir.mkdir_p(File.join(old_root, "dist"))
+        Hwaro::Utils::OutputOwnership.record(real.call(File.join(old_root, "dist")), real.call(old_root))
+
+        new_root = File.join(base, "b")
+        File.rename(old_root, new_root)
+        Hwaro::Utils::OutputOwnership.clearable?("dist", real.call(File.join(new_root, "dist")), real.call(new_root)).should be_true
+        # An output outside the project stays recorded by its absolute path.
+        Hwaro::Utils::OutputOwnership.clearable?("x", real.call(File.join(base, "x")), real.call(new_root)).should be_false
+      end
+    end
   end
 end

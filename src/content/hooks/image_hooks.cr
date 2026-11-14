@@ -141,6 +141,14 @@ module Hwaro
           end
         end
 
+        # A serve pass that skips the BeforeRender hooks (a template-only
+        # re-render) is still a new build for the op-variant memo: the sweep
+        # that ended the previous pass may have deleted a variant it names,
+        # and a memo hit never writes the file again.
+        def self.forget_op_variants : Nil
+          @@lookup_mutex.synchronize { @@op_variants.clear }
+        end
+
         def self.reset_render_lookups(ctx : Core::Lifecycle::BuildContext) : Nil
           @@lookup_mutex.synchronize do
             @@lookup_pages = ctx.all_pages
