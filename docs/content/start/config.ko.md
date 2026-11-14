@@ -17,6 +17,16 @@ toc = true
 Unknown key 'markdonw' in config.toml — hwaro does not read it. Did you mean 'markdown'?
 ```
 
+1.0 이전에 읽던 키는 그 사실을 알려 줍니다. 이전 버전의 `hwaro init`이 만든
+`config.toml`에는 모두 1.0에서 제거된 `[plugins]` 섹션이 들어 있습니다.
+
+```
+Key 'plugins' in config.toml was removed in 1.0 — hwaro does not read it; delete the [plugins] section to silence this warning.
+```
+
+섹션에 예전 기본값(`processors = ["markdown"]`)만 있거나 비어 있으면
+`hwaro doctor --fix`가 지워 줍니다.
+
 이 검사는 최상위 키만 대상으로 합니다. 섹션 안에 중첩된 키의 오타
 (`[markdown] emoij = true`)는 보고되지 않으므로 아래 표와 대조해 확인하세요. `[highlight]` 테이블 대신 `highlight = false`를 쓰거나
 `[[taxonomies]]` 항목 대신 `taxonomies = ["tags"]`를 쓰는 것처럼 알려진

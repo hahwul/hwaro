@@ -36,7 +36,7 @@ hwaro doctor --json
 |------|-------------|
 | -c, --content-dir DIR | Content directory to check (default: content) |
 | -e, --env ENV | Check the config as `build --env ENV` loads it (merges `config.ENV.toml`; defaults to `HWARO_ENV`). `--fix` still edits only `config.toml` |
-| --fix | Perform real fixes — normalize values (base_url trailing slash, sitemap priority, …) |
+| --fix | Perform real fixes — normalize values (base_url trailing slash, sitemap priority, …) and delete a leftover `[plugins]` section that holds only the pre-1.0 default |
 | --approve | Approve and add recommended optional config sections |
 | --full | Both `--fix` and `--approve` |
 | --dry-run | Preview changes without writing `config.toml` |

@@ -3421,12 +3421,15 @@ describe "Hwaro::Models::Config" do
     end
 
     # `[plugins]` was a dead section (nothing read `processors`); it was
-    # removed before 1.0 and must now warn like any other unknown key.
-    it "warns on the removed [plugins] section" do
+    # removed in 1.0, and every config.toml an older `hwaro init` wrote has
+    # it, so the warning says what to do about it.
+    it "warns on the removed [plugins] section, saying it was removed and how to silence it" do
       log = with_captured_log do
         load_config(%([plugins]\nprocessors = ["markdown"]))
       end
-      log.should contain("Unknown key 'plugins'")
+      log.lines.count(&.includes?("plugins")).should eq(1)
+      log.should contain("Key 'plugins' in ")
+      log.should contain(".toml was removed in 1.0 — hwaro does not read it; delete the [plugins] section to silence this warning.")
     end
 
     it "does not warn for any known top-level key" do
