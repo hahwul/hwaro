@@ -1649,6 +1649,10 @@ module Hwaro
           entries = {} of String => String
           if e = data["entries"]?.try(&.as_h?)
             e.each do |k, v|
+              # A slug becomes a file name, and no generated slug holds a NUL
+              # (front matter drops it); one in a hand-edited or static-shipped
+              # manifest made the prune's `File.join` raise and fail the build.
+              next if k.includes?('\0')
               if str = v.as_s?
                 entries[k] = str
               end

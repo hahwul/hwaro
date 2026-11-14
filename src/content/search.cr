@@ -305,8 +305,10 @@ module Hwaro
           Dir.delete(dir)
           dir = File.dirname(dir)
         end
-      rescue File::Error
+      rescue File::Error | ArgumentError
         # Best effort: a stale shard is harmless, a failed build is not.
+        # ArgumentError: an id holding a NUL (a manifest shipped from
+        # `static/`) names no file, and building its path raises.
       end
 
       private def self.build_search_data(pages : Array(Models::Page), config : Models::Config) : Array(Array(Entry))
