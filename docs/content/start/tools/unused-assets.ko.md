@@ -87,7 +87,9 @@ found: 4 unused assets
 색상 터미널에서는 정렬된 행으로 구성된 `hwaro unused-assets` 영수증과
 `✦ found` 결과 줄로 표시됩니다(모두 참조 중이면 `found: no unused assets`).
 `--delete`를 쓰면 확인 후 결과 줄이 `deleted: N files`로 바뀌고, 취소하면
-`cancelled: no files deleted`가 됩니다.
+`cancelled: no files deleted`가 됩니다. 확인 프롬프트에는 터미널이 필요합니다. stdin이나
+stdout이 파이프/리다이렉트된 경우(CI, 스크립트) `--force` 없는 `--delete`는 답을 기다리지 않고
+사용법 오류(종료 코드 2)로 거부됩니다.
 
 ## JSON 출력
 

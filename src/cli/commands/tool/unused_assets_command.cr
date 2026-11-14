@@ -185,6 +185,16 @@ module Hwaro
 
             confirmed = force
             unless confirmed
+              # Without a terminal nobody can answer: a piped stdin would hang
+              # the prompt (or let a stray "y" delete files), so refuse as
+              # `tool agents-md` does.
+              unless Prompt.interactive?
+                raise Hwaro::HwaroError.new(
+                  code: Hwaro::Errors::HWARO_E_USAGE,
+                  message: "--delete cannot prompt for confirmation outside an interactive terminal.",
+                  hint: "Pass --force to delete the unused files non-interactively.",
+                )
+              end
               confirmed = Prompt.confirm?("Delete #{result.unused_count} unused file(s)?", default: false) == true
             end
             if confirmed
