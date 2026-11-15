@@ -188,7 +188,10 @@ module Hwaro
         private def register_url_for_function
           # url_for() function - generate URL for a path
           @env.functions["url_for"] = Crinja.function({path: ""}) do
-            path = arguments["path"].to_s
+            # A pre-escaped SafeString path (a render-hook `destination`) is
+            # unescaped first so the returned URL is escaped exactly once when
+            # printed, not `&amp;amp;` (see UrlFilters.url_text).
+            path = Filters::UrlFilters.url_text(arguments["path"])
             # A `page.assets` entry names the content file; it publishes next
             # to its page.
             path = TemplateEngine.published_asset_url(env, path) || path
