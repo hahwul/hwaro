@@ -388,19 +388,23 @@ end
 module Crinja::Filter
   # Replace up to `limit` occurrences of `search` in `source` (nil/negative =
   # all), counting matches in the ORIGINAL string, not in the partly-replaced
-  # result. Mirrors Python `str.replace(old, new, count)`.
+  # result. Mirrors Python `str.replace(old, new, count)`. Byte offsets, not
+  # char offsets: on non-ASCII text a char `index`/slice rescans from the
+  # start, making the loop quadratic.
   def self.__replace_n(source : String, search : String, replacement : String, limit : Int32?) : String
     return source.gsub(search, replacement) if limit.nil? || limit < 0
     return source if limit == 0 || search.empty?
-    String.build do |io|
+    bytes = source.to_slice
+    String.build(source.bytesize) do |io|
       pos = 0
       done = 0
-      while done < limit && (idx = source.index(search, pos))
-        io << source[pos, idx - pos] << replacement
-        pos = idx + search.size
+      while done < limit && (idx = source.byte_index(search, pos))
+        io.write bytes[pos, idx - pos]
+        io << replacement
+        pos = idx + search.bytesize
         done += 1
       end
-      io << source[pos..]
+      io.write bytes[pos, bytes.size - pos]
     end
   end
 end
