@@ -316,15 +316,46 @@ class Crinja
 end
 
 class Crinja::Template
-  # Never escape this template's own output (its includes still follow
-  # their own names). See the file comment.
+  # Never escape this template's output, nor that of anything it includes.
+  # See the file comment.
   property __no_autoescape : Bool = false
+
+  # Render as text: nothing in this render escapes, whatever the template
+  # and include names say (a `body_template` produces Markdown).
+  def render_text(bindings) : String
+    String.build do |io|
+      env.with_scope(bindings) do |context|
+        context.__text_output = true
+        render(io, env)
+      end
+    end
+  end
+end
+
+class Crinja::Context
+  # Set on a render whose output is text (a template that does not escape:
+  # `page.json.jinja`, a `[[content.generate]]` spec). A template it
+  # includes or imports inherits it, so `{% include "partials/x.html" %}`
+  # inside a JSON output does not HTML-escape there. An HTML template's
+  # includes still follow their own names (a `.js` partial does not escape).
+  property __text_output : Bool? = nil
+
+  def text_output? : Bool
+    if (own = @__text_output).nil?
+      parent.try(&.text_output?) || false
+    else
+      own
+    end
+  end
 end
 
 class Crinja::Renderer
-  # Upstream body; only the autoescape decision consults `__no_autoescape`.
+  # Upstream body; only the autoescape decision is hwaro's: `__no_autoescape`
+  # and a text render (see Context#text_output?) never escape.
   def render(io : IO, template : Template)
-    env.context.autoescape = !template.__no_autoescape && env.config.autoescape?(template.filename)
+    escapes = !env.context.text_output? && !template.__no_autoescape && env.config.autoescape?(template.filename)
+    env.context.autoescape = escapes
+    env.context.__text_output = true unless escapes
 
     env.context.macros.merge(template.macros)
     output = render(template.nodes)

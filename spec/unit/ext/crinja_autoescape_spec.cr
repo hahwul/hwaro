@@ -381,4 +381,21 @@ describe "Crinja autoescape" do
       on(%({% set a %}가가{% endset %}{{ a | replace("가", "", 5) }})).should eq("")
     end
   end
+
+  describe "text renders" do
+    it "a text output's includes never escape; an HTML output's follow their own names" do
+      Dir.mktmpdir do |dir|
+        {"p.html" => "{{ u }}", "s.js" => "{{ u }}", "page.json" => %({"x": "{% include "p.html" %}"}),
+         "page.html" => %(<{% include "p.html" %}|{% include "s.js" %}>)}.each do |name, source|
+          File.write(File.join(dir, name), source)
+        end
+        env = Hwaro::Content::Processors::TemplateEngine.new(true).env
+        env.loader = Crinja::Loader::FileSystemLoader.new(dir)
+        env.get_template("page.json").render(ae_vars).should eq(%({"x": "#{CANARY}"}))
+        env.get_template("page.html").render(ae_vars).should eq("<#{ESCAPED}|#{CANARY}>")
+        env.get_template("p.html").render_text(ae_vars).should eq(CANARY)
+        env.get_template("p.html").render(ae_vars).should eq(ESCAPED)
+      end
+    end
+  end
 end

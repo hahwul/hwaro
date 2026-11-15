@@ -359,4 +359,51 @@ describe "Template autoescape" do
       html.should_not contain(%(alt="<span))
     end
   end
+
+  it "never escapes inside a text output, includes and body_template included" do
+    q = CANARY.gsub('"', "\\\"")
+    build_site(
+      <<-TOML,
+        title = "x"
+        base_url = "https://e.example.com"
+        [templates]
+        autoescape = true
+        [feeds]
+        enabled = true
+        type = "json"
+        [outputs]
+        page = ["json", "txt"]
+        [[content.generate]]
+        source = "items"
+        section = "items"
+        slug = "id"
+        title = '{% include "partials/name.html" %}'
+        body_template = "gen.j2"
+        TOML
+      content_files: {"p.md" => "+++\ntitle = \"T #{q}\"\n+++\nb\n"},
+      template_files: {
+        "page.html"          => "<h1>{{ page.title }}</h1>{{ content }}",
+        "partials/name.html" => "{{ item.name }}",
+        "partials/t.html"    => "{{ page.title }}",
+        "gen.j2"             => "Body {% include \"partials/name.html\" %} {{ item.name }}",
+        "page.json.jinja"    => %({"t": "{% include "partials/t.html" %}"}),
+        "page.txt.jinja"     => %({% include "partials/t.html" %}),
+        "feed.json.jinja"    => %({"items": [{% for p in pages %}"{% include "partials/f.html" %}"{% endfor %}]}),
+        "partials/f.html"    => "{{ p.title }}",
+      },
+      data_files: {"items.json" => %([{"id": "i1", "name": "N #{q}"}])},
+    ) do
+      File.read("public/p/index.json").should eq(%({"t": "T #{CANARY}"}))
+      File.read("public/p/index.txt").should eq("T #{CANARY}")
+      File.read("public/feed.json").should contain(%("T #{CANARY}"))
+      # the generated title and body are text: the page template escapes the
+      # title once, and the Markdown body carries the record's raw text
+      item = File.read("public/items/i1/index.html")
+      item.should contain("<h1>N #{ESCAPED}</h1>")
+      item.should contain(%(Body N <b a="x">))
+      item.should_not contain("Body N &lt;")
+      # an HTML page's include still escapes
+      File.read("public/p/index.html").should contain("<h1>T #{ESCAPED}</h1>")
+    end
+  end
 end
