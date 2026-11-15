@@ -182,8 +182,19 @@ module Crinja::Markup
   # can't reach that generated character, so when the format string contains a
   # `%c` conversion, return the whole result PLAIN — the print path then
   # escapes it once (fail-closed; the safe format string's own markup is
-  # over-escaped, acceptable for this rare case). `%d`/`%x`/`%.2f`/… keep the
-  # safe path and stay byte-identical.
+  # over-escaped, acceptable for this rare case). `%d`/`%x`/`%.2f`/`%%`… keep
+  # the safe path and stay byte-identical.
+  #
+  # A `%c` conversion as Crystal's sprintf reads it: flags, width, a `1$`
+  # position, `*`, a precision, and a named `%<a>` (unreachable — `format`'s
+  # varargs are never the hash it needs — but cheap to cover). `%%` is a
+  # literal percent and is matched first so `%%c` is not taken for one.
+  FORMAT_CONVERSION = /%(?:%|(?:<[^>]*>)?[-+ #0-9.*$]*c)/
+
+  def char_conversion?(format : String) : Bool
+    format.scan(FORMAT_CONVERSION).any? { |match| match[0] != "%%" }
+  end
+
   def keep_safe_format(filter : Callable::Instance) : Callable::Instance
     inner = filter.proc
     proc = ->(arguments : Arguments) do
@@ -193,7 +204,7 @@ module Crinja::Markup
       result = inner.call(args)
       raw = result.raw
       return result unless raw.is_a?(String)
-      arguments.target.to_s.includes?("%c") ? Value.new(raw) : Value.new(SafeString.new(raw))
+      char_conversion?(arguments.target.to_s) ? Value.new(raw) : Value.new(SafeString.new(raw))
     end
     Callable::Instance.new(proc, filter.defaults, filter.name)
   end
