@@ -57,20 +57,20 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 | markdownify | 마크다운 렌더링 | {{ text \| markdownify }} |
 | xml_escape | XML 이스케이프 | {{ text \| xml_escape }} |
 
-[`[templates] autoescape`](/ko/templates/syntax/#html-이스케이프)가 켜져 있으면 필터는 *안전(safe)* 값(그대로 출력되는 마크업)을 Jinja2처럼 다룹니다.
+[`[templates] autoescape`](/ko/templates/syntax/#html-이스케이프)(기본값은 켜짐)에서 필터는 *안전(safe)* 값(그대로 출력되는 마크업)을 Jinja2처럼 다룹니다.
 
 | 필터 | 자동 이스케이프에서의 결과 |
 |------|-------------------------|
 | `e` / `escape` | 텍스트를 이스케이프하고, 안전 값은 그대로 돌려줍니다. 결과는 어느 쪽이든 안전 값이라 두 번 이스케이프되지 않습니다 |
 | `forceescape`, `xml_escape` | 안전 값이어도 이스케이프하며, 결과는 안전 값입니다 |
 | `safe` | 값을 안전 값(그대로 출력)으로 표시합니다 |
-| `markdownify`, `tojson`, `jsonify`, `urlize`, `xmlattr` | 안전한 HTML(또는 스크립트에 넣어도 되는 JSON)을 돌려줍니다. `urlize`는 링크로 바꾸는 텍스트를 이스케이프하고 `http(s)`/`www.` URL만 링크로 만듭니다(`javascript:` 등 안전하지 않은 스킴은 링크하지 않음). 스위치가 켜져 있으면 `xmlattr`는 공백·`/`·`>`·`=`가 든 속성 이름을 거부합니다 |
+| `markdownify`, `tojson`, `jsonify`, `urlize`, `xmlattr` | 안전한 HTML(또는 스크립트에 넣어도 되는 JSON)을 돌려줍니다. `urlize`는 링크로 바꾸는 텍스트를 이스케이프하고 `http(s)`/`www.` URL만 링크로 만듭니다(`javascript:` 등 안전하지 않은 스킴은 링크하지 않음). 자동 이스케이프에서 `xmlattr`는 공백·`/`·`>`·`=`가 든 속성 이름을 거부합니다 |
 | `upper`, `lower`, `capitalize`, `center`, `indent`, `trim`, `truncate`, `truncate_words`, `replace`, `regex_replace`, `format`, `string`, `default` | 안전 값을 넣으면 결과도 안전 값이고, 필터가 덧붙이는 텍스트(`truncate`의 `end`, `replace`의 새 텍스트, `format`의 인자)는 이스케이프됩니다. 일반 텍스트를 넣으면 결과도 일반 텍스트입니다 |
 | `join` | 안전 값이 아닌 항목과 구분자를 이스케이프하며, 결과는 안전 값입니다 |
 | `strip_html`, `striptags` | 엔티티를 디코딩한 일반 텍스트를 돌려주므로 출력할 때 정확히 한 번 이스케이프됩니다 |
 | 그 밖의 필터(`slugify`, `t`, `date`, `urlencode` 등) | 일반 텍스트를 돌려주며 출력할 때 이스케이프됩니다 |
 
-자동 이스케이프가 꺼져 있으면 모든 필터가 예전과 같이 동작합니다. `safe`는 여전히 값을 표시하며, 표시된 값은 `| e`를 그대로 통과합니다.
+`autoescape = false`이면 모든 필터가 hwaro 0.x와 같이 동작합니다. `safe`는 여전히 값을 표시하며, 표시된 값은 `| e`를 그대로 통과합니다.
 
 
 `markdownify`는 사이트의 [`[markdown]`](/ko/features/markdown-extensions/)

@@ -62,7 +62,7 @@ module Hwaro
             4. **Always preview** with `hwaro serve` before committing.
             5. **Validate front matter syntax** (TOML, YAML, or JSON) and `config.toml` after edits.
             6. **Use `{{ base_url }}` prefix** for URLs in templates.
-            7. **Escape user content** with `{{ value | e }}` (or `| escape`) in templates.
+            7. **Printed values are HTML-escaped** by default (`[templates] autoescape`). Keep `{{ value | e }}` on user content, and add `| safe` only to author HTML meant as markup.
 
             ## Full Reference
 
@@ -341,7 +341,7 @@ module Hwaro
             4. **Always preview** with `hwaro serve` before committing.
             5. **Validate front matter syntax** (TOML, YAML, or JSON) and `config.toml` after edits.
             6. **Use `{{ base_url }}` prefix** for URLs in templates.
-            7. **Escape user content** with `{{ value | e }}` (or `| escape`) in templates.
+            7. **Printed values are HTML-escaped** by default (`[templates] autoescape`). Keep `{{ value | e }}` on user content, and add `| safe` only to author HTML meant as markup.
 
             #{SITE_SECTION_MARKER}
 

@@ -17,7 +17,7 @@ Hwaro는 Jinja2 호환 템플릿 엔진인 Crinja를 사용합니다. 이 페이
 {{ content }}
 ```
 
-출력되는 값을 HTML 이스케이프할지는 `[templates] autoescape`에 달려 있습니다. [HTML 이스케이프](#html-이스케이프)를 참고합니다.
+출력되는 값은 안전 값으로 표시되지 않으면 HTML 이스케이프됩니다. [HTML 이스케이프](#html-이스케이프)를 참고합니다.
 
 괄호로 묶은 표현식 뒤에도 속성, 인덱스, 호출 접근을 쓸 수 있으므로 필터나 함수 결과에서 바로 필드를 읽을 수 있습니다.
 
@@ -28,24 +28,36 @@ Hwaro는 Jinja2 호환 템플릿 엔진인 Crinja를 사용합니다. 이 페이
 
 ## HTML 이스케이프
 
-`config.toml`의 `[templates] autoescape`가 출력되는 값을 HTML 이스케이프할지 정합니다. 이번 릴리스의 기본값은 `false`이고, 이후 릴리스에서 기본값이 켜짐으로 바뀝니다.
+Jinja2처럼, 템플릿이 출력하는 값은 *안전(safe)* 값이 아니면 모두 HTML 이스케이프됩니다. 작성자 텍스트(제목, 설명, 섹션 이름과 택소노미 이름, `extra` 필드, 데이터 파일, i18n 문자열)는 요소 텍스트든 속성 값이든 출력하는 곳마다 한 번 이스케이프되며, 여기에 `| e`를 붙여도 문제없습니다(두 번 이스케이프하지 않습니다). 마크업으로 출력하려는 작성자 HTML에는 `| safe`가 필요합니다. 예: `{{ page.extra.banner | safe }}`.
 
-- **꺼짐:** 값은 그대로 출력됩니다. 콘텐츠나 데이터에서 온 텍스트(제목, 설명, 섹션 이름과 택소노미 이름, `extra` 필드, 데이터 파일, i18n 문자열)는 요소 텍스트든 속성 값이든 출력하는 곳마다 `| e`를 거치게 하세요. 예: `<meta name="description" content="{{ page.description | e }}">`.
-- **켜짐**(Jinja2와 같음): *안전(safe)* 값이 아니면 출력되는 모든 값이 이스케이프됩니다. 작성자 텍스트는 한 번 이스케이프되며, 여기에 `| e`를 붙여도 문제없습니다(두 번 이스케이프하지 않습니다). 마크업으로 출력하려는 작성자 HTML에는 `| safe`가 필요합니다. 예: `{{ page.extra.banner | safe }}`.
+hwaro가 HTML로 렌더링한 값(`content`, `toc`, `page.summary`, `og_all_tags`와 그 밖의 `*_tags` 변수 등, [HTML 값](/ko/templates/data-model/#html-값) 참고)은 안전 값이라 그대로 출력됩니다.
 
-두 모드 모두에서 hwaro가 HTML로 렌더링한 값(`content`, `toc`, `page.summary`, `og_all_tags`와 그 밖의 `*_tags` 변수 등, [HTML 값](/ko/templates/data-model/#html-값) 참고)은 안전 값이라 그대로 출력됩니다. 텍스트에는 `| e`, 작성자 HTML에는 `| safe`를 붙여 쓴 템플릿은 어느 모드에서나 같은 결과를 냅니다.
+`config.toml`에 `[templates] autoescape = false`를 쓰면 이스케이프가 꺼집니다. 모든 값이 hwaro 0.x와 똑같이 그대로 출력되므로, 콘텐츠나 데이터에서 온 텍스트는 출력하는 곳마다 `| e`를 거치게 하세요. 예: `<meta name="description" content="{{ page.description | e }}">`. 텍스트에는 `| e`, 작성자 HTML에는 `| safe`를 붙여 쓴 템플릿은 어느 설정에서나 같은 결과를 냅니다.
 
-자동 이스케이프가 켜져 있으면 출력이 HTML이나 XML인 템플릿이 이스케이프합니다. `.html`, `.htm`, `.xhtml`, `.xml`, `.svg`, `.rss`, `.atom`으로 끝나는 파일(뒤에 붙은 `.jinja`, `.j2`, `.jinja2`, `.ecr`는 무시), 형식이 드러나지 않는 이름(`page.j2`), 내장 숏코드, RSS와 Atom 피드 템플릿이 그렇습니다. 텍스트 출력은 이스케이프하지 않습니다. `.json`, `.txt`, `.csv`, `.js`, `.mjs`, `.css`, `.md`, `.markdown` 템플릿(그래서 `page.json.jinja`, `feed.json.jinja`)과 `[[content.generate]]`의 스펙이 그렇습니다. include, import로 불러온 파일은 자기 이름을 따르지만, `{% extends %}` 체인은 ENTRY 템플릿(페이지가 렌더링되는 템플릿)을 따릅니다 — Jinja2처럼 렌더 한 번에 이스케이프 정책 하나입니다. 템플릿 안에서 일부 구간만 끄거나 켤 수 있습니다.
+출력이 HTML이나 XML인 템플릿이 이스케이프합니다. `.html`, `.htm`, `.xhtml`, `.xml`, `.svg`, `.rss`, `.atom`으로 끝나는 파일(뒤에 붙은 `.jinja`, `.j2`, `.jinja2`, `.ecr`는 무시), 형식이 드러나지 않는 이름(`page.j2`), 내장 숏코드, RSS와 Atom 피드 템플릿이 그렇습니다. 텍스트 출력은 이스케이프하지 않습니다. `.json`, `.txt`, `.csv`, `.js`, `.mjs`, `.css`, `.md`, `.markdown` 템플릿(그래서 `page.json.jinja`, `feed.json.jinja`), `[[content.generate]]`의 스펙과 `body_template` 파일, 그리고 텍스트 출력이 include한 모든 것이 그렇습니다. HTML 템플릿이 include, import로 불러온 파일은 자기 이름을 따르고(`.js` 조각은 이스케이프하지 않습니다), `{% extends %}` 체인은 ENTRY 템플릿(페이지가 렌더링되는 템플릿)을 따릅니다 — Jinja2처럼 렌더 한 번에 이스케이프 정책 하나입니다. 템플릿 안에서 일부 구간만 끄거나 켤 수 있습니다.
 
 ```jinja
 {% autoescape false %}{{ legacy_html }}{% endautoescape %}
 ```
 
-이 블록은 그 안에서 include한 파일에는 미치지 않습니다. 자동 이스케이프가 켜져 있으면 다음도 달라집니다.
+이 블록은 그 안에서 include한 파일에는 미치지 않습니다. 자동 이스케이프에서는 다음도 달라집니다.
 
 - `a ~ b`(문자열의 `a + b`도)에 안전 값이 있으면 다른 쪽을 이스케이프하고 결과도 안전 값입니다. `{{ "<p>" ~ x }}`는 `&lt;p&gt;`를 출력하므로, 마크업은 출력이 안전 값인 `{% set %}…{% endset %}` 블록이나 매크로로 만드세요.
 - `| e`와 `| escape`는 안전 값을 건드리지 않습니다. HTML을 텍스트로 보여 주려면(피드 등) 그래도 이스케이프하는 `| forceescape`나 `| xml_escape`를 씁니다.
 - `{{ x | tojson }}`은 `<`, `>`, `&`, `'`를 `\u003c` 형태로 쓴 안전한 JSON이라 `<script>` 안에 바로 넣을 수 있습니다.
+
+### 0.x에서 옮겨 올 때
+
+1.0 이전에는 템플릿이 `| e`를 쓰지 않으면 아무것도 이스케이프되지 않았습니다. 기본값이 사이트에서 무엇을 바꾸는지 보려면, 그대로 한 번, 이스케이프를 끄고 한 번 서로 다른 디렉터리에 빌드해 비교합니다.
+
+```bash
+printf '[templates]\nautoescape = false\n' > config.noescape.toml
+hwaro build -o /tmp/site-1x
+hwaro build --env noescape -o /tmp/site-0x
+diff -r /tmp/site-0x /tmp/site-1x
+```
+
+차이는 둘 중 하나입니다. 0.x가 이스케이프하지 않고 출력하던 텍스트이거나(`Tom & Jerry`가 이제 `Tom &amp; Jerry`로 출력됩니다. 브라우저에서는 똑같이 보이고, 더는 속성 밖으로 빠져나갈 수 없습니다), 이제 텍스트로 보이게 되어 출력하는 곳에 `| safe`가 필요한 작성자 HTML입니다. 그런 다음 `config.toml`에 선택을 적어 둡니다(`autoescape = true`, 또는 0.x 출력을 유지하려면 `false`). 템플릿이 있는데 이 키를 적지 않은 사이트는 `hwaro doctor`가 알려 줍니다. 새 사이트는 `hwaro init`이 이 키를 써 둡니다.
 
 ## 주석
 
