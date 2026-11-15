@@ -968,6 +968,8 @@ module Hwaro::Core::Build::Phases::Initialize
     # with a fresh cache so long serve sessions don't accumulate every
     # historical template source in memory.
     env.cache = Crinja::TemplateCache::InMemory.new
+    # Per build: a serve-mode config reload may flip `[templates] autoescape`.
+    Content::Processors::TemplateEngine.configure_autoescape(env, template_autoescape?)
 
     # Set up template loader for template inheritance and includes
     if loader = build_template_loader
@@ -986,12 +988,17 @@ module Hwaro::Core::Build::Phases::Initialize
   # Each worker fiber gets its own env to avoid shared mutable state in
   # Crinja's `with_scope` (which mutates @context on the environment).
   private def create_fresh_crinja_env : Crinja
-    engine = Content::Processors::TemplateEngine.new
+    engine = Content::Processors::TemplateEngine.new(template_autoescape?)
     env = engine.env
     if loader = build_template_loader
       env.loader = loader
     end
     env
+  end
+
+  # `[templates] autoescape` of the config this build runs with.
+  private def template_autoescape? : Bool
+    @config.try(&.templates.autoescape) || false
   end
 
   # Loader for `{% include %}`/`{% extends %}` resolution. Once templates

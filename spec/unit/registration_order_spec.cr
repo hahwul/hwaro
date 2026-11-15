@@ -112,7 +112,7 @@ describe "registration order" do
       pagination highlight auto_includes og menus taxonomies search languages
       versions build serve markdown series related git permalinks assets
       sass pwa amp image_processing doctor static deployment
-    ] + [""] + %w[outputs links data privacy csp content content])
+    ] + [""] + %w[outputs templates links data privacy csp content content])
   end
 
   it "keeps the config snippet registry" do
@@ -129,7 +129,7 @@ describe "registration order" do
       amp assets auto_includes build content csp data deployment doctor feeds
       git highlight image_processing languages links llms markdown menus og
       outputs pagination permalinks privacy pwa related robots sass search
-      series serve sitemap static taxonomies versions
+      series serve sitemap static taxonomies templates versions
     ])
   end
 end

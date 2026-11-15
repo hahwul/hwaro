@@ -20,6 +20,8 @@ module Hwaro::Core::Build::Phases::Render
     features : Builder::TemplateVarFeatures? = nil,
   ) : Hash(String, Crinja::Value)
     config = site.config
+    # Values hwaro renders to HTML are safe under `[templates] autoescape`.
+    ae = config.templates.autoescape
 
     # Build page-specific vars into a fresh hash, then merge global_vars
     # at the end.  This is cheaper than global_vars.dup (which copies ~25
@@ -53,7 +55,7 @@ module Hwaro::Core::Build::Phases::Render
     vars["taxonomy_term"] = Crinja::Value.new(page.taxonomy_term || "")
     # A term page's authored `_index.md` body ("" without one); see
     # Content::Taxonomies.match_term_metadata.
-    vars["term_content"] = Crinja::Value.new(page.content) if page.generated && page.taxonomy_term
+    vars["term_content"] = Utils::CrinjaUtils.html_value(page.content, ae) if page.generated && page.taxonomy_term
     default_lang = config.default_language
     page_language = page.language || default_lang
     vars["page_language"] = Crinja::Value.new(page_language)
@@ -163,7 +165,7 @@ module Hwaro::Core::Build::Phases::Render
       "taxonomies"        => cached_raw["taxonomies"].as(Crinja::Value),
       "assets"            => assets_crinja,
       "extra"             => extra_crinja,
-      "summary"           => Crinja::Value.new(page.template_summary),
+      "summary"           => summary_crinja(page, ae),
       "summary_truncated" => Crinja::Value.new(page.summary_truncated),
       "word_count"        => Crinja::Value.new(page.word_count),
       "reading_time"      => Crinja::Value.new(page.reading_time),
@@ -255,7 +257,7 @@ module Hwaro::Core::Build::Phases::Render
     vars["__page_path__"] = Crinja::Value.new(page.path)
 
     # Flat variables for new properties
-    vars["page_summary"] = Crinja::Value.new(page.template_summary)
+    vars["page_summary"] = page_obj["summary"]
     vars["page_word_count"] = Crinja::Value.new(page.word_count)
     vars["page_reading_time"] = Crinja::Value.new(page.reading_time)
     vars["page_permalink"] = Crinja::Value.new(permalink)
@@ -395,7 +397,7 @@ module Hwaro::Core::Build::Phases::Render
       "description" => Crinja::Value.new(section_description),
       "pages"       => Crinja::Value.new(section_pages_array),
       "pages_count" => Crinja::Value.new(section_pages_array.size),
-      "list"        => Crinja::Value.new(section_list),
+      "list"        => Utils::CrinjaUtils.html_value(section_list, ae),
       # New section properties
       "subsections"   => Crinja::Value.new(subsections_array),
       "assets"        => section_assets_val,
@@ -406,22 +408,22 @@ module Hwaro::Core::Build::Phases::Render
     vars["section"] = Crinja::Value.new(section_obj)
 
     # Content and layout variables
-    vars["content"] = Crinja::Value.new(content)
-    vars["section_list"] = Crinja::Value.new(section_list)
+    vars["content"] = Utils::CrinjaUtils.html_value(content, ae)
+    vars["section_list"] = Utils::CrinjaUtils.html_value(section_list, ae)
 
     # TOC variables - both flat and structured access
     # - toc (HTML string for backward compatibility)
     # - toc_obj.html (same HTML in structured form)
     # - toc_obj.headers (array of structured header objects for custom rendering)
-    vars["toc"] = Crinja::Value.new(toc)
+    vars["toc"] = Utils::CrinjaUtils.html_value(toc, ae)
     toc_obj = {
-      "html"    => Crinja::Value.new(toc),
-      "headers" => Crinja::Value.new(toc_headers_to_crinja(toc_headers)),
+      "html"    => vars["toc"],
+      "headers" => Crinja::Value.new(toc_headers_to_crinja(toc_headers, ae)),
     }
     vars["toc_obj"] = Crinja::Value.new(toc_obj)
 
-    vars["pagination"] = Crinja::Value.new(pagination)
-    vars["pagination_seo_links"] = Crinja::Value.new(pagination_seo_links)
+    vars["pagination"] = Utils::CrinjaUtils.html_value(pagination, ae)
+    vars["pagination_seo_links"] = Utils::CrinjaUtils.html_value(pagination_seo_links, ae)
 
     if paginator
       # Reuse section_pages_array already built above for paginator.pages
@@ -442,7 +444,7 @@ module Hwaro::Core::Build::Phases::Render
       # Structured pagination object for custom markup in themes
       # Allows: {{ pagination_obj.previous_url }}, {{ pagination_obj.current_page }}, etc.
       pagination_obj_hash = {
-        "html"         => Crinja::Value.new(pagination),
+        "html"         => vars["pagination"],
         "previous_url" => Crinja::Value.new(paginator.has_prev ? (paginator.prev_url || "") : ""),
         "next_url"     => Crinja::Value.new(paginator.has_next ? (paginator.next_url || "") : ""),
         "first_url"    => Crinja::Value.new(paginator.first_url),
@@ -491,9 +493,9 @@ module Hwaro::Core::Build::Phases::Render
                     else
                       "#{og_tags}\n  #{twitter_tags}"
                     end
-      vars["og_tags"] = Crinja::Value.new(og_tags)
-      vars["twitter_tags"] = Crinja::Value.new(twitter_tags)
-      vars["og_all_tags"] = Crinja::Value.new(og_all_tags)
+      vars["og_tags"] = Utils::CrinjaUtils.html_value(og_tags, ae)
+      vars["twitter_tags"] = Utils::CrinjaUtils.html_value(twitter_tags, ae)
+      vars["og_all_tags"] = Utils::CrinjaUtils.html_value(og_all_tags, ae)
 
       # Canonical and Hreflang tags. Pass page_url_override so paginated pages
       # (page/2/ …) self-canonicalize instead of all pointing at page 1, keeping
@@ -521,12 +523,12 @@ module Hwaro::Core::Build::Phases::Render
       # (which canonicalizes to itself) would name page 1 as its own
       # hreflang URL; it gets none.
       hreflang_tags = later_pager ? "" : Content::Seo::Tags.hreflang_tags(page, config)
-      vars["canonical_tag"] = Crinja::Value.new(canonical_tag)
-      vars["hreflang_tags"] = Crinja::Value.new(hreflang_tags)
+      vars["canonical_tag"] = Utils::CrinjaUtils.html_value(canonical_tag, ae)
+      vars["hreflang_tags"] = Utils::CrinjaUtils.html_value(hreflang_tags, ae)
 
       # Sibling output-format alternate links (rel=alternate) — one per
       # enabled format (see `[outputs]`), empty when this page has none.
-      vars["alternate_output_tags"] = Crinja::Value.new(alternate_output_tags(page, config))
+      vars["alternate_output_tags"] = Utils::CrinjaUtils.html_value(alternate_output_tags(page, config), ae)
 
       # Structured SEO object for custom meta tag markup
       canonical_url = Content::Seo::Tags.canonical_url(page, config, canonical_override)
@@ -591,11 +593,12 @@ module Hwaro::Core::Build::Phases::Render
     return if !config.highlight.enabled || config.highlight.copy
     return unless content.includes?(%(data-copy="true"))
     snippet = Models::HighlightConfig::COPY_SNIPPET
-    base_js = vars["highlight_js"]?.try(&.raw).as?(String) || ""
+    base_js = vars["highlight_js"]?.try(&.to_s) || ""
     return if base_js.includes?(snippet)
     js = base_js.empty? ? snippet : "#{base_js}\n#{snippet}"
-    vars["highlight_js"] = Crinja::Value.new(js)
-    base_css = vars["highlight_css"]?.try(&.raw).as?(String) || ""
-    vars["highlight_tags"] = Crinja::Value.new(base_css.empty? ? js : "#{base_css}\n#{js}")
+    ae = config.templates.autoescape
+    vars["highlight_js"] = Utils::CrinjaUtils.html_value(js, ae)
+    base_css = vars["highlight_css"]?.try(&.to_s) || ""
+    vars["highlight_tags"] = Utils::CrinjaUtils.html_value(base_css.empty? ? js : "#{base_css}\n#{js}", ae)
   end
 end

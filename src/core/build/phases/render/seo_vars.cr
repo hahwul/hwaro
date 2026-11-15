@@ -50,19 +50,20 @@ module Hwaro::Core::Build::Phases::Render
     jsonld_parts << jsonld_extra unless jsonld_extra.empty?
     jsonld_all = jsonld_parts.join("\n")
 
-    vars["jsonld_article"] = Crinja::Value.new(jsonld_article)
-    vars["jsonld_breadcrumb"] = Crinja::Value.new(jsonld_breadcrumb)
+    ae = config.templates.autoescape
+    vars["jsonld_article"] = Utils::CrinjaUtils.html_value(jsonld_article, ae)
+    vars["jsonld_breadcrumb"] = Utils::CrinjaUtils.html_value(jsonld_breadcrumb, ae)
     # Only compute FAQ/HowTo JSON-LD when schema_type indicates it (avoids
     # per-page hash lookups + array allocations for the common case)
     schema_type_raw = page.extra["schema_type"]?.try(&.as?(String)) || ""
     schema_lower = schema_type_raw.downcase
-    vars["jsonld_faq"] = Crinja::Value.new(
-      schema_lower == "faqpage" || schema_lower == "faq" ? Content::Seo::JsonLd.faq_page(page, config) : ""
+    vars["jsonld_faq"] = Utils::CrinjaUtils.html_value(
+      schema_lower == "faqpage" || schema_lower == "faq" ? Content::Seo::JsonLd.faq_page(page, config) : "", ae
     )
-    vars["jsonld_howto"] = Crinja::Value.new(
-      schema_lower == "howto" || schema_lower == "how-to" ? Content::Seo::JsonLd.how_to(page, config) : ""
+    vars["jsonld_howto"] = Utils::CrinjaUtils.html_value(
+      schema_lower == "howto" || schema_lower == "how-to" ? Content::Seo::JsonLd.how_to(page, config) : "", ae
     )
-    vars["jsonld"] = Crinja::Value.new(jsonld_all)
+    vars["jsonld"] = Utils::CrinjaUtils.html_value(jsonld_all, ae)
   end
 
   # Resolve the page kind into an `og:type` override. Returns "website"

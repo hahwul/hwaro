@@ -440,7 +440,7 @@ module Hwaro::Core::Build::Phases::Render
     cache_mutex = template_cache_override ? nil : @crinja_cache_mutex
     page_vars = Content::Processors::RenderHooks.page_vars(page, site.config)
     Content::Processors::RenderHooks::HookRenderContext.new(registry, env, cache, cache_mutex, page_vars,
-      site.config.markdown.mermaid, site.config.markdown.admonitions)
+      site.config.markdown.mermaid, site.config.markdown.admonitions, site.config.templates.autoescape)
   end
 
   # Render-path fallback when a page/section has no template: warn, record a

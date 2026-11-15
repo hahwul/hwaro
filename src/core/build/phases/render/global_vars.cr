@@ -364,10 +364,13 @@ module Hwaro::Core::Build::Phases::Render
     cache_bust = cache_busting ? compute_cache_bust(config) : ""
     sri_root = sri_root(config)
 
+    # Tag snippets hwaro builds are HTML: safe under `[templates] autoescape`.
+    ae = config.templates.autoescape
+
     # Highlight tags
-    vars["highlight_css"] = Crinja::Value.new(config.highlight.css_tag(cache_bust, sri_root, config.base_path))
-    vars["highlight_js"] = Crinja::Value.new(config.highlight.js_tag(cache_bust, sri_root, config.base_path))
-    vars["highlight_tags"] = Crinja::Value.new(config.highlight.tags(cache_bust, sri_root, config.base_path))
+    vars["highlight_css"] = Utils::CrinjaUtils.html_value(config.highlight.css_tag(cache_bust, sri_root, config.base_path), ae)
+    vars["highlight_js"] = Utils::CrinjaUtils.html_value(config.highlight.js_tag(cache_bust, sri_root, config.base_path), ae)
+    vars["highlight_tags"] = Utils::CrinjaUtils.html_value(config.highlight.tags(cache_bust, sri_root, config.base_path), ae)
 
     # `use_cdn = false` emits <script src="/assets/js/highlight.min.js"> (+ css),
     # but Hwaro doesn't ship those files — if the user hasn't placed them under
@@ -381,33 +384,33 @@ module Hwaro::Core::Build::Phases::Render
     # only literal TeX / DOT source. Templates can pull them in via
     # `{{ math_tags }}` and `{{ mermaid_tags }}`; the default header partials
     # include them so the feature flags work out of the box.
-    vars["math_tags"] = Crinja::Value.new(config.markdown.math_tags(config.csp.enabled))
-    vars["mermaid_tags"] = Crinja::Value.new(config.markdown.mermaid_tags)
+    vars["math_tags"] = Utils::CrinjaUtils.html_value(config.markdown.math_tags(config.csp.enabled), ae)
+    vars["mermaid_tags"] = Utils::CrinjaUtils.html_value(config.markdown.mermaid_tags, ae)
 
     # PWA wiring. `[pwa] enabled = true` writes manifest.json + sw.js into
     # the output, but neither does anything until a page links the manifest
     # and registers the service worker. `{{ pwa_tags }}` carries both (plus
     # a theme-color meta); it resolves to "" while [pwa] is disabled, so
     # headers can include it unconditionally — same contract as math_tags.
-    vars["pwa_tags"] = Crinja::Value.new(pwa_tags(config))
+    vars["pwa_tags"] = Utils::CrinjaUtils.html_value(pwa_tags(config), ae)
 
     # Built-in search UI (`[search] ui = true`): "" while off. The tags
     # carry per-language i18n strings, so a multilingual site keeps one
     # string per language and each page picks its own (template_variables).
     search_tags = Content::SearchUi.tags_by_language(config, @i18n_translations, cache_busting, sri_root)
-    vars["search_tags"] = Crinja::Value.new(search_tags[config.default_language]? || "")
+    vars["search_tags"] = Utils::CrinjaUtils.html_value(search_tags[config.default_language]? || "", ae)
     if search_tags.size > 1
-      vars["__search_tags__"] = Crinja::Value.new(search_tags.transform_values { |tags| Crinja::Value.new(tags) })
+      vars["__search_tags__"] = Crinja::Value.new(search_tags.transform_values { |tags| Utils::CrinjaUtils.html_value(tags, ae) })
     end
 
     # Auto includes
-    vars["auto_includes_css"] = Crinja::Value.new(config.auto_includes.css_tags(config.base_url, cache_bust, sri_root, config.static))
-    vars["auto_includes_js"] = Crinja::Value.new(config.auto_includes.js_tags(config.base_url, cache_bust, sri_root, config.static))
-    vars["auto_includes"] = Crinja::Value.new(config.auto_includes.all_tags(config.base_url, cache_bust, sri_root, config.static))
+    vars["auto_includes_css"] = Utils::CrinjaUtils.html_value(config.auto_includes.css_tags(config.base_url, cache_bust, sri_root, config.static), ae)
+    vars["auto_includes_js"] = Utils::CrinjaUtils.html_value(config.auto_includes.js_tags(config.base_url, cache_bust, sri_root, config.static), ae)
+    vars["auto_includes"] = Utils::CrinjaUtils.html_value(config.auto_includes.all_tags(config.base_url, cache_bust, sri_root, config.static), ae)
 
     # JSON-LD: site-wide WebSite and Organization schemas
-    vars["jsonld_website"] = Crinja::Value.new(Content::Seo::JsonLd.website(config))
-    vars["jsonld_organization"] = Crinja::Value.new(Content::Seo::JsonLd.organization(config, config.og.default_image))
+    vars["jsonld_website"] = Utils::CrinjaUtils.html_value(Content::Seo::JsonLd.website(config), ae)
+    vars["jsonld_organization"] = Utils::CrinjaUtils.html_value(Content::Seo::JsonLd.organization(config, config.og.default_image), ae)
 
     # Time-related variables (fixed per build, not per page)
     now = Time.local

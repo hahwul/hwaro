@@ -1,4 +1,4 @@
-# Config section — [build], [serve], [static], [outputs], [doctor].
+# Config section — [build], [serve], [static], [templates], [outputs], [doctor].
 #
 # One file per config.toml table family: the nested config class(es) plus the
 # `Config.load_*` loader(s) that read them. To add a section: create a file
@@ -172,6 +172,13 @@ module Hwaro
       end
     end
 
+    # `[templates]` — template engine behaviour.
+    class TemplatesConfig
+      # HTML-escape every printed value that is not marked safe, in templates
+      # whose output is HTML or XML (see TemplateEngine.configure_autoescape).
+      property autoescape : Bool = false
+    end
+
     # `[outputs]` — declares extra per-page/per-section output formats
     # beyond HTML (sibling `index.<fmt>` files rendered from a user-supplied
     # `templates/<name>.<fmt>.jinja` template). See
@@ -313,6 +320,16 @@ module Hwaro
         config.static.use_default_excludes = bool_value(s["use_default_excludes"]?, config.static.use_default_excludes)
         if exclude_any = s["exclude"]?
           config.static.exclude = string_or_array(exclude_any)
+        end
+      end
+
+      private def self.load_templates_config(config : Config)
+        return unless s = config.raw["templates"]?.try(&.as_h?)
+
+        config.templates.autoescape = bool_value(s["autoescape"]?, config.templates.autoescape)
+        s.each_key do |key|
+          next if key == "autoescape"
+          Logger.warn "[templates]: unknown key '#{key}' — hwaro does not read it."
         end
       end
 

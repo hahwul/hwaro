@@ -24,12 +24,9 @@ module Hwaro
       class TemplateEngine
         getter env : Crinja
 
-        def initialize
+        def initialize(autoescape : Bool = false)
           @env = Crinja.new
-          # Disable autoescape completely - Hwaro templates are trusted
-          # and many variables contain pre-rendered HTML (og_tags, highlight_css, etc.)
-          @env.config.autoescape.enabled_extensions = [] of String
-          @env.config.autoescape.default = false
+          TemplateEngine.configure_autoescape(@env, autoescape)
           stock_filters = @env.filters.each.to_h
           stock_functions = @env.functions.each.to_h
           register_custom_filters
@@ -37,6 +34,26 @@ module Hwaro
           register_custom_functions
           warn_on_unknown_kwargs(@env.filters, stock_filters, "filter")
           warn_on_unknown_kwargs(@env.functions, stock_functions, "function")
+        end
+
+        # Output types whose templates HTML-escape when `[templates]
+        # autoescape` is on, and those that never do, by the template file's
+        # extension (`.jinja`/`.j2`/`.jinja2` stripped first: `page.json.jinja`
+        # is JSON). Any other name — `page.html`'s `.j2`/`.jinja`/`.ecr`
+        # siblings, which carry no type — and a template compiled from a
+        # string (built-in shortcodes, feed templates) escapes: hwaro renders
+        # HTML unless it knows otherwise. A template that must not escape
+        # whatever its name sets `Crinja::Template#__no_autoescape`.
+        AUTOESCAPE_EXTENSIONS    = %w[html htm xhtml xml svg rss atom]
+        NO_AUTOESCAPE_EXTENSIONS = %w[json txt csv js mjs css md markdown]
+
+        # Apply `[templates] autoescape` to `env`. Off is Crinja's "never".
+        def self.configure_autoescape(env : Crinja, enabled : Bool) : Nil
+          rule = env.config.autoescape
+          rule.enabled_extensions = enabled ? AUTOESCAPE_EXTENSIONS : [] of String
+          rule.disabled_extensions = enabled ? NO_AUTOESCAPE_EXTENSIONS : [] of String
+          rule.default = enabled
+          rule.default_for_string = enabled
         end
 
         # A keyword argument that one of hwaro's own filters or functions

@@ -1,0 +1,188 @@
+require "../../spec_helper"
+
+# `[templates] autoescape` at the engine level: which templates escape, and
+# Jinja2's Markup rules for filters, operators and tags (src/ext/crinja_autoescape.cr
+# plus the hwaro filters in content/processors/filters/).
+
+private CANARY  = %(<b a="x">&')
+private ESCAPED = "&lt;b a=&quot;x&quot;&gt;&amp;&#39;"
+
+private def ae_render(source : String, autoescape : Bool = true, filename : String? = nil,
+                      vars : Hash(String, Crinja::Value) = {} of String => Crinja::Value) : String
+  env = Hwaro::Content::Processors::TemplateEngine.new(autoescape).env
+  template = filename ? Crinja::Template.new(source, env, filename, filename) : env.from_string(source)
+  template.render(vars)
+end
+
+# `u` is author text with every HTML-special character, `s` a safe value.
+private def ae_vars : Hash(String, Crinja::Value)
+  {
+    "u" => Crinja::Value.new(CANARY),
+    "s" => Crinja::Value.new(Crinja::SafeString.new("<i>s&amp;</i>")),
+    "d" => Crinja::Value.new({"k" => Crinja::Value.new("<v>&'")}),
+  } of String => Crinja::Value
+end
+
+private def on(source : String) : String
+  ae_render(source, vars: ae_vars)
+end
+
+private def off(source : String) : String
+  ae_render(source, autoescape: false, vars: ae_vars)
+end
+
+describe "Crinja autoescape" do
+  describe "which templates escape" do
+    it "escapes HTML/XML outputs and names without a type, not text outputs" do
+      {
+        "templates/page.html"           => true,
+        "templates/page.j2"             => true,
+        "templates/page.jinja2"         => true,
+        "templates/page.ecr"            => true,
+        "templates/page.xml.jinja"      => true,
+        "templates/rss.xml"             => true,
+        "templates/page.json.jinja"     => false,
+        "templates/page.json.jinja2"    => false,
+        "templates/page.txt.j2"         => false,
+        "templates/page.csv.jinja"      => false,
+        "templates/partials/app.js"     => false,
+        "templates/partials/style.css"  => false,
+        "templates/generate/product.md" => false,
+      }.each do |name, escapes|
+        ae_render("{{ u }}", filename: name, vars: ae_vars).should eq(escapes ? ESCAPED : CANARY), name
+      end
+    end
+
+    it "escapes a template compiled from a string" do
+      on("{{ u }}").should eq(ESCAPED)
+    end
+
+    it "never escapes with the switch off, whatever the name" do
+      ae_render("{{ u }}", autoescape: false, filename: "templates/page.html", vars: ae_vars).should eq(CANARY)
+      off("{{ u }}").should eq(CANARY)
+    end
+
+    it "lets a template opt out with __no_autoescape" do
+      env = Hwaro::Content::Processors::TemplateEngine.new(true).env
+      template = env.from_string("{{ u }}")
+      template.__no_autoescape = true
+      template.render(ae_vars).should eq(CANARY)
+    end
+
+    it "escapes exactly what HTML.escape does, wherever the character sits" do
+      ["&", "<", ">", %("), "'"].each do |char|
+        (0..19).each do |at|
+          (at..at + 9).each do |size|
+            s = ("x" * at) + char + ("y" * (size - at))
+            Crinja::Markup.escape(s).should eq(HTML.escape(s))
+          end
+        end
+      end
+      clean = "plain-ascii/path_0123456789 UTF-8: 한국어 é 😀"
+      Crinja::Markup.escape(clean).should be(clean)
+      (0..17).each { |n| Crinja::Markup.escape("z" * n).should eq("z" * n) }
+      (0..9).each { |n| Crinja::Markup.escape(("é" * n) + "<" + "😀").should eq(("é" * n) + "&lt;😀") }
+    end
+
+    it "prints a safe value, a number and a plain string with nothing to escape as is" do
+      on("{{ s }}|{{ 5 }}|{{ 'plain' }}").should eq("<i>s&amp;</i>|5|plain")
+    end
+  end
+
+  describe "{% autoescape %}" do
+    it "turns escaping off and back on inside a template" do
+      on("{% autoescape false %}{{ u }}{% endautoescape %}|{{ u }}").should eq("#{CANARY}|#{ESCAPED}")
+      off("{% autoescape true %}{{ u }}{% endautoescape %}|{{ u }}").should eq("#{ESCAPED}|#{CANARY}")
+    end
+
+    it "keeps the fragment cache of a closed loop apart per mode" do
+      on("{% autoescape false %}{% for i in [u] %}{{ i }}{% endfor %}{% endautoescape %}{% for i in [u] %}{{ i }}{% endfor %}")
+        .should eq("#{CANARY}#{ESCAPED}")
+    end
+
+    it "escapes inside a macro, whose output is safe" do
+      on(%({% macro m(a) %}<i>{{ a }}</i>{% endmacro %}{{ m(u) }}|{{ m(u) | e }})).should eq("<i>#{ESCAPED}</i>|<i>#{ESCAPED}</i>")
+    end
+  end
+
+  describe "filters keep Jinja2's safety rules" do
+    it "escape/e do not double-escape; forceescape does; safe marks" do
+      on("{{ u | e }}|{{ s | e }}|{{ s | forceescape }}|{{ u | safe }}")
+        .should eq("#{ESCAPED}|<i>s&amp;</i>|&lt;i&gt;s&amp;amp;&lt;/i&gt;|#{CANARY}")
+    end
+
+    it "keeps a safe value safe through string filters and escapes what they insert" do
+      on("{{ s | upper }}").should eq("<I>S&AMP;</I>")
+      on("{{ s | trim }}|{{ s | string }}|{{ s | default('x') }}").should eq("<i>s&amp;</i>|<i>s&amp;</i>|<i>s&amp;</i>")
+      on(%({{ s | truncate(5, true, "<>", 0) }})).should eq("<i>&lt;&gt;")
+      on(%({{ s | replace("i", u) }})).should eq("<#{ESCAPED}>s&amp;</#{ESCAPED}>")
+      on(%({{ "a b c" | safe | truncate_words(1, end="<>") }})).should eq("a&lt;&gt;")
+      on(%({{ s | regex_replace(pattern="i", rep="<u>") }})).should eq("<&lt;u&gt;>s&amp;</&lt;u&gt;>")
+      on(%({{ "%s|%s" | safe | format(u, s) }})).should eq("#{ESCAPED}|<i>s&amp;</i>")
+    end
+
+    it "escapes the result of a string filter on plain text once" do
+      on("{{ u | upper }}").should eq("&lt;B A=&quot;X&quot;&gt;&amp;&#39;")
+      on("{{ u | string }}").should eq(ESCAPED)
+      on("{{ u | truncate(3, true, '', 0) }}").should eq("&lt;b ")
+    end
+
+    it "joins with an escaped separator and escaped items" do
+      on(%({{ ["a", u] | join("<br>") }})).should eq("a&lt;br&gt;#{ESCAPED}")
+      on(%({{ [s, s] | join("<br>" | safe) }})).should eq("<i>s&amp;</i><br><i>s&amp;</i>")
+    end
+
+    it "urlize escapes the text it links" do
+      on(%({{ ("see http://x.com/?a=1&b=2 " ~ u) | urlize }}))
+        .should eq(%(see <a href="http://x.com/?a=1&amp;b=2" rel="noopener">http://x.com/?a=1&amp;b=2</a> #{ESCAPED}))
+    end
+
+    it "returns HTML from markdownify and an escaped value from xml_escape, both safe" do
+      on(%({{ "**a** &amp;" | markdownify }})).should eq("<p><strong>a</strong> &amp;</p>\n")
+      on("{{ u | xml_escape }}|{{ s | xml_escape }}").should eq("&lt;b a=&quot;x&quot;&gt;&amp;&apos;|&lt;i&gt;s&amp;amp;&lt;/i&gt;")
+    end
+
+    it "strip_html and striptags give text that is escaped exactly once" do
+      on(%({{ "<p>a &amp; b &lt;c&gt;</p>" | safe | strip_html }}|{{ s | striptags }})).should eq("a &amp; b &lt;c&gt;|s&amp;")
+    end
+
+    it "tojson/jsonify are safe JSON a <script> cannot be broken out of" do
+      on("{{ d | tojson }}|{{ u | jsonify }}")
+        .should eq(%({"k":"\\u003cv\\u003e\\u0026\\u0027"}|"\\u003cb a=\\"x\\"\\u003e\\u0026\\u0027"))
+    end
+
+    it "returns plain text from text filters (escaped when printed)" do
+      on("{{ u | slugify }}|{{ u | urlencode }}|{{ u | t }}").should eq("b-ax|%3Cb%20a%3D%22x%22%3E%26%27|#{ESCAPED}")
+    end
+  end
+
+  describe "operators and tags" do
+    it "concatenation with a safe operand escapes the other one" do
+      on("{{ s ~ u }}|{{ u + s }}|{{ u ~ u }}").should eq("<i>s&amp;</i>#{ESCAPED}|#{ESCAPED}<i>s&amp;</i>|#{ESCAPED}#{ESCAPED}")
+      on(%({{ "<p>" ~ s }})).should eq("&lt;p&gt;<i>s&amp;</i>")
+    end
+
+    it "a set block and a call block are safe markup of their escaped body" do
+      on("{% set x %}<b>{{ u }}</b>{% endset %}{{ x }}|{{ x | e }}").should eq("<b>#{ESCAPED}</b>|<b>#{ESCAPED}</b>")
+      on("{% macro w() %}[{{ caller() }}]{% endmacro %}{% call w() %}<em>{{ u }}</em>{% endcall %}").should eq("[<em>#{ESCAPED}</em>]")
+    end
+
+    it "a filter block hands its body over as markup and escapes a plain result" do
+      on("{% filter upper %}<b>{{ s }}</b>{% endfilter %}").should eq("<B><I>S&AMP;</I></B>")
+      on("{% filter striptags %}<b>{{ u }}</b>{% endfilter %}").should eq(ESCAPED)
+    end
+  end
+
+  describe "with the switch off" do
+    it "renders exactly as before" do
+      off("{{ u }}|{{ u | e }}|{{ u | upper }}").should eq("#{CANARY}|#{ESCAPED}|<B A=\"X\">&'")
+      off(%({{ ["a", u] | join("<br>") }})).should eq("a<br>#{CANARY}")
+      off(%({{ d | tojson }})).should eq(%({"k":"<v>&'"}))
+      off(%({{ "</x>" | tojson }})).should eq(%("<\\/x>"))
+      off(%({{ "<p>a &amp; b</p>" | safe | strip_html }})).should eq("a &amp; b")
+      off("{% filter striptags %}<b>{{ u }}</b>{% endfilter %}").should eq("&'")
+      off("{{ u | string }}|{{ s ~ u }}").should eq("#{CANARY}|<i>s&amp;</i>#{CANARY}")
+      off(%({{ ("http://x.com/?a=1&b=2 " ~ u) | urlize }})).should eq(%(<a href="http://x.com/?a=1&b=2" rel="noopener">http://x.com/?a=1&b=2</a> #{CANARY}))
+    end
+  end
+end

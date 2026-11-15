@@ -1122,7 +1122,10 @@ module Hwaro
               if context.has_key?(key)
                 (saved ||= {} of String => Crinja::Value)[key] = context[key]
               end
-              context[key] = Crinja::Value.new(value)
+              # A block body is the author's content (Markdown/HTML, with
+              # nested shortcodes as placeholder comments), printed as it is
+              # written; every other argument is text.
+              context[key] = key == "body" ? Utils::CrinjaUtils.html_value(value, template_autoescape?) : Crinja::Value.new(value)
             end
 
             # Cache compiled shortcode templates by name and source hash to

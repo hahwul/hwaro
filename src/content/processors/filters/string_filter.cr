@@ -150,6 +150,7 @@ module Hwaro
                 raise Crinja::RuntimeError.new("regex_replace: #{ex.message} for pattern #{pattern.inspect}")
               end
             end
+            env.filters["regex_replace"] = Crinja::Markup.keep_safe(env.filters["regex_replace"].as(Crinja::Callable::Instance), ["rep"])
 
             env.filters["base64_encode"] = Crinja.filter do
               Base64.strict_encode(target.to_s)
@@ -209,6 +210,8 @@ module Hwaro
               end
             end
 
+            env.filters["truncate_words"] = Crinja::Markup.keep_safe(env.filters["truncate_words"].as(Crinja::Callable::Instance), suffix: "end")
+
             # Slugify filter (delegates to TextUtils for CJK support)
             env.filters["slugify"] = Crinja.filter do
               Utils::TextUtils.slugify(target.to_s)
@@ -228,6 +231,7 @@ module Hwaro
               chars = arguments["chars"]
               chars.none? || chars.undefined? ? target.to_s.strip : target.to_s.strip(chars.to_s)
             end
+            env.filters["trim"] = Crinja::Markup.keep_safe(env.filters["trim"].as(Crinja::Callable::Instance))
           end
         end
       end

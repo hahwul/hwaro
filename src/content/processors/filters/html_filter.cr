@@ -8,9 +8,13 @@ module Hwaro
       module Filters
         module HtmlFilters
           def self.register(env : Crinja)
-            # Strip HTML tags filter (delegates to TextUtils for robust tag handling)
+            # Strip HTML tags filter (delegates to TextUtils for robust tag handling).
+            # Under autoescape the result is plain text, entities decoded, as
+            # Jinja2's `striptags` gives: it is escaped once when printed (a
+            # kept `&amp;` printed as `&amp;amp;`).
             env.filters["strip_html"] = Crinja.filter do
-              Hwaro::Utils::TextUtils.strip_html(target.to_s)
+              text = Hwaro::Utils::TextUtils.strip_html(target.to_s)
+              env.context.autoescape? ? HTML.unescape(text) : text
             end
 
             # Markdownify filter. Honors the site's [markdown] safe and
@@ -21,27 +25,33 @@ module Hwaro
             # highlighting) is deliberately NOT applied here: routing it
             # would change bytes for every existing `| markdownify` call.
             env.filters["markdownify"] = Crinja.filter do
-              if cfg = Hwaro::Processor::Markdown.filter_markdown_config
-                text = target.to_s
-                options = Markd::Options.new(safe: cfg.safe, smart: cfg.smart_punctuation)
-                if cfg.safe && text.includes?("<!--HWARO-SHORTCODE-PLACEHOLDER-")
-                  # A block body (`{% alert %}A {{ youtube(...) }}{% end %}`)
-                  # carries its nested shortcodes as placeholder comments,
-                  # which plain Markd safe mode erased. Keep them, as the
-                  # page body's renderer does; documented "shortcode output
-                  # is kept".
-                  HighlightingRenderer.new(options, false).render(Markd::Parser.parse(text, options))
-                else
-                  Markd.to_html(text, options)
-                end
-              else
-                Markd.to_html(target.to_s)
-              end
+              html = if cfg = Hwaro::Processor::Markdown.filter_markdown_config
+                       text = target.to_s
+                       options = Markd::Options.new(safe: cfg.safe, smart: cfg.smart_punctuation)
+                       if cfg.safe && text.includes?("<!--HWARO-SHORTCODE-PLACEHOLDER-")
+                         # A block body (`{% alert %}A {{ youtube(...) }}{% end %}`)
+                         # carries its nested shortcodes as placeholder comments,
+                         # which plain Markd safe mode erased. Keep them, as the
+                         # page body's renderer does; documented "shortcode output
+                         # is kept".
+                         HighlightingRenderer.new(options, false).render(Markd::Parser.parse(text, options))
+                       else
+                         Markd.to_html(text, options)
+                       end
+                     else
+                       Markd.to_html(target.to_s)
+                     end
+              # HTML hwaro renders: safe under autoescape.
+              env.context.autoescape? ? Crinja::SafeString.new(html) : html
             end
 
             # XML escape filter (single-pass via TextUtils)
+            # Escapes safe input too (it is how a feed puts `content` in XML),
+            # and under autoescape returns the result safe, so it is not
+            # escaped a second time.
             env.filters["xml_escape"] = Crinja.filter do
-              Hwaro::Utils::TextUtils.escape_xml(target.to_s)
+              escaped = Hwaro::Utils::TextUtils.escape_xml(target.to_s)
+              env.context.autoescape? ? Crinja::SafeString.new(escaped) : escaped
             end
 
             # Safe filter

@@ -29,7 +29,7 @@ module Hwaro::Core::Build::Phases::Render
 
     # Build template variables — reuse prebuilt_vars if available (shortcode path)
     vars = if pv = prebuilt_vars
-             update_content_vars(pv, content, section_list, toc, toc_headers, pagination, pagination_seo_links)
+             update_content_vars(pv, content, section_list, toc, toc_headers, pagination, pagination_seo_links, site.config.templates.autoescape)
              # The prebuilt hash is the shortcode pre-render context, built
              # with content="" — its per-fence copy probe saw nothing. Re-run
              # it against the FINAL rendered content, otherwise a
@@ -303,16 +303,17 @@ module Hwaro::Core::Build::Phases::Render
     toc_headers : Array(Models::TocHeader),
     pagination : String,
     pagination_seo_links : String,
+    autoescape : Bool,
   )
-    vars["content"] = Crinja::Value.new(content)
-    vars["section_list"] = Crinja::Value.new(section_list)
-    vars["toc"] = Crinja::Value.new(toc)
+    vars["content"] = Utils::CrinjaUtils.html_value(content, autoescape)
+    vars["section_list"] = Utils::CrinjaUtils.html_value(section_list, autoescape)
+    vars["toc"] = Utils::CrinjaUtils.html_value(toc, autoescape)
     vars["toc_obj"] = Crinja::Value.new({
-      "html"    => Crinja::Value.new(toc),
-      "headers" => Crinja::Value.new(toc_headers_to_crinja(toc_headers)),
+      "html"    => vars["toc"],
+      "headers" => Crinja::Value.new(toc_headers_to_crinja(toc_headers, autoescape)),
     })
-    vars["pagination"] = Crinja::Value.new(pagination)
-    vars["pagination_seo_links"] = Crinja::Value.new(pagination_seo_links)
+    vars["pagination"] = Utils::CrinjaUtils.html_value(pagination, autoescape)
+    vars["pagination_seo_links"] = Utils::CrinjaUtils.html_value(pagination_seo_links, autoescape)
 
     # NOTE: pagination_obj is not updated here because its fields (URLs, page
     # numbers, booleans) are stable across the shortcode pre-render and final

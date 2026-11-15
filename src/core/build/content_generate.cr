@@ -14,7 +14,9 @@
 #
 # Field-or-template semantics (the convenience contract):
 #   - A spec containing `{{` or `{%` is a Crinja template rendered with the
-#     record bound to `item` (autoescape stays OFF, as everywhere in hwaro).
+#     record bound to `item`, never HTML-escaped (even under `[templates]
+#     autoescape`: specs produce text). A `body_template` file escapes by its
+#     extension, like any template (`.md` does not).
 #   - Any other spec is a record FIELD NAME (dotted for nesting). A missing
 #     field is a hard per-record error naming the rule, the record's index
 #     and the available keys — typo protection; a field that exists but
@@ -296,7 +298,9 @@ module Hwaro
                                 template_cache : Hash(String, Crinja::Template),
                                 where : String) : String
           template = template_cache[spec] ||= begin
-            env.from_string(spec)
+            # Specs produce text (slug, title, front matter values), never
+            # HTML: no `[templates] autoescape` here.
+            env.from_string(spec).tap(&.__no_autoescape = true)
           rescue ex : Crinja::Error
             raise generate_error("#{where}: template #{spec.inspect} does not parse: #{ex.message}")
           end

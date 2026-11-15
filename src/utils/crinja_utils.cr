@@ -18,6 +18,13 @@ module Hwaro
       # Pre-allocated nil value to avoid repeated allocations in hot paths
       NIL_VALUE = Crinja::Value.new(nil)
 
+      # A string hwaro built as HTML, or text it already escaped, as a
+      # template value: safe (printed as is) under `[templates] autoescape`,
+      # a plain string — exactly what templates always got — without it.
+      def html_value(html : String, autoescape : Bool) : Crinja::Value
+        Crinja::Value.new(autoescape ? Crinja::SafeString.new(html) : html)
+      end
+
       # Convert a YAML::Any value to Crinja::Value.
       #
       # `depth` guards against a self-referencing YAML anchor, whose parsed

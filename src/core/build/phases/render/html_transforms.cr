@@ -166,14 +166,16 @@ module Hwaro::Core::Build::Phases::Render
   end
 
   # Convert TocHeader tree to Crinja-compatible array for toc_obj.headers.
-  private def toc_headers_to_crinja(headers : Array(Models::TocHeader)) : Array(Crinja::Value)
+  # `id`, `title` and `permalink` are already-escaped text (the heading's
+  # markup with its tags removed), hence safe under `[templates] autoescape`.
+  private def toc_headers_to_crinja(headers : Array(Models::TocHeader), autoescape : Bool = false) : Array(Crinja::Value)
     headers.map do |h|
       Crinja::Value.new({
         "level"     => Crinja::Value.new(h.level),
-        "id"        => Crinja::Value.new(h.id),
-        "title"     => Crinja::Value.new(h.title),
-        "permalink" => Crinja::Value.new(h.permalink),
-        "children"  => Crinja::Value.new(toc_headers_to_crinja(h.children)),
+        "id"        => Utils::CrinjaUtils.html_value(h.id, autoescape),
+        "title"     => Utils::CrinjaUtils.html_value(h.title, autoescape),
+        "permalink" => Utils::CrinjaUtils.html_value(h.permalink, autoescape),
+        "children"  => Crinja::Value.new(toc_headers_to_crinja(h.children, autoescape)),
       })
     end
   end
