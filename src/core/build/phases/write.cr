@@ -242,8 +242,10 @@ module Hwaro::Core::Build::Phases::Write
     page.assets.map do |asset_path|
       # asset_path is relative to content/ (e.g. "blog/post/image.jpg");
       # the destination keeps its path inside the bundle (e.g. "image.jpg").
-      relative_to_bundle = Path[asset_path].relative_to(page_bundle_dir)
-      {File.join("content", asset_path), File.join(dest_dir, relative_to_bundle.to_s)}
+      # ...and, like the page URL it sits under, in NFC whatever form the
+      # source name is stored in (Utils::PermalinkResolver).
+      relative_to_bundle = Utils::PathUtils.nfc(Path[asset_path].relative_to(page_bundle_dir).to_s)
+      {File.join("content", asset_path), File.join(dest_dir, relative_to_bundle)}
     end
   end
 

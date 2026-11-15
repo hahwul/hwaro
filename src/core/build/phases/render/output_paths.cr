@@ -176,7 +176,13 @@ module Hwaro::Core::Build::Phases::Render
     writers.each do |page|
       url = page.url
       if prev_path = winners[url]?
-        Logger.warn "Duplicate output path '#{url}' — '#{page.path}' collides with '#{prev_path}' and is not written" unless quiet
+        unless quiet
+          # Page URLs are NFC, so two names that only a normalization-
+          # sensitive file system (ext4) keeps apart land here — and print
+          # identically, so say why.
+          same_name = Utils::PathUtils.nfc(page.path) == Utils::PathUtils.nfc(prev_path)
+          Logger.warn "Duplicate output path '#{url}' — '#{page.path}' collides with '#{prev_path}' and is not written#{" (the two file names differ only in Unicode form, NFC vs NFD: rename or remove one)" if same_name}"
+        end
         suppressed << page.path
         next
       end

@@ -315,4 +315,25 @@ describe Hwaro::Utils::PermalinkResolver do
       resolve("posts/x.md", config_with({"posts" => "/:slug//:year/"}), slug: "s", date: Time.utc(2026, 1, 2)).should eq("/s/2026/")
     end
   end
+
+  describe "Unicode normalization" do
+    nfd = ->(s : String) { s.unicode_normalize(:nfd) }
+
+    it "spells a URL derived from an NFD-stored path in NFC" do
+      resolve(nfd.call("한글/글.md"), nil).should eq("/한글/글/")
+      resolve(nfd.call("café/_index.md"), nil).should eq("/café/")
+      resolve(nfd.call("문서/v1/설치.md"), nil).should eq("/문서/v1/설치/")
+    end
+
+    it "matches an NFC [permalinks] key against an NFD-stored directory" do
+      config = config_with({"블로그" => "/:year/:slug/", "café" => "kafe"})
+      resolve(nfd.call("블로그/첫 글.md"), config, date: Time.utc(2024, 5, 1)).should eq("/2024/첫 글/")
+      resolve(nfd.call("café/crème.md"), config).should eq("/kafe/crème/")
+    end
+
+    it "folds an NFD slug or path to NFC" do
+      resolve("blog/x.md", nil, slug: nfd.call("슬러그")).should eq("/blog/슬러그/")
+      resolve("blog/x.md", nil, custom_path: nfd.call("직접/경로")).should eq("/직접/경로/")
+    end
+  end
 end

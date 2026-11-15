@@ -274,7 +274,7 @@ module Hwaro
                 next if page.assets.empty?
                 bundle_dir = File.dirname(page.path)
                 page.assets.each do |asset|
-                  relative = Path[asset].relative_to(bundle_dir).to_s
+                  relative = Utils::PathUtils.nfc(Path[asset].relative_to(bundle_dir).to_s)
                   sources[("/" + page.url.lchop("/") + relative)] ||= File.join("content", asset)
                 end
               end
@@ -643,7 +643,7 @@ module Hwaro
           # (ImageProcessor), so `B.JPG` must look for `B_320w.jpg`.
           # `variant_ext` checks another format's set (`.webp`) instead.
           ext = File.extname(source_path)
-          basename = File.basename(source_path, ext)
+          basename = Utils::PathUtils.nfc(File.basename(source_path, ext))
           ext = variant_ext || ext.downcase
 
           # resize_and_lqip clamps any requested width larger than the source to
@@ -776,13 +776,13 @@ module Hwaro
               next unless File.exists?(source_path)
               next unless safe_path?(source_path, "content")
 
-              relative_to_bundle = Path[asset_path].relative_to(page_bundle_dir)
-              original_url = "/" + url_path + relative_to_bundle.to_s
+              relative_to_bundle = Utils::PathUtils.nfc(Path[asset_path].relative_to(page_bundle_dir).to_s)
+              original_url = "/" + url_path + relative_to_bundle
               next if seen.includes?(original_url)
-              asset_dest_dir = File.join(dest_dir, File.dirname(relative_to_bundle.to_s))
+              asset_dest_dir = File.join(dest_dir, File.dirname(relative_to_bundle))
               next unless safe_path_dest?(asset_dest_dir, resolved_output)
 
-              url_prefix = "/" + url_path + File.dirname(relative_to_bundle.to_s).rstrip(".") + "/"
+              url_prefix = "/" + url_path + File.dirname(relative_to_bundle).rstrip(".") + "/"
               url_prefix = url_prefix.gsub("//", "/")
 
               seen.add(original_url)
@@ -932,7 +932,7 @@ module Hwaro
             page_bundle_dir = File.dirname(page.path)
             url_path = page.url.lchop("/")
             relative_to_bundle = begin
-              Path[relative].relative_to(page_bundle_dir).to_s
+              Utils::PathUtils.nfc(Path[relative].relative_to(page_bundle_dir).to_s)
             rescue ArgumentError
               next
             end

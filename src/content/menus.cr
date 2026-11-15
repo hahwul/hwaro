@@ -162,7 +162,9 @@ module Hwaro
         entries = [] of Entry
         own, others = content.select(Models::Section).partition(&.version.same?(version))
         (own + others).each do |s|
-          next unless dir = top_level_dir(s.section, s.version)
+          # NFC like the section URL, so an entry typed with this identifier
+          # overrides the auto entry whatever form the directory is stored in.
+          next unless dir = top_level_dir(s.section, s.version).try { |d| Utils::PathUtils.nfc(d) }
           next unless (s.language || default_lang) == lang
           next if s.excluded_from_listings? || s.transparent
           next if s.redirect_to.try { |r| external_url?(r) }

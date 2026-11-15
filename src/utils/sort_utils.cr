@@ -45,14 +45,24 @@ module Hwaro
                  else
                    0
                  end
-        result == 0 ? (a.path <=> b.path) : result
+        result == 0 ? compare_paths(a, b) : result
+      end
+
+      # Path order, the tiebreak of every page sort: by the NFC spelling of
+      # the source path (Page#nfc_path), so a tree stored NFD orders like the
+      # same tree stored NFC — `cre\u0300me` sorts before `crf` byte-wise,
+      # `cr\u00E8me` after. Raw bytes decide only between two spellings of
+      # one name.
+      def compare_paths(a : Models::Page, b : Models::Page) : Int32
+        result = a.nfc_path <=> b.nfc_path
+        result == 0 ? a.path <=> b.path : result
       end
 
       # Compare two pages by title alphabetically (A-Z)
       #
       def compare_by_title(a : Models::Page, b : Models::Page) : Int32
         result = a.title <=> b.title
-        result == 0 ? (a.path <=> b.path) : result
+        result == 0 ? compare_paths(a, b) : result
       end
 
       # Compare two taxonomy term names alphabetically, ignoring case
@@ -80,7 +90,7 @@ module Hwaro
         # Tiebreak by path so equal weights (e.g. the archetype's default
         # weight = 0) keep a stable, deterministic order across builds.
         result = a.weight <=> b.weight
-        result == 0 ? (a.path <=> b.path) : result
+        result == 0 ? compare_paths(a, b) : result
       end
 
       # Generic page sorting with specified criteria

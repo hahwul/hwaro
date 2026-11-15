@@ -230,6 +230,9 @@ module Hwaro
       property is_index : Bool    # Is this an index file?
       property language : String? # Language code (e.g. "en", "ko", nil for default)
       property translations : Array(TranslationLink)
+      # `path` in NFC, memoized: every page sort tie-breaks on it
+      # (SortUtils#compare_paths).
+      getter(nfc_path : String) { Utils::PathUtils.nfc(@path) }
       # Front matter `translation_key`: pages sharing it (within one version)
       # are translations of each other, whatever their file names. Nil
       # groups by file name (Content::Multilingual.link_translations!).

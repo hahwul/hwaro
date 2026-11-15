@@ -34,7 +34,10 @@ module Hwaro::Core::Build::Phases::ReadContent
     # Sorted: glob yields raw readdir order (hash order on APFS/ext4, name
     # order on HFS+), which would otherwise leak into `site.pages`,
     # sitemap.xml and the search index, so one tree built differently per host.
-    content_paths = Dir.glob("content/**/*").sort!
+    # Keyed by the NFC spelling, so an NFD-stored tree reads (and lists) in
+    # the order an NFC one does; raw bytes only order two spellings of one
+    # name.
+    content_paths = Dir.glob("content/**/*").sort_by! { |path| {Utils::PathUtils.nfc(path), path} }
     Utils::DeniedDirs.warn("content")
     content_paths.each do |file_path|
       # `[content] ignore` first: a matched path is invisible to the build —

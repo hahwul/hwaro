@@ -16,6 +16,7 @@
 
 require "../models/config"
 require "./errors"
+require "./path_utils"
 require "./text_utils"
 
 module Hwaro
@@ -151,6 +152,16 @@ module Hwaro
         title : String,
         version : Models::VersionConfig? = nil,
       ) : {String, String?}
+        # One visible name, one URL: the URL is spelled in NFC whatever form
+        # the file system stored the name in (or the author typed a `slug` /
+        # `path` in). macOS tools often hand out decomposed (NFD) names while
+        # Linux checkouts and keyboards produce precomposed (NFC) ones, and
+        # the same site published `/%ED%95%9C/` from one checkout and
+        # `/%E1%84%92%E1%85%A1%E1%86%AB/` from the other. The path is folded
+        # up front so `[permalinks]` keys (typed NFC) match an NFD directory;
+        # each return folds what `slug`, `path` and the pattern contributed.
+        relative_path = Utils::PathUtils.nfc(relative_path)
+
         # Versioned content: swap the version's content directory for the
         # directory it publishes under BEFORE anything else looks at the
         # path, so `[permalinks]` rules, bundle detection and the index
@@ -197,7 +208,7 @@ module Hwaro
           # `path = "a//b"` (or a `slug` with a leading `/`) is written to
           # `a/b/index.html` — the output writer drops empty segments — so
           # the URL must say `/a/b/` too, not `/a//b/` (page.url, sitemap).
-          return {url.squeeze('/'), nil}
+          return {Utils::PathUtils.nfc(url.squeeze('/')), nil}
         end
 
         error = nil
@@ -209,7 +220,7 @@ module Hwaro
             slug: slug, date: date, title: title,
           )
           if path
-            return {(path.empty? ? "#{lang_prefix}/" : "#{lang_prefix}/#{path}/").squeeze('/'), nil}
+            return {Utils::PathUtils.nfc((path.empty? ? "#{lang_prefix}/" : "#{lang_prefix}/#{path}/").squeeze('/')), nil}
           end
           # Date token, no date: report and fall back to the un-remapped
           # directory URL (the pattern target has no directory to remap to).
@@ -233,7 +244,7 @@ module Hwaro
                   "#{lang_prefix}/#{effective_dir}/#{leaf}/"
                 end
               end
-        {url.squeeze('/'), error}
+        {Utils::PathUtils.nfc(url.squeeze('/')), error}
       end
 
       # A leaf bundle (`<dir>/index.md`) is a single page whose URL segment is

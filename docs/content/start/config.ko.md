@@ -316,7 +316,7 @@ auto_sections = "main"
 
 ## 정적 파일
 
-`static/` 아래의 모든 것은 디렉터리 구조를 유지한 채 사이트 루트로 그대로 복사되므로 `static/css/app.css`는 `/css/app.css`로 서빙됩니다. 숨김 항목도 포함되므로 `static/.well-known/security.txt`는 `/.well-known/security.txt`로 게시됩니다. 기본적으로 Hwaro는 흔한 OS·에디터·VCS 잔여 파일을 걸러내 프로덕션에 실려 가지 않게 합니다.
+`static/` 아래의 모든 것은 디렉터리 구조를 유지한 채 사이트 루트로 그대로 복사되므로 `static/css/app.css`는 `/css/app.css`로 서빙됩니다. 숨김 항목도 포함되므로 `static/.well-known/security.txt`는 `/.well-known/security.txt`로 게시됩니다. 기본적으로 Hwaro는 흔한 OS·에디터·VCS 잔여 파일을 걸러내 프로덕션에 실려 가지 않게 합니다. 파일 이름도 유니코드 형태까지 저장된 그대로 복사됩니다. 정적 파일 이름은 NFC(키보드로 입력되는 조합형)로 지으세요. macOS가 파일을 분해형(NFD)으로 저장했다면 `/img/한글.png` 링크는 Linux 호스트에서 404가 됩니다.
 
 ```toml
 [static]
