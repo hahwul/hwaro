@@ -35,7 +35,7 @@ Hwaro는 Jinja2 호환 템플릿 엔진인 Crinja를 사용합니다. 이 페이
 
 두 모드 모두에서 hwaro가 HTML로 렌더링한 값(`content`, `toc`, `page.summary`, `og_all_tags`와 그 밖의 `*_tags` 변수 등, [HTML 값](/ko/templates/data-model/#html-값) 참고)은 안전 값이라 그대로 출력됩니다. 텍스트에는 `| e`, 작성자 HTML에는 `| safe`를 붙여 쓴 템플릿은 어느 모드에서나 같은 결과를 냅니다.
 
-자동 이스케이프가 켜져 있으면 출력이 HTML이나 XML인 템플릿이 이스케이프합니다. `.html`, `.htm`, `.xhtml`, `.xml`, `.svg`, `.rss`, `.atom`으로 끝나는 파일(뒤에 붙은 `.jinja`, `.j2`, `.jinja2`는 무시), 형식이 드러나지 않는 이름(`page.j2`), 내장 숏코드, RSS와 Atom 피드 템플릿이 그렇습니다. 텍스트 출력은 이스케이프하지 않습니다. `.json`, `.txt`, `.csv`, `.js`, `.mjs`, `.css`, `.md`, `.markdown` 템플릿(그래서 `page.json.jinja`, `feed.json.jinja`)과 `[[content.generate]]`의 스펙이 그렇습니다. include, import, extends로 불러온 파일은 자기 이름을 따릅니다. 템플릿 안에서 일부 구간만 끄거나 켤 수 있습니다.
+자동 이스케이프가 켜져 있으면 출력이 HTML이나 XML인 템플릿이 이스케이프합니다. `.html`, `.htm`, `.xhtml`, `.xml`, `.svg`, `.rss`, `.atom`으로 끝나는 파일(뒤에 붙은 `.jinja`, `.j2`, `.jinja2`, `.ecr`는 무시), 형식이 드러나지 않는 이름(`page.j2`), 내장 숏코드, RSS와 Atom 피드 템플릿이 그렇습니다. 텍스트 출력은 이스케이프하지 않습니다. `.json`, `.txt`, `.csv`, `.js`, `.mjs`, `.css`, `.md`, `.markdown` 템플릿(그래서 `page.json.jinja`, `feed.json.jinja`)과 `[[content.generate]]`의 스펙이 그렇습니다. include, import로 불러온 파일은 자기 이름을 따르지만, `{% extends %}` 체인은 ENTRY 템플릿(페이지가 렌더링되는 템플릿)을 따릅니다 — Jinja2처럼 렌더 한 번에 이스케이프 정책 하나입니다. 템플릿 안에서 일부 구간만 끄거나 켤 수 있습니다.
 
 ```jinja
 {% autoescape false %}{{ legacy_html }}{% endautoescape %}
