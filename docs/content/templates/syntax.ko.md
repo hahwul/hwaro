@@ -43,7 +43,7 @@ hwaro가 HTML로 렌더링한 값(`content`, `toc`, `page.summary`, `og_all_tags
 이 블록은 그 안에서 include한 파일에는 미치지 않습니다. 자동 이스케이프에서는 다음도 달라집니다.
 
 - `a ~ b`(문자열의 `a + b`도)에 안전 값이 있으면 다른 쪽을 이스케이프하고 결과도 안전 값입니다. `{{ "<p>" ~ x }}`는 `&lt;p&gt;`를 출력하므로, 마크업은 출력이 안전 값인 `{% set %}…{% endset %}` 블록이나 매크로로 만드세요.
-- `| e`와 `| escape`는 안전 값을 건드리지 않습니다. 단, hwaro가 렌더링한 HTML(`content`, `page.summary` 등 데이터 모델의 HTML 값)은 1.0 이전처럼 여전히 이스케이프하므로, 피드의 `{{ p.summary | escape }}`는 마크업을 텍스트로 보여 줍니다. 0.x처럼 거기서 파생한 값도 마찬가지입니다. `{{ content[:300] | e }}`, `{{ p.summary | truncate(200) | escape }}`, `{{ (content ~ "…") | e }}`, 그리고 `markdownify`와 `tojson`의 결과도 이스케이프하므로 `data-x="{{ v | tojson | e }}"`의 따옴표는 계속 속성 안에 머뭅니다. `| forceescape`와 `| xml_escape`는 어떤 값이든 이스케이프합니다.
+- `| e`와 `| escape`는 안전 값을 건드리지 않습니다. 단, hwaro가 렌더링한 HTML(`content`, `page.summary` 등 데이터 모델의 HTML 값)은 1.0 이전처럼 여전히 이스케이프하므로, `section.pages`를 도는 `{{ p.summary | escape }}`나 RSS·Atom 템플릿의 `{{ p.content_html | escape }}`는 마크업을 텍스트로 보여 줍니다(피드 템플릿의 `p.summary`는 이미 일반 텍스트이므로 `| escape`가 한 번 이스케이프합니다). 0.x처럼 거기서 파생한 값도 마찬가지입니다. `{{ content[:300] | e }}`, `{{ p.summary | truncate(200) | escape }}`, `{{ (content ~ "…") | e }}`, 그리고 `markdownify`와 `tojson`의 결과도 이스케이프하므로 `data-x="{{ v | tojson | e }}"`의 따옴표는 계속 속성 안에 머뭅니다. `| forceescape`와 `| xml_escape`는 어떤 값이든 이스케이프합니다.
 - `{{ x | tojson }}`은 `<`, `>`, `&`, `'`를 `\u003c` 형태로 쓴 안전한 JSON이라 `<script>` 안에 바로 넣을 수 있습니다.
 
 ### 0.x에서 옮겨 올 때
