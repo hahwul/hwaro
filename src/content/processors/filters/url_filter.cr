@@ -13,10 +13,15 @@ module Hwaro
           # unescaped to its real URL first, so the filter returns a plain
           # string that is escaped exactly once when printed, instead of
           # `&amp;amp;`. A plain String input (an ordinary URL variable) is
-          # taken as is. Off the switch a hook `destination` is a plain String,
-          # so this is a no-op and OFF output is byte-identical.
-          def self.url_text(value : Crinja::Value) : String
-            value.raw.is_a?(Crinja::SafeString) ? HTML.unescape(value.to_s) : value.to_s
+          # taken as is. Off the switch nothing is unescaped (a hook
+          # `destination` is a plain String there, and an author's
+          # `"…&amp;…" | safe` keeps its bytes), so OFF output is byte-identical.
+          def self.url_text(value : Crinja::Value, env : Crinja) : String
+            if value.raw.is_a?(Crinja::SafeString) && Crinja::Markup.enabled?(env)
+              HTML.unescape(value.to_s)
+            else
+              value.to_s
+            end
           end
 
           # A value that already carries its own origin and must therefore be
@@ -53,12 +58,12 @@ module Hwaro
           def self.register(env : Crinja)
             # Absolute URL filter
             env.filters["absolute_url"] = Crinja.filter do
-              UrlFilters.absolutize(UrlFilters.url_text(target), env.resolve("base_url").to_s)
+              UrlFilters.absolutize(UrlFilters.url_text(target, env), env.resolve("base_url").to_s)
             end
 
             # Relative URL filter — returns path-only URL (no protocol/host)
             env.filters["relative_url"] = Crinja.filter do
-              url = UrlFilters.url_text(target)
+              url = UrlFilters.url_text(target, env)
               base_url = env.resolve("base_url").to_s
 
               if !UrlFilters.has_own_origin?(url) && url.starts_with?("/")

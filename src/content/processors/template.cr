@@ -191,7 +191,7 @@ module Hwaro
             # A pre-escaped SafeString path (a render-hook `destination`) is
             # unescaped first so the returned URL is escaped exactly once when
             # printed, not `&amp;amp;` (see UrlFilters.url_text).
-            path = Filters::UrlFilters.url_text(arguments["path"])
+            path = Filters::UrlFilters.url_text(arguments["path"], env)
             # A `page.assets` entry names the content file; it publishes next
             # to its page.
             path = TemplateEngine.published_asset_url(env, path) || path
