@@ -39,6 +39,16 @@ class Crinja::Renderer
       # Escaped, the bytes Finalizer writes; a string with nothing to escape
       # (most of them) is still not copied.
       return RenderedOutput.new(env.context.autoescape? ? Crinja::Markup.escape(raw) : raw)
+    else
+      # A non-string (list, hash, tuple, callable, …): the finalizer escapes a
+      # nested string's CONTENTS but writes the structural `'`, `[`, `=>` raw,
+      # so `{{ page.tags }}` in a single-quoted attribute could break out.
+      # Build the WHOLE representation unescaped, then escape it once — Jinja2's
+      # `escape(str(value))`. Off-mode keeps the finalizer's own (unescaped)
+      # representation.
+      if env.context.autoescape?
+        return RenderedOutput.new(Crinja::Markup.escape(Crinja::Finalizer.stringify(raw, escape: false)))
+      end
     end
 
     RenderedOutput.new env.stringify(result)
