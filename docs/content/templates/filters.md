@@ -64,7 +64,7 @@ Under [`[templates] autoescape`](/templates/syntax/#html-escaping) (on by defaul
 | `e` / `escape` | Escapes text; a safe value is returned unchanged, except HTML hwaro rendered (`content`, `page.summary`, …), which is still escaped as before 1.0. Safe either way, so it never escapes twice |
 | `forceescape`, `xml_escape` | Escape the value even when it is safe; the result is safe |
 | `safe` | Marks the value safe (prints as is) |
-| `markdownify`, `tojson`, `jsonify`, `urlize`, `xmlattr` | Return safe HTML (or script-safe JSON). `urlize` escapes the text it links and only links `http(s)`/`www.` URLs (never `javascript:` and other unsafe schemes). Under autoescape, `xmlattr` rejects an attribute name containing a space, `/`, `>` or `=` |
+| `markdownify`, `tojson`, `jsonify`, `urlize`, `xmlattr` | Return safe HTML (or script-safe JSON). `urlize` escapes the text it links and links `www.` and `scheme://` URLs, except the unsafe schemes `javascript:`, `vbscript:`, `file:` and `data:`, which stay plain text (so `ftp://example.com/a` is linked). Under autoescape, `xmlattr` rejects an attribute name containing a space, `/`, `>` or `=` |
 | `upper`, `lower`, `capitalize`, `center`, `indent`, `trim`, `truncate`, `truncate_words`, `replace`, `regex_replace`, `format`, `string`, `default` | A safe input stays safe; text the filter adds (`truncate`'s `end`, `replace`'s new text, `format`'s arguments) is escaped. A plain input stays plain |
 | `join` | Escapes each item and the separator unless they are safe; the result is safe |
 | `strip_html`, `striptags` | Return plain text with entities decoded, so it prints escaped exactly once |
