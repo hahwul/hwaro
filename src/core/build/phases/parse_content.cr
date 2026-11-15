@@ -1039,6 +1039,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     # edit just added still wins.
     previous_image = page.image
     previous_url = page.url
+    previous_title = page.title
 
     page.title = data[:title]
     page.description = data[:description]
@@ -1136,8 +1137,10 @@ module Hwaro::Core::Build::Phases::ParseContent
     # The preserved auto-OG URL above is named after the page URL. A slug or
     # path edit moved the page, and the image regenerated after this
     # re-render lives under the new name: re-derive it now, or the page's
-    # og:image kept pointing at the old, deleted file.
-    if (img = page.image) && img == previous_image && page.url != previous_url && (cfg = @config)
+    # og:image kept pointing at the old, deleted file. The root page has no
+    # URL to name it after, so its image is named after its title instead.
+    moved = page.url != previous_url || (page.title != previous_title && page.url.strip('/').empty?)
+    if (img = page.image) && img == previous_image && moved && (cfg = @config)
       ai = cfg.og.auto_image
       if ai.enabled && Content::Seo::OgImage.auto_assigned?(img, ai)
         page.image = "/#{ai.output_dir}/#{Content::Seo::OgImage.slug_for(page, {} of String => String)}#{File.extname(img)}"
