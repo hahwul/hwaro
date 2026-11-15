@@ -63,7 +63,16 @@ module Hwaro::Core::Build::Phases::Render
       # Cache compiled Crinja templates by content hash.
       # Most pages share the same base template string, so this avoids
       # re-parsing the template AST on every page render.
+      #
+      # A compiled template carries its filename, and that filename decides
+      # autoescape at render time — so a `page.html` and a `page.json.jinja`
+      # with byte-identical source must NOT share one compiled template, or
+      # whichever compiled first imposes its escaping on the other (HTML left
+      # raw, or JSON escaped). Fold the template's effective autoescape into
+      # the key: a no-op with the switch off (always false), so OFF-mode keys
+      # — and the cache's behaviour — are unchanged.
       cache_key = processed_template.hash
+      cache_key ^= AUTOESCAPE_CACHE_SALT if compiled_template_autoescape?(env, template_name)
       crinja_template = if cached = cache[cache_key]?
                           @cache_manager.record_hit("compiled_templates")
                           cached
@@ -270,6 +279,21 @@ module Hwaro::Core::Build::Phases::Render
     # to_i? (not to_i): a counterfeit token whose digit run overflows Int32
     # must not raise out of the render.
     text.gsub(TEMPLATE_MASK_RE) { |tok| $1.to_i?.try { |i| spans[i]? } || tok }
+  end
+
+  # A distinct bit pattern so the autoescape variant of a page/output
+  # template's source hash does not collide with its own non-escaping
+  # entry. Shortcode and hook entries in the same cache carry their own
+  # salts, so they are unaffected.
+  private AUTOESCAPE_CACHE_SALT = 0xAE5CA_E5CA_AE5CA_u64
+
+  # The autoescape `compile_template` will give the template it compiles for
+  # `template_name`: its filename is the on-disk path (its extension decides)
+  # or nil (`from_string`, so the string default), exactly as the renderer
+  # reads it. `false` whenever the site switch is off.
+  private def compiled_template_autoescape?(env : Crinja, template_name : String?) : Bool
+    path = template_name.try { |tn| @template_paths[tn]? }
+    env.config.autoescape?(path)
   end
 
   # Compile a template string, attaching its source filename when the template

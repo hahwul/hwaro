@@ -105,7 +105,16 @@ module Hwaro
         include Phases::Write
         include Phases::Finalize
 
-        TEMPLATE_EXTENSION_REGEX = /\.(html|j2|jinja2|jinja|ecr)$/
+        # The extensions hwaro loads as templates, highest load priority
+        # first (see Initialize#load_templates). The single source of truth:
+        # the regex and the autoescape wrapper-strip set are both derived
+        # from it, so they cannot drift.
+        TEMPLATE_EXTENSIONS      = %w[html j2 jinja2 jinja ecr]
+        TEMPLATE_EXTENSION_REGEX = /\.(#{TEMPLATE_EXTENSIONS.join("|")})$/
+        # Wrapper suffixes stripped to read a template's real output type
+        # (`page.json.jinja` → json, `page.txt.ecr` → txt): every loadable
+        # extension except `html`, which is itself an HTML output type.
+        TEMPLATE_WRAPPER_EXTNAMES = (TEMPLATE_EXTENSIONS - %w[html]).map { |e| ".#{e}" }
 
         @site : Models::Site?
         # The last successfully built site, held during a serve-mode full
