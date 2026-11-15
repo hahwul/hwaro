@@ -21,8 +21,10 @@ module Hwaro
       # A string hwaro built as HTML, or text it already escaped, as a
       # template value: safe (printed as is) under `[templates] autoescape`,
       # a plain string — exactly what templates always got — without it.
+      # Marked as rendered HTML, so `| e` still escapes it (see
+      # ext/crinja_autoescape.cr).
       def html_value(html : String, autoescape : Bool) : Crinja::Value
-        Crinja::Value.new(autoescape ? Crinja::SafeString.new(html) : html)
+        Crinja::Value.new(autoescape ? Crinja::SafeString.new(html, false, true) : html)
       end
 
       # A TEXT value that is usually already escaped for an HTML attribute or

@@ -31,6 +31,34 @@
 # `tojson`/`jsonify`, `safe`, `default`, `strip_html`) follow the same rules
 # in content/processors/filters/.
 
+# HTML hwaro rendered (`content`, summaries, `toc`, hook `text`, the feed
+# `content` — `Utils::CrinjaUtils.html_value`) is safe, but `| e` and
+# `| escape` on it still escape it, as they did before autoescape: a feed
+# template's `{{ p.summary | escape | xml_escape }}` and `{{ content | e }}`
+# show the markup as text. Any other safe value (a capture, a macro result,
+# `| safe`, pre-escaped text such as a hook `destination`) passes `| e`
+# unchanged, as in Jinja2. A filter that builds a new SafeString drops the
+# mark.
+struct Crinja::SafeString
+  @__rendered_html = false
+
+  def initialize(@string : String, @plain_value : Bool, @__rendered_html : Bool)
+  end
+
+  def rendered_html? : Bool
+    @__rendered_html
+  end
+end
+
+Crinja.filter(:escape) do
+  raw = target.raw
+  if raw.is_a?(Crinja::SafeString) && !raw.rendered_html?
+    raw
+  else
+    Crinja::SafeString.escape(raw.to_s)
+  end
+end
+
 module Crinja::Markup
   extend self
 
