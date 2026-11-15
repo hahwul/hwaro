@@ -19,6 +19,22 @@ describe Hwaro::Services::Initializer do
       end
     end
 
+    it "states [templates] autoescape = true in every generated config" do
+      Hwaro::Config::Options::ScaffoldType.values.each do |scaffold|
+        [{false, false}, {true, false}, {false, true}].each do |minimal, full|
+          Dir.mktmpdir do |dir|
+            target = File.join(dir, "mysite")
+            Hwaro::Services::Initializer.new.run(Hwaro::Config::Options::InitOptions.new(
+              path: target, scaffold: scaffold, minimal_config: minimal, full_config: full))
+            text = File.read(File.join(target, "config.toml"))
+            text.scan(/^\[templates\]$/m).size.should eq(1), "#{scaffold} minimal=#{minimal} full=#{full}"
+            config = TOML.parse(text)
+            config["templates"].as_h["autoescape"].as_bool.should be_true
+          end
+        end
+      end
+    end
+
     it "exposes math and mermaid toggles in the default [markdown] config" do
       # Discoverability: the balanced default config listed emoji/task_lists/
       # footnotes but omitted math/mermaid, so users couldn't tell the
