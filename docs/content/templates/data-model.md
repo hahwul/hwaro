@@ -192,7 +192,7 @@ The `site.authors` object contains every author referenced by a listed page, key
 ```jinja
 {% for id, author in site.authors %}
   <div class="author">
-    <img src="{{ author.avatar }}" alt="{{ author.name | e }}">
+    <img src="{{ author.avatar | e }}" alt="{{ author.name | e }}">
     <h3>{{ author.name | e }}</h3>
     <p>{{ author.bio | e }}</p>
 
@@ -631,7 +631,7 @@ Page title, description, URL, and image are available as `page.title`, `page.des
   <meta property="og:description" content="{{ page.description | e }}">
   {% endif %}
   {% if seo.og_image %}
-  <meta property="og:image" content="{{ seo.og_image }}">
+  <meta property="og:image" content="{{ seo.og_image | e }}">
   {% endif %}
   <meta name="twitter:card" content="{{ seo.twitter_card }}">
   {% if seo.twitter_site %}

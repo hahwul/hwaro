@@ -170,7 +170,7 @@ Always use `safe` for rendered content:
 
 ```jinja
 {{ page.description | default(value=site.description) | e }}
-{{ page.image | default(value="/images/default.png") }}
+{{ page.image | default(value="/images/default.png") | e }}
 ```
 
 `default` returns the fallback when the value is undefined, `none`, or an empty string. The fallback keeps its type, so `default(value=0)` still works in arithmetic; a `none` fallback (`default(value=none)`) renders as an empty string. A value that is not empty is returned as follows: an array, map, or object passes through unchanged, and any other value (a string, number, or boolean) is returned as a string, so string filters such as `length` or `replace` can follow it. Pass `boolean=true` (`default(value="N/A", boolean=true)`) to also replace any falsy value: `false`, `0`, or an empty list or map. Jinja2's name for the fallback, `default_value=`, works as well as `value=`.
@@ -317,7 +317,7 @@ Tests evaluate conditions in `{% if %}` statements.
 {% endif %}
 
 {% if page.image is present %}
-<meta property="og:image" content="{{ page.image | absolute_url }}">
+<meta property="og:image" content="{{ page.image | absolute_url | e }}">
 {% endif %}
 
 {% if "hero.jpg" is matching("[.](jpg|png)$") %}

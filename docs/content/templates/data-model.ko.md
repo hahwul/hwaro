@@ -192,7 +192,7 @@ john-doe:
 ```jinja
 {% for id, author in site.authors %}
   <div class="author">
-    <img src="{{ author.avatar }}" alt="{{ author.name | e }}">
+    <img src="{{ author.avatar | e }}" alt="{{ author.name | e }}">
     <h3>{{ author.name | e }}</h3>
     <p>{{ author.bio | e }}</p>
 
@@ -628,7 +628,7 @@ pros = ["Fast", "Reliable"]
   <meta property="og:description" content="{{ page.description | e }}">
   {% endif %}
   {% if seo.og_image %}
-  <meta property="og:image" content="{{ seo.og_image }}">
+  <meta property="og:image" content="{{ seo.og_image | e }}">
   {% endif %}
   <meta name="twitter:card" content="{{ seo.twitter_card }}">
   {% if seo.twitter_site %}

@@ -230,7 +230,7 @@ toc = true
 ```jinja
 {% set menu = load_data(path="data/menu.json") %}
 {% for item in menu %}
-<a href="{{ item.url }}">{{ item.title | e }}</a>
+<a href="{{ item.url | e }}">{{ item.title | e }}</a>
 {% endfor %}
 ```
 
@@ -282,7 +282,7 @@ url = "https://twitter.com/example"
 ```jinja
 {% set social = load_data(path="data/social.toml") %}
 {% for link in social.links %}
-<a href="{{ link.url }}">{{ link.name | e }}</a>
+<a href="{{ link.url | e }}">{{ link.name | e }}</a>
 {% endfor %}
 ```
 
@@ -509,7 +509,7 @@ base_url이 포함된 URL을 생성합니다.
 {# With page image from front matter #}
 {% if page.image %}
   {% set thumb = resize_image(path=page.image, width=320) %}
-  <img src="{{ thumb.url }}" alt="{{ page_title }}">
+  <img src="{{ thumb.url | e }}" alt="{{ page_title | e }}">
 {% endif %}
 
 {# LQIP blur-up placeholder #}

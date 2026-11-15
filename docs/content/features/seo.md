@@ -527,7 +527,7 @@ The `seo` object provides individual field access for building custom meta tags:
   <meta property="og:description" content="{{ page.description | e }}">
   {% endif %}
   {% if seo.og_image %}
-  <meta property="og:image" content="{{ seo.og_image }}">
+  <meta property="og:image" content="{{ seo.og_image | e }}">
   {% endif %}
   {% if seo.fb_app_id %}
   <meta property="fb:app_id" content="{{ seo.fb_app_id }}">
