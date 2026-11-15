@@ -113,6 +113,29 @@ describe "serve image reprocessing on changed bytes (A12)" do
     end
   end
 
+  # A narrower replacement clamps the widest width to its own: the previous
+  # image's wider variant is not cut again, and a cold build has none.
+  it "removes the variants a narrower replacement image no longer has" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_image_site
+        File.write("config.toml", File.read("config.toml").sub("widths = [32]", "widths = [32, 48]"))
+        write_solid_png("static/img/photo.png", 64, 64, 255_u8, 0_u8, 0_u8)
+
+        server = Hwaro::Services::Server.new
+        options = img_options
+        server.img_fix_builder.run(options).should be_true
+        File.exists?("public/img/photo_48w.png").should be_true
+
+        write_solid_png("static/img/photo.png", 40, 40, 0_u8, 0_u8, 255_u8)
+        server.img_fix_apply_changeset(static_changeset(["static/img/photo.png"]), options)
+
+        File.exists?("public/img/photo_40w.png").should be_true
+        File.exists?("public/img/photo_48w.png").should be_false
+      end
+    end
+  end
+
   it "regenerates the WebP copies too" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do
