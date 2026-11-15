@@ -48,6 +48,13 @@ struct Crinja::SafeString
   def rendered_html? : Bool
     @__rendered_html
   end
+
+  # `==` compares the string alone (upstream), so the hash must too: the
+  # inherited struct hash covered every ivar, so `content` and the equal
+  # `content | safe` (or a String) missed each other as dictionary keys.
+  def hash(hasher)
+    @string.hash(hasher)
+  end
 end
 
 Crinja.filter(:escape) do
