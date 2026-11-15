@@ -971,7 +971,11 @@ module Hwaro
 
           warn_missing_shortcode_args(name, template_key, args, warnings) unless user_template
 
-          html = render_shortcode_jinja(template, args, context, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, shortcode_name: name, warnings: warnings)
+          # Only a block shortcode's body (passed via `extra_args`) is the
+          # author's page content that may stay safe markup; a `body="…"`
+          # named argument on an inline call is an argument like any other.
+          block_body = !extra_args.nil? && extra_args.has_key?("body")
+          html = render_shortcode_jinja(template, args, context, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override, shortcode_name: name, warnings: warnings, block_body: block_body)
 
           if results = shortcode_results
             placeholder = "#{SHORTCODE_PLACEHOLDER_PREFIX}#{results.size}#{SHORTCODE_PLACEHOLDER_SUFFIX}"
@@ -1104,7 +1108,7 @@ module Hwaro
         end
 
         # Render a shortcode template with Crinja
-        private def render_shortcode_jinja(template : String, args : Hash(String, String), context : Hash(String, Crinja::Value), crinja_env_override : Crinja? = nil, template_cache_override : Hash(UInt64, Crinja::Template)? = nil, shortcode_name : String? = nil, warnings : Array(String)? = nil) : String
+        private def render_shortcode_jinja(template : String, args : Hash(String, String), context : Hash(String, Crinja::Value), crinja_env_override : Crinja? = nil, template_cache_override : Hash(UInt64, Crinja::Template)? = nil, shortcode_name : String? = nil, warnings : Array(String)? = nil, block_body : Bool = false) : String
           env = crinja_env_override || crinja_env
 
           # Inject the shortcode args into the caller's context and restore
@@ -1122,16 +1126,15 @@ module Hwaro
               if context.has_key?(key)
                 (saved ||= {} of String => Crinja::Value)[key] = context[key]
               end
-              # A block body is the author's content. With `[markdown] safe =
-              # false` (the default) the author may write raw HTML in a page
-              # body anyway, so `{{ body }}` stays safe markup. With `safe =
-              # true` it is PLAIN text, so under autoescape `{{ body }}` can't
-              # be a way around safe mode — `{{ body | markdownify }}`, which
-              # honours safe mode, is the way to render it. Every other
-              # argument is text.
-              context[key] = if key == "body" && !shortcode_body_safe?
-                               Crinja::Value.new(value)
-                             elsif key == "body"
+              # The BLOCK body of a block shortcode is the author's page
+              # content: with `[markdown] safe = false` (the default) the
+              # author may write raw HTML in a page body anyway, so `{{ body }}`
+              # stays safe markup; with `safe = true` it is PLAIN text, so under
+              # autoescape `{{ body }}` can't be a way around safe mode (use
+              # `{{ body | markdownify }}`, which honours it). Every other
+              # argument — including a `body="…"` named argument on an inline
+              # call — is plain text.
+              context[key] = if key == "body" && block_body && shortcode_body_safe?
                                Utils::CrinjaUtils.html_value(value, template_autoescape?)
                              else
                                Crinja::Value.new(value)
