@@ -294,6 +294,26 @@ class Crinja::Config::Autoescape
   end
 end
 
+class Crinja
+  # The one place a value becomes printed text (`{{ x }}`, `join`'s items,
+  # `env.evaluate`). Upstream's finalizer escapes a nested string's CONTENTS
+  # but writes a container's structural `'`, `[`, `=>` raw, so `{{ page.tags }}`
+  # or `{{ [[u]] | join }}` in a single-quoted attribute could break out. With
+  # autoescape active, build the WHOLE representation unescaped and escape it
+  # once — Jinja2's `escape(str(value))`. A String/SafeString, and every value
+  # with the switch off (even inside `{% autoescape true %}`), keeps the
+  # upstream bytes.
+  def stringify(object, pretty = false)
+    if Crinja::Markup.active?(self)
+      raw = object.is_a?(Value) ? object.raw : object
+      unless raw.is_a?(String) || raw.is_a?(SafeString)
+        return Crinja::Markup.escape(Finalizer.stringify(raw, escape: false))
+      end
+    end
+    @finalizer.stringify(object, context.autoescape?)
+  end
+end
+
 class Crinja::Template
   # Never escape this template's own output (its includes still follow
   # their own names). See the file comment.
