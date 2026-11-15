@@ -75,13 +75,19 @@ jobs:
           "
       - if: matrix.platform == 'macos'
         name: Install macOS build dependencies
-        run: brew install openssl@3 pkg-config
+        run: brew install openssl@3 pkg-config pcre2 libyaml
       - if: matrix.platform == 'macos'
         name: Build and package binary (macOS)
         run: |
           mkdir -p build
           OPENSSL_PREFIX="$(brew --prefix openssl@3)"
           export PKG_CONFIG_PATH="${OPENSSL_PREFIX}/lib/pkgconfig"
+          # The official Crystal tarball embeds PCRE2 10.42 (2022) and libyaml
+          # 0.1.6 (2014) and links them statically. With those, a URL inside a
+          # YAML flow sequence is a parse error and regexes behave differently
+          # from every other build. Link Homebrew's instead; package-macos.sh
+          # bundles and re-signs them like the OpenSSL dylibs.
+          export CRYSTAL_LIBRARY_PATH="$(brew --prefix pcre2)/lib:$(brew --prefix libyaml)/lib:$(crystal env CRYSTAL_LIBRARY_PATH)"
           BIN="build/hwaro-${GITHUB_REF_SLUG}-osx-${ARCH}"
           crystal build src/main.cr -o "$BIN" --no-debug --release
           chmod +x scripts/package-macos.sh
