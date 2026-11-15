@@ -279,4 +279,25 @@ describe "cache: generated outputs converge on the clean build" do
       end
     end
   end
+
+  # With no content pages a config edit re-renders nothing, so "no page
+  # re-rendered" read as "unchanged" and the feed kept the old title.
+  it "regenerates the feed and llms.txt after a config edit on a site with no pages" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", "title = \"Old Title\"\nbase_url = \"http://old.test\"\n[feeds]\nenabled = true\n[llms]\nenabled = true\n")
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        run_builder(true, false)
+        File.read("public/rss.xml").should contain("Old Title")
+
+        File.write("config.toml", File.read("config.toml").gsub("Old Title", "New Title").gsub("old.test", "new.test"))
+        run_builder(true, false)
+        File.read("public/rss.xml").should contain("New Title")
+        File.read("public/rss.xml").should contain("http://new.test")
+        File.read("public/llms.txt").should contain("New Title")
+      end
+    end
+  end
 end
