@@ -54,7 +54,8 @@ module Hwaro
       # templates printed raw is now escaped, and author HTML printed as
       # markup needs `| safe`. Say so once, until the key is written down.
       private def check_autoescape_explicit(issues : Array(Issue), config : Models::Config) : Nil
-        return if config.raw["templates"]?.try(&.as_h?).try(&.has_key?("autoescape"))
+        # Only a real boolean is a choice: the loader ignores `"false"`.
+        return if config.raw["templates"]?.try(&.as_h?).try(&.["autoescape"]?).try(&.raw).is_a?(Bool)
         issues << Issue.new(id: "templates-autoescape-unset", level: :info, category: "config", file: @config_path,
           message: "[templates] autoescape is not set: since hwaro 1.0 templates HTML-escape every printed value by default. " \
                    "Author HTML printed as markup needs `| safe`; set `autoescape = true` to confirm, or `autoescape = false` to render as before 1.0.")

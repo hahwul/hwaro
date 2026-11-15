@@ -35,3 +35,11 @@ describe "Doctor templates-autoescape-unset" do
     Dir.mktmpdir { |dir| autoescape_ids(dir, "", templates: false).should be_empty }
   end
 end
+
+describe "Doctor templates-autoescape-unset with a non-boolean value" do
+  it "r4#6 still notes a key the loader ignores" do
+    Dir.mktmpdir do |dir|
+      autoescape_ids(dir, "[templates]\nautoescape = \"false\"\n").size.should eq(1)
+    end
+  end
+end
