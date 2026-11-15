@@ -70,7 +70,7 @@ fb_app_id = "${FB_APP_ID:-}"
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-  gtag('config', '{{ env("GA_ID") }}');
+  gtag('config', {{ env("GA_ID") | tojson }});
 </script>
 {% endif %}
 ```
@@ -79,9 +79,11 @@ fb_app_id = "${FB_APP_ID:-}"
 
 ```jinja
 <script>
-  const API_URL = "{{ env("API_URL", default="https://api.example.com") }}";
+  const API_URL = {{ env("API_URL", default="https://api.example.com") | tojson }};
 </script>
 ```
+
+`<script>` 안에서는 값을 `| tojson`으로 출력하세요. 따옴표로 감싼, 스크립트에 넣어도 안전한 JavaScript 문자열이 됩니다. 따옴표 안에 `{{ env(...) }}`를 그대로 쓰면 자동 이스케이프가 `&`를 `&amp;`로 바꿔 URL이 깨집니다.
 
 ## 활용 사례
 

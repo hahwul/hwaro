@@ -70,7 +70,7 @@ If the variable is not set and no default is provided, an empty string is return
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-  gtag('config', '{{ env("GA_ID") }}');
+  gtag('config', {{ env("GA_ID") | tojson }});
 </script>
 {% endif %}
 ```
@@ -79,9 +79,11 @@ If the variable is not set and no default is provided, an empty string is return
 
 ```jinja
 <script>
-  const API_URL = "{{ env("API_URL", default="https://api.example.com") }}";
+  const API_URL = {{ env("API_URL", default="https://api.example.com") | tojson }};
 </script>
 ```
+
+Inside a `<script>`, print the value with `| tojson`: it writes a quoted JavaScript string that is safe in a script. A bare `{{ env(...) }}` between quotes would be HTML-escaped there under autoescape, so a `&` in the URL would reach the script as `&amp;`.
 
 ## Use Cases
 

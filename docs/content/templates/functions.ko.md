@@ -320,7 +320,7 @@ url = "https://twitter.com/example"
 
 {# API endpoint with fallback #}
 <script>
-  const API = "{{ env("API_URL", default="https://api.example.com") }}";
+  const API = {{ env("API_URL", default="https://api.example.com") | tojson }};
 </script>
 ```
 

@@ -320,7 +320,7 @@ If the variable is not set and no default is provided, an empty string is return
 
 {# API endpoint with fallback #}
 <script>
-  const API = "{{ env("API_URL", default="https://api.example.com") }}";
+  const API = {{ env("API_URL", default="https://api.example.com") | tojson }};
 </script>
 ```
 
