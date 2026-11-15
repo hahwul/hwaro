@@ -55,6 +55,21 @@ describe "ext/crinja_tag_args_memo" do
     template.render({"name" => "missing.html", "v" => 3}).should eq("|A")
   end
 
+  it "keeps a context-free include's sets and macros out of the includer and later renders" do
+    env = Crinja.new
+    env.loader = Crinja::Loader::HashLoader.new({
+      "vars.html"   => %({% set leaked = "L" %}{% macro m() %}M{% endmacro %}),
+      "first.html"  => %({% include "vars.html" without context %}[{{ leaked | default("none") }}]),
+      "second.html" => %([{{ leaked | default("none") }}]),
+      "macro.html"  => %({{ m() }}),
+    })
+
+    # the includer itself, then later pages on the same environment
+    env.get_template("first.html").render.should eq("[none]")
+    env.get_template("second.html").render.should eq("[none]")
+    expect_raises(Crinja::Error) { env.get_template("macro.html").render }
+  end
+
   it "raises a malformed tag on every execution, not only the first" do
     template = Crinja.new.from_string("{% if %}x{% endif %}")
 

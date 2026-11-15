@@ -446,6 +446,28 @@ describe "Crinja autoescape" do
       })
     end
 
+    it "a capture made in a text render never reaches an HTML render unescaped" do
+      sources = {"tvars.txt"   => %({% set label %}{{ "A&B" }}{% endset %}),
+                 "hvars.html"  => %({% set label %}{{ "A&B" }}{% endset %}),
+                 "wrap.txt"    => %({% include "hvars.html" without context %}),
+                 "uses.html"   => %({% include "tvars.txt" without context %}[{{ label }}]),
+                 "nested.html" => %({% include "wrap.txt" %}[{{ label }}]),
+                 "later.html"  => "[{{ label }}]"}
+      Dir.mktmpdir do |dir|
+        sources.each { |name, source| File.write(File.join(dir, name), source) }
+        {true, false}.each do |switch|
+          env = Hwaro::Content::Processors::TemplateEngine.new(switch).env
+          env.loader = Crinja::Loader::FileSystemLoader.new(dir)
+          # what a context-free text include captures, directly or nested
+          env.get_template("uses.html").render(ae_vars).should eq("[]")
+          env.get_template("nested.html").render(ae_vars).should eq("[]")
+          # a text output's top-level capture, then an HTML page on the same env
+          env.get_template("tvars.txt").render_text(ae_vars)
+          env.get_template("later.html").render(ae_vars).should eq("[]")
+        end
+      end
+    end
+
     it "r4#3 a text output's context-free include and import do not escape" do
       with_env.call(->(env : Crinja) {
         env.get_template("inc.txt").render(ae_vars).should eq("A&B")

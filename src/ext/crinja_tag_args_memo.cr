@@ -165,7 +165,12 @@ class Crinja::Tag::Include < Crinja::Tag
       include_name = source.to_s
     end
 
-    context = env.global_context unless with_context
+    # `without context`: a FRESH child of the global context, as in Jinja2 —
+    # the partial sees globals only, and its own top-level `{% set %}`s and
+    # macros die with it. Upstream rendered on the long-lived global context
+    # itself, so they leaked into the includer and into every later page
+    # rendered on this environment (worker-dependent output).
+    context = Crinja::Context.new(env.global_context) unless with_context
 
     begin
       env.logger.debug { "loading include #{include_name}" }
