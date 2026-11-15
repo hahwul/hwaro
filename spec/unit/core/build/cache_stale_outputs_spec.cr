@@ -573,6 +573,24 @@ describe "warm --cache builds" do
       end
     end
 
+    # Once the page whose alias shadowed the static file is gone, a cold
+    # build publishes the static file there. The stale stub's path is the
+    # static copy's, which this build claims: pruning the stub deleted it.
+    it "keeps the static file an alias stub stops shadowing" do
+      with_cached_site do
+        FileUtils.mkdir_p("static/legacy")
+        File.write("static/legacy/index.html", "<p>STATIC LEGACY</p>")
+        cached_build
+        File.read("public/legacy/index.html").should contain("0; url=")
+
+        File.delete("content/posts/gone.md")
+        cached_build
+
+        File.exists?("public/legacy/index.html").should be_true
+        File.read("public/legacy/index.html").should eq("<p>STATIC LEGACY</p>")
+      end
+    end
+
     # The static copy runs before any render. A build that then failed (a
     # front matter typo anywhere) left the static bytes on the page's output
     # with the previous cache file still vouching for that page, so the next

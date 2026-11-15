@@ -151,12 +151,15 @@ module Hwaro::Core::Build::Phases::Finalize
     stale.uniq!
     return if stale.empty?
 
-    # On a case-folding filesystem a section or bundle renamed by case only
-    # (`docs/` -> `Docs/`) leaves stale entries and claims spelled the old
-    # way that name the SAME files this build publishes; the respelled
-    # directory above does not change that. A bundle asset copied with its
-    # source mtime reads as unwritten, so deleting the old spelling deleted
-    # the live copy. Same fold-aware keep as the serve prune.
+    # Nor a file this build CLAIMS. Static and bundle-asset copies keep their
+    # source mtime, so `written_this_build?` reads them as unwritten: an
+    # alias stub that stopped shadowing `static/legacy/index.html` was pruned
+    # together with the static copy now at its path. And on a case-folding
+    # filesystem a section renamed by case only (`docs/` -> `Docs/`) leaves
+    # stale entries and claims spelled the old way that name the SAME files
+    # this build publishes; deleting the old spelling deleted the live copy.
+    # Same keep (exact, or the same file under another case) as the serve
+    # prune.
     exact = Set(String).new
     folded = {} of String => Array(String)
     (owned | still_written | generated_output_claims).each { |path| keep_output(path, cwd, exact, folded) }
