@@ -72,7 +72,7 @@ class Crinja::Tag::Import < Crinja::Tag
       env.with_scope do |scope|
         template.render(IO::Memory.new, env)
         scope.session_bindings.each do |key, value|
-          exported[Crinja::Value.new(key)] = value unless key.starts_with?('_')
+          exported[Crinja::Value.new(key)] = Crinja::Markup.imported_value(env, template, value) unless key.starts_with?('_')
         end
       end
 
@@ -111,7 +111,7 @@ class Crinja::Tag::From < Crinja::Tag
       if template.macros.has_key?(from_name)
         env.context.macros[import_name] = template.macros[from_name]
       elsif child.context.has_key?(from_name)
-        env.context[import_name] = child.context[from_name]
+        env.context[import_name] = Crinja::Markup.imported_value(env, template, child.context[from_name])
       else
         raise RuntimeError.new("Unknown import `#{from_name}` in #{template}").at(tag_node)
       end

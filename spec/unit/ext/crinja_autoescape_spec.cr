@@ -411,6 +411,13 @@ describe "Crinja autoescape" do
       "vars.html"    => %({% set label %}{{ "A&B" }}{% endset %}),
       "inc.txt"      => %({% include "literal.html" without context %}),
       "from.txt"     => %({% from "vars.html" import label %}{{ label }}),
+      "mod.txt"      => %({% set banner %}{{ u }}{% endset %}{% set tag %}<b>{% endset %}{% macro show(t) %}<i>{{ t }}</i>{% endmacro %}),
+      "imp.html"     => %({% import "mod.txt" as m %}{{ m.banner }}|{{ m.tag }}|{{ m.show(u) }}),
+      "imp_ctx.html" => %({% import "mod.txt" as m with context %}{{ m.banner }}),
+      "fro.html"     => %({% from "mod.txt" import tag, show %}{{ tag }}|{{ show(u) }}),
+      "fro_ctx.html" => %({% from "mod.txt" import banner with context %}{{ banner }}),
+      "imp.txt"      => %({% import "mod.txt" as m %}{{ m.banner }}|{{ m.tag }}),
+      "imp2.html"    => %({% import "vars.html" as m %}{% from "vars.html" import label %}{{ m.label }}|{{ label }}),
     }
     with_env = ->(block : Crinja -> Nil) do
       Dir.mktmpdir do |dir|
@@ -446,6 +453,25 @@ describe "Crinja autoescape" do
         env.get_template("literal.html").render(ae_vars).should eq("A&amp;B")
         nil
       })
+    end
+
+    it "a text module hands an escaping importer its captures as plain text; macros run in the caller" do
+      with_env.call(->(env : Crinja) {
+        env.get_template("imp.html").render(ae_vars).should eq("#{ESCAPED}|&lt;b&gt;|<i>#{ESCAPED}</i>")
+        env.get_template("imp_ctx.html").render(ae_vars).should eq(ESCAPED)
+        env.get_template("fro.html").render(ae_vars).should eq("&lt;b&gt;|<i>#{ESCAPED}</i>")
+        env.get_template("fro_ctx.html").render(ae_vars).should eq(ESCAPED)
+        # text importing text, and HTML importing HTML, are unchanged
+        env.get_template("imp.txt").render(ae_vars).should eq("#{CANARY}|<b>")
+        env.get_template("imp2.html").render(ae_vars).should eq("A&amp;B|A&amp;B")
+        nil
+      })
+      Dir.mktmpdir do |dir|
+        files.each { |name, source| File.write(File.join(dir, name), source) }
+        env = Hwaro::Content::Processors::TemplateEngine.new(false).env
+        env.loader = Crinja::Loader::FileSystemLoader.new(dir)
+        env.get_template("imp.html").render(ae_vars).should eq("#{CANARY}|<b>|<i>#{CANARY}</i>")
+      end
     end
 
     it "r4#2 an entry template rendered for an HTML file escapes whatever its name" do
@@ -492,7 +518,54 @@ describe "Crinja autoescape" do
     end
   end
 
+  # The mark means "a String in 0.x": what 0.x derived from `content` was a
+  # String too, so `| e` on it escapes as it did there.
+  describe "the rendered-HTML mark survives derivation" do
+    exprs = ["c[0]", "c[-1]", "c[:6]", "c[2:9]", "c[::-1]", "c | upper", "c | lower", "c | capitalize", "c | center(30)",
+             "c | indent(2, true)", "c | trim", "c | truncate(8)", "c | truncate(8, true, '~')", "c | truncate(500)",
+             "c | truncate_words(1)", "c | truncate_words(50)", "c | replace('p', 'q')", "c | regex_replace('y', 'Z')",
+             "c | format", "c | string", "c | default('d')", "c | append('z')", "c | prepend('z')", "c ~ 'z'", "'z' ~ c",
+             "c + 'z'", "c ~ c", "c | markdownify", "c | xml_escape", "c[:6] | upper | truncate(4, true, '~')"]
+    html = "<p>x &amp; y</p>"
+
+    it "| e on a value derived from rendered HTML prints what 0.x printed (HTML and text renders)" do
+      on_vars = {"c" => Hwaro::Utils::CrinjaUtils.html_value(html, true)} of String => Crinja::Value
+      off_vars = {"c" => Hwaro::Utils::CrinjaUtils.html_value(html, false)} of String => Crinja::Value
+      on_env = Hwaro::Content::Processors::TemplateEngine.new(true).env
+      off_env = Hwaro::Content::Processors::TemplateEngine.new(false).env
+      exprs.each do |expr|
+        src = "{{ (#{expr}) | e }}|{{ (#{expr}) | escape }}"
+        want = off_env.from_string(src).render(off_vars)
+        on_env.from_string(src).render(on_vars).should eq(want), expr
+        on_env.from_string(src).render_text(on_vars).should eq(want), "#{expr} (text render)"
+      end
+    end
+
+    it "still prints the derived markup itself, and | safe still drops the mark" do
+      vars = {"c" => Hwaro::Utils::CrinjaUtils.html_value(html, true)} of String => Crinja::Value
+      env = Hwaro::Content::Processors::TemplateEngine.new(true).env
+      env.from_string("{{ c[:3] }}|{{ c | truncate(500) }}|{{ c ~ '<' }}|{{ c | safe | e }}|{{ c | e | e }}").render(vars)
+        .should eq("<p>|<p>x &amp; y</p>|<p>x &amp; y</p>&lt;|<p>x &amp; y</p>|&lt;p&gt;x &amp;amp; y&lt;/p&gt;")
+    end
+
+    it "tojson and jsonify output is marked, so the 0.x attribute idiom | e keeps quotes inside the attribute" do
+      env = Hwaro::Content::Processors::TemplateEngine.new(true).env
+      out = env.from_string(%(<div data-x="{{ {"t": u} | tojson | e }}" data-y="{{ {"t": u} | jsonify | escape }}">)).render(ae_vars)
+      out.count('"').should eq(4)
+      env.from_string(%({{ {"t": u} | tojson }})).render(ae_vars).should contain(%("t":))
+    end
+  end
+
   it "r4#8 an engine built without saying otherwise escapes" do
     Hwaro::Content::Processors::TemplateEngine.new.env.from_string("{{ u }}").render(ae_vars).should eq(ESCAPED)
+  end
+
+  # Minimal cases from the expression-level differential fuzzer.
+  describe "fuzzer cases" do
+    it "append/prepend concatenate like ~: a safe side stays markup, the plain side is escaped" do
+      on(%({{ s | append(u) }}|{{ s | prepend(u) }}|{{ u | append(s) }}|{{ u | append("<i>") }})).should eq(
+        "<i>s&amp;</i>#{ESCAPED}|#{ESCAPED}<i>s&amp;</i>|#{ESCAPED}<i>s&amp;</i>|#{ESCAPED}&lt;i&gt;")
+      off(%({{ s | append(u) }}|{{ u | prepend(s) }})).should eq("<i>s&amp;</i>#{CANARY}|<i>s&amp;</i>#{CANARY}")
+    end
   end
 end

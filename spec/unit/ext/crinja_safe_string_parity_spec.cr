@@ -55,10 +55,9 @@ private CONSTRUCTS = [
   "{{ x is string }}", "{{ x is iterable }}", "{{ x is sequence }}", "{{ x is mapping }}", "{{ x is defined }}", "{{ x is none }}",
   "{{ x | default('d') }}", "{{ e | default('d') }}", "{{ e | default('d', true) }}", "{{ x | tojson }}", "{{ x | jsonify }}",
   "{% set d = {x: 1} %}{{ d[y] }}|{{ d[x] }}", "{% set d = {y: 1} %}{{ d[x] }}|{{ x in d }}",
-  "{% set d = {x: 1, 'a': 0, 'b': 0, 'c': 0, 'd': 0, 'e': 0, 'f': 0, 'g': 0, 'h': 0} %}{{ d[y] }}|{{ y in d }}",
-  "{% set d = {y: 1, 'a': 0, 'b': 0, 'c': 0, 'd': 0, 'e': 0, 'f': 0, 'g': 0, 'h': 0} %}{{ d[x] }}|{{ x in d }}",
-  "{% if x == y %}eq{% endif %}{% if y == x %}qe{% endif %}{% if x != y %}ne{% endif %}", "{{ [x, y, 'a'] | sort | join('|') }}", "{{ [x, y] | unique | length }}",
-  "{% for g in [{'k': x}, {'k': y}] | groupby('k') %}{{ g.grouper }}:{{ g.list | length }};{% endfor %}",
+  # (a SafeString and the equal String are distinct keys, as in 0.x: KEY_CASES below)
+  "{% if x == y %}eq{% endif %}{% if y == x %}qe{% endif %}{% if x != y %}ne{% endif %}", "{{ [x, y, 'a'] | sort | join('|') }}",
+  "{% for k, v in [{'k': x}, {'k': y}] | groupby('k') %}{{ k }}:{{ v | length }};{% endfor %}",
   "{% for i in [1, 2] %}{{ loop.cycle(x, 'o') }}{% endfor %}", "{% set s = x %}{{ s }}",
   "{% macro m(v) %}[{{ v }}]{% endmacro %}{{ m(x) }}", "{{ x | first }}", "{{ x | last }}", "{{ x | list | length }}",
   "{{ x | reverse }}", "{{ x | wordcount }}", "{{ x | upper }}", "{{ x.upper() }}", "{{ x | slice(2) | list | length }}",
@@ -140,18 +139,52 @@ describe "SafeString parity" do
   end
 end
 
+private KEY_FILL      = "'a': 0, 'b': 0, 'c': 0, 'd': 0, 'e': 0, 'f': 0, 'g': 0, 'h': 0"
+private KEY_FILL_LIST = "'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'"
+private KEY_FILL_GRP  = "{'k': 'a'}, {'k': 'b'}, {'k': 'c'}, {'k': 'd'}, {'k': 'e'}, {'k': 'f'}, {'k': 'g'}, {'k': 'h'}"
+
+# `s` is a SafeString (a capture, as in 0.x), `p` the equal String. Expected
+# bytes are what the pre-autoescape engine (94b2ebe5) prints, small
+# collections and ones past eight entries (Hash indexes them by hash).
+private KEY_CASES = [
+  {"{{ [s, p] | unique | length }}", "2"},
+  {"{{ [s, p, #{KEY_FILL_LIST}] | unique | length }}", "10"},
+  {"{{ [s, s] | unique | length }}", "1"},
+  {"{{ {s: 1, p: 2} | length }}", "2"},
+  {"{{ {s: 1, p: 2, #{KEY_FILL}} | length }}", "10"},
+  {"{% set d = {s: 1} %}{{ d[p] }}|{{ p in d }}|{{ d[s] }}|{{ s in d }}", "1|true|1|true"},
+  {"{% set d = {p: 1} %}{{ d[s] }}|{{ s in d }}", "1|true"},
+  {"{% set d = {s: 1, #{KEY_FILL}} %}{{ d[p] }}|{{ p in d }}|{{ d[s] }}|{{ s in d }}", "|false||true"},
+  {"{% set d = {p: 1, #{KEY_FILL}} %}{{ d[s] }}|{{ s in d }}", "1|false"},
+  {"{{ s in [p] }}|{{ p in [s] }}", "true|true"},
+  {"{% for k, v in [{'k': s}, {'k': p}] | groupby('k') %}{{ k }}:{{ v | length }};{% endfor %}", "x:2;"},
+  {"{% for k, v in [{'k': s}, {'k': p}, #{KEY_FILL_GRP}] | groupby('k') %}{{ k }}:{{ v | length }};{% endfor %}",
+   "x:2;a:1;b:1;c:1;d:1;e:1;f:1;g:1;h:1;"},
+]
+
 describe "SafeString hashing" do
-  it "hashes from the string alone, so equal values find each other as keys" do
-    marked = Crinja::SafeString.new(TEXT, false, true)
-    unmarked = Crinja::SafeString.new(TEXT)
+  it "hashes as before the rendered-HTML mark: content and content | safe are one key" do
+    marked = Crinja::SafeString.new("x", false, true)
+    unmarked = Crinja::SafeString.new("x")
     marked.hash.should eq(unmarked.hash)
-    marked.hash.should eq(TEXT.hash)
+    marked.hash.should_not eq("x".hash)
     env = Hwaro::Content::Processors::TemplateEngine.new.env
-    filler = "'a': 0, 'b': 0, 'c': 0, 'd': 0, 'e': 0, 'f': 0, 'g': 0, 'h': 0"
-    vars = {"m" => Crinja::Value.new(marked), "u" => Crinja::Value.new(unmarked), "p" => Crinja::Value.new(TEXT)} of String => Crinja::Value
-    [{"m", "u"}, {"u", "m"}, {"m", "p"}, {"p", "m"}, {"u", "p"}, {"p", "u"}].each do |key, lookup|
-      src = "{% set d = {#{key}: 1, #{filler}} %}{{ #{lookup} in d }}|{{ d[#{lookup}] }}"
-      env.from_string(src).render(vars).should eq("true|1"), "#{key} -> #{lookup}"
+    vars = {"m" => Crinja::Value.new(marked), "u" => Crinja::Value.new(unmarked)} of String => Crinja::Value
+    {
+      "{{ [m, u] | unique | length }}"                                                                      => "1",
+      "{{ [m, u, #{KEY_FILL_LIST}] | unique | length }}"                                                    => "9",
+      "{{ {m: 1, u: 2, #{KEY_FILL}} | length }}"                                                            => "9",
+      "{% set d = {m: 1, #{KEY_FILL}} %}{{ u in d }}|{% set d = {u: 1, #{KEY_FILL}} %}{{ m in d }}"         => "true|true",
+      "{% for k, v in [{'k': m}, {'k': u}, #{KEY_FILL_GRP}] | groupby('k') %}{{ v | length }};{% endfor %}" => "2;1;1;1;1;1;1;1;1;",
+    }.each { |src, want| env.from_string(src).render(vars).should eq(want), src }
+  end
+
+  [true, false].each do |ae|
+    it "keeps a SafeString and the equal String apart as keys, as in 0.x (autoescape #{ae})" do
+      env = Hwaro::Content::Processors::TemplateEngine.new(ae).env
+      KEY_CASES.each do |src, want|
+        env.from_string(%({% set s %}x{% endset %}{% set p = "x" %}) + src).render.should eq(want), src
+      end
     end
   end
 end

@@ -41,10 +41,12 @@ module Hwaro
           # autoescape `</` becomes `<\/`, as always. With it the JSON is a
           # safe value — printed as is, not HTML-escaped into `&quot;` — so
           # `<`, `>`, `&` and `'` become `\u003c`-style escapes (Jinja2's
-          # `tojson`), which no HTML parser reads as markup.
+          # `tojson`), which no HTML parser reads as markup. It carries the
+          # rendered-HTML mark: 0.x returned a String, so `| e` escaped it, and
+          # `data-x="{{ v | tojson | e }}"` must keep its `"` inside the attribute.
           def self.script_json(env : Crinja, json : String) : Crinja::Value
             return Crinja::Value.new(json.gsub("</", "<\\/")) unless Crinja::Markup.active?(env)
-            Crinja::Value.new(Crinja::SafeString.new(json.gsub({'<' => "\\u003c", '>' => "\\u003e", '&' => "\\u0026", '\'' => "\\u0027"})))
+            Crinja::Value.new(Crinja::SafeString.new(json.gsub({'<' => "\\u003c", '>' => "\\u003e", '&' => "\\u0026", '\'' => "\\u0027"}), false, true))
           end
 
           def self.register(env : Crinja)

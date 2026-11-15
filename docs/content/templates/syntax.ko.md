@@ -34,7 +34,7 @@ hwaro가 HTML로 렌더링한 값(`content`, `toc`, `page.summary`, `og_all_tags
 
 `config.toml`에 `[templates] autoescape = false`를 쓰면 이스케이프가 꺼집니다. 모든 값이 hwaro 0.x와 똑같이 그대로 출력되므로, 콘텐츠나 데이터에서 온 텍스트는 출력하는 곳마다 `| e`를 거치게 하세요. 예: `<meta name="description" content="{{ page.description | e }}">`. 텍스트에는 `| e`, 작성자 HTML에는 `| safe`를 붙여 쓴 템플릿은 어느 설정에서나 같은 결과를 냅니다.
 
-출력이 HTML이나 XML인 템플릿이 이스케이프합니다. `.html`, `.htm`, `.xhtml`, `.xml`, `.svg`, `.rss`, `.atom`으로 끝나는 파일(뒤에 붙은 `.jinja`, `.j2`, `.jinja2`, `.ecr`는 무시), 형식이 드러나지 않는 이름(`page.j2`), 내장 숏코드, RSS와 Atom 피드 템플릿이 그렇습니다. 텍스트 출력은 이스케이프하지 않습니다. `.json`, `.txt`, `.csv`, `.js`, `.mjs`, `.css`, `.md`, `.markdown` 템플릿(그래서 `page.json.jinja`, `feed.json.jinja`), `[[content.generate]]`의 스펙과 `body_template` 파일, 그리고 텍스트 출력이 include한 모든 것이 그렇습니다. hwaro가 쓰는 파일의 형식을 알 때는 템플릿 이름이 아니라 그 형식이 진입 템플릿의 이스케이프를 정합니다. 프런트 매터가 `plain.txt.jinja`를 고르더라도 `index.html`로 쓰는 페이지는 이스케이프하고, `[outputs]`의 JSON·텍스트·CSV 파일은 템플릿 이름과 상관없이 이스케이프하지 않습니다. HTML 템플릿이 include, import로 불러온 파일은 자기 이름을 따르고(`.js` 조각은 이스케이프하지 않습니다), `{% extends %}` 체인은 ENTRY 템플릿(페이지가 렌더링되는 템플릿)을 따릅니다 — Jinja2처럼 렌더 한 번에 이스케이프 정책 하나입니다. 템플릿 안에서 일부 구간만 끄거나 켤 수 있습니다.
+출력이 HTML이나 XML인 템플릿이 이스케이프합니다. `.html`, `.htm`, `.xhtml`, `.xml`, `.svg`, `.rss`, `.atom`으로 끝나는 파일(뒤에 붙은 `.jinja`, `.j2`, `.jinja2`, `.ecr`는 무시), 형식이 드러나지 않는 이름(`page.j2`), 내장 숏코드, RSS와 Atom 피드 템플릿이 그렇습니다. 텍스트 출력은 이스케이프하지 않습니다. `.json`, `.txt`, `.csv`, `.js`, `.mjs`, `.css`, `.md`, `.markdown` 템플릿(그래서 `page.json.jinja`, `feed.json.jinja`), `[[content.generate]]`의 스펙과 `body_template` 파일, 그리고 텍스트 출력이 include한 모든 것이 그렇습니다. hwaro가 쓰는 파일의 형식을 알 때는 템플릿 이름이 아니라 그 형식이 진입 템플릿의 이스케이프를 정합니다. 프런트 매터가 `plain.txt.jinja`를 고르더라도 `index.html`로 쓰는 페이지는 이스케이프하고, `[outputs]`의 JSON·텍스트·CSV 파일은 템플릿 이름과 상관없이 이스케이프하지 않습니다. HTML 템플릿이 include, import로 불러온 파일은 자기 이름을 따르지만(`.js` 조각은 이스케이프하지 않습니다), HTML 템플릿이 텍스트 파일에서 import한 값(`vars.txt.jinja`의 `{% set %}` 캡처)은 일반 텍스트로 넘어와 출력할 때 이스케이프됩니다. `{% extends %}` 체인은 ENTRY 템플릿(페이지가 렌더링되는 템플릿)을 따릅니다 — Jinja2처럼 렌더 한 번에 이스케이프 정책 하나입니다. 템플릿 안에서 일부 구간만 끄거나 켤 수 있습니다.
 
 ```jinja
 {% autoescape false %}{{ legacy_html }}{% endautoescape %}
@@ -43,7 +43,7 @@ hwaro가 HTML로 렌더링한 값(`content`, `toc`, `page.summary`, `og_all_tags
 이 블록은 그 안에서 include한 파일에는 미치지 않습니다. 자동 이스케이프에서는 다음도 달라집니다.
 
 - `a ~ b`(문자열의 `a + b`도)에 안전 값이 있으면 다른 쪽을 이스케이프하고 결과도 안전 값입니다. `{{ "<p>" ~ x }}`는 `&lt;p&gt;`를 출력하므로, 마크업은 출력이 안전 값인 `{% set %}…{% endset %}` 블록이나 매크로로 만드세요.
-- `| e`와 `| escape`는 안전 값을 건드리지 않습니다. 단, hwaro가 렌더링한 HTML(`content`, `page.summary` 등 데이터 모델의 HTML 값)은 1.0 이전처럼 여전히 이스케이프하므로, 피드의 `{{ p.summary | escape }}`는 마크업을 텍스트로 보여 줍니다. `| forceescape`와 `| xml_escape`는 어떤 값이든 이스케이프합니다.
+- `| e`와 `| escape`는 안전 값을 건드리지 않습니다. 단, hwaro가 렌더링한 HTML(`content`, `page.summary` 등 데이터 모델의 HTML 값)은 1.0 이전처럼 여전히 이스케이프하므로, 피드의 `{{ p.summary | escape }}`는 마크업을 텍스트로 보여 줍니다. 0.x처럼 거기서 파생한 값도 마찬가지입니다. `{{ content[:300] | e }}`, `{{ p.summary | truncate(200) | escape }}`, `{{ (content ~ "…") | e }}`, 그리고 `markdownify`와 `tojson`의 결과도 이스케이프하므로 `data-x="{{ v | tojson | e }}"`의 따옴표는 계속 속성 안에 머뭅니다. `| forceescape`와 `| xml_escape`는 어떤 값이든 이스케이프합니다.
 - `{{ x | tojson }}`은 `<`, `>`, `&`, `'`를 `\u003c` 형태로 쓴 안전한 JSON이라 `<script>` 안에 바로 넣을 수 있습니다.
 
 ### 0.x에서 옮겨 올 때
