@@ -18,6 +18,86 @@ module Hwaro
       # Pre-allocated nil value to avoid repeated allocations in hot paths
       NIL_VALUE = Crinja::Value.new(nil)
 
+      # A string hwaro built as HTML, or text it already escaped, as a
+      # template value: safe (printed as is) under `[templates] autoescape`,
+      # a plain string — exactly what templates always got — without it.
+      def html_value(html : String, autoescape : Bool) : Crinja::Value
+        Crinja::Value.new(autoescape ? Crinja::SafeString.new(html) : html)
+      end
+
+      # A TEXT value that is usually already escaped for an HTML attribute or
+      # text node (markd's escaper: `& < > "` but NOT `'`), but not always —
+      # a raw-HTML heading's TOC title/id or an image alt holding inline HTML
+      # carries raw `"`/`<`/`&`. Under autoescape it is marked safe, so first
+      # normalise it to fully escaped text in one pass: a character reference
+      # (`&amp;`, `&#39;`, `&copy;`, …) is kept as written, and every other
+      # `& < > " '` is escaped. Already-escaped input keeps its bytes (and so
+      # its meaning, in text and attribute alike); raw specials can no longer
+      # leave a quoted attribute. Off the switch it stays the plain string it
+      # was, byte-identical.
+      def preescaped_value(text : String, autoescape : Bool) : Crinja::Value
+        return Crinja::Value.new(text) unless autoescape
+        Crinja::Value.new(Crinja::SafeString.new(escape_text(text)))
+      end
+
+      # `text` with every `& < > " '` escaped except a terminated character
+      # reference's `&`, which is kept with the reference. The same String
+      # when there is nothing to escape. A byte scan, not a regex `gsub`:
+      # it runs on every hook value and TOC field.
+      private def escape_text(text : String) : String
+        bytes = text.to_slice
+        first = bytes.index { |byte| Crinja::Markup::SPECIAL.unsafe_fetch(byte) }
+        return text unless first
+        String.build(text.bytesize + 16) do |io|
+          io.write bytes[0, first]
+          i = run = first
+          while i < bytes.size
+            byte = bytes[i]
+            unless Crinja::Markup::SPECIAL.unsafe_fetch(byte)
+              i += 1
+              next
+            end
+            if byte === '&' && (ref = reference_length(bytes, i)) > 0
+              i += ref
+              next
+            end
+            io.write bytes[run, i - run]
+            io << (case byte
+            when '&' then "&amp;"
+            when '<' then "&lt;"
+            when '>' then "&gt;"
+            when '"' then "&quot;"
+            else          "&#39;"
+            end)
+            i += 1
+            run = i
+          end
+          io.write bytes[run, bytes.size - run]
+        end
+      end
+
+      # Byte length of the terminated reference (`&amp;`, `&#39;`, `&#x27;`,
+      # `&copy;`) starting at the `&` at `at`, or 0 when there is none.
+      private def reference_length(bytes : Bytes, at : Int32) : Int32
+        i = at + 1
+        if i < bytes.size && bytes[i] === '#'
+          i += 1
+          hex = i < bytes.size && (bytes[i] === 'x' || bytes[i] === 'X')
+          i += 1 if hex
+          start = i
+          while i < bytes.size && (hex ? bytes[i].unsafe_chr.hex? : bytes[i].unsafe_chr.ascii_number?)
+            i += 1
+          end
+        else
+          start = i
+          return 0 unless i < bytes.size && bytes[i].unsafe_chr.ascii_letter?
+          while i < bytes.size && bytes[i].unsafe_chr.ascii_alphanumeric?
+            i += 1
+          end
+        end
+        i > start && i < bytes.size && bytes[i] === ';' ? i - at + 1 : 0
+      end
+
       # Convert a YAML::Any value to Crinja::Value.
       #
       # `depth` guards against a self-referencing YAML anchor, whose parsed

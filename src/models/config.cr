@@ -92,6 +92,7 @@ module Hwaro
       property doctor : DoctorConfig
       property static : StaticConfig
       property outputs : OutputsConfig
+      property templates : TemplatesConfig
       property links : LinksConfig
       property data_remote : Array(RemoteDataConfig)
       property privacy : PrivacyConfig
@@ -144,6 +145,7 @@ module Hwaro
         @doctor = DoctorConfig.new
         @static = StaticConfig.new
         @outputs = OutputsConfig.new
+        @templates = TemplatesConfig.new
         @links = LinksConfig.new
         @data_remote = [] of RemoteDataConfig
         @privacy = PrivacyConfig.new
@@ -459,6 +461,7 @@ module Hwaro
         SectionLoader.new(%w[deployment], ->(c : Config) { load_deployment(c) }),
         SectionLoader.new(%w[], ->(c : Config) { resolve_deployment_source_dir(c) }),
         SectionLoader.new(%w[outputs], ->(c : Config) { load_outputs(c) }),
+        SectionLoader.new(%w[templates], ->(c : Config) { load_templates_config(c) }),
         SectionLoader.new(%w[links], ->(c : Config) { load_links(c) }),
         SectionLoader.new(%w[data], ->(c : Config) { load_data_remote(c) }),
         SectionLoader.new(%w[privacy], ->(c : Config) { load_privacy(c) }),

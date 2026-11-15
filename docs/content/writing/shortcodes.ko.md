@@ -366,6 +366,8 @@ This is the **body** content of the shortcode.
 <div class="note">{{ body }}</div>
 ```
 
+**블록** 본문(`{% sc %}…{% end %}` 형식)은 작성자의 페이지 콘텐츠입니다. `[markdown] safe = false`(기본값)이면 작성자가 본문에 원시 HTML을 쓸 수 있으므로 [`[templates] autoescape`](/ko/templates/syntax/#html-이스케이프)를 켜든 끄든 그대로 출력됩니다. `[markdown] safe = true`이면 `body`는 일반 텍스트라서 자동 이스케이프에서 `{{ body }}`가 이스케이프되고 safe 모드를 우회할 수 없습니다. safe 모드를 지키며 렌더링하려면 `{{ body | markdownify }}`를 쓰세요. 다른 인자는 — 인라인 `{{ sc(body="…") }}` 호출에 넘긴 `body="…"`를 포함해 — 모두 일반 텍스트입니다. 자동 이스케이프에서는 `{{ caption }}`이 이스케이프되어 출력되므로, HTML을 담아야 하는 캡션에는 `{{ caption | safe }}`가 필요합니다.
+
 ### 중첩 숏코드
 
 블록 숏코드는 최대 5단계까지 중첩할 수 있습니다:

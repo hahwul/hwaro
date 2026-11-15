@@ -150,6 +150,7 @@ module Hwaro
                 raise Crinja::RuntimeError.new("regex_replace: #{ex.message} for pattern #{pattern.inspect}")
               end
             end
+            env.filters["regex_replace"] = Crinja::Markup.keep_safe(env.filters["regex_replace"].as(Crinja::Callable::Instance), ["rep"])
 
             env.filters["base64_encode"] = Crinja.filter do
               Base64.strict_encode(target.to_s)
@@ -197,13 +198,20 @@ module Hwaro
               # the intended behaviour for an over-large length is "return the
               # text untouched".
               length = Utils::CrinjaUtils.to_count(arguments["length"], default: 50, max: Int32::MAX - 1)
-              ending = arguments["end"].to_s
 
               # Split one past the limit so `words.size > length` can tell
               # "exactly length words" from "more than length words".
               words = text.split(/\s+/, limit: length + 1)
-              if words.size > length
-                words[0...length].join(" ") + ending
+              truncated = words.size > length
+              # markupsafe semantics (see Markup.append_suffix): a safe target
+              # (or safe `end`) keeps its markup; the `end` is preserved if
+              # safe and escaped if plain, and only when the text is truncated.
+              # An untruncated safe string (even after the leading strip) is
+              # returned as is; off the switch, a plain concat, byte-identical.
+              if truncated
+                Crinja::Markup.append_suffix(env, words[0...length].join(" "), target, arguments["end"])
+              elsif Crinja::Markup.active?(env) && Crinja::Markup.safe?(target)
+                Crinja::Value.new(Crinja::SafeString.new(text))
               else
                 text
               end
@@ -228,6 +236,7 @@ module Hwaro
               chars = arguments["chars"]
               chars.none? || chars.undefined? ? target.to_s.strip : target.to_s.strip(chars.to_s)
             end
+            env.filters["trim"] = Crinja::Markup.keep_safe(env.filters["trim"].as(Crinja::Callable::Instance))
           end
         end
       end

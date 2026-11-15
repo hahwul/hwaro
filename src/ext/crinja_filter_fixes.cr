@@ -85,16 +85,22 @@ Crinja.filter({length: 255, killwords: false, end: "...", leeway: nil}, :truncat
   leeway = arguments.fetch("leeway") { env.policies.fetch("truncate.leeway", 5) }.to_i
   raise "expected leeway >= 0, got #{leeway}" if leeway < 0
 
+  # markupsafe semantics: a safe target (or a safe `end`) keeps its markup,
+  # and the appended `end` — the only inserted text, only on the cut branch —
+  # is preserved if safe and escaped if plain (`Markup.append_suffix`). A whole
+  # (untruncated) safe string is returned as is; off the switch everything is
+  # a plain concat, byte-identical.
+  safe_target = Crinja::Markup.active?(env) && Crinja::Markup.safe?(target)
   s = target.to_s
   if s.size - leeway <= length
-    s
+    Crinja::Value.new(safe_target ? Crinja::SafeString.new(s) : s)
   else
     trimmed = Hwaro::Utils::TextUtils.safe_prefix(s, length - append.size)
     unless arguments["killwords"].truthy?
       cut = trimmed.rindex(' ')
       trimmed = trimmed[0, cut] if cut
     end
-    trimmed + append
+    Crinja::Markup.append_suffix(env, trimmed, target, arguments["end"])
   end
 end
 

@@ -474,6 +474,11 @@ module Hwaro
           feed_updated = newest || Utils::SortUtils::FALLBACK_DATE
           feed_author = config.title.empty? ? feed_title : config.title
 
+          # HTML fields are safe under `[templates] autoescape`: an XML feed
+          # template escapes them on purpose (`| xml_escape`) or wraps them
+          # in CDATA, as it always had to.
+          autoescape = config.templates.autoescape
+          html = ->(text : String) { autoescape ? Crinja::SafeString.new(text) : text }
           page_values = pages.map do |page|
             entry_src = page.updated || page.date
             entry_updated = entry_src ? normalize_feed_time(entry_src) : Utils::SortUtils::FALLBACK_DATE
@@ -487,8 +492,8 @@ module Hwaro
               "updated_rfc3339" => entry_updated.to_rfc3339,
               "description"     => page.description,
               "summary"         => summary_for_feed(page, config),
-              "content"         => get_content_for_feed(page, config),
-              "content_html"    => full_content_for_feed(page, config),
+              "content"         => is_text ? get_content_for_feed(page, config) : html.call(get_content_for_feed(page, config)),
+              "content_html"    => html.call(full_content_for_feed(page, config)),
               "content_is_html" => !is_text,
               "authors"         => page.authors,
               "image"           => page.social_image.try { |img| feed_image_url(img, base_url) },

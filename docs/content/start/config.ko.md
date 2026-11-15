@@ -331,6 +331,17 @@ exclude = ["*.bak", "drafts/**"]         # 추가로 건너뛸 패턴
 
 내장 차단 목록은 잔여 파일만 제거합니다. `.well-known/`, `.domains` 같은 정상적인 점(dot) 경로는 **절대** 걸러지지 않고 항상 게시되며, 콜드 빌드와 `--cache`/증분 빌드에서 동일하게 동작합니다. 내장 필터링을 완전히 끄려면 `use_default_excludes = false`로 설정합니다.
 
+## 템플릿
+
+```toml
+[templates]
+autoescape = false   # 안전 값으로 표시되지 않은 출력 값을 HTML 이스케이프
+```
+
+| 키 | 타입 | 기본값 | 설명 |
+|-----|------|---------|-------------|
+| autoescape | bool | false | 출력이 HTML이나 XML인 템플릿에 Jinja2 방식의 HTML 자동 이스케이프를 적용합니다. `false`는 지금의 동작을 유지하며, 이후 릴리스에서 기본값이 `true`로 바뀝니다. [HTML 이스케이프](/ko/templates/syntax/#html-이스케이프)를 참고합니다 |
+
 ## 개발 서버
 
 `hwaro serve`에만 적용되는 옵션입니다. `hwaro build` 출력에는 영향을 주지 않습니다.
@@ -382,6 +393,7 @@ Cache-Control = "no-store"
 | `[csp]` | [콘텐츠 보안 정책(CSP)](/ko/features/csp/) | 인라인 스크립트/스타일 해시로 Content-Security-Policy 생성(`_headers` 또는 `<meta>`) |
 | `[static]` | [정적 파일](#정적-파일) | `static/` 복사에서 잔여 파일 필터링 / 경로 제외 |
 | `[serve]` | [개발 서버](#개발-서버) | 개발 서버 응답 헤더 & 빠른 모드 |
+| `[templates]` | [템플릿](#템플릿) | HTML 자동 이스케이프 |
 | `[links]` | [링크](#링크) | 깨진 내부 `@/` 링크 처리 (경고 또는 빌드 실패) |
 | `[series]` | [시리즈](/ko/features/series/) | 글을 순서 있는 시리즈로 묶기 |
 | `[related]` | [관련 글](/ko/features/related-posts/) | 관련 콘텐츠 추천 |

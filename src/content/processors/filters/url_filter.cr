@@ -1,4 +1,5 @@
 require "crinja"
+require "html"
 require "uri"
 require "../internal_link_resolver"
 
@@ -7,6 +8,27 @@ module Hwaro
     module Processors
       module Filters
         module UrlFilters
+          # The plain-text URL to transform. A pre-escaped SafeString input (a
+          # render-hook `destination`, which carries `&amp;`/`&#39;`) is
+          # unescaped to its real URL first, so the filter returns a plain
+          # string that is escaped exactly once when printed, instead of
+          # `&amp;amp;`. A plain String input (an ordinary URL variable) is
+          # taken as is. Off the switch nothing is unescaped (a hook
+          # `destination` is a plain String there, and an author's
+          # `"…&amp;…" | safe` keeps its bytes), so OFF output is byte-identical.
+          #
+          # Only the five encodings hwaro's escaping emits are reversed, in
+          # one pass (`&amp;lt;` → `&lt;`): `HTML.unescape` also decodes a
+          # semicolonless legacy entity, so `?a=1&copy=2` became `?a=1©=2`.
+          def self.url_text(value : Crinja::Value, env : Crinja) : String
+            text = value.to_s
+            return text unless value.raw.is_a?(Crinja::SafeString) && Crinja::Markup.enabled?(env) && text.includes?('&')
+            text.gsub(HWARO_ENTITY, HWARO_ENTITIES)
+          end
+
+          HWARO_ENTITY   = /&(?:amp|lt|gt|quot|#39);/
+          HWARO_ENTITIES = {"&amp;" => "&", "&lt;" => "<", "&gt;" => ">", "&quot;" => "\"", "&#39;" => "'"}
+
           # A value that already carries its own origin and must therefore be
           # passed through untouched by both filters:
           #
@@ -41,12 +63,12 @@ module Hwaro
           def self.register(env : Crinja)
             # Absolute URL filter
             env.filters["absolute_url"] = Crinja.filter do
-              UrlFilters.absolutize(target.to_s, env.resolve("base_url").to_s)
+              UrlFilters.absolutize(UrlFilters.url_text(target, env), env.resolve("base_url").to_s)
             end
 
             # Relative URL filter — returns path-only URL (no protocol/host)
             env.filters["relative_url"] = Crinja.filter do
-              url = target.to_s
+              url = UrlFilters.url_text(target, env)
               base_url = env.resolve("base_url").to_s
 
               if !UrlFilters.has_own_origin?(url) && url.starts_with?("/")

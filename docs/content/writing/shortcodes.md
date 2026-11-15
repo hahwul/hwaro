@@ -370,6 +370,8 @@ Or use the body as-is for raw content:
 <div class="note">{{ body }}</div>
 ```
 
+The **block** body (the `{% sc %}…{% end %}` form) is the author's page content. With `[markdown] safe = false` (the default) it prints as is in both modes of [`[templates] autoescape`](/templates/syntax/#html-escaping), since the author may write raw HTML in the body anyway. With `[markdown] safe = true` the body is plain text, so `{{ body }}` is escaped under autoescape and can't bypass safe mode — use `{{ body | markdownify }}`, which honours safe mode, to render it. Every other argument — including a `body="…"` passed to an inline `{{ sc(body="…") }}` call — is plain text: under autoescape `{{ caption }}` prints escaped, so a caption that should carry HTML needs `{{ caption | safe }}`.
+
 ### Nested Shortcodes
 
 Block shortcodes can be nested up to 5 levels deep:

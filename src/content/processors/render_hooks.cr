@@ -9,10 +9,13 @@
 # never branches on hooks at all. `HookedRenderer` (a separate subclass)
 # only comes into play once a registry exists.
 #
-# Values handed to hook templates arrive PRE-ESCAPED (Crinja autoescape is
-# globally off for hwaro templates — see `template.cr`), so a hook template
-# must emit `{{ text }}` etc. verbatim rather than piping through an escape
-# filter.
+# Values handed to hook templates arrive PRE-ESCAPED: each is either the
+# rendered HTML of the element (`text`, `highlighted`, `html`, …) or text
+# already escaped for an attribute or text node (`destination`, `title`,
+# `alt`, `code`, …). A hook template emits `{{ text }}` etc. verbatim, not
+# through an escape filter; under `[templates] autoescape` they are safe
+# values, so the output is the same in both modes. A heading's `id` and a
+# code block's `copy` are plain text (escaped under autoescape).
 
 require "crinja"
 require "digest/md5"
@@ -160,8 +163,10 @@ module Hwaro
             end
           end
 
+          autoescape = config.templates.autoescape
+          @@fallback_mutex.synchronize { Content::Processors::TemplateEngine.configure_autoescape(env, autoescape) }
           HookRenderContext.new(reg, env, @@fallback_cache, @@fallback_mutex, page_vars(page, config),
-            config.markdown.mermaid, config.markdown.admonitions)
+            config.markdown.mermaid, config.markdown.admonitions, autoescape)
         end
 
         # Shared page/config variable builder, used by both the render-phase
@@ -213,7 +218,29 @@ module Hwaro
             @page_vars : Hash(String, Crinja::Value),
             @mermaid_bypass : Bool,
             @admonition_bypass : Bool = false,
+            @autoescape : Bool = false,
           )
+          end
+
+          # Whether hook output is HTML-escaped (the site switch). Folded
+          # into `render_body_cached`'s memo key so an OFF and an ON render of
+          # the same body never share an entry.
+          def autoescape? : Bool
+            @autoescape
+          end
+
+          # `text`/`highlighted`/`html`/`header_html`/`body_html` are the
+          # element's RENDERED HTML — markup, marked safe as is.
+          private def hook_value(value : String) : Crinja::Value
+            Utils::CrinjaUtils.html_value(value, @autoescape)
+          end
+
+          # `destination`/`title`/`alt`/`lang`/`options`/`code`/`name` are
+          # TEXT, normally markd-escaped (an image `alt` can still carry raw
+          # inline HTML); normalised to fully escaped text, `'` included, then
+          # marked safe (see CrinjaUtils.preescaped_value).
+          private def attr_value(value : String) : Crinja::Value
+            Utils::CrinjaUtils.preescaped_value(value, @autoescape)
           end
 
           def link? : Bool
@@ -270,9 +297,9 @@ module Hwaro
             return stock_link(destination, title, text) unless hook
 
             vars = @page_vars.dup
-            vars["destination"] = Crinja::Value.new(destination)
-            vars["title"] = Crinja::Value.new(title)
-            vars["text"] = Crinja::Value.new(text)
+            vars["destination"] = attr_value(destination)
+            vars["title"] = attr_value(title)
+            vars["text"] = hook_value(text)
             render_hook_template("hooks/render-link", hook, SALT_LINK, vars) { stock_link(destination, title, text) }
           end
 
@@ -283,9 +310,9 @@ module Hwaro
             return stock_image(destination, alt, title) unless hook
 
             vars = @page_vars.dup
-            vars["destination"] = Crinja::Value.new(destination)
-            vars["alt"] = Crinja::Value.new(alt)
-            vars["title"] = Crinja::Value.new(title)
+            vars["destination"] = attr_value(destination)
+            vars["alt"] = attr_value(alt)
+            vars["title"] = attr_value(title)
             render_hook_template("hooks/render-image", hook, SALT_IMAGE, vars) { stock_image(destination, alt, title) }
           end
 
@@ -298,7 +325,9 @@ module Hwaro
 
             vars = @page_vars.dup
             vars["level"] = Crinja::Value.new(level)
-            vars["text"] = Crinja::Value.new(text)
+            vars["text"] = hook_value(text)
+            # Text: a `{id="…"}` attribute value is not escaped (`#id` and slugs
+            # never need it), so it escapes like any text under autoescape.
             vars["id"] = Crinja::Value.new(id)
             render_hook_template("hooks/render-heading", hook, SALT_HEADING, vars) { stock_heading(level, text, id) }
           end
@@ -316,11 +345,11 @@ module Hwaro
             return stock_codeblock(lang, code) unless hook
 
             vars = @page_vars.dup
-            vars["lang"] = Crinja::Value.new(lang)
-            vars["options"] = Crinja::Value.new(options)
-            vars["code"] = Crinja::Value.new(code)
-            vars["highlighted"] = Crinja::Value.new(highlighted)
-            vars["name"] = Crinja::Value.new(name)
+            vars["lang"] = attr_value(lang)
+            vars["options"] = attr_value(options)
+            vars["code"] = attr_value(code)
+            vars["highlighted"] = hook_value(highlighted)
+            vars["name"] = attr_value(name)
             vars["copy"] = Crinja::Value.new(copy)
             render_hook_template("hooks/render-codeblock", hook, SALT_CODEBLOCK, vars) { stock_codeblock(lang, code) }
           end
@@ -332,7 +361,7 @@ module Hwaro
             return stock_blockquote(text) unless hook
 
             vars = @page_vars.dup
-            vars["text"] = Crinja::Value.new(text)
+            vars["text"] = hook_value(text)
             render_hook_template("hooks/render-blockquote", hook, SALT_BLOCKQUOTE, vars) { stock_blockquote(text) }
           end
 
@@ -350,9 +379,9 @@ module Hwaro
             return html unless hook
 
             vars = @page_vars.dup
-            vars["html"] = Crinja::Value.new(html)
-            vars["header_html"] = Crinja::Value.new(header_html)
-            vars["body_html"] = Crinja::Value.new(body_html)
+            vars["html"] = hook_value(html)
+            vars["header_html"] = hook_value(header_html)
+            vars["body_html"] = hook_value(body_html)
             result = render_hook_template("hooks/render-table", hook, SALT_TABLE, vars) { html }
             # `\r?` so a hook template saved with CRLF line endings still has
             # its blank lines collapsed — markd treats a stray `\r\n\r\n`

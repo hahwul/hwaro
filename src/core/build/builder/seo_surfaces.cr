@@ -22,7 +22,10 @@ module Hwaro
           ->(source : String, context : Hash(String, Crinja::Value)) do
             env = create_fresh_crinja_env
             # Rendered by every build, so its reads key nothing.
-            Content::Processors::TemplateEngine.without_render_reads { env.from_string(source).render(context) }
+            template = env.from_string(source)
+            # The JSON feed is not markup: it never HTML-escapes.
+            template.__no_autoescape = context["feed"]?.try(&.["type"].to_s) == "json"
+            Content::Processors::TemplateEngine.without_render_reads { template.render(context) }
           end
         end
 

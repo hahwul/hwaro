@@ -799,6 +799,18 @@ For custom listings, use `get_taxonomy()`. See [Taxonomies](/writing/taxonomies/
 
 See [Menus](/features/menus/) for the full config/front-matter reference, hierarchy, and per-language behavior.
 
+## HTML Values
+
+These variables hold HTML that hwaro rendered (or text it already escaped). They are *safe*: printed as they are, never escaped again under [`[templates] autoescape`](/templates/syntax/#html-escaping).
+
+- Content: `content`, `term_content`, `page.summary` / `page_summary` (the `<!-- more -->` summary or the automatic excerpt; when it falls back to `page.description` it is that text, not HTML), `section.list` / `section_list`, the `summary` of every page object in a list
+- Navigation: `toc`, `toc_obj.html`, `toc_obj.headers[].title`, `.id` and `.permalink` (heading text with tags removed, already escaped; under autoescape a raw-HTML heading's quotes, `<` and `&` are escaped too), `pagination`, `pagination_obj.html`
+- Head tags: `og_tags`, `twitter_tags`, `og_all_tags`, `canonical_tag`, `hreflang_tags`, `alternate_output_tags`, `pagination_seo_links`, `jsonld` and every `jsonld_*`, `highlight_css`, `highlight_js`, `highlight_tags`, `math_tags`, `mermaid_tags`, `pwa_tags`, `search_tags`, `auto_includes`, `auto_includes_css`, `auto_includes_js`
+- Render hooks: every hook variable but the heading `id` and the code block `copy` (see [Render Hooks](/templates/render-hooks/#context-variables)); shortcodes: `body`
+- Feed templates: `content_html`, and `content` when `content_is_html`
+
+Everything else is text or a URL (titles, descriptions, names, `page.extra`, `site.data`, i18n strings, `page.url`, `permalink`) and is escaped under autoescape. A text field you fill with HTML on purpose needs `| safe` there.
+
 ---
 
 ## Type Reference

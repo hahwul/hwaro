@@ -15,11 +15,11 @@ class Crinja::Renderer
   # === 1. PrintStatement fast path ======================================
   # Upstream stringifies every printed value through Finalizer via
   # String.build, which copies the string even in the overwhelmingly common
-  # case: a String (or SafeString) value with autoescape disabled, where
-  # Finalizer writes the bytes verbatim (`quote` only adds quotes inside
-  # structs, never at the top level). Return the string itself instead of
-  # copying it. Non-string values and autoescaped output keep the original
-  # path.
+  # case: a String (or SafeString) value, which Finalizer writes verbatim
+  # (`quote` only adds quotes inside structs, never at the top level) or,
+  # with autoescape on, HTML-escaped. Return the string itself (or its
+  # escaped form) instead of copying it. Non-string values keep the
+  # original path.
   def render(node : AST::PrintStatement)
     expr = node.expression
     if expr.is_a?(AST::CallExpression) &&
@@ -36,9 +36,14 @@ class Crinja::Renderer
       # SafeString is never escaped; #to_s returns the wrapped String.
       return RenderedOutput.new(raw.to_s)
     when String
-      return RenderedOutput.new(raw) unless env.context.autoescape?
+      # Escaped, the bytes Finalizer writes; a string with nothing to escape
+      # (most of them) is still not copied.
+      return RenderedOutput.new(env.context.autoescape? ? Crinja::Markup.escape(raw) : raw)
     end
 
+    # A non-string (list, hash, tuple, callable, …): `Crinja#stringify` (see
+    # ext/crinja_autoescape.cr) escapes its whole representation once when
+    # autoescape is active.
     RenderedOutput.new env.stringify(result)
   rescue ex : Crinja::Error
     ex.at(node) unless ex.has_location?

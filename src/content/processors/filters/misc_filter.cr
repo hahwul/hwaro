@@ -37,13 +37,23 @@ module Hwaro
             end
           end
 
+          # JSON for a `<script>` (or a single-quoted attribute). Without
+          # autoescape `</` becomes `<\/`, as always. With it the JSON is a
+          # safe value — printed as is, not HTML-escaped into `&quot;` — so
+          # `<`, `>`, `&` and `'` become `\u003c`-style escapes (Jinja2's
+          # `tojson`), which no HTML parser reads as markup.
+          def self.script_json(env : Crinja, json : String) : Crinja::Value
+            return Crinja::Value.new(json.gsub("</", "<\\/")) unless Crinja::Markup.active?(env)
+            Crinja::Value.new(Crinja::SafeString.new(json.gsub({'<' => "\\u003c", '>' => "\\u003e", '&' => "\\u0026", '\'' => "\\u0027"})))
+          end
+
           def self.register(env : Crinja)
             # JSON encode filter (escapes </ to prevent script-tag breakout in inline JS).
             # Serialize the actual value tree — `target.to_s.to_json` would stringify
             # the Crinja::Value first and emit broken JSON (e.g. "[Crinja::Value<...>]")
             # for arrays/hashes/numbers.
             env.filters["jsonify"] = Crinja.filter do
-              JSON.build { |b| MiscFilters.build_json(b, target) }.gsub("</", "<\\/")
+              MiscFilters.script_json(env, JSON.build { |b| MiscFilters.build_json(b, target) })
             end
 
             # Override Crinja's built-in `tojson`. Crinja wraps its output in
@@ -62,7 +72,7 @@ module Hwaro
               # overflow `to_i` or allocate a giant per-level indent. 0..16 is a
               # sane range for JSON indentation.
               indent_str = raw_indent.is_a?(Int) ? " " * raw_indent.clamp(0, 16) : ""
-              JSON.build(indent_str) { |b| MiscFilters.build_json(b, target) }.gsub("</", "<\\/")
+              MiscFilters.script_json(env, JSON.build(indent_str) { |b| MiscFilters.build_json(b, target) })
             end
 
             # Default filter — returns the fallback when the target is
@@ -85,7 +95,13 @@ module Hwaro
                 target
               else
                 val = target.to_s
-                val.empty? ? fallback : Crinja::Value.new(val)
+                if val.empty?
+                  fallback
+                elsif Crinja::Markup.active?(env) && target.raw.is_a?(Crinja::SafeString)
+                  target # stays safe (Jinja2 returns the value itself)
+                else
+                  Crinja::Value.new(val)
+                end
               end
             end
 

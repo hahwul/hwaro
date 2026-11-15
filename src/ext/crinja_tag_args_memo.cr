@@ -96,7 +96,11 @@ class Crinja::Tag::Set < Crinja::Tag
       name = args.current_token.value
       args.next_token
       value = renderer.render(tag_node.block).value
-      env.context[name] = SafeString.new(value)
+      # Jinja2: a `{% set %}…{% endset %}` capture is Markup only when it was
+      # rendered WITH autoescape on. A capture made inside `{% autoescape
+      # false %}` is plain text, so printing it later re-escapes it. Off the
+      # site switch, always a SafeString, byte-identical to before.
+      env.context[name] = (Crinja::Markup.enabled?(env) && !env.context.autoescape?) ? value : SafeString.new(value)
       args.close
     else
       assignments = tag_node.__args_keywords ||= begin

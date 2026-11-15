@@ -61,7 +61,7 @@ module Hwaro::Core::Build::Phases::Render
       "language"          => Crinja::Value.new(p.language || default_language),
       "translations"      => Crinja::Value.new(translations),
       "weight"            => Crinja::Value.new(p.weight),
-      "summary"           => Crinja::Value.new(p.template_summary),
+      "summary"           => summary_crinja(p, template_autoescape?),
       "summary_truncated" => Crinja::Value.new(p.summary_truncated),
       "word_count"        => Crinja::Value.new(p.word_count),
       "reading_time"      => Crinja::Value.new(p.reading_time),
@@ -96,6 +96,15 @@ module Hwaro::Core::Build::Phases::Render
       hash["version_links"] = Content::Versions.version_links_value(p)
     end
     Crinja::Value.new(hash)
+  end
+
+  # `page.summary`: the rendered `<!-- more -->` summary or the automatic
+  # excerpt — HTML — or, failing both, the front matter description, which
+  # is author text (Page#template_summary).
+  private def summary_crinja(p : Models::Page, autoescape : Bool) : Crinja::Value
+    summary = p.template_summary
+    return Crinja::Value.new(summary) if p.summary_html.nil? && p.summary.nil? && p.description
+    Utils::CrinjaUtils.html_value(summary, autoescape)
   end
 
   # `page.git` as templates see it: a mapping of the commit fields, or nil

@@ -29,7 +29,7 @@ module Hwaro::Core::Build::Phases::Render
 
     # Build template variables — reuse prebuilt_vars if available (shortcode path)
     vars = if pv = prebuilt_vars
-             update_content_vars(pv, content, section_list, toc, toc_headers, pagination, pagination_seo_links)
+             update_content_vars(pv, content, section_list, toc, toc_headers, pagination, pagination_seo_links, site.config.templates.autoescape)
              # The prebuilt hash is the shortcode pre-render context, built
              # with content="" — its per-fence copy probe saw nothing. Re-run
              # it against the FINAL rendered content, otherwise a
@@ -63,7 +63,16 @@ module Hwaro::Core::Build::Phases::Render
       # Cache compiled Crinja templates by content hash.
       # Most pages share the same base template string, so this avoids
       # re-parsing the template AST on every page render.
+      #
+      # A compiled template carries its filename, and that filename decides
+      # autoescape at render time — so a `page.html` and a `page.json.jinja`
+      # with byte-identical source must NOT share one compiled template, or
+      # whichever compiled first imposes its escaping on the other (HTML left
+      # raw, or JSON escaped). Fold the template's effective autoescape into
+      # the key: a no-op with the switch off (always false), so OFF-mode keys
+      # — and the cache's behaviour — are unchanged.
       cache_key = processed_template.hash
+      cache_key ^= AUTOESCAPE_CACHE_SALT if compiled_template_autoescape?(env, template_name)
       crinja_template = if cached = cache[cache_key]?
                           @cache_manager.record_hit("compiled_templates")
                           cached
@@ -272,6 +281,21 @@ module Hwaro::Core::Build::Phases::Render
     text.gsub(TEMPLATE_MASK_RE) { |tok| $1.to_i?.try { |i| spans[i]? } || tok }
   end
 
+  # A distinct bit pattern so the autoescape variant of a page/output
+  # template's source hash does not collide with its own non-escaping
+  # entry. Shortcode and hook entries in the same cache carry their own
+  # salts, so they are unaffected.
+  private AUTOESCAPE_CACHE_SALT = 0xAE5CA_E5CA_AE5CA_u64
+
+  # The autoescape `compile_template` will give the template it compiles for
+  # `template_name`: its filename is the on-disk path (its extension decides)
+  # or nil (`from_string`, so the string default), exactly as the renderer
+  # reads it. `false` whenever the site switch is off.
+  private def compiled_template_autoescape?(env : Crinja, template_name : String?) : Bool
+    path = template_name.try { |tn| @template_paths[tn]? }
+    env.config.autoescape?(path)
+  end
+
   # Compile a template string, attaching its source filename when the template
   # came from disk. Crinja errors then report `templates/foo.html:line:col`
   # with a source excerpt instead of an anonymous `<string>` template.
@@ -303,16 +327,17 @@ module Hwaro::Core::Build::Phases::Render
     toc_headers : Array(Models::TocHeader),
     pagination : String,
     pagination_seo_links : String,
+    autoescape : Bool,
   )
-    vars["content"] = Crinja::Value.new(content)
-    vars["section_list"] = Crinja::Value.new(section_list)
-    vars["toc"] = Crinja::Value.new(toc)
+    vars["content"] = Utils::CrinjaUtils.html_value(content, autoescape)
+    vars["section_list"] = Utils::CrinjaUtils.html_value(section_list, autoescape)
+    vars["toc"] = Utils::CrinjaUtils.html_value(toc, autoescape)
     vars["toc_obj"] = Crinja::Value.new({
-      "html"    => Crinja::Value.new(toc),
-      "headers" => Crinja::Value.new(toc_headers_to_crinja(toc_headers)),
+      "html"    => vars["toc"],
+      "headers" => Crinja::Value.new(toc_headers_to_crinja(toc_headers, autoescape)),
     })
-    vars["pagination"] = Crinja::Value.new(pagination)
-    vars["pagination_seo_links"] = Crinja::Value.new(pagination_seo_links)
+    vars["pagination"] = Utils::CrinjaUtils.html_value(pagination, autoescape)
+    vars["pagination_seo_links"] = Utils::CrinjaUtils.html_value(pagination_seo_links, autoescape)
 
     # NOTE: pagination_obj is not updated here because its fields (URLs, page
     # numbers, booleans) are stable across the shortcode pre-render and final
