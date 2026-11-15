@@ -25,7 +25,8 @@ Key 'plugins' in config.toml was removed in 1.0 — hwaro does not read it; dele
 ```
 
 `hwaro doctor --fix` deletes it when it holds only the old default
-(`processors = ["markdown"]`) or nothing.
+(`processors = ["markdown"]`) or nothing. [Upgrading to 1.0](/start/upgrading/)
+lists everything else that changed.
 
 The check covers top-level keys only: a misspelled key nested inside a
 section (`[markdown] emoij = true`) is not reported, so double-check nested

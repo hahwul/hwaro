@@ -25,7 +25,8 @@ Key 'plugins' in config.toml was removed in 1.0 — hwaro does not read it; dele
 ```
 
 섹션에 예전 기본값(`processors = ["markdown"]`)만 있거나 비어 있으면
-`hwaro doctor --fix`가 지워 줍니다.
+`hwaro doctor --fix`가 지워 줍니다. 그 밖에 달라진 점은
+[1.0으로 업그레이드](/ko/start/upgrading/)에 정리되어 있습니다.
 
 이 검사는 최상위 키만 대상으로 합니다. 섹션 안에 중첩된 키의 오타
 (`[markdown] emoij = true`)는 보고되지 않으므로 아래 표와 대조해 확인하세요. `[highlight]` 테이블 대신 `highlight = false`를 쓰거나
