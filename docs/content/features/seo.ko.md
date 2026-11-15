@@ -243,7 +243,7 @@ generate_feed = false   # /ja/rss.xml을 생성하지 않음
 
 #### 예시
 
-값은 **미리 이스케이프되지 않습니다.** `xml_escape`를 적용하거나 CDATA로 감싸는 일은 템플릿 작성자의 몫입니다. `summary`는 일반 텍스트이므로 RSS `<description>`처럼 HTML을 담는 요소에는 먼저 `escape`를 적용하세요. `feed.json` 템플릿에서는 `tojson` 필터를 쓰세요:
+값은 **미리 이스케이프되지 않습니다.** 기본값인 [`[templates] autoescape`](/ko/templates/syntax/#html-이스케이프)에서는 RSS·Atom 템플릿이 출력하는 값을 이스케이프하고, `xml_escape`는 거기서 두 번 이스케이프하지 않으므로 그대로 두세요(또는 CDATA). 그러면 `autoescape = false`에서도 같은 템플릿이 동작하며, 그때 이스케이프는 템플릿 작성자의 몫입니다. `content_html`은 그대로 출력되는 HTML이므로 이스케이프하거나 CDATA로 감싸세요. `summary`는 일반 텍스트이므로 RSS `<description>`처럼 HTML을 담는 요소에는 먼저 `escape`를 적용하세요. `feed.json` 템플릿에서는 `tojson` 필터를 쓰세요:
 
 ```jinja
 <?xml version="1.0" encoding="UTF-8"?>
@@ -273,12 +273,12 @@ generate_feed = false   # /ja/rss.xml을 생성하지 않음
 ```jinja
 <link rel="alternate" type="application/rss+xml" 
       href="{{ base_url }}/rss.xml" 
-      title="{{ site.title }}">
+      title="{{ site.title | e }}">
 
 {% if page.language and page.language != "en" %}
 <link rel="alternate" type="application/rss+xml"
       href="{{ base_url }}/{{ page.language }}/rss.xml"
-      title="{{ site.title }} ({{ page.language }})">
+      title="{{ site.title | e }} ({{ page.language }})">
 {% endif %}
 ```
 
@@ -287,7 +287,7 @@ JSON Feed는 `type="application/feed+json"`과 `feed.json`을 씁니다:
 ```jinja
 <link rel="alternate" type="application/feed+json"
       href="{{ base_url }}/feed.json"
-      title="{{ site.title }}">
+      title="{{ site.title | e }}">
 ```
 
 ---
@@ -520,20 +520,20 @@ FAQ, HowTo, WebSite, Organization 같은 추가 스키마 타입도 사용할 �
 ```jinja
 <head>
   <link rel="canonical" href="{{ seo.canonical_url }}">
-  <meta property="og:title" content="{{ page.title }}">
+  <meta property="og:title" content="{{ page.title | e }}">
   <meta property="og:type" content="{{ seo.og_type }}">
   <meta property="og:url" content="{{ seo.canonical_url }}">
   {% if page.description %}
-  <meta property="og:description" content="{{ page.description }}">
+  <meta property="og:description" content="{{ page.description | e }}">
   {% endif %}
   {% if seo.og_image %}
-  <meta property="og:image" content="{{ seo.og_image }}">
+  <meta property="og:image" content="{{ seo.og_image | e }}">
   {% endif %}
   {% if seo.fb_app_id %}
   <meta property="fb:app_id" content="{{ seo.fb_app_id }}">
   {% endif %}
   <meta name="twitter:card" content="{{ seo.twitter_card }}">
-  <meta name="twitter:title" content="{{ page.title }}">
+  <meta name="twitter:title" content="{{ page.title | e }}">
   {% if seo.twitter_site %}
   <meta name="twitter:site" content="{{ seo.twitter_site }}">
   {% endif %}
@@ -575,8 +575,8 @@ twitter_site = "@mysite"
 <html>
 <head>
   <meta charset="utf-8">
-  <title>{{ page.title }} - {{ site.title }}</title>
-  <meta name="description" content="{{ page.description | default(value=site.description) }}">
+  <title>{{ page.title | e }} - {{ site.title | e }}</title>
+  <meta name="description" content="{{ page.description | default(value=site.description) | e }}">
   {{ og_all_tags | safe }}
   {{ canonical_tag | safe }}
   {{ hreflang_tags | safe }}

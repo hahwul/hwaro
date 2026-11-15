@@ -153,7 +153,7 @@ Crystal은 Ruby와 닮은 문법의 컴파일 언어입니다.
 {% extends "base.html" %}
 
 {% block content %}
-<h1>{{ page.title }}</h1>
+<h1>{{ page.title | e }}</h1>
 {{ content }}
 {% endblock %}
 ```
@@ -166,7 +166,7 @@ Crystal은 Ruby와 닮은 문법의 컴파일 언어입니다.
 {% for term in tax.items %}
   <li>
     <a href="{{ get_taxonomy_url(kind=taxonomy_name, term=term.name) }}">
-      {{ term.name }} ({{ term.count }})
+      {{ term.name | e }} ({{ term.count }})
     </a>
   </li>
 {% endfor %}
@@ -181,7 +181,7 @@ Crystal은 Ruby와 닮은 문법의 컴파일 언어입니다.
 {% extends "base.html" %}
 
 {% block content %}
-<h1>{{ taxonomy_name }}: {{ taxonomy_term }}</h1>
+<h1>{{ taxonomy_name }}: {{ taxonomy_term | e }}</h1>
 {{ content }}
 {% endblock %}
 ```
@@ -193,7 +193,7 @@ Crystal은 Ruby와 닮은 문법의 컴파일 언어입니다.
 {% for term in tax.items if term.name == taxonomy_term %}
 <ul>
 {% for p in term.pages %}
-  <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+  <li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
 {% endfor %}
 </ul>
 {% endfor %}
@@ -230,7 +230,7 @@ Crystal은 Ruby와 닮은 문법의 컴파일 언어입니다.
 {% if tags %}
 <div class="tag-cloud">
 {% for term in tags.items %}
-  <a href="/tags/{{ term.slug }}/">{{ term.name }}</a>
+  <a href="/tags/{{ term.slug }}/">{{ term.name | e }}</a>
 {% endfor %}
 </div>
 {% endif %}
@@ -256,7 +256,7 @@ Crystal은 Ruby와 닮은 문법의 컴파일 언어입니다.
 {% for term in tags.items %}
   <a href="/tags/{{ term.slug }}/" 
      class="tag count-{{ term.count }}">
-    {{ term.name }}
+    {{ term.name | e }}
   </a>
 {% endfor %}
 </div>
@@ -268,7 +268,7 @@ Crystal은 Ruby와 닮은 문법의 컴파일 언어입니다.
 {% if page.tags %}
 <div class="post-tags">
 {% for tag in page.tags %}
-  <a href="{{ get_taxonomy_url(kind="tags", term=tag) }}">{{ tag }}</a>
+  <a href="{{ get_taxonomy_url(kind="tags", term=tag) }}">{{ tag | e }}</a>
 {% endfor %}
 </div>
 {% endif %}
@@ -283,7 +283,7 @@ Crystal은 Ruby와 닮은 문법의 컴파일 언어입니다.
 <nav class="categories">
 {% for cat in categories.items %}
   <a href="/categories/{{ cat.slug }}/">
-    {{ cat.name }} ({{ cat.count }})
+    {{ cat.name | e }} ({{ cat.count }})
   </a>
 {% endfor %}
 </nav>

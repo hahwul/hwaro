@@ -270,12 +270,12 @@ module Hwaro
 
             ```jinja
             {# Previous/Next page #}
-            {% if page.lower %}<a href="{{ page.lower.url }}">← {{ page.lower.title }}</a>{% endif %}
-            {% if page.higher %}<a href="{{ page.higher.url }}">{{ page.higher.title }} →</a>{% endif %}
+            {% if page.lower %}<a href="{{ page.lower.url }}">← {{ page.lower.title | e }}</a>{% endif %}
+            {% if page.higher %}<a href="{{ page.higher.url }}">{{ page.higher.title | e }} →</a>{% endif %}
 
             {# Breadcrumbs #}
             {% for ancestor in page.ancestors %}
-              <a href="{{ ancestor.url }}">{{ ancestor.title }}</a> /
+              <a href="{{ ancestor.url }}">{{ ancestor.title | e }}</a> /
             {% endfor %}
             ```
 

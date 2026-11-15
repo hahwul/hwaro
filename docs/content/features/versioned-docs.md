@@ -140,7 +140,7 @@ Like `page.url`, every URL above is site-relative, so prefix it with `{{ base_ur
 {% if page.version %}
 <details class="version-switch">
   <summary aria-label="Switch documentation version">
-    {{ page.version.label }}
+    {{ page.version.label | e }}
     {% if not page.version.latest %}<span class="badge">old</span>{% endif %}
   </summary>
   <ul>
@@ -149,7 +149,7 @@ Like `page.url`, every URL above is site-relative, so prefix it with `{{ base_ur
       <a href="{{ base_url }}{{ v.url }}"
          {% if v.current %}class="current" aria-current="page"{% endif %}
          {% if not v.exists %}title="This page does not exist in {{ v.label }} — opens the {{ v.label }} start page"{% endif %}>
-        {{ v.label }}{% if v.latest %} (latest){% endif %}
+        {{ v.label | e }}{% if v.latest %} (latest){% endif %}
       </a>
     </li>
     {% endfor %}
@@ -160,7 +160,7 @@ Like `page.url`, every URL above is site-relative, so prefix it with `{{ base_ur
 <div class="version-banner">
   You are reading the {{ page.version.label }} documentation.
   {% for v in page.version_links %}{% if v.latest %}
-  <a href="{{ base_url }}{{ v.url }}">{% if v.exists %}Read this page in {{ v.label }}{% else %}Go to the {{ v.label }} docs{% endif %}</a>
+  <a href="{{ base_url }}{{ v.url }}">{% if v.exists %}Read this page in {{ v.label | e }}{% else %}Go to the {{ v.label }} docs{% endif %}</a>
   {% endif %}{% endfor %}
 </div>
 {% endif %}
@@ -170,10 +170,10 @@ Like `page.url`, every URL above is site-relative, so prefix it with `{{ base_ur
 A site-wide entry point that does not depend on the current page:
 
 ```jinja
-<a href="{{ base_url }}{{ versions.latest.url }}">Docs ({{ versions.latest.label }})</a>
+<a href="{{ base_url }}{{ versions.latest.url }}">Docs ({{ versions.latest.label | e }})</a>
 <select onchange="location.href=this.value">
   {% for v in versions %}
-  <option value="{{ base_url }}{{ v.url }}">{{ v.label }}</option>
+  <option value="{{ base_url }}{{ v.url }}">{{ v.label | e }}</option>
   {% endfor %}
 </select>
 ```

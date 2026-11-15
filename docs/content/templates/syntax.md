@@ -12,8 +12,8 @@ Hwaro uses Crinja, a Jinja2-compatible template engine. This page covers the ess
 Print values with double braces:
 
 ```jinja
-{{ page.title }}
-{{ site.description }}
+{{ page.title | e }}
+{{ site.description | e }}
 {{ content }}
 ```
 
@@ -22,8 +22,8 @@ Printed values are HTML-escaped unless they are marked safe; see [HTML Escaping]
 Attribute, index and call access also work after a parenthesized expression, so you can read a field straight off a filter or function result:
 
 ```jinja
-{{ (section.pages | first).title }}
-{{ (get_section(path="blog").pages | map(attribute="title") | list)[0] }}
+{{ (section.pages | first).title | e }}
+{{ (get_section(path="blog").pages | map(attribute="title") | list)[0] | e }}
 ```
 
 ## HTML Escaping
@@ -43,7 +43,7 @@ A template escapes when its output is HTML or XML: files ending in `.html`, `.ht
 The block does not reach into a file it includes. Under autoescape, also:
 
 - `a ~ b` (and `a + b` on strings) with a safe operand escapes the other one and is safe. `{{ "<p>" ~ x }}` prints `&lt;p&gt;`: build markup with a `{% set %}…{% endset %}` block or a macro, whose output is safe.
-- `| e` and `| escape` leave a safe value alone, except HTML hwaro rendered (`content`, `page.summary`, the HTML values listed in the data model), which they still escape as before 1.0, so `{{ p.summary | escape }}` in a feed shows the markup as text. The same holds for what you derive from it, as in 0.x: `{{ content[:300] | e }}`, `{{ p.summary | truncate(200) | escape }}`, `{{ (content ~ "…") | e }}`, and for `markdownify` and `tojson` output, so `data-x="{{ v | tojson | e }}"` still keeps its quotes inside the attribute. `| forceescape` and `| xml_escape` escape any value.
+- `| e` and `| escape` leave a safe value alone, except HTML hwaro rendered (`content`, `page.summary`, the HTML values listed in the data model), which they still escape as before 1.0, so `{{ p.summary | escape }}` over `section.pages`, or `{{ p.content_html | escape }}` in an RSS or Atom template, shows the markup as text (a feed template's `p.summary` is plain text already, which `| escape` escapes once). The same holds for what you derive from it, as in 0.x: `{{ content[:300] | e }}`, `{{ p.summary | truncate(200) | escape }}`, `{{ (content ~ "…") | e }}`, and for `markdownify` and `tojson` output, so `data-x="{{ v | tojson | e }}"` still keeps its quotes inside the attribute. `| forceescape` and `| xml_escape` escape any value.
 - `{{ x | tojson }}` is safe JSON with `<`, `>`, `&` and `'` written as `\u003c`-style escapes, ready for a `<script>`.
 
 ### Coming from 0.x
@@ -70,7 +70,7 @@ Every difference is one of two things: text that 0.x printed unescaped (`Tom & J
 
 ```jinja
 {% if page.description %}
-<meta name="description" content="{{ page.description }}">
+<meta name="description" content="{{ page.description | e }}">
 {% endif %}
 ```
 
@@ -99,7 +99,7 @@ With elif:
 Inline, as an expression (the `else` part is optional and renders empty when left out):
 
 ```jinja
-<a href="{{ item.url }}" class="{{ 'active' if item.url == page.url else '' }}">{{ item.name }}</a>
+<a href="{{ item.url }}" class="{{ 'active' if item.url == page.url else '' }}">{{ item.name | e }}</a>
 {% set label = page.title if page.title else "Untitled" %}
 ```
 
@@ -109,7 +109,7 @@ Inline, as an expression (the `else` part is optional and renders empty when lef
 
 ```jinja
 {% for p in section.pages %}
-<li><a href="{{ p.url }}">{{ p.title }}</a></li>
+<li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
 {% endfor %}
 ```
 
@@ -118,7 +118,7 @@ With index:
 ```jinja
 {% for tag in page.tags %}
 {% if not loop.first %}, {% endif %}
-{{ tag }}
+{{ tag | e }}
 {% endfor %}
 ```
 
@@ -143,10 +143,10 @@ Take part of a list or string with `[start:stop:step]`, as in Jinja2. Any part c
 
 ```jinja
 {% for p in section.pages[:5] %}
-<li><a href="{{ p.url }}">{{ p.title }}</a></li>
+<li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
 {% endfor %}
 
-{{ page.title[:40] }}
+{{ page.title[:40] | e }}
 {% for p in section.pages[::-1] %}…{% endfor %}
 ```
 
@@ -162,7 +162,7 @@ To show the first few items of a long list, slice it rather than skipping the re
 <!DOCTYPE html>
 <html>
 <head>
-  <title>{% block title %}{{ site.title }}{% endblock %}</title>
+  <title>{% block title %}{{ site.title | e }}{% endblock %}</title>
   {{ highlight_css | safe }}
 </head>
 <body>
@@ -179,11 +179,11 @@ To show the first few items of a long list, slice it rather than skipping the re
 ```jinja
 {% extends "base.html" %}
 
-{% block title %}{{ page.title }} - {{ site.title }}{% endblock %}
+{% block title %}{{ page.title | e }} - {{ site.title | e }}{% endblock %}
 
 {% block content %}
 <article>
-  <h1>{{ page.title }}</h1>
+  <h1>{{ page.title | e }}</h1>
   {{ content | safe }}
 </article>
 {% endblock %}
@@ -199,6 +199,8 @@ Include partial templates:
 {% include "partials/footer.html" %}
 ```
 
+An included file escapes by its own name, not by the page's: `{% include "partials/x.txt.jinja" %}` (or a `.js`, `.css`, `.json`, `.md` or `.csv` partial) inside an HTML page prints its values unescaped, so put `| e` on author text such a partial prints into HTML.
+
 ## Macros
 
 Define reusable snippets with `{% macro %}`, usually in a partial, and import them where you need them:
@@ -207,7 +209,7 @@ Define reusable snippets with `{% macro %}`, usually in a partial, and import th
 
 ```jinja
 {% macro card(p, show_date=true) %}
-<a href="{{ p.url }}">{{ p.title }}</a>
+<a href="{{ p.url }}">{{ p.title | e }}</a>
 {% if show_date and p.date %}<time>{{ p.date }}</time>{% endif %}
 {% endmacro %}
 ```
@@ -256,7 +258,7 @@ Evaluate conditions:
 {% endif %}
 
 {% if page.description is empty %}
-<meta name="description" content="{{ site.description }}">
+<meta name="description" content="{{ site.description | e }}">
 {% endif %}
 ```
 
@@ -357,7 +359,7 @@ Output literal Jinja syntax:
 {% if section.pages %}
 <ul>
 {% for p in section.pages %}
-  <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+  <li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
 {% endfor %}
 </ul>
 {% else %}

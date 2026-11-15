@@ -356,12 +356,12 @@ allow_extensions = ["jpg", "jpeg", "png"]
   {% set hero = resize_image(path=page.image, width=1024) %}
   {% set thumb = resize_image(path=page.image, width=320) %}
   <picture>
-    <source media="(min-width: 768px)" srcset="{{ hero.url }}">
+    <source media="(min-width: 768px)" srcset="{{ hero.url | e }}">
     <img
-      src="{{ thumb.url }}"
+      src="{{ thumb.url | e }}"
       style="background-color: {{ thumb.dominant_color }}"
       loading="lazy"
-      alt="{{ page.title }}"
+      alt="{{ page.title | e }}"
     >
   </picture>
 {% endif %}

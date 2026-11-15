@@ -265,7 +265,7 @@ This generates the configuration and sample content files for each specified lan
 <html lang="{{ page.language | default(value='en') }}">
 <head>
   <meta charset="utf-8">
-  <title>{{ page.title }} - {{ site.title }}</title>
+  <title>{{ page.title | e }} - {{ site.title | e }}</title>
   {{ canonical_tag | safe }}
   {{ hreflang_tags | safe }}
   {{ og_all_tags | safe }}
@@ -339,7 +339,7 @@ Use the `t` filter to translate keys:
 
 ```jinja
 <nav>
-  <a href="/">{{ "nav.home" | t }}</a>
+  <a href="/">{{ "nav.home" | t | e }}</a>
   <a href="/blog/">{{ "nav.blog" | t }}</a>
   <a href="/about/">{{ "nav.about" | t }}</a>
 </nav>
@@ -429,13 +429,13 @@ Add language-specific feed links in your templates:
 {# Main feed (default language) #}
 <link rel="alternate" type="application/rss+xml"
       href="{{ base_url }}/rss.xml"
-      title="{{ site.title }}">
+      title="{{ site.title | e }}">
 
 {# Language-specific feed #}
 {% if page.language and page.language != "en" %}
 <link rel="alternate" type="application/rss+xml"
       href="{{ base_url }}/{{ page.language }}/rss.xml"
-      title="{{ site.title }} ({{ page.language }})">
+      title="{{ site.title | e }} ({{ page.language }})">
 {% endif %}
 ```
 

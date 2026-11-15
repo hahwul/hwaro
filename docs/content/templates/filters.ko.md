@@ -64,7 +64,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 | `e` / `escape` | 텍스트를 이스케이프하고, 안전 값은 그대로 돌려줍니다. 단, hwaro가 렌더링한 HTML(`content`, `page.summary` 등)은 1.0 이전처럼 이스케이프합니다. 결과는 어느 쪽이든 안전 값이라 두 번 이스케이프되지 않습니다 |
 | `forceescape`, `xml_escape` | 안전 값이어도 이스케이프하며, 결과는 안전 값입니다 |
 | `safe` | 값을 안전 값(그대로 출력)으로 표시합니다 |
-| `markdownify`, `tojson`, `jsonify`, `urlize`, `xmlattr` | 안전한 HTML(또는 스크립트에 넣어도 되는 JSON)을 돌려줍니다. `urlize`는 링크로 바꾸는 텍스트를 이스케이프하고 `http(s)`/`www.` URL만 링크로 만듭니다(`javascript:` 등 안전하지 않은 스킴은 링크하지 않음). 자동 이스케이프에서 `xmlattr`는 공백·`/`·`>`·`=`가 든 속성 이름을 거부합니다 |
+| `markdownify`, `tojson`, `jsonify`, `urlize`, `xmlattr` | 안전한 HTML(또는 스크립트에 넣어도 되는 JSON)을 돌려줍니다. `urlize`는 링크로 바꾸는 텍스트를 이스케이프하고 `www.`와 `scheme://` 형태의 URL을 링크로 만듭니다. 안전하지 않은 스킴 `javascript:`, `vbscript:`, `file:`, `data:`만 일반 텍스트로 남습니다(그래서 `ftp://example.com/a`는 링크가 됩니다). 자동 이스케이프에서 `xmlattr`는 공백·`/`·`>`·`=`가 든 속성 이름을 거부합니다 |
 | `upper`, `lower`, `capitalize`, `center`, `indent`, `trim`, `truncate`, `truncate_words`, `replace`, `regex_replace`, `format`, `string`, `default` | 안전 값을 넣으면 결과도 안전 값이고, 필터가 덧붙이는 텍스트(`truncate`의 `end`, `replace`의 새 텍스트, `format`의 인자)는 이스케이프됩니다. 일반 텍스트를 넣으면 결과도 일반 텍스트입니다 |
 | `join` | 안전 값이 아닌 항목과 구분자를 이스케이프하며, 결과는 안전 값입니다 |
 | `strip_html`, `striptags` | 엔티티를 디코딩한 일반 텍스트를 돌려주므로 출력할 때 정확히 한 번 이스케이프됩니다 |
@@ -139,8 +139,8 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 `active_path`는 URL(보통 [메뉴](/ko/features/menus/) 엔트리의 `item.url`)을 현재 페이지와 비교합니다. 기본은 정확히 일치할 때만 참이고, `ancestor=true`를 넘기면 하위 페이지도 매칭합니다.
 
 ```jinja
-<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name }}</a>
-<a href="{{ item.href }}"{% if item.url | active_path(ancestor=true) %} class="open"{% endif %}>{{ item.name }}</a>
+<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name | e }}</a>
+<a href="{{ item.href }}"{% if item.url | active_path(ancestor=true) %} class="open"{% endif %}>{{ item.name | e }}</a>
 ```
 
 비교 전에 양쪽 모두 끝 슬래시 하나로 정규화되므로 `/posts`와 `/posts/`는 같습니다. 루트 경로(`/`)와 현재 페이지 언어의 홈(`/ko/`)은 `ancestor=true`여도 정확히 일치할 때만 매칭됩니다. 외부 `item.url`(`http://`, `https://`, `//`)은 절대 매칭되지 않으며, `url` 없이 적은 엔트리(그룹 제목)의 빈 `url`도 마찬가지입니다.
@@ -169,8 +169,8 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 ### 기본값
 
 ```jinja
-{{ page.description | default(value=site.description) }}
-{{ page.image | default(value="/images/default.png") }}
+{{ page.description | default(value=site.description) | e }}
+{{ page.image | default(value="/images/default.png") | e }}
 ```
 
 `default`는 값이 정의되지 않았거나 `none`이거나 빈 문자열일 때 폴백 값을 반환합니다. 폴백 값은 원래 타입을 유지하므로 `default(value=0)`의 결과로 산술 연산을 할 수 있으며, `none` 폴백(`default(value=none)`)은 빈 문자열로 렌더링됩니다. 값이 비어 있지 않으면 배열, 맵, 객체는 그대로 반환하고, 그 밖의 값(문자열, 숫자, 불리언)은 문자열로 반환하므로 뒤에 `length`나 `replace` 같은 문자열 필터를 이어서 쓸 수 있습니다. `boolean=true`를 함께 넘기면(`default(value="N/A", boolean=true)`) `false`, `0`, 빈 리스트나 맵처럼 거짓으로 평가되는 값도 폴백 값으로 바꿉니다. 폴백 값은 `value=` 대신 Jinja2의 이름인 `default_value=`로 넘겨도 됩니다.
@@ -239,7 +239,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 ```jinja
 {{ "2024-03-05" | regex_replace(pattern="(\d+)-(\d+)-(\d+)", rep="$3/$2/$1") }}  {# 05/03/2024 #}
 {{ "John Smith" | regex_replace(pattern="(?<first>\w+) (?<last>\w+)", rep="$last, $first") }}
-{{ page.title | regex_replace("\s+", " ") }}
+{{ page.title | regex_replace("\s+", " ") | e }}
 ```
 
 패턴이 잘못되었거나 백트래킹이 PCRE2의 매치 한도를 넘으면, 패턴을 알려 주는 템플릿 오류로 빌드가 멈춥니다.
@@ -267,7 +267,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
   <h3>{{ group.grouper }}</h3>
   <ul>
   {% for p in group.list %}
-    <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+    <li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
   {% endfor %}
   </ul>
 {% endfor %}
@@ -281,7 +281,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 ```jinja
 {# Translate UI strings (requires i18n/*.toml files) #}
 <nav>
-  <a href="/">{{ "nav.home" | t }}</a>
+  <a href="/">{{ "nav.home" | t | e }}</a>
   <a href="/blog/">{{ "nav.blog" | t }}</a>
 </nav>
 
@@ -313,11 +313,11 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 {% endif %}
 
 {% if page.description is empty %}
-<meta name="description" content="{{ site.description }}">
+<meta name="description" content="{{ site.description | e }}">
 {% endif %}
 
 {% if page.image is present %}
-<meta property="og:image" content="{{ page.image | absolute_url }}">
+<meta property="og:image" content="{{ page.image | absolute_url | e }}">
 {% endif %}
 
 {% if "hero.jpg" is matching("[.](jpg|png)$") %}

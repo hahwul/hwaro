@@ -12,8 +12,8 @@ Hwaro는 Jinja2 호환 템플릿 엔진인 Crinja를 사용합니다. 이 페이
 이중 중괄호로 값을 출력합니다.
 
 ```jinja
-{{ page.title }}
-{{ site.description }}
+{{ page.title | e }}
+{{ site.description | e }}
 {{ content }}
 ```
 
@@ -22,8 +22,8 @@ Hwaro는 Jinja2 호환 템플릿 엔진인 Crinja를 사용합니다. 이 페이
 괄호로 묶은 표현식 뒤에도 속성, 인덱스, 호출 접근을 쓸 수 있으므로 필터나 함수 결과에서 바로 필드를 읽을 수 있습니다.
 
 ```jinja
-{{ (section.pages | first).title }}
-{{ (get_section(path="blog").pages | map(attribute="title") | list)[0] }}
+{{ (section.pages | first).title | e }}
+{{ (get_section(path="blog").pages | map(attribute="title") | list)[0] | e }}
 ```
 
 ## HTML 이스케이프
@@ -43,7 +43,7 @@ hwaro가 HTML로 렌더링한 값(`content`, `toc`, `page.summary`, `og_all_tags
 이 블록은 그 안에서 include한 파일에는 미치지 않습니다. 자동 이스케이프에서는 다음도 달라집니다.
 
 - `a ~ b`(문자열의 `a + b`도)에 안전 값이 있으면 다른 쪽을 이스케이프하고 결과도 안전 값입니다. `{{ "<p>" ~ x }}`는 `&lt;p&gt;`를 출력하므로, 마크업은 출력이 안전 값인 `{% set %}…{% endset %}` 블록이나 매크로로 만드세요.
-- `| e`와 `| escape`는 안전 값을 건드리지 않습니다. 단, hwaro가 렌더링한 HTML(`content`, `page.summary` 등 데이터 모델의 HTML 값)은 1.0 이전처럼 여전히 이스케이프하므로, 피드의 `{{ p.summary | escape }}`는 마크업을 텍스트로 보여 줍니다. 0.x처럼 거기서 파생한 값도 마찬가지입니다. `{{ content[:300] | e }}`, `{{ p.summary | truncate(200) | escape }}`, `{{ (content ~ "…") | e }}`, 그리고 `markdownify`와 `tojson`의 결과도 이스케이프하므로 `data-x="{{ v | tojson | e }}"`의 따옴표는 계속 속성 안에 머뭅니다. `| forceescape`와 `| xml_escape`는 어떤 값이든 이스케이프합니다.
+- `| e`와 `| escape`는 안전 값을 건드리지 않습니다. 단, hwaro가 렌더링한 HTML(`content`, `page.summary` 등 데이터 모델의 HTML 값)은 1.0 이전처럼 여전히 이스케이프하므로, `section.pages`를 도는 `{{ p.summary | escape }}`나 RSS·Atom 템플릿의 `{{ p.content_html | escape }}`는 마크업을 텍스트로 보여 줍니다(피드 템플릿의 `p.summary`는 이미 일반 텍스트이므로 `| escape`가 한 번 이스케이프합니다). 0.x처럼 거기서 파생한 값도 마찬가지입니다. `{{ content[:300] | e }}`, `{{ p.summary | truncate(200) | escape }}`, `{{ (content ~ "…") | e }}`, 그리고 `markdownify`와 `tojson`의 결과도 이스케이프하므로 `data-x="{{ v | tojson | e }}"`의 따옴표는 계속 속성 안에 머뭅니다. `| forceescape`와 `| xml_escape`는 어떤 값이든 이스케이프합니다.
 - `{{ x | tojson }}`은 `<`, `>`, `&`, `'`를 `\u003c` 형태로 쓴 안전한 JSON이라 `<script>` 안에 바로 넣을 수 있습니다.
 
 ### 0.x에서 옮겨 올 때
@@ -70,7 +70,7 @@ diff -r /tmp/site-0x /tmp/site-1x
 
 ```jinja
 {% if page.description %}
-<meta name="description" content="{{ page.description }}">
+<meta name="description" content="{{ page.description | e }}">
 {% endif %}
 ```
 
@@ -99,7 +99,7 @@ elif와 함께:
 표현식 안에서 인라인으로 쓸 수도 있습니다(`else` 부분은 생략할 수 있으며, 생략하면 빈 값으로 렌더링됩니다).
 
 ```jinja
-<a href="{{ item.url }}" class="{{ 'active' if item.url == page.url else '' }}">{{ item.name }}</a>
+<a href="{{ item.url }}" class="{{ 'active' if item.url == page.url else '' }}">{{ item.name | e }}</a>
 {% set label = page.title if page.title else "Untitled" %}
 ```
 
@@ -109,7 +109,7 @@ elif와 함께:
 
 ```jinja
 {% for p in section.pages %}
-<li><a href="{{ p.url }}">{{ p.title }}</a></li>
+<li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
 {% endfor %}
 ```
 
@@ -118,7 +118,7 @@ elif와 함께:
 ```jinja
 {% for tag in page.tags %}
 {% if not loop.first %}, {% endif %}
-{{ tag }}
+{{ tag | e }}
 {% endfor %}
 ```
 
@@ -143,10 +143,10 @@ Jinja2처럼 `[start:stop:step]`으로 리스트나 문자열의 일부를 꺼�
 
 ```jinja
 {% for p in section.pages[:5] %}
-<li><a href="{{ p.url }}">{{ p.title }}</a></li>
+<li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
 {% endfor %}
 
-{{ page.title[:40] }}
+{{ page.title[:40] | e }}
 {% for p in section.pages[::-1] %}…{% endfor %}
 ```
 
@@ -162,7 +162,7 @@ Jinja2처럼 `[start:stop:step]`으로 리스트나 문자열의 일부를 꺼�
 <!DOCTYPE html>
 <html>
 <head>
-  <title>{% block title %}{{ site.title }}{% endblock %}</title>
+  <title>{% block title %}{{ site.title | e }}{% endblock %}</title>
   {{ highlight_css | safe }}
 </head>
 <body>
@@ -179,11 +179,11 @@ Jinja2처럼 `[start:stop:step]`으로 리스트나 문자열의 일부를 꺼�
 ```jinja
 {% extends "base.html" %}
 
-{% block title %}{{ page.title }} - {{ site.title }}{% endblock %}
+{% block title %}{{ page.title | e }} - {{ site.title | e }}{% endblock %}
 
 {% block content %}
 <article>
-  <h1>{{ page.title }}</h1>
+  <h1>{{ page.title | e }}</h1>
   {{ content | safe }}
 </article>
 {% endblock %}
@@ -199,6 +199,8 @@ Jinja2처럼 `[start:stop:step]`으로 리스트나 문자열의 일부를 꺼�
 {% include "partials/footer.html" %}
 ```
 
+include한 파일은 페이지가 아니라 자기 이름에 따라 이스케이프합니다. HTML 페이지 안의 `{% include "partials/x.txt.jinja" %}`(또는 `.js`, `.css`, `.json`, `.md`, `.csv` 조각)는 값을 이스케이프하지 않고 출력하므로, 이런 조각이 HTML에 출력하는 작성자 텍스트에는 `| e`를 붙이세요.
+
 ## 매크로
 
 `{% macro %}`로 재사용할 조각을 정의하고(보통 부분 템플릿에 둡니다), 필요한 곳에서 가져와 씁니다.
@@ -207,7 +209,7 @@ Jinja2처럼 `[start:stop:step]`으로 리스트나 문자열의 일부를 꺼�
 
 ```jinja
 {% macro card(p, show_date=true) %}
-<a href="{{ p.url }}">{{ p.title }}</a>
+<a href="{{ p.url }}">{{ p.title | e }}</a>
 {% if show_date and p.date %}<time>{{ p.date }}</time>{% endif %}
 {% endmacro %}
 ```
@@ -256,7 +258,7 @@ Jinja2처럼 `[start:stop:step]`으로 리스트나 문자열의 일부를 꺼�
 {% endif %}
 
 {% if page.description is empty %}
-<meta name="description" content="{{ site.description }}">
+<meta name="description" content="{{ site.description | e }}">
 {% endif %}
 ```
 
@@ -357,7 +359,7 @@ Jinja 문법을 그대로 출력합니다.
 {% if section.pages %}
 <ul>
 {% for p in section.pages %}
-  <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+  <li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
 {% endfor %}
 </ul>
 {% else %}

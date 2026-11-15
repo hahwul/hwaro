@@ -48,7 +48,7 @@ HTML 외에도 페이지/섹션은 `[outputs]` 설정으로 활성화한 형제 
 
 {% block content %}
 <article>
-  <h1>{{ page.title }}</h1>
+  <h1>{{ page.title | e }}</h1>
   <time>{{ page.date }}</time>
   {{ content | safe }}
 </article>

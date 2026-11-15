@@ -114,11 +114,11 @@ Entries with a `parent` become children of the entry whose `identifier` matches.
 <ul>
 {% for item in get_menu(name="main") %}
   <li>
-    <a href="{{ item.href }}">{{ item.name }}</a>
+    <a href="{{ item.href }}">{{ item.name | e }}</a>
     {% if item.children %}
     <ul>
       {% for child in item.children %}
-      <li><a href="{{ child.href }}">{{ child.name }}</a></li>
+      <li><a href="{{ child.href }}">{{ child.name | e }}</a></li>
       {% endfor %}
     </ul>
     {% endif %}
@@ -156,14 +156,14 @@ The `active_path` filter compares a menu entry's `url` against the current page:
 
 ```jinja
 {% for item in get_menu(name="main") %}
-<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name }}</a>
+<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name | e }}</a>
 {% endfor %}
 ```
 
 Pass `ancestor=true` to also match descendant pages (useful for keeping a parent nav item highlighted/expanded while browsing inside its section):
 
 ```jinja
-<a href="{{ item.href }}"{% if item.url | active_path(ancestor=true) %} class="open"{% endif %}>{{ item.name }}</a>
+<a href="{{ item.href }}"{% if item.url | active_path(ancestor=true) %} class="open"{% endif %}>{{ item.name | e }}</a>
 ```
 
 The root path (`/`) and, on a multilingual site, the current page's language home (`/ko/`) only ever match exactly, even with `ancestor=true`. Otherwise the home nav item would read as active/open on every page of the site (or of that language). External entries never match (there's no "current page" for them to be an ancestor of). See [Filters › URL Filters](/templates/filters/#url-filters).

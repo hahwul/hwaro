@@ -549,4 +549,21 @@ describe "WordPress import: fields the export declares" do
       File.read(File.join(output_dir, "posts", "plain.md")).should_not contain("aliases")
     end
   end
+
+  it "decodes the entity-encoded title and excerpt into plain front matter text" do
+    Dir.mktmpdir do |dir|
+      wxr = File.join(dir, "export.xml")
+      File.write(wxr, BASIC_WXR.sub("<title>Hello World</title>", "<title><![CDATA[Tom &amp; Jerry&#8217;s]]></title>")
+        .sub("A short excerpt", "Cats &amp; mice"))
+      output_dir = File.join(dir, "output")
+      with_captured_log do
+        Hwaro::Services::Importers::WordPressImporter.new.run(Hwaro::Config::Options::ImportOptions.new(
+          source_type: "wordpress", path: wxr, output_dir: output_dir))
+      end
+
+      out = File.read(File.join(output_dir, "posts", "hello-world.md"))
+      out.should contain(%(title = "Tom & Jerry’s"))
+      out.should contain(%(description = "Cats & mice"))
+    end
+  end
 end

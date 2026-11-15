@@ -42,4 +42,15 @@ describe "Doctor templates-autoescape-unset with a non-boolean value" do
       autoescape_ids(dir, "[templates]\nautoescape = \"false\"\n").size.should eq(1)
     end
   end
+
+  it "names the value instead of calling the key unset" do
+    {"\"false\"" => %(autoescape = "false" is not a boolean), "0" => "autoescape = 0 is not a boolean"}.each do |raw, said|
+      Dir.mktmpdir do |dir|
+        message = autoescape_ids(dir, "[templates]\nautoescape = #{raw}\n")[0].message
+        message.should contain(said)
+        message.should_not contain("is not set")
+      end
+    end
+    Dir.mktmpdir { |dir| autoescape_ids(dir, "")[0].message.should contain("autoescape is not set") }
+  end
 end

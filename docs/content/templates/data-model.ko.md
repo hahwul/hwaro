@@ -90,8 +90,8 @@ data/
 
 ```jinja
 {% for product in site.data.products %}
-  <h2>{{ product.name }}</h2>
-  <p>{{ product.price }}</p>
+  <h2>{{ product.name | e }}</h2>
+  <p>{{ product.price | e }}</p>
 {% endfor %}
 ```
 
@@ -107,7 +107,7 @@ data/
 ```jinja
 {% for name, user in site.data.users %}
   <h3>{{ name }}</h3>
-  <p>{{ user.bio }}</p>
+  <p>{{ user.bio | e }}</p>
 {% endfor %}
 ```
 
@@ -192,14 +192,14 @@ john-doe:
 ```jinja
 {% for id, author in site.authors %}
   <div class="author">
-    <img src="{{ author.avatar }}" alt="{{ author.name }}">
-    <h3>{{ author.name }}</h3>
-    <p>{{ author.bio }}</p>
+    <img src="{{ author.avatar | e }}" alt="{{ author.name | e }}">
+    <h3>{{ author.name | e }}</h3>
+    <p>{{ author.bio | e }}</p>
 
     <h4>Recent Posts</h4>
     <ul>
     {% for p in author.pages %}
-      <li><a href="{{ base_url }}{{ p.url }}">{{ p.title }}</a></li>
+      <li><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></li>
     {% endfor %}
     </ul>
   </div>
@@ -209,7 +209,7 @@ john-doe:
 ### 예시
 
 ```jinja
-<title>{{ site.title }}</title>
+<title>{{ site.title | e }}</title>
 <link rel="canonical" href="{{ site.base_url }}{{ page.url }}">
 ```
 
@@ -273,10 +273,10 @@ john-doe:
 ```jinja
 {% for p in section.pages %}
 <article>
-  <h2><a href="{{ base_url }}{{ p.url }}">{{ p.title }}</a></h2>
+  <h2><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></h2>
   <time>{{ p.date }}</time>
   {% if p.description %}
-  <p>{{ p.description }}</p>
+  <p>{{ p.description | e }}</p>
   {% endif %}
 </article>
 {% endfor %}
@@ -287,7 +287,7 @@ john-doe:
 ```jinja
 {% for sub in section.subsections %}
 <div class="category">
-  <a href="{{ base_url }}{{ sub.url }}">{{ sub.title }}</a>
+  <a href="{{ base_url }}{{ sub.url }}">{{ sub.title | e }}</a>
   <span>({{ sub.pages_count }} articles)</span>
 </div>
 {% endfor %}
@@ -307,7 +307,7 @@ john-doe:
 <ul>
 {% for p in section.pages %}
   <li>
-    <a href="{{ base_url }}{{ p.url }}">{{ p.title }}</a>
+    <a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a>
     {% if p.date %}<time>{{ p.date }}</time>{% endif %}
   </li>
 {% endfor %}
@@ -448,11 +448,11 @@ john-doe:
 ```jinja
 <nav class="post-nav">
   {% if page.lower %}
-  <a href="{{ base_url }}{{ page.lower.url }}">← {{ page.lower.title }}</a>
+  <a href="{{ base_url }}{{ page.lower.url }}">← {{ page.lower.title | e }}</a>
   {% endif %}
   
   {% if page.higher %}
-  <a href="{{ base_url }}{{ page.higher.url }}">{{ page.higher.title }} →</a>
+  <a href="{{ base_url }}{{ page.higher.url }}">{{ page.higher.title | e }} →</a>
   {% endif %}
 </nav>
 ```
@@ -467,9 +467,9 @@ john-doe:
 <nav class="breadcrumbs">
   <a href="{{ base_url }}/">Home</a>
   {% for ancestor in page.ancestors %}
-  / <a href="{{ base_url }}{{ ancestor.url }}">{{ ancestor.title }}</a>
+  / <a href="{{ base_url }}{{ ancestor.url }}">{{ ancestor.title | e }}</a>
   {% endfor %}
-  / <span>{{ page.title }}</span>
+  / <span>{{ page.title | e }}</span>
 </nav>
 ```
 
@@ -499,7 +499,7 @@ john-doe:
 
 ```jinja
 {% for v in page.version_links %}
-<a href="{{ base_url }}{{ v.url }}"{% if v.current %} aria-current="page"{% endif %}>{{ v.label }}</a>
+<a href="{{ base_url }}{{ v.url }}"{% if v.current %} aria-current="page"{% endif %}>{{ v.label | e }}</a>
 {% endfor %}
 ```
 
@@ -551,11 +551,11 @@ pros = ["Fast", "Reliable"]
 <span class="badge">Featured</span>
 {% endif %}
 
-<div class="rating">{{ page.extra.rating }} / 5</div>
+<div class="rating">{{ page.extra.rating | e }} / 5</div>
 
 <ul>
 {% for pro in page.extra.pros %}
-  <li>{{ pro }}</li>
+  <li>{{ pro | e }}</li>
 {% endfor %}
 </ul>
 ```
@@ -573,7 +573,7 @@ pros = ["Fast", "Reliable"]
 | current_datetime | String | 현재 날짜와 시간 |
 
 ```jinja
-<footer>&copy; {{ current_year }} {{ site.title }}</footer>
+<footer>&copy; {{ current_year }} {{ site.title | e }}</footer>
 ```
 
 ---
@@ -621,14 +621,14 @@ pros = ["Fast", "Reliable"]
 ```jinja
 <head>
   <link rel="canonical" href="{{ seo.canonical_url }}">
-  <meta property="og:title" content="{{ page.title }}">
+  <meta property="og:title" content="{{ page.title | e }}">
   <meta property="og:type" content="{{ seo.og_type }}">
   <meta property="og:url" content="{{ seo.canonical_url }}">
   {% if page.description %}
-  <meta property="og:description" content="{{ page.description }}">
+  <meta property="og:description" content="{{ page.description | e }}">
   {% endif %}
   {% if seo.og_image %}
-  <meta property="og:image" content="{{ seo.og_image }}">
+  <meta property="og:image" content="{{ seo.og_image | e }}">
   {% endif %}
   <meta name="twitter:card" content="{{ seo.twitter_card }}">
   {% if seo.twitter_site %}
@@ -777,7 +777,7 @@ pros = ["Fast", "Reliable"]
 
 ```jinja
 {% for item in get_menu(name="main") %}
-<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name }}</a>
+<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name | e }}</a>
 {% endfor %}
 ```
 
@@ -803,7 +803,7 @@ pros = ["Fast", "Reliable"]
 - 콘텐츠: `content`, `term_content`, `page.summary` / `page_summary`(`<!-- more -->` 요약이나 자동 발췌. `page.description`으로 대체될 때는 HTML이 아니라 그 텍스트입니다), `section.list` / `section_list`, 목록 속 모든 페이지 객체의 `summary`
 - 내비게이션: `toc`, `toc_obj.html`, `toc_obj.headers[].title`, `.id`, `.permalink`(태그를 뺀, 이미 이스케이프된 제목 텍스트. 자동 이스케이프에서는 HTML로 직접 쓴 헤딩의 따옴표, `<`, `&`도 이스케이프됩니다), `pagination`, `pagination_obj.html`
 - head 태그: `og_tags`, `twitter_tags`, `og_all_tags`, `canonical_tag`, `hreflang_tags`, `alternate_output_tags`, `pagination_seo_links`, `jsonld`와 모든 `jsonld_*`, `highlight_css`, `highlight_js`, `highlight_tags`, `math_tags`, `mermaid_tags`, `pwa_tags`, `search_tags`, `auto_includes`, `auto_includes_css`, `auto_includes_js`
-- 렌더 훅: 헤딩의 `id`와 코드 블록의 `copy`를 뺀 모든 훅 변수([렌더 훅](/ko/templates/render-hooks/#컨텍스트-변수) 참고). 숏코드: `body`
+- 렌더 훅: 헤딩의 `id`와 코드 블록의 `copy`를 뺀 모든 훅 변수([렌더 훅](/ko/templates/render-hooks/#컨텍스트-변수) 참고). 숏코드: `[markdown] safe = false`(기본값)일 때 블록 숏코드(`{% sc() %}…{% end %}`)의 `body`. 인라인 `{{ sc(body="…") }}` 인자와 `safe = true`일 때의 블록 본문은 텍스트입니다([블록 숏코드](/ko/writing/shortcodes/#블록-숏코드) 참고)
 - 피드 템플릿: `content_html`, 그리고 `content_is_html`일 때의 `content`
 
 그 밖의 값은 텍스트나 URL(제목, 설명, 이름, `page.extra`, `site.data`, i18n 문자열, `page.url`, `permalink`)이며 자동 이스케이프에서는 이스케이프됩니다. 일부러 HTML을 넣은 텍스트 필드는 출력하는 곳에 `| safe`가 필요합니다.
@@ -836,7 +836,7 @@ pros = ["Fast", "Reliable"]
 {% if page.description is present %}...{% endif %}
 
 {# Default value #}
-{{ page.description | default(value=site.description) }}
+{{ page.description | default(value=site.description) | e }}
 ```
 
 ---

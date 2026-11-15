@@ -119,7 +119,7 @@ With `[sass]` enabled, each non-partial `.scss` file in the scanned directories 
 <html>
 <head>
   <meta charset="utf-8">
-  <title>{{ page.title }} - {{ site.title }}</title>
+  <title>{{ page.title | e }} - {{ site.title | e }}</title>
   {{ highlight_css | safe }}
   {{ auto_includes_css | safe }}
 </head>

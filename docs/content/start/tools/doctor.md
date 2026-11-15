@@ -88,7 +88,7 @@ hwaro doctor --json
   (block shortcodes such as `{% alert(type="info") %}…{% end %}`, which the
   build expands before parsing, are not errors; an unknown tag such as a
   misspelled `{% includ %}` is)
-- `config.toml` not setting `[templates] autoescape` (info): templates
+- `config.toml` not setting `[templates] autoescape` to `true` or `false` (info; a value that is not a boolean, such as `"false"`, is named, since the build ignores it): templates
   HTML-escape every printed value by default since 1.0, so author HTML
   printed as markup needs `| safe`. Set the key to `true` to confirm, or
   `false` to render as before 1.0 (see
@@ -173,7 +173,7 @@ hwaro: doctor
   templates/
     [ok]   required files (page.html, section.html)
     [ok]   template syntax
-    [ok]   autoescape (set explicitly)
+    [ok]   autoescape choice
 
   content/
     [ok]   directory present
@@ -284,7 +284,7 @@ Rows marked ✗ are error level and **cannot** be ignored.
 | `template-section-missing` | template | `section.html` missing; sections render with `page.html` |
 | `template-syntax-error` | template | Template fails to parse ✗ |
 | `template-read-error` | template | Failed to read template ✗ |
-| `templates-autoescape-unset` | config | `[templates] autoescape` not set while `templates/` exists (info) |
+| `templates-autoescape-unset` | config | `[templates] autoescape` not set to a boolean while `templates/` exists (info) |
 | `content-dir-missing` | content | Content directory not found |
 | `content-frontmatter-invalid` | content | Front matter fails to parse ✗ |
 | `content-read-error` | content | Failed to read content file ✗ |

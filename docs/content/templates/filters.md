@@ -64,7 +64,7 @@ Under [`[templates] autoescape`](/templates/syntax/#html-escaping) (on by defaul
 | `e` / `escape` | Escapes text; a safe value is returned unchanged, except HTML hwaro rendered (`content`, `page.summary`, …), which is still escaped as before 1.0. Safe either way, so it never escapes twice |
 | `forceescape`, `xml_escape` | Escape the value even when it is safe; the result is safe |
 | `safe` | Marks the value safe (prints as is) |
-| `markdownify`, `tojson`, `jsonify`, `urlize`, `xmlattr` | Return safe HTML (or script-safe JSON). `urlize` escapes the text it links and only links `http(s)`/`www.` URLs (never `javascript:` and other unsafe schemes). Under autoescape, `xmlattr` rejects an attribute name containing a space, `/`, `>` or `=` |
+| `markdownify`, `tojson`, `jsonify`, `urlize`, `xmlattr` | Return safe HTML (or script-safe JSON). `urlize` escapes the text it links and links `www.` and `scheme://` URLs, except the unsafe schemes `javascript:`, `vbscript:`, `file:` and `data:`, which stay plain text (so `ftp://example.com/a` is linked). Under autoescape, `xmlattr` rejects an attribute name containing a space, `/`, `>` or `=` |
 | `upper`, `lower`, `capitalize`, `center`, `indent`, `trim`, `truncate`, `truncate_words`, `replace`, `regex_replace`, `format`, `string`, `default` | A safe input stays safe; text the filter adds (`truncate`'s `end`, `replace`'s new text, `format`'s arguments) is escaped. A plain input stays plain |
 | `join` | Escapes each item and the separator unless they are safe; the result is safe |
 | `strip_html`, `striptags` | Return plain text with entities decoded, so it prints escaped exactly once |
@@ -139,8 +139,8 @@ The `t` filter looks up translation keys from TOML files in the `i18n/` director
 `active_path` compares a URL (typically a [menu](/features/menus/) entry's `item.url`) against the current page. It's an exact match by default; pass `ancestor=true` to also match descendant pages:
 
 ```jinja
-<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name }}</a>
-<a href="{{ item.href }}"{% if item.url | active_path(ancestor=true) %} class="open"{% endif %}>{{ item.name }}</a>
+<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name | e }}</a>
+<a href="{{ item.href }}"{% if item.url | active_path(ancestor=true) %} class="open"{% endif %}>{{ item.name | e }}</a>
 ```
 
 Both sides are normalized to one trailing slash before comparing, so `/posts` and `/posts/` are equal. The root path (`/`) and the current page's language home (`/ko/`) only ever match exactly, even with `ancestor=true`. An external `item.url` (`http://`, `https://`, `//`) never matches, and neither does the empty `url` of an entry written without one (a group heading).
@@ -169,8 +169,8 @@ Always use `safe` for rendered content:
 ### Default Values
 
 ```jinja
-{{ page.description | default(value=site.description) }}
-{{ page.image | default(value="/images/default.png") }}
+{{ page.description | default(value=site.description) | e }}
+{{ page.image | default(value="/images/default.png") | e }}
 ```
 
 `default` returns the fallback when the value is undefined, `none`, or an empty string. The fallback keeps its type, so `default(value=0)` still works in arithmetic; a `none` fallback (`default(value=none)`) renders as an empty string. A value that is not empty is returned as follows: an array, map, or object passes through unchanged, and any other value (a string, number, or boolean) is returned as a string, so string filters such as `length` or `replace` can follow it. Pass `boolean=true` (`default(value="N/A", boolean=true)`) to also replace any falsy value: `false`, `0`, or an empty list or map. Jinja2's name for the fallback, `default_value=`, works as well as `value=`.
@@ -239,7 +239,7 @@ Names follow CLDR's in-date ("format") forms, so Russian and Polish months are g
 ```jinja
 {{ "2024-03-05" | regex_replace(pattern="(\d+)-(\d+)-(\d+)", rep="$3/$2/$1") }}  {# 05/03/2024 #}
 {{ "John Smith" | regex_replace(pattern="(?<first>\w+) (?<last>\w+)", rep="$last, $first") }}
-{{ page.title | regex_replace("\s+", " ") }}
+{{ page.title | regex_replace("\s+", " ") | e }}
 ```
 
 An invalid pattern, or one that backtracks past PCRE2's match limit, stops the build with a template error that names the pattern.
@@ -267,7 +267,7 @@ A value that isn't a number (text, `true`, an undefined value, NaN) comes back u
   <h3>{{ group.grouper }}</h3>
   <ul>
   {% for p in group.list %}
-    <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+    <li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
   {% endfor %}
   </ul>
 {% endfor %}
@@ -281,7 +281,7 @@ A value that isn't a number (text, `true`, an undefined value, NaN) comes back u
 ```jinja
 {# Translate UI strings (requires i18n/*.toml files) #}
 <nav>
-  <a href="/">{{ "nav.home" | t }}</a>
+  <a href="/">{{ "nav.home" | t | e }}</a>
   <a href="/blog/">{{ "nav.blog" | t }}</a>
 </nav>
 
@@ -313,11 +313,11 @@ Tests evaluate conditions in `{% if %}` statements.
 {% endif %}
 
 {% if page.description is empty %}
-<meta name="description" content="{{ site.description }}">
+<meta name="description" content="{{ site.description | e }}">
 {% endif %}
 
 {% if page.image is present %}
-<meta property="og:image" content="{{ page.image | absolute_url }}">
+<meta property="og:image" content="{{ page.image | absolute_url | e }}">
 {% endif %}
 
 {% if "hero.jpg" is matching("[.](jpg|png)$") %}

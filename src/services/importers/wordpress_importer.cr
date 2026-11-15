@@ -292,7 +292,12 @@ module Hwaro
 
           # Build frontmatter fields
           fields = {} of String => FieldValue
-          fields["title"] = title unless title.empty?
+          # WordPress prints the title and the excerpt as HTML and stores
+          # them entity-encoded for authors without `unfiltered_html`
+          # (kses turns `&` into `&amp;`), like term names. Front matter is
+          # plain text, so decode them, or every template — and the
+          # autoescape default — shows a literal `&amp;`.
+          fields["title"] = HTML.unescape(title) unless title.empty?
           fields["date"] = date_str
           # A modification time earlier than (or equal to) the post date is
           # WordPress's default for an unedited post; only a real edit is
@@ -307,7 +312,7 @@ module Hwaro
           if old = old_url_alias(link, new_path)
             fields["aliases"] = [old]
           end
-          fields["description"] = excerpt unless excerpt.empty?
+          fields["description"] = HTML.unescape(excerpt) unless excerpt.empty?
           fields["draft"] = true if is_draft
           fields["tags"] = tags.uniq unless tags.empty?
           fields["categories"] = categories.uniq unless categories.empty?

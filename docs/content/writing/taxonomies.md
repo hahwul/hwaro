@@ -166,7 +166,7 @@ Both templates receive a ready-made listing as `{{ content }}`: the term list in
 {% extends "base.html" %}
 
 {% block content %}
-<h1>{{ page.title }}</h1>
+<h1>{{ page.title | e }}</h1>
 {{ content }}
 {% endblock %}
 ```
@@ -179,7 +179,7 @@ Custom term list:
 {% for term in tax.items %}
   <li>
     <a href="{{ get_taxonomy_url(kind=taxonomy_name, term=term.name) }}">
-      {{ term.name }} ({{ term.count }})
+      {{ term.name | e }} ({{ term.count }})
     </a>
   </li>
 {% endfor %}
@@ -194,7 +194,7 @@ Custom term list:
 {% extends "base.html" %}
 
 {% block content %}
-<h1>{{ taxonomy_name }}: {{ taxonomy_term }}</h1>
+<h1>{{ taxonomy_name }}: {{ taxonomy_term | e }}</h1>
 {{ content }}
 {% endblock %}
 ```
@@ -206,7 +206,7 @@ Custom page list, looking up the current term's pages via `get_taxonomy()`:
 {% for term in tax.items if term.name == taxonomy_term %}
 <ul>
 {% for p in term.pages %}
-  <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+  <li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
 {% endfor %}
 </ul>
 {% endfor %}
@@ -243,7 +243,7 @@ Access taxonomy data anywhere:
 {% if tags %}
 <div class="tag-cloud">
 {% for term in tags.items %}
-  <a href="/tags/{{ term.slug }}/">{{ term.name }}</a>
+  <a href="/tags/{{ term.slug }}/">{{ term.name | e }}</a>
 {% endfor %}
 </div>
 {% endif %}
@@ -269,7 +269,7 @@ Generate taxonomy term URL:
 {% for term in tags.items %}
   <a href="/tags/{{ term.slug }}/" 
      class="tag count-{{ term.count }}">
-    {{ term.name }}
+    {{ term.name | e }}
   </a>
 {% endfor %}
 </div>
@@ -281,7 +281,7 @@ Generate taxonomy term URL:
 {% if page.tags %}
 <div class="post-tags">
 {% for tag in page.tags %}
-  <a href="{{ get_taxonomy_url(kind="tags", term=tag) }}">{{ tag }}</a>
+  <a href="{{ get_taxonomy_url(kind="tags", term=tag) }}">{{ tag | e }}</a>
 {% endfor %}
 </div>
 {% endif %}
@@ -296,7 +296,7 @@ Use `get_taxonomy_url()` (or `term.slug` from `get_taxonomy()`) rather than `{{ 
 <nav class="categories">
 {% for cat in categories.items %}
   <a href="/categories/{{ cat.slug }}/">
-    {{ cat.name }} ({{ cat.count }})
+    {{ cat.name | e }} ({{ cat.count }})
   </a>
 {% endfor %}
 </nav>

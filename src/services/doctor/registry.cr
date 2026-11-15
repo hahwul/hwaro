@@ -109,7 +109,7 @@ module Hwaro
             ["template-dir-missing", "template-required-missing", "template-section-missing"]),
           CheckSpec.new("template syntax",
             ["template-syntax-error", "template-read-error"]),
-          CheckSpec.new("autoescape (set explicitly)",
+          CheckSpec.new("autoescape choice",
             ["templates-autoescape-unset"], blocked_by: CONFIG_BLOCKING_IDS),
         ],
         blocked_by: ["template-dir-missing"],

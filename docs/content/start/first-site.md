@@ -81,7 +81,7 @@ Two rules cover most of it.
 
 ```jinja
 {% for member in site.data.team %}
-  <li>{{ member.name }}</li>
+  <li>{{ member.name | e }}</li>
 {% endfor %}
 ```
 

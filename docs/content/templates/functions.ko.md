@@ -18,7 +18,7 @@ toc = true
 ```jinja
 {% set about = get_page(path="about.md") %}
 {% if about %}
-<a href="{{ base_url }}{{ about.url }}">{{ about.title }}</a>
+<a href="{{ base_url }}{{ about.url }}">{{ about.title | e }}</a>
 {% endif %}
 ```
 
@@ -52,10 +52,10 @@ toc = true
 ```jinja
 {% set blog = get_section(path="blog") %}
 {% if blog %}
-<h2>{{ blog.title }}</h2>
+<h2>{{ blog.title | e }}</h2>
 <ul>
 {% for p in blog.pages %}
-  <li><a href="{{ base_url }}{{ p.url }}">{{ p.title }}</a></li>
+  <li><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></li>
 {% endfor %}
 </ul>
 {% endif %}
@@ -118,7 +118,7 @@ toc = true
 {% for term in tags.items %}
   <li>
     <a href="{{ get_taxonomy_url(kind='tags', term=term.name) }}">
-      {{ term.name }} ({{ term.count }})
+      {{ term.name | e }} ({{ term.count }})
     </a>
   </li>
 {% endfor %}
@@ -192,7 +192,7 @@ toc = true
 
 ```jinja
 {% for item in get_menu(name="main") %}
-<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name }}</a>
+<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name | e }}</a>
 {% endfor %}
 ```
 
@@ -230,7 +230,7 @@ toc = true
 ```jinja
 {% set menu = load_data(path="data/menu.json") %}
 {% for item in menu %}
-<a href="{{ item.url }}">{{ item.title }}</a>
+<a href="{{ item.url | e }}">{{ item.title | e }}</a>
 {% endfor %}
 ```
 
@@ -267,7 +267,7 @@ JSON (`data/team.json`):
 {% set team = load_data(path="data/team.json") %}
 <ul>
 {% for member in team %}
-  <li>{{ member.name }} - {{ member.role }}</li>
+  <li>{{ member.name | e }} - {{ member.role | e }}</li>
 {% endfor %}
 </ul>
 ```
@@ -282,7 +282,7 @@ url = "https://twitter.com/example"
 ```jinja
 {% set social = load_data(path="data/social.toml") %}
 {% for link in social.links %}
-<a href="{{ link.url }}">{{ link.name }}</a>
+<a href="{{ link.url | e }}">{{ link.name | e }}</a>
 {% endfor %}
 ```
 
@@ -295,8 +295,8 @@ url = "https://twitter.com/example"
 템플릿에서 환경 변수를 읽습니다.
 
 ```jinja
-{{ env("ANALYTICS_ID") }}
-{{ env("API_KEY", default="none") }}
+{{ env("ANALYTICS_ID") | e }}
+{{ env("API_KEY", default="none") | e }}
 ```
 
 **파라미터:**
@@ -315,12 +315,12 @@ url = "https://twitter.com/example"
 ```jinja
 {# Google Analytics #}
 {% if env("GA_ID") %}
-<script async src="https://www.googletagmanager.com/gtag/js?id={{ env("GA_ID") }}"></script>
+<script async src="https://www.googletagmanager.com/gtag/js?id={{ env("GA_ID") | e }}"></script>
 {% endif %}
 
 {# API endpoint with fallback #}
 <script>
-  const API = "{{ env("API_URL", default="https://api.example.com") }}";
+  const API = {{ env("API_URL", default="https://api.example.com") | tojson }};
 </script>
 ```
 
@@ -509,7 +509,7 @@ base_url이 포함된 URL을 생성합니다.
 {# With page image from front matter #}
 {% if page.image %}
   {% set thumb = resize_image(path=page.image, width=320) %}
-  <img src="{{ thumb.url }}" alt="{{ page_title }}">
+  <img src="{{ thumb.url | e }}" alt="{{ page_title | e }}">
 {% endif %}
 
 {# LQIP blur-up placeholder #}
@@ -542,7 +542,7 @@ base_url이 포함된 URL을 생성합니다.
 ```jinja
 {% set page = get_page(path="featured.md") %}
 {% if page %}
-{{ page.title }}
+{{ page.title | e }}
 {% else %}
 <p>Coming soon</p>
 {% endif %}
@@ -553,11 +553,11 @@ base_url이 포함된 URL을 생성합니다.
 ```jinja
 {# Good: Single lookup #}
 {% set blog = get_section(path="blog") %}
-<h2>{{ blog.title }}</h2>
+<h2>{{ blog.title | e }}</h2>
 <p>{{ blog.pages_count }} posts</p>
 
 {# Avoid: Multiple lookups #}
-<h2>{{ get_section(path="blog").title }}</h2>
+<h2>{{ get_section(path="blog").title | e }}</h2>
 <p>{{ get_section(path="blog").pages_count }} posts</p>
 ```
 

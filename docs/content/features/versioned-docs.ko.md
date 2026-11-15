@@ -140,7 +140,7 @@ URL 세그먼트는 디렉터리 이름이 아니라 버전 **name**입니다. `
 {% if page.version %}
 <details class="version-switch">
   <summary aria-label="문서 버전 전환">
-    {{ page.version.label }}
+    {{ page.version.label | e }}
     {% if not page.version.latest %}<span class="badge">old</span>{% endif %}
   </summary>
   <ul>
@@ -149,7 +149,7 @@ URL 세그먼트는 디렉터리 이름이 아니라 버전 **name**입니다. `
       <a href="{{ base_url }}{{ v.url }}"
          {% if v.current %}class="current" aria-current="page"{% endif %}
          {% if not v.exists %}title="이 페이지는 {{ v.label }}에 없습니다 — {{ v.label }} 시작 페이지로 이동"{% endif %}>
-        {{ v.label }}{% if v.latest %} (latest){% endif %}
+        {{ v.label | e }}{% if v.latest %} (latest){% endif %}
       </a>
     </li>
     {% endfor %}
@@ -160,7 +160,7 @@ URL 세그먼트는 디렉터리 이름이 아니라 버전 **name**입니다. `
 <div class="version-banner">
   {{ page.version.label }} 문서를 보고 있습니다.
   {% for v in page.version_links %}{% if v.latest %}
-  <a href="{{ base_url }}{{ v.url }}">{% if v.exists %}{{ v.label }}에서 이 페이지 보기{% else %}{{ v.label }} 문서로 이동{% endif %}</a>
+  <a href="{{ base_url }}{{ v.url }}">{% if v.exists %}{{ v.label | e }}에서 이 페이지 보기{% else %}{{ v.label }} 문서로 이동{% endif %}</a>
   {% endif %}{% endfor %}
 </div>
 {% endif %}
@@ -170,10 +170,10 @@ URL 세그먼트는 디렉터리 이름이 아니라 버전 **name**입니다. `
 현재 페이지에 의존하지 않는 사이트 전역 진입점:
 
 ```jinja
-<a href="{{ base_url }}{{ versions.latest.url }}">Docs ({{ versions.latest.label }})</a>
+<a href="{{ base_url }}{{ versions.latest.url }}">Docs ({{ versions.latest.label | e }})</a>
 <select onchange="location.href=this.value">
   {% for v in versions %}
-  <option value="{{ base_url }}{{ v.url }}">{{ v.label }}</option>
+  <option value="{{ base_url }}{{ v.url }}">{{ v.label | e }}</option>
   {% endfor %}
 </select>
 ```
