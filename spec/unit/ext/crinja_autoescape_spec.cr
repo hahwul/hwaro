@@ -495,4 +495,13 @@ describe "Crinja autoescape" do
   it "r4#8 an engine built without saying otherwise escapes" do
     Hwaro::Content::Processors::TemplateEngine.new.env.from_string("{{ u }}").render(ae_vars).should eq(ESCAPED)
   end
+
+  # Minimal cases from the expression-level differential fuzzer.
+  describe "fuzzer cases" do
+    it "append/prepend concatenate like ~: a safe side stays markup, the plain side is escaped" do
+      on(%({{ s | append(u) }}|{{ s | prepend(u) }}|{{ u | append(s) }}|{{ u | append("<i>") }})).should eq(
+        "<i>s&amp;</i>#{ESCAPED}|#{ESCAPED}<i>s&amp;</i>|#{ESCAPED}<i>s&amp;</i>|#{ESCAPED}&lt;i&gt;")
+      off(%({{ s | append(u) }}|{{ u | prepend(s) }})).should eq("<i>s&amp;</i>#{CANARY}|<i>s&amp;</i>#{CANARY}")
+    end
+  end
 end

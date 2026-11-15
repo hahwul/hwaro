@@ -344,6 +344,21 @@ module Crinja::Markup
     Callable::Instance.new(proc, filter.defaults, filter.name)
   end
 
+  # `prepend` / `append` (Crinja's Liquid filters) concatenate like `~`:
+  # with escaping active and either side safe, the plain side is escaped
+  # and the result is safe. They returned a plain String, so
+  # `{{ content | append("…") }}` printed the rendered HTML as text.
+  def keep_safe_concat(filter : Callable::Instance, prepend : Bool) : Callable::Instance
+    inner = filter.proc
+    proc = ->(arguments : Arguments) do
+      target = arguments.target || Value.new(nil)
+      string = arguments["string"]
+      return inner.call(arguments) unless active?(arguments.env) && (safe?(target) || safe?(string))
+      Value.new(SafeString.new(prepend ? escape(string) + escape(target) : escape(target) + escape(string)))
+    end
+    Callable::Instance.new(proc, filter.defaults, filter.name)
+  end
+
   # `filter` with a SafeString target handed over as the equal String.
   def string_target(filter : Callable::Instance) : Callable::Instance
     inner = filter.proc
@@ -688,6 +703,8 @@ Crinja::Filter::Library.defaults.map! do |filter|
     Crinja::Filter.__undefined_as_empty(filter)
   elsif name == "format"
     Crinja::Markup.keep_safe_format(filter)
+  elsif name.in?("prepend", "append")
+    Crinja::Markup.keep_safe_concat(filter, name == "prepend")
   elsif name.in?("list", "reverse")
     # They narrow on `String`; a SafeString is listed/reversed as its string
     # (the result is plain, as for a String).
