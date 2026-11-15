@@ -50,6 +50,15 @@ module Hwaro
       # `create_directory` when the parent already existed on disk.
       @planned_dirs = Set(String).new
 
+      TEMPLATES_TOML = <<-TOML
+
+        [templates]
+        # HTML-escape every value a template prints unless it is marked `| safe`
+        # (the default since 1.0). `false` renders exactly as hwaro 0.x did.
+        autoescape = true
+
+        TOML
+
       def run(options : Config::Options::InitOptions)
         scaffold = if remote = options.scaffold_remote
                      Scaffolds::Remote.new(remote)
@@ -181,6 +190,7 @@ module Hwaro
         # - minimal_config : bare essentials, no comments
         # - full_config    : maximum discoverability (current verbose behavior + doctor injection)
         # - default        : balanced (core + commonly useful sections with light comments)
+        verbatim_remote = false
         if scaffold.is_a?(Scaffolds::Remote)
           remote_config = scaffold.config_content(skip_taxonomies, multilingual_languages)
           if remote_config.strip.empty?
@@ -197,6 +207,7 @@ module Hwaro
           else
             # Use the remote's config as-is (respecting its custom settings), ignore --min/--full.
             config_content = remote_config
+            verbatim_remote = true
           end
         elsif minimal_config
           config_content = scaffold.minimal_config_content(skip_taxonomies, multilingual_languages)
@@ -216,6 +227,10 @@ module Hwaro
           escaped = Hwaro::Utils::FrontmatterWriter.escape_toml_string(title)
           config_content = config_content.sub(/^title\s*=\s*"[^"\n]*"/m) { "title = \"#{escaped}\"" }
         end
+
+        # A new site states its escaping choice instead of inheriting a
+        # default (a remote scaffold's own config is left as written).
+        config_content += TEMPLATES_TOML unless verbatim_remote
 
         create_file(File.join(target_path, "config.toml"), config_content)
 

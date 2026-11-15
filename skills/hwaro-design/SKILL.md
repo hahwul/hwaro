@@ -208,9 +208,10 @@ sites).
    content-hash fingerprinting (cache busting) for free.
 
 Values Hwaro renders as HTML (`{{ content }}`, `{{ auto_includes_css }}` and
-friends) print raw with `[templates] autoescape` off (the current default) or
-on, so they need no `| safe` (harmless if present). Escape author text with
-`| e`.
+friends) print raw with `[templates] autoescape` on (the default since 1.0)
+or off, so they need no `| safe` (harmless if present). Author HTML printed as
+markup needs `| safe`. Keep `| e` on author text: it never escapes twice and
+protects a site that sets `autoescape = false`.
 
 > **SCSS is built in; Tailwind and component frameworks are not.**
 > `[sass] enabled = true` compiles `.scss` with a pure-Crystal compiler that

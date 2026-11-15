@@ -24,7 +24,9 @@ module Hwaro
       class TemplateEngine
         getter env : Crinja
 
-        def initialize(autoescape : Bool = false)
+        # Fails closed: an engine built without saying otherwise escapes, as a
+        # site does by default. Build paths pass the config value.
+        def initialize(autoescape : Bool = Models::TemplatesConfig.new.autoescape)
           @env = Crinja.new
           TemplateEngine.configure_autoescape(@env, autoescape)
           stock_filters = @env.filters.each.to_h

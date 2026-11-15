@@ -176,7 +176,8 @@ module Hwaro
     class TemplatesConfig
       # HTML-escape every printed value that is not marked safe, in templates
       # whose output is HTML or XML (see TemplateEngine.configure_autoescape).
-      property autoescape : Bool = false
+      # On by default since 1.0; `false` renders exactly as 0.x did.
+      property autoescape : Bool = true
     end
 
     # `[outputs]` — declares extra per-page/per-section output formats

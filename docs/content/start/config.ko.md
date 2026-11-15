@@ -335,12 +335,12 @@ exclude = ["*.bak", "drafts/**"]         # 추가로 건너뛸 패턴
 
 ```toml
 [templates]
-autoescape = false   # 안전 값으로 표시되지 않은 출력 값을 HTML 이스케이프
+autoescape = true    # 안전 값으로 표시되지 않은 출력 값을 HTML 이스케이프
 ```
 
 | 키 | 타입 | 기본값 | 설명 |
 |-----|------|---------|-------------|
-| autoescape | bool | false | 출력이 HTML이나 XML인 템플릿에 Jinja2 방식의 HTML 자동 이스케이프를 적용합니다. `false`는 지금의 동작을 유지하며, 이후 릴리스에서 기본값이 `true`로 바뀝니다. [HTML 이스케이프](/ko/templates/syntax/#html-이스케이프)를 참고합니다 |
+| autoescape | bool | true | 출력이 HTML이나 XML인 템플릿에 Jinja2 방식의 HTML 자동 이스케이프를 적용합니다. `false`는 hwaro 0.x와 똑같이, 템플릿이 `\| e`를 쓰지 않으면 아무것도 이스케이프하지 않습니다. 새 사이트에는 `hwaro init`이 이 키를 써 둡니다. [HTML 이스케이프](/ko/templates/syntax/#html-이스케이프)를 참고합니다 |
 
 ## 개발 서버
 

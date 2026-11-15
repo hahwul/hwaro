@@ -15,8 +15,9 @@
 # Field-or-template semantics (the convenience contract):
 #   - A spec containing `{{` or `{%` is a Crinja template rendered with the
 #     record bound to `item`, never HTML-escaped (even under `[templates]
-#     autoescape`: specs produce text). A `body_template` file escapes by its
-#     extension, like any template (`.md` does not).
+#     autoescape`: specs produce text). Nor is a `body_template` file,
+#     whatever its name (its output is Markdown), or anything either one
+#     includes.
 #   - Any other spec is a record FIELD NAME (dotted for nesting). A missing
 #     field is a hard per-record error naming the rule, the record's index
 #     and the available keys — typo protection; a field that exists but
@@ -155,7 +156,7 @@ module Hwaro
                 body = eval_spec(spec, item, env, template_cache, "#{record_where}: body") || ""
               elsif tmpl = body_template
                 body = begin
-                  tmpl.render({"item" => item})
+                  tmpl.render_text({"item" => item})
                 rescue ex : Crinja::Error
                   raise generate_error("#{record_where}: body_template \"#{rule.body_template}\" failed to render: #{ex.message}")
                 end

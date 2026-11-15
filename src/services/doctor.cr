@@ -115,6 +115,7 @@ module Hwaro
           check_referenced_paths(issues, config)
           check_lexers(issues, config)
           check_sass(issues, config)
+          check_autoescape_explicit(issues, config) if template_names
         end
         @observed_blocking_ids = issues.map(&.id).to_set & ALL_BLOCKING_IDS
 

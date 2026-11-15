@@ -1328,7 +1328,7 @@ describe "Build Integration: Edge cases" do
     ) do
       File.exists?("public/special/index.html").should be_true
       html = File.read("public/special/index.html")
-      html.should contain("Hello & World <Test>")
+      html.should contain("Hello &amp; World &lt;Test&gt;")
     end
   end
 

@@ -85,6 +85,10 @@ hwaro doctor --json
 - 빌드와 동일한 Crinja 파서로 검사한 템플릿 문법 오류
   (빌드가 파싱 전에 펼치는 `{% alert(type="info") %}…{% end %}` 같은 블록 숏코드는
   오류로 보지 않지만, `{% includ %}`처럼 철자가 틀린 알 수 없는 태그는 오류입니다)
+- `config.toml`이 `[templates] autoescape`를 정하지 않음 (info): 1.0부터 템플릿은
+  출력하는 값을 기본으로 HTML 이스케이프하므로, 마크업으로 출력하는 작성자 HTML에는
+  `| safe`가 필요합니다. 키를 `true`로 적어 확정하거나, 1.0 이전처럼 렌더링하려면
+  `false`로 적습니다([0.x에서 옮겨 올 때](/ko/templates/syntax/#0x에서-옮겨-올-때) 참고)
 
 **콘텐츠 진단:**
 
@@ -164,6 +168,7 @@ hwaro: doctor
   templates/
     [ok]   required files (page.html, section.html)
     [ok]   template syntax
+    [ok]   autoescape (set explicitly)
 
   content/
     [ok]   directory present
@@ -272,6 +277,7 @@ ignore = [
 | `template-section-missing` | template | `section.html` 누락, 섹션은 `page.html`로 렌더링됨 |
 | `template-syntax-error` | template | 템플릿 파싱 실패 ✗ |
 | `template-read-error` | template | 템플릿 읽기 실패 ✗ |
+| `templates-autoescape-unset` | config | `templates/`가 있는데 `[templates] autoescape`를 정하지 않음 (info) |
 | `content-dir-missing` | content | 콘텐츠 디렉터리를 찾을 수 없음 |
 | `content-frontmatter-invalid` | content | 프론트 매터 파싱 실패 ✗ |
 | `content-read-error` | content | 콘텐츠 파일 읽기 실패 ✗ |

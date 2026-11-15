@@ -164,7 +164,8 @@ end
 describe "DateFilters" do
   describe "date" do
     it "prints a list it cannot format as `{{ list }}` does" do
-      render_crinja("{{ [1, 'a'] | date }}|{{ 5 | date }}").should eq("[1, 'a']|5")
+      render_crinja("{{ [1, 'a'] | date }}|{{ 5 | date }}").should eq(render_crinja("{{ [1, 'a'] }}|5"))
+      render_crinja("{{ [1, 'a'] | date }}|{{ 5 | date }}", autoescape: false).should eq("[1, 'a']|5")
     end
 
     it "formats a date string with default format" do
@@ -465,7 +466,9 @@ describe "MiscFilters" do
       vars = {"text" => Crinja::Value.new("</script>")}
       result = render_crinja("{{ text | jsonify }}", vars)
       result.should_not contain("</script>")
-      result.should contain("<\\/script>")
+      result.should contain("\\u003c/script")
+      # autoescape off: `</` written as `<\/`
+      render_crinja("{{ text | jsonify }}", vars, autoescape: false).should contain("<\\/script>")
     end
   end
 
@@ -500,8 +503,11 @@ describe "MiscFilters" do
       vars = {"text" => Crinja::Value.new("</script>")}
       result = render_crinja("{{ text | tojson }}", vars).strip
       result.should_not contain("</script>")
-      result.should contain("<\\/script>")
+      result.should contain("\\u003c/script")
       JSON.parse(result).as_s.should eq("</script>")
+      off = render_crinja("{{ text | tojson }}", vars, autoescape: false).strip
+      off.should contain("<\\/script>")
+      JSON.parse(off).as_s.should eq("</script>")
     end
 
     it "supports the indent argument" do
@@ -1237,7 +1243,8 @@ describe "MiscFilters (extended)" do
     it "inspects a string value" do
       vars = {"val" => Crinja::Value.new("hello")}
       result = render_crinja("{{ val | inspect }}", vars)
-      result.should eq("\"hello\"")
+      result.should eq("&quot;hello&quot;")
+      render_crinja("{{ val | inspect }}", vars, autoescape: false).should eq("\"hello\"")
     end
 
     it "inspects nil value" do

@@ -292,11 +292,12 @@ Templates under `templates/` are Crinja (Jinja2-compatible). The essentials:
   `{% block content %}…{% endblock %}`. Partials via `{% include "partials/x.html" %}`.
 - **Rendered HTML emits raw:** values Hwaro renders as HTML (`{{ content }}`,
   `{{ og_all_tags }}`, `{{ toc }}`, …) output HTML directly whether
-  `[templates] autoescape` is off (the current default) or on — the built-in
-  scaffolds write them with no filter. `| safe` on them is harmless. Put `| e`
-  on author text (titles, descriptions, `extra` fields, data) so it is escaped
-  in both modes (it never escapes twice), and `| safe` on author HTML you mean
-  as markup (needed once autoescape is on).
+  `[templates] autoescape` is on (the default since 1.0) or off — the built-in
+  scaffolds write them with no filter. `| safe` on them is harmless. Every
+  other printed value is escaped by default; `| safe` marks author HTML you
+  mean as markup. Keep `| e` on author text (titles, descriptions, `extra`
+  fields, data): it never escapes twice, and it keeps a site that sets
+  `autoescape = false` safe.
 - **Always guard nil:** `{% if page.image %}…{% endif %}`; use
   `{{ page.description | default(value=site.description) }}`.
 - **URLs:** build links with `{{ url_for(path='/about/') }}` (alias `get_url`),

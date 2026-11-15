@@ -337,12 +337,12 @@ The built-in denylist only removes cruft. Legitimate dot-paths such as `.well-kn
 
 ```toml
 [templates]
-autoescape = false   # HTML-escape printed values that are not marked safe
+autoescape = true    # HTML-escape printed values that are not marked safe
 ```
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| autoescape | bool | false | Jinja2-style HTML autoescape for templates whose output is HTML or XML. `false` keeps today's behavior; a later release changes the default to `true`. See [HTML Escaping](/templates/syntax/#html-escaping) |
+| autoescape | bool | true | Jinja2-style HTML autoescape for templates whose output is HTML or XML. `false` renders exactly as hwaro 0.x did, with nothing escaped unless a template says `\| e`. `hwaro init` writes the key into new sites. See [HTML Escaping](/templates/syntax/#html-escaping) |
 
 ## Development Server
 

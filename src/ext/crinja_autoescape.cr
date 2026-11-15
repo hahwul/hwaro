@@ -31,6 +31,128 @@
 # `tojson`/`jsonify`, `safe`, `default`, `strip_html`) follow the same rules
 # in content/processors/filters/.
 
+# HTML hwaro rendered (`content`, summaries, `toc`, hook `text`, the feed
+# `content` — `Utils::CrinjaUtils.html_value`) is safe, but `| e` and
+# `| escape` on it still escape it, as they did before autoescape: a feed
+# template's `{{ p.summary | escape | xml_escape }}` and `{{ content | e }}`
+# show the markup as text. Any other safe value (a capture, a macro result,
+# `| safe`, pre-escaped text such as a hook `destination`) passes `| e`
+# unchanged, as in Jinja2. A filter that builds a new SafeString drops the
+# mark.
+struct Crinja::SafeString
+  @__rendered_html = false
+
+  def initialize(@string : String, @plain_value : Bool, @__rendered_html : Bool)
+  end
+
+  def rendered_html? : Bool
+    @__rendered_html
+  end
+
+  # `==` compares the string alone (upstream), so the hash must too: the
+  # inherited struct hash covered every ivar, so `content` and the equal
+  # `content | safe` (or a String) missed each other as dictionary keys.
+  def hash(hasher)
+    @string.hash(hasher)
+  end
+end
+
+# Under autoescape the HTML hwaro renders reaches templates as a SafeString
+# where it used to be a String. A SafeString behaves as its string wherever
+# upstream only knew String: first/last, indexing, iteration (`for`, `list`,
+# `batch`, `sort`, …). The characters it yields are plain Strings, as a
+# String's are. Upstream bodies (lib/crinja/src/runtime/value.cr), copied
+# because `previous_def` on the generic-iterator overload trips a compiler
+# bug; the only change is `String` → `String, SafeString` (and `to_s`). No
+# other ext file patches these methods.
+struct Crinja::Value
+  def [](index : Int) : Value
+    case object = @raw
+    when Indexable
+      Value.new object[index]
+    when String, SafeString
+      Value.new object.to_s[index].to_s
+    else
+      raise TypeError.new(self, "expected Array for #[](index : Int), not #{object.class}")
+    end
+  end
+
+  def first
+    case object = @raw
+    when Dictionary
+      Value.new(Crinja::Tuple.new(object.first_key, object.first_value))
+    when Iterable
+      Value.new object.first
+    when String, SafeString
+      Value.new object.to_s[0, 1]
+    else
+      raise TypeError.new(self, "expected Iterable, Hash or String for #first, not #{object.class}")
+    end
+  end
+
+  def last
+    object = @raw
+
+    if object.responds_to?(:last)
+      Value.new object.last
+    elsif object.is_a?(String | SafeString)
+      Value.new object.to_s[-1, 1]
+    else
+      raise TypeError.new(self, "expected Enumerable or String for #last, not #{object.class}")
+    end
+  end
+
+  def raw_each : ::Iterator
+    case object = @raw
+    when Hash
+      HashTupleIterator.new(object.each)
+    when Iterable(Value)
+      RawIterator.new(object.each)
+    when Iterable
+      object.each
+    when ::Iterator(Value)
+      RawIterator.new(object)
+    when ::Iterator
+      object
+    when String, SafeString
+      object.to_s.each_char.map(&.to_s)
+    when StrictUndefined
+      raise TypeError.new(self, "can't iterate over undefined")
+    when Undefined
+      ([] of Nil).each
+    else
+      raise TypeError.new(self, "#{object.class} is not iterable")
+    end
+  end
+
+  def raw_each(&)
+    case object = @raw
+    when Hash
+      object.each { |key, value| yield Crinja::Tuple.from({key, value}) }
+    when Iterable(Value), ::Iterator(Value)
+      object.each { |value| yield value.as(Value).raw }
+    when Iterable, ::Iterator
+      object.each { |value| yield value }
+    when String, SafeString
+      object.to_s.each_char { |char| yield char.to_s }
+    when StrictUndefined
+      raise TypeError.new(self, "can't iterate over undefined")
+    when Undefined
+    else
+      raise TypeError.new(self, "#{object.class} is not iterable")
+    end
+  end
+end
+
+Crinja.filter(:escape) do
+  raw = target.raw
+  if raw.is_a?(Crinja::SafeString) && !raw.rendered_html?
+    raw
+  else
+    Crinja::SafeString.escape(raw.to_s)
+  end
+end
+
 module Crinja::Markup
   extend self
 
@@ -90,7 +212,16 @@ module Crinja::Markup
   # sets `default_for_string` to the switch, so an OFF-mode build never takes
   # the Markup code paths even inside a `{% autoescape true %}` block — its
   # output stays byte-identical to the pre-autoescape engine.
+  #
+  # Inside a text render (`Crinja#__text_render`: a JSON/text output, a
+  # `[[content.generate]]` spec) it is false, so the engine there behaves
+  # exactly as with the switch off.
   def enabled?(env : Crinja) : Bool
+    switch?(env) && !env.__text_render
+  end
+
+  # The site switch alone.
+  def switch?(env : Crinja) : Bool
     env.config.autoescape.default_for_string
   end
 
@@ -210,6 +341,19 @@ module Crinja::Markup
     Callable::Instance.new(proc, filter.defaults, filter.name)
   end
 
+  # `filter` with a SafeString target handed over as the equal String.
+  def string_target(filter : Callable::Instance) : Callable::Instance
+    inner = filter.proc
+    proc = ->(arguments : Arguments) do
+      raw = arguments.target.try(&.raw)
+      if raw.is_a?(SafeString)
+        arguments = Arguments.new(arguments.env, arguments.varargs, arguments.kwargs, arguments.defaults, Value.new(raw.to_s))
+      end
+      inner.call(arguments)
+    end
+    Callable::Instance.new(proc, filter.defaults, filter.name)
+  end
+
   # Filters that keep a safe target safe, with the argument names they insert
   # as text (escaped first). `indent` inserts a string `width`; `replace`/
   # `format` are handled by dedicated filters/wrappers (mixed safety, `%c`).
@@ -315,29 +459,102 @@ class Crinja
   end
 end
 
+class Crinja
+  # Render state that lives exactly as long as the render that set it
+  # (Renderer#render restores both in `ensure`), on the environment so a
+  # `without context` include, which renders on the long-lived global
+  # context, can neither hide it nor leak it:
+  #
+  #   * `__text_render` — this render's output is text (a template whose name
+  #     does not escape, `__no_autoescape`, `render_text`, or an `[outputs]`
+  #     JSON/text/CSV render): nothing in it escapes, includes and imports
+  #     included, and the Markup rules are off (`Markup.enabled?`).
+  #   * `__entry_html` — the caller knows the entry template writes an HTML
+  #     or XML file (`Template#render_entry`): it escapes under the switch
+  #     whatever its name says. Read once, by the entry render.
+  property __text_render : Bool = false
+  property __entry_html : Bool = false
+
+  # Run the block with `__text_render` set to `text`, then restore it.
+  def with_text_render(text : Bool, &)
+    previous = @__text_render
+    @__text_render = text
+    begin
+      yield
+    ensure
+      @__text_render = previous
+    end
+  end
+
+  # `{% import %}` / `{% from %}` render in a fresh environment: it carries the
+  # text-render state, so a context-free import inside a text output does not
+  # escape.
+  def __share_features(source : Crinja) : self
+    previous_def
+    @__text_render = source.__text_render
+    self
+  end
+end
+
 class Crinja::Template
-  # Never escape this template's own output (its includes still follow
-  # their own names). See the file comment.
+  # Never escape this template's output, nor that of anything it includes.
+  # See the file comment.
   property __no_autoescape : Bool = false
+
+  # Render as text: nothing in this render escapes, whatever the template
+  # and include names say (a `body_template` produces Markdown).
+  def render_text(bindings) : String
+    env.with_text_render(true) { render(bindings) }
+  end
+
+  # Render as the entry template of an output file whose type hwaro knows:
+  # HTML/XML escapes under the switch whatever the template's name says;
+  # text never escapes.
+  def render_entry(bindings, html : Bool) : String
+    return render_text(bindings) unless html
+    previous = env.__entry_html
+    env.__entry_html = true
+    begin
+      render(bindings)
+    ensure
+      env.__entry_html = previous
+    end
+  end
 end
 
 class Crinja::Renderer
-  # Upstream body; only the autoescape decision consults `__no_autoescape`.
+  # Upstream body; only the autoescape decision is hwaro's (see the
+  # `Crinja#__text_render` note), and it is undone in `ensure` so no render
+  # state outlives its render.
   def render(io : IO, template : Template)
-    env.context.autoescape = !template.__no_autoescape && env.config.autoescape?(template.filename)
+    context = env.context
+    previous_autoescape = context.autoescape
+    previous_text = env.__text_render
+    forced_html = env.__entry_html
+    env.__entry_html = false
+    switch = Crinja::Markup.switch?(env)
+    by_name = env.config.autoescape?(template.filename)
+    text = previous_text || (switch && !forced_html && (template.__no_autoescape || !by_name))
+    env.__text_render = text
+    context.autoescape = !text && (forced_html ? switch : by_name)
+    begin
+      env.context.macros.merge(template.macros)
+      output = render(template.nodes)
 
-    env.context.macros.merge(template.macros)
-    output = render(template.nodes)
+      @extend_parent_templates.each do |parent_template|
+        output = render(parent_template.nodes)
 
-    @extend_parent_templates.each do |parent_template|
-      output = render(parent_template.nodes)
+        env.context.extend_path_stack.pop
+      end
 
-      env.context.extend_path_stack.pop
+      resolve_block_stubs(output)
+
+      output.value(io)
+    ensure
+      context.autoescape = previous_autoescape
+      env.__text_render = previous_text
+      env.__entry_html = forced_html
     end
-
-    resolve_block_stubs(output)
-
-    output.value(io)
   end
 end
 
@@ -468,6 +685,10 @@ Crinja::Filter::Library.defaults.map! do |filter|
     Crinja::Filter.__undefined_as_empty(filter)
   elsif name == "format"
     Crinja::Markup.keep_safe_format(filter)
+  elsif name.in?("list", "reverse")
+    # They narrow on `String`; a SafeString is listed/reversed as its string
+    # (the result is plain, as for a String).
+    Crinja::Markup.string_target(filter)
   else
     filter
   end

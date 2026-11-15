@@ -381,4 +381,118 @@ describe "Crinja autoescape" do
       on(%({% set a %}가가{% endset %}{{ a | replace("가", "", 5) }})).should eq("")
     end
   end
+
+  describe "text renders" do
+    it "a text output's includes never escape; an HTML output's follow their own names" do
+      Dir.mktmpdir do |dir|
+        {"p.html" => "{{ u }}", "s.js" => "{{ u }}", "page.json" => %({"x": "{% include "p.html" %}"}),
+         "page.html" => %(<{% include "p.html" %}|{% include "s.js" %}>)}.each do |name, source|
+          File.write(File.join(dir, name), source)
+        end
+        env = Hwaro::Content::Processors::TemplateEngine.new(true).env
+        env.loader = Crinja::Loader::FileSystemLoader.new(dir)
+        env.get_template("page.json").render(ae_vars).should eq(%({"x": "#{CANARY}"}))
+        env.get_template("page.html").render(ae_vars).should eq("<#{ESCAPED}|#{CANARY}>")
+        env.get_template("p.html").render_text(ae_vars).should eq(CANARY)
+        env.get_template("p.html").render(ae_vars).should eq(ESCAPED)
+      end
+    end
+  end
+
+  # Review round 4: no render state outlives its render.
+  describe "render state" do
+    files = {
+      "empty.txt"    => "",
+      "title.html"   => "{{ u }}",
+      "page.html"    => %({% include "empty.txt" without context %}{% include "title.html" %}),
+      "other.html"   => "{{ u }}",
+      "bad.txt"      => %({{ u }}{% include "missing.html" %}),
+      "literal.html" => %({{ "A&B" }}),
+      "vars.html"    => %({% set label %}{{ "A&B" }}{% endset %}),
+      "inc.txt"      => %({% include "literal.html" without context %}),
+      "from.txt"     => %({% from "vars.html" import label %}{{ label }}),
+    }
+    with_env = ->(block : Crinja -> Nil) do
+      Dir.mktmpdir do |dir|
+        files.each { |name, source| File.write(File.join(dir, name), source) }
+        env = Hwaro::Content::Processors::TemplateEngine.new(true).env
+        env.loader = Crinja::Loader::FileSystemLoader.new(dir)
+        block.call(env)
+      end
+    end
+
+    it "r4#1 a text include without context does not switch escaping off for the rest" do
+      with_env.call(->(env : Crinja) {
+        env.get_template("page.html").render(ae_vars).should eq(ESCAPED)
+        # a later page on the same environment
+        env.get_template("other.html").render(ae_vars).should eq(ESCAPED)
+        nil
+      })
+    end
+
+    it "r4#1 a text render that raises leaves the environment escaping" do
+      with_env.call(->(env : Crinja) {
+        expect_raises(Crinja::Error) { env.get_template("bad.txt").render(ae_vars) }
+        expect_raises(Crinja::Error) { env.get_template("bad.txt").render_text(ae_vars) }
+        env.get_template("other.html").render(ae_vars).should eq(ESCAPED)
+        nil
+      })
+    end
+
+    it "r4#3 a text output's context-free include and import do not escape" do
+      with_env.call(->(env : Crinja) {
+        env.get_template("inc.txt").render(ae_vars).should eq("A&B")
+        env.get_template("from.txt").render(ae_vars).should eq("A&B")
+        env.get_template("literal.html").render(ae_vars).should eq("A&amp;B")
+        nil
+      })
+    end
+
+    it "r4#2 an entry template rendered for an HTML file escapes whatever its name" do
+      with_env.call(->(env : Crinja) {
+        env.get_template("title.html").render_entry(ae_vars, html: true).should eq(ESCAPED)
+        env.from_string("{{ u }}").tap(&.__no_autoescape = true).render(ae_vars).should eq(CANARY)
+        Crinja::Template.new("{{ u }}", env, "plain.txt", "plain.txt").render_entry(ae_vars, html: true).should eq(ESCAPED)
+        Crinja::Template.new("{{ u }}", env, "page.html", "page.html").render_entry(ae_vars, html: false).should eq(CANARY)
+        nil
+      })
+    end
+  end
+
+  # Review round 4: inside a text render the engine behaves as with the switch off.
+  describe "text render semantics" do
+    it "r4#4 captures, producers, URL and xmlattr behave exactly as with the switch off" do
+      src = %({% set x %}A&B{% endset %}{{ x | e }}|{{ ["A&B"] | join | e }}|{% macro m() %}A&B{% endmacro %}{{ m() | e }}|) +
+            %({{ "/x?a=1&amp;b=2" | safe | relative_url }}|{{ {"x y": "v"} | xmlattr }}|{{ [u] }}|{{ u ~ ("<s>" | safe) }}|{{ u | string }})
+      on = Hwaro::Content::Processors::TemplateEngine.new(true).env.from_string(src).render_text(ae_vars)
+      off = Hwaro::Content::Processors::TemplateEngine.new(false).env.from_string(src).render(ae_vars)
+      on.should eq(off)
+    end
+  end
+
+  # Review round 4: `| e` on HTML hwaro rendered still escapes it.
+  describe "| e on rendered HTML" do
+    it "r4#5 escapes hwaro's HTML values, leaves other safe values alone, in every mode" do
+      [true, false].each do |ae|
+        vars = {
+          "content" => Hwaro::Utils::CrinjaUtils.html_value("<p>x &amp; y</p>", ae),
+          "dest"    => Hwaro::Utils::CrinjaUtils.preescaped_value("/a?b=1&amp;c=2", ae),
+        } of String => Crinja::Value
+        env = Hwaro::Content::Processors::TemplateEngine.new(ae).env
+        render = ->(src : String) { env.from_string(src).render(vars) }
+        render.call("{{ content | e }}").should eq("&lt;p&gt;x &amp;amp; y&lt;/p&gt;")
+        render.call("{{ content | escape | xml_escape }}").should eq("&amp;lt;p&amp;gt;x &amp;amp;amp; y&amp;lt;/p&amp;gt;")
+        env.from_string("{{ content | e }}").render_text(vars).should eq("&lt;p&gt;x &amp;amp; y&lt;/p&gt;")
+        if ae
+          render.call(%({% set c %}<i>{% endset %}{{ c | e }})).should eq("<i>")
+          render.call(%({{ "<b>" | safe | e }})).should eq("<b>")
+          render.call("{{ dest | e }}").should eq("/a?b=1&amp;c=2")
+        end
+      end
+    end
+  end
+
+  it "r4#8 an engine built without saying otherwise escapes" do
+    Hwaro::Content::Processors::TemplateEngine.new.env.from_string("{{ u }}").render(ae_vars).should eq(ESCAPED)
+  end
 end

@@ -17,7 +17,7 @@ Print values with double braces:
 {{ content }}
 ```
 
-Whether a printed value is HTML-escaped depends on `[templates] autoescape`; see [HTML Escaping](#html-escaping).
+Printed values are HTML-escaped unless they are marked safe; see [HTML Escaping](#html-escaping).
 
 Attribute, index and call access also work after a parenthesized expression, so you can read a field straight off a filter or function result:
 
@@ -28,14 +28,13 @@ Attribute, index and call access also work after a parenthesized expression, so 
 
 ## HTML Escaping
 
-`[templates] autoescape` in `config.toml` decides whether printed values are HTML-escaped. It is `false` by default in this release; a later release turns it on by default.
+Every value a template prints is HTML-escaped unless it is *safe*, as in Jinja2. Author text (titles, descriptions, section and taxonomy names, `extra` fields, data files, i18n strings) is escaped once wherever you print it, in element text and in attribute values alike; `| e` on it is harmless (it never escapes twice). Author HTML you mean to print as markup needs `| safe`: `{{ page.extra.banner | safe }}`.
 
-- **Off:** values print as they are. Text that comes from content or data (titles, descriptions, section and taxonomy names, `extra` fields, data files, i18n strings) goes through `| e` wherever you print it, in element text and in attribute values alike: `<meta name="description" content="{{ page.description | e }}">`.
-- **On** (as in Jinja2): every printed value is escaped unless it is *safe*. Author text is escaped once; `| e` on it is harmless (it never escapes twice). Author HTML you mean to print as markup needs `| safe`: `{{ page.extra.banner | safe }}`.
+The values hwaro renders as HTML (`content`, `toc`, `page.summary`, `og_all_tags`, the other `*_tags` variables, …, listed in [HTML values](/templates/data-model/#html-values)) are safe and print as they are.
 
-In both modes the values hwaro renders as HTML (`content`, `toc`, `page.summary`, `og_all_tags`, the other `*_tags` variables, …, listed in [HTML values](/templates/data-model/#html-values)) are safe and print as they are. A template written with `| e` on text and `| safe` on author HTML renders the same either way.
+`[templates] autoescape = false` in `config.toml` turns escaping off: every value prints as it is, exactly as in hwaro 0.x, so text from content or data needs `| e` wherever you print it: `<meta name="description" content="{{ page.description | e }}">`. A template written with `| e` on text and `| safe` on author HTML renders the same under both settings.
 
-With autoescape on, a template escapes when its output is HTML or XML: files ending in `.html`, `.htm`, `.xhtml`, `.xml`, `.svg`, `.rss` or `.atom` (a trailing `.jinja`, `.j2`, `.jinja2` or `.ecr` is ignored), names that carry no type (`page.j2`), built-in shortcodes, and the RSS and Atom feed templates. Text outputs never escape: `.json`, `.txt`, `.csv`, `.js`, `.mjs`, `.css`, `.md` and `.markdown` templates (so `page.json.jinja` and `feed.json.jinja`), and `[[content.generate]]` specs. An included or imported file follows its own name; an `{% extends %}` chain follows the ENTRY template (the one the page renders with) — one escaping policy per render, as in Jinja2. Inside a template, turn escaping off or on for a region:
+A template escapes when its output is HTML or XML: files ending in `.html`, `.htm`, `.xhtml`, `.xml`, `.svg`, `.rss` or `.atom` (a trailing `.jinja`, `.j2`, `.jinja2` or `.ecr` is ignored), names that carry no type (`page.j2`), built-in shortcodes, and the RSS and Atom feed templates. Text outputs never escape: `.json`, `.txt`, `.csv`, `.js`, `.mjs`, `.css`, `.md` and `.markdown` templates (so `page.json.jinja` and `feed.json.jinja`), `[[content.generate]]` specs and `body_template` files, and anything a text output includes. Where hwaro knows the type of the file it writes, that decides for the entry template, not its name: a page written to `index.html` escapes even through a `plain.txt.jinja` its front matter picks, and an `[outputs]` JSON, text or CSV file does not escape whatever its template is called. A file an HTML template includes or imports follows its own name (a `.js` partial does not escape); an `{% extends %}` chain follows the ENTRY template (the one the page renders with) — one escaping policy per render, as in Jinja2. Inside a template, turn escaping off or on for a region:
 
 ```jinja
 {% autoescape false %}{{ legacy_html }}{% endautoescape %}
@@ -44,8 +43,22 @@ With autoescape on, a template escapes when its output is HTML or XML: files end
 The block does not reach into a file it includes. Under autoescape, also:
 
 - `a ~ b` (and `a + b` on strings) with a safe operand escapes the other one and is safe. `{{ "<p>" ~ x }}` prints `&lt;p&gt;`: build markup with a `{% set %}…{% endset %}` block or a macro, whose output is safe.
-- `| e` and `| escape` leave a safe value alone. To show HTML as text (in a feed, say), use `| forceescape` or `| xml_escape`, which escape it anyway.
+- `| e` and `| escape` leave a safe value alone, except HTML hwaro rendered (`content`, `page.summary`, the HTML values listed in the data model), which they still escape as before 1.0, so `{{ p.summary | escape }}` in a feed shows the markup as text. `| forceescape` and `| xml_escape` escape any value.
 - `{{ x | tojson }}` is safe JSON with `<`, `>`, `&` and `'` written as `\u003c`-style escapes, ready for a `<script>`.
+
+### Coming from 0.x
+
+Before 1.0 nothing was escaped unless a template said `| e`. To see what the default changes on your site, build it once as it is and once with escaping off, into two directories, and compare them:
+
+```bash
+hwaro build -o /tmp/site-1x
+# now set `autoescape = false` under [templates] in config.toml
+hwaro build -o /tmp/site-0x
+diff -r /tmp/site-0x /tmp/site-1x
+# then set it back to `true` (or keep `false` for the 0.x output)
+```
+
+Every difference is one of two things: text that 0.x printed unescaped (`Tom & Jerry` now prints as `Tom &amp; Jerry`, which the browser shows the same and which can no longer break out of an attribute), or author HTML that now shows as text and needs `| safe` where the template prints it. Then write the choice into `config.toml` (`autoescape = true`, or `false` to keep the 0.x output); `hwaro doctor` notes a site with its own templates that has not. `hwaro init` writes the key for new sites. One difference shows only in a text output (`page.json.jinja`, `page.txt.jinja`): `toc_obj.headers[].title`, `.id` and `.permalink` come out as fully escaped text there, so `it's` prints as `it&#39;s` (in 0.x they were escaped text too, apostrophes aside).
 
 ## Comments
 

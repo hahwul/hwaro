@@ -51,7 +51,9 @@ module Hwaro
 
         disk_data = Core::Build::DataDisk.load_hash
         remote_keys = config.data_remote.map(&.key.downcase)
-        env = Content::Processors::TemplateEngine.new.env
+        # Escaping off: the planner only evaluates `[[content.generate]]`
+        # specs, whose output is text (slugs, titles) — never HTML.
+        env = Content::Processors::TemplateEngine.new(false).env
         # A templated title/slug/description may `{% include %}` a partial,
         # which the build resolves from templates/ — so must the planner, or
         # every row of that rule is skipped as a failure.

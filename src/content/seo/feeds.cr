@@ -478,7 +478,7 @@ module Hwaro
           # template escapes them on purpose (`| xml_escape`) or wraps them
           # in CDATA, as it always had to.
           autoescape = config.templates.autoescape
-          html = ->(text : String) { autoescape ? Crinja::SafeString.new(text) : text }
+          html = ->(text : String) { Utils::CrinjaUtils.html_value(text, autoescape) }
           page_values = pages.map do |page|
             entry_src = page.updated || page.date
             entry_updated = entry_src ? normalize_feed_time(entry_src) : Utils::SortUtils::FALLBACK_DATE

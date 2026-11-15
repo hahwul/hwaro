@@ -200,9 +200,10 @@ describe "SEO: social image query strings and external URLs" do
       encoded = "http://localhost/img/%EC%82%AC%EC%A7%84.png?v=2&amp;s=1#top"
       about.should contain(%(og:image" content="#{encoded}"))
       about.should contain(%(twitter:image" content="#{encoded}"))
-      # JSON-LD escapes `&` as `&`; seo.og_image is the raw URL.
+      # JSON-LD escapes `&` as `\u0026`; seo.og_image is the raw URL (text,
+      # so autoescape prints its `&` as `&amp;`).
       about.should contain(%("image":"http://localhost/img/%EC%82%AC%EC%A7%84.png?v=2\\u0026s=1#top"))
-      about.should contain("|http://localhost/img/%EC%82%AC%EC%A7%84.png?v=2&s=1#top")
+      about.should contain("|http://localhost/img/%EC%82%AC%EC%A7%84.png?v=2&amp;s=1#top")
 
       cdn = File.read("public/cdn/index.html")
       raw = "https://cdn.example.com/사진 1.png?w=1"
