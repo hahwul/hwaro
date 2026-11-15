@@ -137,4 +137,87 @@ describe "Template autoescape" do
       File.read("public/posts/p/index.html").should contain("<title>T #{CANARY}</title>")
     end
   end
+
+  # Review-round regressions, end to end.
+
+  it "#1 does not let a JSON output template share the HTML template's escaping" do
+    # Byte-identical source for the HTML and JSON templates: the compiled-template
+    # cache must still give each its own escaping (HTML escaped, JSON raw).
+    build_site(
+      <<-TOML,
+        title = "x"
+        base_url = "https://e.example.com"
+        [templates]
+        autoescape = true
+        [outputs]
+        page = ["json"]
+        TOML
+      content_files: {"p.md" => "+++\ntitle = \"<x&>\"\n+++\nb\n"},
+      template_files: {"page.html" => "T:{{ page.title }}", "page.json.jinja" => "T:{{ page.title }}"},
+    ) do
+      File.read("public/p/index.html").should eq("T:&lt;x&amp;&gt;")
+      File.read("public/p/index.json").should eq("T:<x&>")
+    end
+  end
+
+  it "#11 strips a .ecr wrapper before reading the output type" do
+    build_site(
+      <<-TOML,
+        title = "x"
+        base_url = "https://e.example.com"
+        [templates]
+        autoescape = true
+        [outputs]
+        page = ["json"]
+        TOML
+      content_files: {"p.md" => "+++\ntitle = \"<x>\"\n+++\nb\n"},
+      template_files: {"page.html" => "H", "page.json.ecr" => %({"t":"{{ page.title }}"})},
+    ) do
+      File.read("public/p/index.json").should eq(%({"t":"<x>"}))
+    end
+  end
+
+  it "#5 escapes apostrophes in render-hook attribute text so a quote can't break out" do
+    build_site(
+      <<-TOML,
+        title = "x"
+        base_url = "https://e.example.com"
+        [templates]
+        autoescape = true
+        TOML
+      content_files: {"p.md" => "+++\ntitle = \"p\"\n+++\n![x' onerror='boom](/i)\n"},
+      template_files: {"page.html" => "{{ content }}", "hooks/render-image.html" => "<img src=\"{{ destination }}\" alt='{{ alt }}'>"},
+    ) do
+      html = File.read("public/p/index.html")
+      html.should contain("alt='x&#39; onerror=&#39;boom'")
+      html.should_not contain("alt='x' onerror='boom'")
+    end
+  end
+
+  it "#2 keeps a shortcode body safe only when markdown.safe is off" do
+    [{false, true}, {true, false}].each do |safe_mode, raw|
+      build_site(
+        <<-TOML,
+          title = "x"
+          base_url = "https://e.example.com"
+          [templates]
+          autoescape = true
+          [markdown]
+          safe = #{safe_mode}
+          TOML
+
+
+        content_files: {"p.md" => "+++\ntitle = \"p\"\n+++\n{% echo() %}\n<img src=x data-ae>\n{% end %}\n"},
+        template_files: {"page.html" => "{{ content }}", "shortcodes/echo.html" => %(<div>{{ body }}</div>)},
+      ) do
+        html = File.read("public/p/index.html")
+        if raw
+          html.should contain("<img src=x data-ae>")
+        else
+          html.should contain("&lt;img src=x data-ae&gt;")
+          html.should_not contain("<img src=x data-ae>")
+        end
+      end
+    end
+  end
 end

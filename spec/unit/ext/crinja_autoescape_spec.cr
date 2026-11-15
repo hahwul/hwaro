@@ -185,4 +185,74 @@ describe "Crinja autoescape" do
       off(%({{ ("http://x.com/?a=1&b=2 " ~ u) | urlize }})).should eq(%(<a href="http://x.com/?a=1&b=2" rel="noopener">http://x.com/?a=1&b=2</a> #{CANARY}))
     end
   end
+
+  # Review-round regressions. Each asserts the Jinja2/markupsafe behaviour a
+  # finding said the branch got wrong.
+  describe "review fixes" do
+    it "#3/#4 escapes every inserted filter argument, whatever its type" do
+      on("{{ s | indent(width=u, indentfirst=true) }}").should eq("#{ESCAPED}<i>s&amp;</i>")
+      on(%({% set f = "<b>%s</b>" | safe %}{{ f | format([u]) }}))
+        .should eq("<b>[&#39;#{ESCAPED}&#39;]</b>")
+      on(%({{ s | replace("i", d) }}))
+        .should eq("<{&#39;k&#39; =&gt; &#39;&lt;v&gt;&amp;&#39;&#39;}>s&amp;</{&#39;k&#39; =&gt; &#39;&lt;v&gt;&amp;&#39;&#39;}>")
+    end
+
+    it "#9 replace keeps a safe replacement's markup and escapes the unsafe source" do
+      on(%({{ "A&X" | replace("X", s) }})).should eq("A&amp;<i>s&amp;</i>")
+      on(%({{ "A&X" | safe | replace("X", "<b>" | safe) }})).should eq("A&<b>")
+    end
+
+    it "#10 escapes a truncation suffix only when it is actually appended" do
+      on(%({% set t %} <b>x</b> {% endset %}{{ t | truncate_words(50, end="</b>") }})).should eq("<b>x</b>")
+      on(%({{ "<b>x</b> and more words now" | safe | truncate_words(3, end="</b>") }}))
+        .should eq("<b>x</b> and more&lt;/b&gt;")
+      on(%({{ "  <b>x</b>  " | safe | truncate(50, true, "</b>", 0) }})).should eq("  <b>x</b>  ")
+    end
+
+    it "#6 escapes a plain {% call %} result, keeps a macro's safe markup" do
+      on("{% call env(name=\"__AE_MISSING__\", default=u) %}{% endcall %}").should eq(ESCAPED)
+      # A macro's output is safe markup: its own tags pass through, and a
+      # `{{ … }}` printed inside its body is escaped there, not again.
+      on("{% macro w(a) %}<i>{{ a }}{{ caller() }}</i>{% endmacro %}{% call w(u) %}x{% endcall %}").should eq("<i>#{ESCAPED}x</i>")
+    end
+
+    it "#7 a capture made under autoescape false is plain outside it" do
+      on("{% autoescape false %}{% set x %}{{ u }}{% endset %}{% endautoescape %}{{ x }}").should eq(ESCAPED)
+      on("{% set x %}{{ u }}{% endset %}{{ x }}").should eq(ESCAPED) # captured under on → safe, prints once-escaped
+    end
+
+    it "#8 xmlattr rejects an attribute name with a space, slash, gt or eq" do
+      {" " => "x y", "/" => "x/y", ">" => "x>y", "=" => "x=y"}.each do |_, key|
+        expect_raises(Crinja::RuntimeError, /invalid attribute name/) do
+          on(%({{ {#{key.inspect}: "v"} | xmlattr }}))
+        end
+      end
+      on(%({{ {"data-x": "a&b"} | xmlattr }})).should eq(%( data-x="a&amp;b"))
+    end
+
+    it "#8 holds with the switch off too" do
+      expect_raises(Crinja::RuntimeError, /invalid attribute name/) do
+        off(%({{ {"x y": "v"} | xmlattr }}))
+      end
+    end
+
+    it "#13 escape matches HTML.escape at every offset and never overflows" do
+      ["&", "<", ">", %("), "'"].each do |char|
+        (0..19).each do |at|
+          (at..at + 10).each do |size|
+            str = ("x" * at) + char + ("y" * (size - at))
+            Crinja::Markup.escape(str).should eq(HTML.escape(str))
+          end
+        end
+      end
+      clean = "a" * 40
+      Crinja::Markup.escape(clean).should be(clean) # no copy when nothing to escape
+    end
+
+    it "#12 gates the new semantics on the site switch, not the tag" do
+      # With the switch OFF, an inner {% autoescape true %} reproduces the old
+      # (pre-branch) engine byte-for-byte: string is double-escaped as before.
+      off("{% autoescape true %}{{ u | string }}{% endautoescape %}").should eq("&amp;lt;b a=&amp;quot;x&amp;quot;&amp;gt;&amp;amp;&amp;#39;")
+    end
+  end
 end
