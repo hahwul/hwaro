@@ -220,4 +220,99 @@ describe "Template autoescape" do
       end
     end
   end
+
+  # Review round 2 regressions, end to end.
+
+  it "r2#1 escapes a shortcode body= named argument, keeps a block body safe" do
+    build_site(
+      <<-TOML,
+        title = "x"
+        base_url = "https://e.example.com"
+        [templates]
+        autoescape = true
+        TOML
+      content_files: {"p.md" => "+++\ntitle = \"p\"\n+++\n{% echo() %}\n<b data-block>\n{% end %}\n\n{{ echo(body=\"<b data-named>\") }}\n"},
+      template_files: {"page.html" => "{{ content }}", "shortcodes/echo.html" => %(<div>{{ body }}</div>)},
+    ) do
+      html = File.read("public/p/index.html")
+      html.should contain("<b data-block>")       # block body is safe markup (markdown.safe = false)
+      html.should contain("&lt;b data-named&gt;") # named body= argument is plain text
+      html.should_not contain("<b data-named>")
+    end
+  end
+
+  it "r2#8 URL filters on a pre-escaped hook destination escape exactly once" do
+    build_site(
+      <<-TOML,
+        title = "x"
+        base_url = "https://example.test"
+        [templates]
+        autoescape = true
+        TOML
+      content_files: {"p.md" => "+++\ntitle = \"p\"\n+++\n[x](/p?a=1&b=2)\n"},
+      template_files: {"page.html"              => "{{ content }}",
+                       "hooks/render-link.html" => %(<a href="{{ destination | absolute_url }}" data-r="{{ destination | relative_url }}" data-u="{{ get_url(path=destination) }}">{{ text }}</a>)},
+    ) do
+      html = File.read("public/p/index.html")
+      html.should contain(%(href="https://example.test/p?a=1&amp;b=2"))
+      html.should contain(%(data-r="/p?a=1&amp;b=2"))
+      html.should contain(%(data-u="https://example.test/p?a=1&amp;b=2"))
+      html.should_not contain("&amp;amp;")
+    end
+  end
+
+  it "r2#9 xmlattr does not validate keys with the switch off" do
+    build_site(
+      <<-TOML,
+        title = "x"
+        base_url = "https://e.example.com"
+        TOML
+      content_files: {"p.md" => "+++\ntitle = \"p\"\n[extra.a]\n\"x y\" = \"v\"\n+++\nb\n"},
+      template_files: {"page.html" => %(<div{{ page.extra.a | xmlattr }}></div>)},
+    ) do
+      File.read("public/p/index.html").should eq(%(<div x y="v"></div>))
+    end
+  end
+
+  it "r2#10 a block override and super() in an escaping template are escaped (no fail-open)" do
+    build_site(
+      <<-TOML,
+        title = "x"
+        base_url = "https://e.example.com"
+        [templates]
+        autoescape = true
+        TOML
+      content_files: {"p.md" => "+++\ntitle = \"<x&>\"\n+++\nb\n"},
+      template_files: {
+        "base.html" => "B[{% block b %}base={{ page.title }}{% endblock %}]",
+        "page.html" => "{% extends \"base.html\" %}{% block b %}child={{ page.title }}|{{ super() }}{% endblock %}",
+      },
+    ) do
+      File.read("public/p/index.html").should eq("B[child=&lt;x&amp;&gt;|base=&lt;x&amp;&gt;]")
+    end
+  end
+
+  it "r2#10 the entry template decides escaping for the whole extends chain" do
+    # An HTML entry extending a text-output parent escapes (entry decides,
+    # Jinja's one-eval-context-per-render); a text entry does not.
+    build_site(
+      <<-TOML,
+        title = "x"
+        base_url = "https://e.example.com"
+        [templates]
+        autoescape = true
+        [outputs]
+        page = ["txt"]
+        TOML
+      content_files: {"p.md" => "+++\ntitle = \"<x>\"\n+++\nb\n"},
+      template_files: {
+        "base.txt.jinja" => "{{ page.title }}",
+        "page.html"      => "{% extends \"base.txt.jinja\" %}",
+        "page.txt.jinja" => "{% extends \"base.txt.jinja\" %}",
+      },
+    ) do
+      File.read("public/p/index.html").should eq("&lt;x&gt;") # HTML entry → escaped
+      File.read("public/p/index.txt").should eq("<x>")        # txt entry → raw
+    end
+  end
 end

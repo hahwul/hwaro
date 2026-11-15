@@ -230,10 +230,8 @@ describe "Crinja autoescape" do
       on(%({{ {"data-x": "a&b"} | xmlattr }})).should eq(%( data-x="a&amp;b"))
     end
 
-    it "#8 holds with the switch off too" do
-      expect_raises(Crinja::RuntimeError, /invalid attribute name/) do
-        off(%({{ {"x y": "v"} | xmlattr }}))
-      end
+    it "#8/#9 does NOT validate with the switch off (OFF output unchanged)" do
+      off(%({{ {"x y": "v"} | xmlattr }})).should eq(%( x y="v"))
     end
 
     it "#13 escape matches HTML.escape at every offset and never overflows" do
@@ -253,6 +251,65 @@ describe "Crinja autoescape" do
       # With the switch OFF, an inner {% autoescape true %} reproduces the old
       # (pre-branch) engine byte-for-byte: string is double-escaped as before.
       off("{% autoescape true %}{{ u | string }}{% endautoescape %}").should eq("&amp;lt;b a=&amp;quot;x&amp;quot;&amp;gt;&amp;amp;&amp;#39;")
+    end
+  end
+
+  # Review round 2 regressions.
+  describe "review round 2" do
+    it "r2#2 escapes the WHOLE representation of a non-string value once" do
+      # The structural quotes/brackets are escaped too — ON == HTML.escape(OFF repr).
+      ["{{ [u] }}", "{{ d }}", "{{ (u, u) }}"].each do |c|
+        on(c).should eq(HTML.escape(off(c))), c
+      end
+      on("{{ [u] }}").should_not contain(%('])) # no raw closing structural quote
+    end
+
+    it "r2#2 escapes a printed callable's representation" do
+      src = "{% macro w() %}[{{ caller }}]{% endmacro %}{% call(y=u) w() %}{% endcall %}"
+      on(src).should contain("&#39;")
+      on(src).should_not contain("<b a=")
+    end
+
+    it "r2#3 format with %c does not synthesize raw markup" do
+      on("{% set f = \"%c%s%c\" | safe %}{{ f | format(60, u, 62) }}").should_not contain("<b a=")
+      # legitimate numeric formatting is byte-identical to off
+      ["%d", "%05d", "%x"].each do |conv|
+        src = "{% set f = #{conv.inspect} | safe %}{{ f | format(255) }}"
+        on(src).should eq(off(src)), conv
+      end
+    end
+
+    it "r2#4 producers under {% autoescape false %} are plain, escaped where printed" do
+      on("{% autoescape false %}{% set x = [u] | join %}{% endautoescape %}{{ x }}").should eq(ESCAPED)
+      on("{% autoescape false %}{% set x = u | urlize %}{% endautoescape %}{{ x }}").should eq(ESCAPED)
+      on("{% macro m(v) %}{{ v }}{% endmacro %}{% autoescape false %}{% set x = m(u) %}{% endautoescape %}{{ x }}").should eq(ESCAPED)
+      # still safe in the normal escaping context
+      on("{{ [s] | join }}").should eq("<i>s&amp;</i>")
+    end
+
+    it "r2#5 urlize does not link an unsafe scheme (both modes)" do
+      js = "javascript://x/%0Aalert(1)"
+      on(%({{ #{js.inspect} | urlize }})).should_not contain("<a ")
+      off(%({{ #{js.inspect} | urlize }})).should_not contain("<a ")
+      on(%({{ "http://example.com/" | urlize }})).should contain(%(<a href="http://example.com/"))
+    end
+
+    it "r2#6 replace does not escape the search, and counts matches in the source" do
+      on(%({{ s | replace("<i>", "") }})).should eq("s&amp;</i>")
+      on(%({% set a %}ab{% endset %}{{ a | replace("a", "aX", 2) }})).should eq("aXb")
+      on(%({% set a %}ab{% endset %}{{ a | replace("a", "aX", -1) }})).should eq("aXb")
+    end
+
+    it "r2#7 a safe truncation suffix stays safe, with any target" do
+      on(%({% set t %}<i/>{% endset %}{{ "abcdef" | truncate(5, true, t, 0) }})).should eq("a<i/>")
+      on(%({% set t %}<i/>{% endset %}{{ "a b" | safe | truncate_words(1, end=t) }})).should eq("a<i/>")
+      # a plain suffix is still escaped, and an untruncated safe string untouched
+      on(%({{ "a b c" | safe | truncate_words(1, end="</b>") }})).should eq("a</b>".sub("</b>", "&lt;/b&gt;"))
+    end
+
+    it "r2#11 urlize coerces an Int64 trim_url_limit and a SafeString target" do
+      on(%({{ "http://example.com/" | urlize(trim_url_limit=20) }})).should contain(%(<a href="http://example.com/"))
+      on("{{ s | urlize(trim_url_limit=20) }}").should eq("<i>s&amp;</i>")
     end
   end
 end
