@@ -43,7 +43,7 @@ A template escapes when its output is HTML or XML: files ending in `.html`, `.ht
 The block does not reach into a file it includes. Under autoescape, also:
 
 - `a ~ b` (and `a + b` on strings) with a safe operand escapes the other one and is safe. `{{ "<p>" ~ x }}` prints `&lt;p&gt;`: build markup with a `{% set %}…{% endset %}` block or a macro, whose output is safe.
-- `| e` and `| escape` leave a safe value alone. To show HTML as text (in a feed, say), use `| forceescape` or `| xml_escape`, which escape it anyway.
+- `| e` and `| escape` leave a safe value alone, except HTML hwaro rendered (`content`, `page.summary`, the HTML values listed in the data model), which they still escape as before 1.0, so `{{ p.summary | escape }}` in a feed shows the markup as text. `| forceescape` and `| xml_escape` escape any value.
 - `{{ x | tojson }}` is safe JSON with `<`, `>`, `&` and `'` written as `\u003c`-style escapes, ready for a `<script>`.
 
 ### Coming from 0.x
@@ -51,13 +51,14 @@ The block does not reach into a file it includes. Under autoescape, also:
 Before 1.0 nothing was escaped unless a template said `| e`. To see what the default changes on your site, build it once as it is and once with escaping off, into two directories, and compare them:
 
 ```bash
-printf '[templates]\nautoescape = false\n' > config.noescape.toml
 hwaro build -o /tmp/site-1x
-hwaro build --env noescape -o /tmp/site-0x
+# now set `autoescape = false` under [templates] in config.toml
+hwaro build -o /tmp/site-0x
 diff -r /tmp/site-0x /tmp/site-1x
+# then set it back to `true` (or keep `false` for the 0.x output)
 ```
 
-Every difference is one of two things: text that 0.x printed unescaped (`Tom & Jerry` now prints as `Tom &amp; Jerry`, which the browser shows the same and which can no longer break out of an attribute), or author HTML that now shows as text and needs `| safe` where the template prints it. Then write the choice into `config.toml` (`autoescape = true`, or `false` to keep the 0.x output); `hwaro doctor` notes a site with its own templates that has not. `hwaro init` writes the key for new sites.
+Every difference is one of two things: text that 0.x printed unescaped (`Tom & Jerry` now prints as `Tom &amp; Jerry`, which the browser shows the same and which can no longer break out of an attribute), or author HTML that now shows as text and needs `| safe` where the template prints it. Then write the choice into `config.toml` (`autoescape = true`, or `false` to keep the 0.x output); `hwaro doctor` notes a site with its own templates that has not. `hwaro init` writes the key for new sites. One difference shows only in a text output (`page.json.jinja`, `page.txt.jinja`): `toc_obj.headers[].title`, `.id` and `.permalink` come out as fully escaped text there, so `it's` prints as `it&#39;s` (in 0.x they were escaped text too, apostrophes aside).
 
 ## Comments
 

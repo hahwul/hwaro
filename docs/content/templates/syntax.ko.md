@@ -43,7 +43,7 @@ hwaro가 HTML로 렌더링한 값(`content`, `toc`, `page.summary`, `og_all_tags
 이 블록은 그 안에서 include한 파일에는 미치지 않습니다. 자동 이스케이프에서는 다음도 달라집니다.
 
 - `a ~ b`(문자열의 `a + b`도)에 안전 값이 있으면 다른 쪽을 이스케이프하고 결과도 안전 값입니다. `{{ "<p>" ~ x }}`는 `&lt;p&gt;`를 출력하므로, 마크업은 출력이 안전 값인 `{% set %}…{% endset %}` 블록이나 매크로로 만드세요.
-- `| e`와 `| escape`는 안전 값을 건드리지 않습니다. HTML을 텍스트로 보여 주려면(피드 등) 그래도 이스케이프하는 `| forceescape`나 `| xml_escape`를 씁니다.
+- `| e`와 `| escape`는 안전 값을 건드리지 않습니다. 단, hwaro가 렌더링한 HTML(`content`, `page.summary` 등 데이터 모델의 HTML 값)은 1.0 이전처럼 여전히 이스케이프하므로, 피드의 `{{ p.summary | escape }}`는 마크업을 텍스트로 보여 줍니다. `| forceescape`와 `| xml_escape`는 어떤 값이든 이스케이프합니다.
 - `{{ x | tojson }}`은 `<`, `>`, `&`, `'`를 `\u003c` 형태로 쓴 안전한 JSON이라 `<script>` 안에 바로 넣을 수 있습니다.
 
 ### 0.x에서 옮겨 올 때
@@ -51,13 +51,14 @@ hwaro가 HTML로 렌더링한 값(`content`, `toc`, `page.summary`, `og_all_tags
 1.0 이전에는 템플릿이 `| e`를 쓰지 않으면 아무것도 이스케이프되지 않았습니다. 기본값이 사이트에서 무엇을 바꾸는지 보려면, 그대로 한 번, 이스케이프를 끄고 한 번 서로 다른 디렉터리에 빌드해 비교합니다.
 
 ```bash
-printf '[templates]\nautoescape = false\n' > config.noescape.toml
 hwaro build -o /tmp/site-1x
-hwaro build --env noescape -o /tmp/site-0x
+# 이제 config.toml의 [templates]에 `autoescape = false`를 적습니다
+hwaro build -o /tmp/site-0x
 diff -r /tmp/site-0x /tmp/site-1x
+# 다 보면 `true`로 되돌립니다(0.x 출력을 유지하려면 `false`로 둡니다)
 ```
 
-차이는 둘 중 하나입니다. 0.x가 이스케이프하지 않고 출력하던 텍스트이거나(`Tom & Jerry`가 이제 `Tom &amp; Jerry`로 출력됩니다. 브라우저에서는 똑같이 보이고, 더는 속성 밖으로 빠져나갈 수 없습니다), 이제 텍스트로 보이게 되어 출력하는 곳에 `| safe`가 필요한 작성자 HTML입니다. 그런 다음 `config.toml`에 선택을 적어 둡니다(`autoescape = true`, 또는 0.x 출력을 유지하려면 `false`). 템플릿이 있는데 이 키를 적지 않은 사이트는 `hwaro doctor`가 알려 줍니다. 새 사이트는 `hwaro init`이 이 키를 써 둡니다.
+차이는 둘 중 하나입니다. 0.x가 이스케이프하지 않고 출력하던 텍스트이거나(`Tom & Jerry`가 이제 `Tom &amp; Jerry`로 출력됩니다. 브라우저에서는 똑같이 보이고, 더는 속성 밖으로 빠져나갈 수 없습니다), 이제 텍스트로 보이게 되어 출력하는 곳에 `| safe`가 필요한 작성자 HTML입니다. 그런 다음 `config.toml`에 선택을 적어 둡니다(`autoescape = true`, 또는 0.x 출력을 유지하려면 `false`). 템플릿이 있는데 이 키를 적지 않은 사이트는 `hwaro doctor`가 알려 줍니다. 새 사이트는 `hwaro init`이 이 키를 써 둡니다. 텍스트 출력(`page.json.jinja`, `page.txt.jinja`)에서만 보이는 차이가 하나 있습니다. `toc_obj.headers[].title`, `.id`, `.permalink`가 그곳에서도 완전히 이스케이프된 텍스트로 나오므로 `it's`가 `it&#39;s`로 출력됩니다(0.x에서도 작은따옴표만 빼고 이스케이프된 텍스트였습니다).
 
 ## 주석
 

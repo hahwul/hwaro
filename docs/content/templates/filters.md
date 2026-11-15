@@ -61,7 +61,7 @@ Under [`[templates] autoescape`](/templates/syntax/#html-escaping) (on by defaul
 
 | Filter | Result under autoescape |
 |--------|-------------------------|
-| `e` / `escape` | Escapes text; a safe value is returned unchanged. Safe either way, so it never escapes twice |
+| `e` / `escape` | Escapes text; a safe value is returned unchanged, except HTML hwaro rendered (`content`, `page.summary`, …), which is still escaped as before 1.0. Safe either way, so it never escapes twice |
 | `forceescape`, `xml_escape` | Escape the value even when it is safe; the result is safe |
 | `safe` | Marks the value safe (prints as is) |
 | `markdownify`, `tojson`, `jsonify`, `urlize`, `xmlattr` | Return safe HTML (or script-safe JSON). `urlize` escapes the text it links and only links `http(s)`/`www.` URLs (never `javascript:` and other unsafe schemes). Under autoescape, `xmlattr` rejects an attribute name containing a space, `/`, `>` or `=` |
