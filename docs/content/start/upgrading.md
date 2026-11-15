@@ -27,6 +27,20 @@ Templates whose output is HTML or XML now escape every printed value unless it i
 {{ page.extra.banner | safe }}   {# markup in both #}
 ```
 
+In practice this is most often a translated string or a data value that carries a tag, printed through `t`:
+
+```toml
+# i18n/en.toml
+lede = "Every request becomes a <b>flow</b>."
+```
+
+```jinja
+<p>{{ "home.lede" | t }}</p>          {# 1.0: the <b> shows as text #}
+<p>{{ "home.lede" | t | safe }}</p>   {# markup, in 0.22 and in 1.0 #}
+```
+
+Adding `| safe` does not change what 0.22 prints, so you can make the change before upgrading.
+
 The values Hwaro renders as HTML (`content`, `page.summary`, `toc`, the `*_tags` variables, pagination) print as before, and `| e` on them still escapes them, so `{{ p.summary | escape | xml_escape }}` in a feed template keeps working. JSON, text and CSV outputs do not change.
 
 To keep the 0.22 behaviour for the whole site:
