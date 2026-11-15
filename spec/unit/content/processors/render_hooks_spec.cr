@@ -56,7 +56,9 @@ private def make_hooks(
 ) : RenderHooks::HookRenderContext
   registry = make_registry(link: link, image: image, heading: heading, codeblock: codeblock,
     blockquote: blockquote, table: table)
-  env = Hwaro::Content::Processors::TemplateEngine.new.env
+  # The hook context defaults to `[templates] autoescape` off; its
+  # environment must say the same.
+  env = Hwaro::Content::Processors::TemplateEngine.new(false).env
   cache = {} of UInt64 => Crinja::Template
   RenderHooks::HookRenderContext.new(registry, env, cache, nil, {} of String => Crinja::Value,
     mermaid_bypass, admonition_bypass)
@@ -88,7 +90,7 @@ describe RenderHooks do
       config.base_url = "https://example.com/sub"
       page = Hwaro::Models::Page.new("about.md")
       registry = make_registry(link: %({{ destination | absolute_url }}|{{ get_url(path="/z/") }}|{{ "/q/" | relative_url }}))
-      hooks = RenderHooks::HookRenderContext.new(registry, Hwaro::Content::Processors::TemplateEngine.new.env,
+      hooks = RenderHooks::HookRenderContext.new(registry, Hwaro::Content::Processors::TemplateEngine.new(false).env,
         {} of UInt64 => Crinja::Template, nil, RenderHooks.page_vars(page, config), false, false)
       SyntaxHighlighter.render("[x](/a/)", hooks: hooks).should contain("https://example.com/sub/a/|https://example.com/sub/z/|/sub/q/")
     end

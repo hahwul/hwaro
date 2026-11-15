@@ -111,7 +111,8 @@ describe Hwaro::Content::Processors::Filters::StringFilters do
 
     it "decodes the URL-safe alphabet and unpadded input" do
       render_crinja(%({{ "aGVsbG8" | base64_decode }})).should eq("hello")
-      render_crinja(%({{ "PDw_Pz4-" | base64_decode }})).should eq("<<??>>")
+      # decoded text, escaped once where it is printed
+      render_crinja(%({{ "PDw_Pz4-" | base64_decode }})).should eq("&lt;&lt;??&gt;&gt;")
     end
 
     it "raises a template error for invalid input or non-UTF-8 bytes" do
