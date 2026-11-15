@@ -18,6 +18,8 @@
       url: /start/config/
     - title: Tools & Completion
       url: /start/tools/
+    - title: Upgrading to 1.0
+      url: /start/upgrading/
 - title: Writing
   section: writing
   items:

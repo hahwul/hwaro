@@ -48,6 +48,8 @@ The block does not reach into a file it includes. Under autoescape, also:
 
 ### Coming from 0.x
 
+Everything else that changes between 0.22 and 1.0 is listed in [Upgrading to 1.0](/start/upgrading/).
+
 Before 1.0 nothing was escaped unless a template said `| e`. To see what the default changes on your site, build it once as it is and once with escaping off, into two directories, and compare them:
 
 ```bash

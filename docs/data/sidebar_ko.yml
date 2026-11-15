@@ -16,6 +16,8 @@
       url: /ko/start/config/
     - title: 도구와 자동 완성
       url: /ko/start/tools/
+    - title: 1.0으로 업그레이드
+      url: /ko/start/upgrading/
 - title: 콘텐츠 작성
   section: writing
   items:
