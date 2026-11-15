@@ -381,7 +381,8 @@ jobs:
             echo "::error::tarball bundled no dylibs; packaging silently stopped working"
             exit 1
           }
-          for want in libssl libcrypto libpcre2-8 libyaml; do
+          # libyaml's file is libyaml-0.2.dylib: the glob below needs the `-0`.
+          for want in libssl libcrypto libpcre2-8 libyaml-0; do
             test -n "$(echo "verify/lib/$want".*.dylib)" || {
               echo "::error::tarball is missing $want"
               exit 1
