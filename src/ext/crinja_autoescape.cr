@@ -504,36 +504,23 @@ end
 # switch on the body is raw text, so the result must be plain so printing it
 # elsewhere escapes it (`producer_safe?`). Off the switch, always safe
 # (byte-identical to the old engine).
+#
+# A wrapper, not a copy of the upstream body: `previous_def` keeps every
+# patch underneath, in particular crinja_recursion_depth_fix.cr's stack
+# guard (a copied body dropped it, and unbounded macro recursion killed the
+# process again).
 class Crinja::Tag::Macro::MacroFunction
   def call(arguments : Arguments)
-    arguments.defaults = @defaults
-
-    arguments.env.with_scope(arguments.to_h) do |context|
-      context.merge!({
-        "varargs" => arguments.varargs,
-        "kwargs"  => arguments.kwargs,
-      })
-
-      body = String.build do |io|
-        Crinja::Renderer.new(@renderer.template, arguments.env).render(children).value(io)
-      end
-      Crinja::Markup.producer_safe?(arguments.env) ? SafeString.new(body) : body
-    end
+    result = previous_def
+    Crinja::Markup.producer_safe?(arguments.env) ? result : result.to_s
   end
 end
 
 # `{{ loop(children) }}` inside a `{% for … recursive %}` — same producer rule.
 class Crinja::Tag::For::ForLoop::Recursive
   def call(arguments : Arguments)
-    sub_iterator = arguments.varargs.first
-
-    sub_loop = self.class.new(@loop_runner, sub_iterator)
-    sub_loop.depth0 = depth
-
-    body = String.build do |io|
-      io << @loop_runner.run_loop(sub_loop).value
-    end
-    Crinja::Markup.producer_safe?(arguments.env) ? SafeString.new(body) : body
+    result = previous_def
+    Crinja::Markup.producer_safe?(arguments.env) ? result : result.to_s
   end
 end
 
