@@ -14,7 +14,7 @@ module Hwaro
             # kept `&amp;` printed as `&amp;amp;`).
             env.filters["strip_html"] = Crinja.filter do
               text = Hwaro::Utils::TextUtils.strip_html(target.to_s)
-              env.context.autoescape? ? HTML.unescape(text) : text
+              Crinja::Markup.active?(env) ? HTML.unescape(text) : text
             end
 
             # Markdownify filter. Honors the site's [markdown] safe and
@@ -42,7 +42,7 @@ module Hwaro
                        Markd.to_html(target.to_s)
                      end
               # HTML hwaro renders: safe under autoescape.
-              env.context.autoescape? ? Crinja::SafeString.new(html) : html
+              Crinja::Markup.active?(env) ? Crinja::SafeString.new(html) : html
             end
 
             # XML escape filter (single-pass via TextUtils)
@@ -51,7 +51,7 @@ module Hwaro
             # escaped a second time.
             env.filters["xml_escape"] = Crinja.filter do
               escaped = Hwaro::Utils::TextUtils.escape_xml(target.to_s)
-              env.context.autoescape? ? Crinja::SafeString.new(escaped) : escaped
+              Crinja::Markup.active?(env) ? Crinja::SafeString.new(escaped) : escaped
             end
 
             # Safe filter

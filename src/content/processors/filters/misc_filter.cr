@@ -43,7 +43,7 @@ module Hwaro
           # `<`, `>`, `&` and `'` become `\u003c`-style escapes (Jinja2's
           # `tojson`), which no HTML parser reads as markup.
           def self.script_json(env : Crinja, json : String) : Crinja::Value
-            return Crinja::Value.new(json.gsub("</", "<\\/")) unless env.context.autoescape?
+            return Crinja::Value.new(json.gsub("</", "<\\/")) unless Crinja::Markup.active?(env)
             Crinja::Value.new(Crinja::SafeString.new(json.gsub({'<' => "\\u003c", '>' => "\\u003e", '&' => "\\u0026", '\'' => "\\u0027"})))
           end
 
@@ -97,7 +97,7 @@ module Hwaro
                 val = target.to_s
                 if val.empty?
                   fallback
-                elsif env.context.autoescape? && target.raw.is_a?(Crinja::SafeString)
+                elsif Crinja::Markup.active?(env) && target.raw.is_a?(Crinja::SafeString)
                   target # stays safe (Jinja2 returns the value itself)
                 else
                   Crinja::Value.new(val)

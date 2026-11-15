@@ -18,7 +18,13 @@ class Crinja::Tag::Call < Crinja::Tag
       instance.defaults[key] = value.is_a?(AST::ExpressionNode) ? env.evaluate(value) : Value.new(value)
     end
 
-    output = env.with_scope({"caller" => Value.new(instance)}) { env.evaluate(call).to_s }
+    # `{% call %}` takes any call expression, so the result may be a macro's
+    # SafeString OR an ordinary function's plain value (`{% call env(...) %}`).
+    # When escaping is active, escape a plain result so it can't inject
+    # markup, while a macro's SafeString passes through unchanged. Off the
+    # switch, `.to_s` exactly as before (byte-identical).
+    result = env.with_scope({"caller" => Value.new(instance)}) { env.evaluate(call) }
+    output = Crinja::Markup.active?(env) ? Crinja::Markup.escape(result) : result.to_s
     Renderer::RenderedOutput.new(output)
   end
 

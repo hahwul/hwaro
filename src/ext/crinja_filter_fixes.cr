@@ -85,17 +85,23 @@ Crinja.filter({length: 255, killwords: false, end: "...", leeway: nil}, :truncat
   leeway = arguments.fetch("leeway") { env.policies.fetch("truncate.leeway", 5) }.to_i
   raise "expected leeway >= 0, got #{leeway}" if leeway < 0
 
+  # Under autoescape, a safe target stays safe and `append` — the only text
+  # the filter inserts, and only on the cut branch — is escaped exactly where
+  # it is appended, so a whole (untruncated) safe string is never touched.
+  safe = Crinja::Markup.active?(env) && Crinja::Markup.safe?(target)
   s = target.to_s
-  if s.size - leeway <= length
-    s
-  else
-    trimmed = Hwaro::Utils::TextUtils.safe_prefix(s, length - append.size)
-    unless arguments["killwords"].truthy?
-      cut = trimmed.rindex(' ')
-      trimmed = trimmed[0, cut] if cut
-    end
-    trimmed + append
-  end
+  result = if s.size - leeway <= length
+             return Crinja::Value.new(Crinja::SafeString.new(s)) if safe
+             s
+           else
+             trimmed = Hwaro::Utils::TextUtils.safe_prefix(s, length - append.size)
+             unless arguments["killwords"].truthy?
+               cut = trimmed.rindex(' ')
+               trimmed = trimmed[0, cut] if cut
+             end
+             trimmed + (safe ? Crinja::Markup.escape(append) : append)
+           end
+  safe ? Crinja::Value.new(Crinja::SafeString.new(result)) : result
 end
 
 # `format` hands numbers to `sprintf` unwrapped. Upstream passed the

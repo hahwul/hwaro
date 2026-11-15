@@ -203,14 +203,19 @@ module Hwaro
               # Split one past the limit so `words.size > length` can tell
               # "exactly length words" from "more than length words".
               words = text.split(/\s+/, limit: length + 1)
-              if words.size > length
-                words[0...length].join(" ") + ending
-              else
-                text
-              end
+              truncated = words.size > length
+              # Under autoescape a safe target stays safe; `ending` — the only
+              # inserted text, and only when truncated — is escaped exactly
+              # where it is appended, so an untruncated safe string (even after
+              # the leading strip) is never falsely escaped.
+              safe = Crinja::Markup.active?(env) && Crinja::Markup.safe?(target)
+              result = if truncated
+                         words[0...length].join(" ") + (safe ? Crinja::Markup.escape(ending) : ending)
+                       else
+                         text
+                       end
+              safe ? Crinja::Value.new(Crinja::SafeString.new(result)) : result
             end
-
-            env.filters["truncate_words"] = Crinja::Markup.keep_safe(env.filters["truncate_words"].as(Crinja::Callable::Instance), suffix: "end")
 
             # Slugify filter (delegates to TextUtils for CJK support)
             env.filters["slugify"] = Crinja.filter do
