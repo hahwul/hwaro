@@ -46,7 +46,8 @@ module Tartrazine
     # `<include>` nesting at the current position (see the file comment).
     property hwaro_include_depth = 0
 
-    # Stock body, plus the zero-width counter (see the file comment).
+    # Stock body, plus the zero-width counter (see the file comment) and a
+    # no-match step of one whole UTF-8 character instead of one byte.
     def next : Iterator::Stop | Token
       if @dq.size > 0
         return @dq.shift
@@ -75,13 +76,19 @@ module Tartrazine
         end
         if !matched
           @hwaro_stalls = 0
+          width = 1
           if @text[@pos] == 10u8
             @dq << {type: "Text", value: "\n"}
             @state_stack = ["root"]
           else
-            @dq << {type: "Error", value: String.new(@text[@pos..@pos])}
+            # Stock code emitted ONE BYTE here, so a multi-byte character no
+            # rule matches (`→`, `✓`, a combining mark) came out as one
+            # U+FFFD per byte. Emit the whole character (an invalid byte
+            # stays one byte wide).
+            width = Char::Reader.new(String.new(@text[@pos, Math.min(4, @text.size - @pos)])).current_char_width
+            @dq << {type: "Error", value: String.new(@text[@pos, width])}
           end
-          @pos += 1
+          @pos += width
           break
         end
       end
