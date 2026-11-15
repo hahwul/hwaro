@@ -509,6 +509,18 @@ describe "Template autoescape" do
     end
   end
 
+  it "does not hand author text a context-free text partial captured to its HTML includer" do
+    build_site(
+      %(title = "x"\nbase_url = "https://e.example.com"\n),
+      content_files: {"a.md" => "+++\ntitle = \"a\"\n+++\nb\n"},
+      template_files: {"page.html"      => %({% include "vars.txt.jinja" without context %}<p>{{ name }}</p>),
+                       "vars.txt.jinja" => %({% set name %}{{ load_data(path="data/d.json").name }}{% endset %})},
+      data_files: {"d.json" => {"name" => CANARY}.to_json},
+    ) do
+      File.read("public/a/index.html").should eq("<p></p>")
+    end
+  end
+
   it "r4#2 escapes an HTML page whose front matter picks a text-named template" do
     q = CANARY.gsub('"', "\\\"")
     build_site(
