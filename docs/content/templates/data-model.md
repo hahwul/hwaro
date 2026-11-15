@@ -90,8 +90,8 @@ Can be accessed in templates:
 
 ```jinja
 {% for product in site.data.products %}
-  <h2>{{ product.name }}</h2>
-  <p>{{ product.price }}</p>
+  <h2>{{ product.name | e }}</h2>
+  <p>{{ product.price | e }}</p>
 {% endfor %}
 ```
 
@@ -107,7 +107,7 @@ Given the layout above, `data/users/alice.yml`, `data/users/bob.yml`, and `data/
 ```jinja
 {% for name, user in site.data.users %}
   <h3>{{ name }}</h3>
-  <p>{{ user.bio }}</p>
+  <p>{{ user.bio | e }}</p>
 {% endfor %}
 ```
 
@@ -192,14 +192,14 @@ The `site.authors` object contains every author referenced by a listed page, key
 ```jinja
 {% for id, author in site.authors %}
   <div class="author">
-    <img src="{{ author.avatar }}" alt="{{ author.name }}">
-    <h3>{{ author.name }}</h3>
-    <p>{{ author.bio }}</p>
+    <img src="{{ author.avatar }}" alt="{{ author.name | e }}">
+    <h3>{{ author.name | e }}</h3>
+    <p>{{ author.bio | e }}</p>
 
     <h4>Recent Posts</h4>
     <ul>
     {% for p in author.pages %}
-      <li><a href="{{ base_url }}{{ p.url }}">{{ p.title }}</a></li>
+      <li><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></li>
     {% endfor %}
     </ul>
   </div>
@@ -209,7 +209,7 @@ The `site.authors` object contains every author referenced by a listed page, key
 ### Example
 
 ```jinja
-<title>{{ site.title }}</title>
+<title>{{ site.title | e }}</title>
 <link rel="canonical" href="{{ site.base_url }}{{ page.url }}">
 ```
 
@@ -273,10 +273,10 @@ The section objects in `section.subsections`, `site.sections` and `get_section()
 ```jinja
 {% for p in section.pages %}
 <article>
-  <h2><a href="{{ base_url }}{{ p.url }}">{{ p.title }}</a></h2>
+  <h2><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></h2>
   <time>{{ p.date }}</time>
   {% if p.description %}
-  <p>{{ p.description }}</p>
+  <p>{{ p.description | e }}</p>
   {% endif %}
 </article>
 {% endfor %}
@@ -287,7 +287,7 @@ The section objects in `section.subsections`, `site.sections` and `get_section()
 ```jinja
 {% for sub in section.subsections %}
 <div class="category">
-  <a href="{{ base_url }}{{ sub.url }}">{{ sub.title }}</a>
+  <a href="{{ base_url }}{{ sub.url }}">{{ sub.title | e }}</a>
   <span>({{ sub.pages_count }} articles)</span>
 </div>
 {% endfor %}
@@ -307,7 +307,7 @@ For custom markup, iterate `section.pages` directly:
 <ul>
 {% for p in section.pages %}
   <li>
-    <a href="{{ base_url }}{{ p.url }}">{{ p.title }}</a>
+    <a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a>
     {% if p.date %}<time>{{ p.date }}</time>{% endif %}
   </li>
 {% endfor %}
@@ -448,11 +448,11 @@ Both are full page objects, the same shape as the entries of `section.pages`, so
 ```jinja
 <nav class="post-nav">
   {% if page.lower %}
-  <a href="{{ base_url }}{{ page.lower.url }}">← {{ page.lower.title }}</a>
+  <a href="{{ base_url }}{{ page.lower.url }}">← {{ page.lower.title | e }}</a>
   {% endif %}
   
   {% if page.higher %}
-  <a href="{{ base_url }}{{ page.higher.url }}">{{ page.higher.title }} →</a>
+  <a href="{{ base_url }}{{ page.higher.url }}">{{ page.higher.title | e }} →</a>
   {% endif %}
 </nav>
 ```
@@ -467,9 +467,9 @@ here and in the JSON-LD `BreadcrumbList`:
 <nav class="breadcrumbs">
   <a href="{{ base_url }}/">Home</a>
   {% for ancestor in page.ancestors %}
-  / <a href="{{ base_url }}{{ ancestor.url }}">{{ ancestor.title }}</a>
+  / <a href="{{ base_url }}{{ ancestor.url }}">{{ ancestor.title | e }}</a>
   {% endfor %}
-  / <span>{{ page.title }}</span>
+  / <span>{{ page.title | e }}</span>
 </nav>
 ```
 
@@ -499,7 +499,7 @@ One row per configured version, in config order.
 
 ```jinja
 {% for v in page.version_links %}
-<a href="{{ base_url }}{{ v.url }}"{% if v.current %} aria-current="page"{% endif %}>{{ v.label }}</a>
+<a href="{{ base_url }}{{ v.url }}"{% if v.current %} aria-current="page"{% endif %}>{{ v.label | e }}</a>
 {% endfor %}
 ```
 
@@ -551,11 +551,11 @@ pros = ["Fast", "Reliable"]
 <span class="badge">Featured</span>
 {% endif %}
 
-<div class="rating">{{ page.extra.rating }} / 5</div>
+<div class="rating">{{ page.extra.rating | e }} / 5</div>
 
 <ul>
 {% for pro in page.extra.pros %}
-  <li>{{ pro }}</li>
+  <li>{{ pro | e }}</li>
 {% endfor %}
 </ul>
 ```
@@ -576,7 +576,7 @@ unknown key that lands in `page.extra.outputs`, and it overrides the
 | current_datetime | String | Current datetime |
 
 ```jinja
-<footer>&copy; {{ current_year }} {{ site.title }}</footer>
+<footer>&copy; {{ current_year }} {{ site.title | e }}</footer>
 ```
 
 ---
@@ -624,11 +624,11 @@ Page title, description, URL, and image are available as `page.title`, `page.des
 ```jinja
 <head>
   <link rel="canonical" href="{{ seo.canonical_url }}">
-  <meta property="og:title" content="{{ page.title }}">
+  <meta property="og:title" content="{{ page.title | e }}">
   <meta property="og:type" content="{{ seo.og_type }}">
   <meta property="og:url" content="{{ seo.canonical_url }}">
   {% if page.description %}
-  <meta property="og:description" content="{{ page.description }}">
+  <meta property="og:description" content="{{ page.description | e }}">
   {% endif %}
   {% if seo.og_image %}
   <meta property="og:image" content="{{ seo.og_image }}">
@@ -780,7 +780,7 @@ For custom listings, use `get_taxonomy()`. See [Taxonomies](/writing/taxonomies/
 
 ```jinja
 {% for item in get_menu(name="main") %}
-<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name }}</a>
+<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name | e }}</a>
 {% endfor %}
 ```
 
@@ -839,7 +839,7 @@ Everything else is text or a URL (titles, descriptions, names, `page.extra`, `si
 {% if page.description is present %}...{% endif %}
 
 {# Default value #}
-{{ page.description | default(value=site.description) }}
+{{ page.description | default(value=site.description) | e }}
 ```
 
 ---

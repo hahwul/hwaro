@@ -273,12 +273,12 @@ Values are **not** pre-escaped. Under the default [`[templates] autoescape`](/te
 ```jinja
 <link rel="alternate" type="application/rss+xml" 
       href="{{ base_url }}/rss.xml" 
-      title="{{ site.title }}">
+      title="{{ site.title | e }}">
 
 {% if page.language and page.language != "en" %}
 <link rel="alternate" type="application/rss+xml"
       href="{{ base_url }}/{{ page.language }}/rss.xml"
-      title="{{ site.title }} ({{ page.language }})">
+      title="{{ site.title | e }} ({{ page.language }})">
 {% endif %}
 ```
 
@@ -287,7 +287,7 @@ For a JSON Feed, use `type="application/feed+json"` and `feed.json`:
 ```jinja
 <link rel="alternate" type="application/feed+json"
       href="{{ base_url }}/feed.json"
-      title="{{ site.title }}">
+      title="{{ site.title | e }}">
 ```
 
 ---
@@ -520,11 +520,11 @@ The `seo` object provides individual field access for building custom meta tags:
 ```jinja
 <head>
   <link rel="canonical" href="{{ seo.canonical_url }}">
-  <meta property="og:title" content="{{ page.title }}">
+  <meta property="og:title" content="{{ page.title | e }}">
   <meta property="og:type" content="{{ seo.og_type }}">
   <meta property="og:url" content="{{ seo.canonical_url }}">
   {% if page.description %}
-  <meta property="og:description" content="{{ page.description }}">
+  <meta property="og:description" content="{{ page.description | e }}">
   {% endif %}
   {% if seo.og_image %}
   <meta property="og:image" content="{{ seo.og_image }}">
@@ -533,7 +533,7 @@ The `seo` object provides individual field access for building custom meta tags:
   <meta property="fb:app_id" content="{{ seo.fb_app_id }}">
   {% endif %}
   <meta name="twitter:card" content="{{ seo.twitter_card }}">
-  <meta name="twitter:title" content="{{ page.title }}">
+  <meta name="twitter:title" content="{{ page.title | e }}">
   {% if seo.twitter_site %}
   <meta name="twitter:site" content="{{ seo.twitter_site }}">
   {% endif %}
@@ -575,8 +575,8 @@ twitter_site = "@mysite"
 <html>
 <head>
   <meta charset="utf-8">
-  <title>{{ page.title }} - {{ site.title }}</title>
-  <meta name="description" content="{{ page.description | default(value=site.description) }}">
+  <title>{{ page.title | e }} - {{ site.title | e }}</title>
+  <meta name="description" content="{{ page.description | default(value=site.description) | e }}">
   {{ og_all_tags | safe }}
   {{ canonical_tag | safe }}
   {{ hreflang_tags | safe }}

@@ -48,7 +48,7 @@ A `template` key in a page's or section's front matter overrides this choice. If
 
 {% block content %}
 <article>
-  <h1>{{ page.title }}</h1>
+  <h1>{{ page.title | e }}</h1>
   <time>{{ page.date }}</time>
   {{ content | safe }}
 </article>

@@ -254,8 +254,8 @@ Hwaro는 호출 위치에 HTML 주석을 표시하고 페이지 렌더링을 계
 
 ```jinja
 {% if type and message %}
-<div class="alert alert-{{ type }}">
-  {{ message | safe }}
+<div class="alert alert-{{ type | e }}">
+  {{ message | e }}
 </div>
 {% endif %}
 ```
@@ -282,7 +282,7 @@ Hwaro는 호출 위치에 HTML 주석을 표시하고 페이지 렌더링을 계
 {% if id %}
 <div class="video-container">
   <iframe 
-    src="https://www.youtube.com/embed/{{ id }}"
+    src="https://www.youtube.com/embed/{{ id | e }}"
     frameborder="0"
     allowfullscreen>
   </iframe>
@@ -302,9 +302,9 @@ Hwaro는 호출 위치에 HTML 주석을 표시하고 페이지 렌더링을 계
 
 ```jinja
 <figure>
-  <img src="{{ src }}" alt="{{ alt | default(value='') }}">
+  <img src="{{ src | e }}" alt="{{ alt | default(value='') | e }}">
   {% if caption %}
-  <figcaption>{{ caption }}</figcaption>
+  <figcaption>{{ caption | e }}</figcaption>
   {% endif %}
 </figure>
 ```
@@ -327,7 +327,7 @@ Hwaro는 호출 위치에 HTML 주석을 표시하고 페이지 렌더링을 계
   {%- if asset is matching("[.](jpg|png)$") -%}
     {% set image = resize_image(path=asset, width=240, height=180) %}
     <a href="{{ get_url(path=asset) }}" target="_blank">
-      <img src="{{ image.url }}" alt="{{ asset }}" />
+      <img src="{{ image.url }}" alt="{{ asset | e }}" />
     </a>
   {%- endif %}
 {%- endfor %}
@@ -403,7 +403,7 @@ This is the **body** content of the shortcode.
 숏코드 템플릿에서는 `{{ _0 }}`으로 접근합니다:
 
 ```jinja
-<iframe src="https://www.youtube.com/embed/{{ _0 }}"></iframe>
+<iframe src="https://www.youtube.com/embed/{{ _0 | e }}"></iframe>
 ```
 
 ## 내장 변수
@@ -417,7 +417,7 @@ This is the **body** content of the shortcode.
 
 ```jinja
 {# In shortcode template #}
-<a href="{{ site.base_url }}/{{ url }}">{{ text }}</a>
+<a href="{{ site.base_url }}/{{ url | e }}">{{ text | e }}</a>
 ```
 
 ## 팁
@@ -430,7 +430,7 @@ This is the **body** content of the shortcode.
 {% if not url %}
 <p class="error">Missing url parameter</p>
 {% else %}
-<a href="{{ url }}">{{ text | default(value="Link") }}</a>
+<a href="{{ url | e }}">{{ text | default(value="Link") | e }}</a>
 {% endif %}
 ```
 

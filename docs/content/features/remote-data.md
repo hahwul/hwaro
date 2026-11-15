@@ -28,8 +28,8 @@ on_error = "fail"           # fail | warn-and-use-cache | warn-and-skip
 
 ```jinja
 {% for person in site.data.team %}
-  <h2>{{ person.name }}</h2>
-  <p>{{ person.role }}</p>
+  <h2>{{ person.name | e }}</h2>
+  <p>{{ person.role | e }}</p>
 {% endfor %}
 ```
 

@@ -12,8 +12,8 @@ Hwaro는 Jinja2 호환 템플릿 엔진인 Crinja를 사용합니다. 이 페이
 이중 중괄호로 값을 출력합니다.
 
 ```jinja
-{{ page.title }}
-{{ site.description }}
+{{ page.title | e }}
+{{ site.description | e }}
 {{ content }}
 ```
 
@@ -22,8 +22,8 @@ Hwaro는 Jinja2 호환 템플릿 엔진인 Crinja를 사용합니다. 이 페이
 괄호로 묶은 표현식 뒤에도 속성, 인덱스, 호출 접근을 쓸 수 있으므로 필터나 함수 결과에서 바로 필드를 읽을 수 있습니다.
 
 ```jinja
-{{ (section.pages | first).title }}
-{{ (get_section(path="blog").pages | map(attribute="title") | list)[0] }}
+{{ (section.pages | first).title | e }}
+{{ (get_section(path="blog").pages | map(attribute="title") | list)[0] | e }}
 ```
 
 ## HTML 이스케이프
@@ -70,7 +70,7 @@ diff -r /tmp/site-0x /tmp/site-1x
 
 ```jinja
 {% if page.description %}
-<meta name="description" content="{{ page.description }}">
+<meta name="description" content="{{ page.description | e }}">
 {% endif %}
 ```
 
@@ -99,7 +99,7 @@ elif와 함께:
 표현식 안에서 인라인으로 쓸 수도 있습니다(`else` 부분은 생략할 수 있으며, 생략하면 빈 값으로 렌더링됩니다).
 
 ```jinja
-<a href="{{ item.url }}" class="{{ 'active' if item.url == page.url else '' }}">{{ item.name }}</a>
+<a href="{{ item.url }}" class="{{ 'active' if item.url == page.url else '' }}">{{ item.name | e }}</a>
 {% set label = page.title if page.title else "Untitled" %}
 ```
 
@@ -109,7 +109,7 @@ elif와 함께:
 
 ```jinja
 {% for p in section.pages %}
-<li><a href="{{ p.url }}">{{ p.title }}</a></li>
+<li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
 {% endfor %}
 ```
 
@@ -118,7 +118,7 @@ elif와 함께:
 ```jinja
 {% for tag in page.tags %}
 {% if not loop.first %}, {% endif %}
-{{ tag }}
+{{ tag | e }}
 {% endfor %}
 ```
 
@@ -143,10 +143,10 @@ Jinja2처럼 `[start:stop:step]`으로 리스트나 문자열의 일부를 꺼�
 
 ```jinja
 {% for p in section.pages[:5] %}
-<li><a href="{{ p.url }}">{{ p.title }}</a></li>
+<li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
 {% endfor %}
 
-{{ page.title[:40] }}
+{{ page.title[:40] | e }}
 {% for p in section.pages[::-1] %}…{% endfor %}
 ```
 
@@ -162,7 +162,7 @@ Jinja2처럼 `[start:stop:step]`으로 리스트나 문자열의 일부를 꺼�
 <!DOCTYPE html>
 <html>
 <head>
-  <title>{% block title %}{{ site.title }}{% endblock %}</title>
+  <title>{% block title %}{{ site.title | e }}{% endblock %}</title>
   {{ highlight_css | safe }}
 </head>
 <body>
@@ -179,11 +179,11 @@ Jinja2처럼 `[start:stop:step]`으로 리스트나 문자열의 일부를 꺼�
 ```jinja
 {% extends "base.html" %}
 
-{% block title %}{{ page.title }} - {{ site.title }}{% endblock %}
+{% block title %}{{ page.title | e }} - {{ site.title | e }}{% endblock %}
 
 {% block content %}
 <article>
-  <h1>{{ page.title }}</h1>
+  <h1>{{ page.title | e }}</h1>
   {{ content | safe }}
 </article>
 {% endblock %}
@@ -209,7 +209,7 @@ include한 파일은 페이지가 아니라 자기 이름에 따라 이스케이
 
 ```jinja
 {% macro card(p, show_date=true) %}
-<a href="{{ p.url }}">{{ p.title }}</a>
+<a href="{{ p.url }}">{{ p.title | e }}</a>
 {% if show_date and p.date %}<time>{{ p.date }}</time>{% endif %}
 {% endmacro %}
 ```
@@ -258,7 +258,7 @@ include한 파일은 페이지가 아니라 자기 이름에 따라 이스케이
 {% endif %}
 
 {% if page.description is empty %}
-<meta name="description" content="{{ site.description }}">
+<meta name="description" content="{{ site.description | e }}">
 {% endif %}
 ```
 
@@ -359,7 +359,7 @@ Jinja 문법을 그대로 출력합니다.
 {% if section.pages %}
 <ul>
 {% for p in section.pages %}
-  <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+  <li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
 {% endfor %}
 </ul>
 {% else %}

@@ -48,8 +48,8 @@ fb_app_id = "${FB_APP_ID:-}"
 템플릿 안에서 환경 변수를 읽으려면 `env()` 함수를 사용합니다.
 
 ```jinja
-{{ env("ANALYTICS_ID") }}
-{{ env("API_KEY", default="none") }}
+{{ env("ANALYTICS_ID") | e }}
+{{ env("API_KEY", default="none") | e }}
 ```
 
 | 파라미터 | 타입 | 설명 |
@@ -65,7 +65,7 @@ fb_app_id = "${FB_APP_ID:-}"
 
 ```jinja
 {% if env("GA_ID") %}
-<script async src="https://www.googletagmanager.com/gtag/js?id={{ env("GA_ID") }}"></script>
+<script async src="https://www.googletagmanager.com/gtag/js?id={{ env("GA_ID") | e }}"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}

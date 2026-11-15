@@ -139,8 +139,8 @@ The `t` filter looks up translation keys from TOML files in the `i18n/` director
 `active_path` compares a URL (typically a [menu](/features/menus/) entry's `item.url`) against the current page. It's an exact match by default; pass `ancestor=true` to also match descendant pages:
 
 ```jinja
-<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name }}</a>
-<a href="{{ item.href }}"{% if item.url | active_path(ancestor=true) %} class="open"{% endif %}>{{ item.name }}</a>
+<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name | e }}</a>
+<a href="{{ item.href }}"{% if item.url | active_path(ancestor=true) %} class="open"{% endif %}>{{ item.name | e }}</a>
 ```
 
 Both sides are normalized to one trailing slash before comparing, so `/posts` and `/posts/` are equal. The root path (`/`) and the current page's language home (`/ko/`) only ever match exactly, even with `ancestor=true`. An external `item.url` (`http://`, `https://`, `//`) never matches, and neither does the empty `url` of an entry written without one (a group heading).
@@ -169,7 +169,7 @@ Always use `safe` for rendered content:
 ### Default Values
 
 ```jinja
-{{ page.description | default(value=site.description) }}
+{{ page.description | default(value=site.description) | e }}
 {{ page.image | default(value="/images/default.png") }}
 ```
 
@@ -239,7 +239,7 @@ Names follow CLDR's in-date ("format") forms, so Russian and Polish months are g
 ```jinja
 {{ "2024-03-05" | regex_replace(pattern="(\d+)-(\d+)-(\d+)", rep="$3/$2/$1") }}  {# 05/03/2024 #}
 {{ "John Smith" | regex_replace(pattern="(?<first>\w+) (?<last>\w+)", rep="$last, $first") }}
-{{ page.title | regex_replace("\s+", " ") }}
+{{ page.title | regex_replace("\s+", " ") | e }}
 ```
 
 An invalid pattern, or one that backtracks past PCRE2's match limit, stops the build with a template error that names the pattern.
@@ -267,7 +267,7 @@ A value that isn't a number (text, `true`, an undefined value, NaN) comes back u
   <h3>{{ group.grouper }}</h3>
   <ul>
   {% for p in group.list %}
-    <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+    <li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
   {% endfor %}
   </ul>
 {% endfor %}
@@ -281,7 +281,7 @@ A value that isn't a number (text, `true`, an undefined value, NaN) comes back u
 ```jinja
 {# Translate UI strings (requires i18n/*.toml files) #}
 <nav>
-  <a href="/">{{ "nav.home" | t }}</a>
+  <a href="/">{{ "nav.home" | t | e }}</a>
   <a href="/blog/">{{ "nav.blog" | t }}</a>
 </nav>
 
@@ -313,7 +313,7 @@ Tests evaluate conditions in `{% if %}` statements.
 {% endif %}
 
 {% if page.description is empty %}
-<meta name="description" content="{{ site.description }}">
+<meta name="description" content="{{ site.description | e }}">
 {% endif %}
 
 {% if page.image is present %}

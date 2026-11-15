@@ -48,8 +48,8 @@ Missing variables without a default value are left unchanged and produce a build
 Use the `env()` function to read environment variables inside templates.
 
 ```jinja
-{{ env("ANALYTICS_ID") }}
-{{ env("API_KEY", default="none") }}
+{{ env("ANALYTICS_ID") | e }}
+{{ env("API_KEY", default="none") | e }}
 ```
 
 | Parameter | Type | Description |
@@ -65,7 +65,7 @@ If the variable is not set and no default is provided, an empty string is return
 
 ```jinja
 {% if env("GA_ID") %}
-<script async src="https://www.googletagmanager.com/gtag/js?id={{ env("GA_ID") }}"></script>
+<script async src="https://www.googletagmanager.com/gtag/js?id={{ env("GA_ID") | e }}"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}

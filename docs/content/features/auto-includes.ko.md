@@ -119,7 +119,7 @@ CSS와 JS를 한꺼번에 포함합니다.
 <html>
 <head>
   <meta charset="utf-8">
-  <title>{{ page.title }} - {{ site.title }}</title>
+  <title>{{ page.title | e }} - {{ site.title | e }}</title>
   {{ highlight_css | safe }}
   {{ auto_includes_css | safe }}
 </head>

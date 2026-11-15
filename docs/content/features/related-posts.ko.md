@@ -54,9 +54,9 @@ taxonomies = ["tags"]
   <ul>
     {% for post in page.related_posts %}
     <li>
-      <a href="{{ base_url }}{{ post.url }}">{{ post.title }}</a>
+      <a href="{{ base_url }}{{ post.url }}">{{ post.title | e }}</a>
       {% if post.description %}
-        <p>{{ post.description }}</p>
+        <p>{{ post.description | e }}</p>
       {% endif %}
     </li>
     {% endfor %}
@@ -73,10 +73,10 @@ taxonomies = ["tags"]
   <h3>You might also like</h3>
   {% for post in page.related_posts %}
   <article>
-    <a href="{{ base_url }}{{ post.url }}">{{ post.title }}</a>
+    <a href="{{ base_url }}{{ post.url }}">{{ post.title | e }}</a>
     <div class="tags">
       {% for tag in post.tags %}
-        <span class="tag">{{ tag }}</span>
+        <span class="tag">{{ tag | e }}</span>
       {% endfor %}
     </div>
   </article>

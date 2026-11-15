@@ -126,11 +126,11 @@ paginate_path = "page"
 {% extends "base.html" %}
 
 {% block content %}
-<h1>{{ section.title }}</h1>
+<h1>{{ section.title | e }}</h1>
 
 <ul>
 {% for p in section.pages %}
-  <li><a href="{{ base_url }}{{ p.url }}">{{ p.title }}</a></li>
+  <li><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></li>
 {% endfor %}
 </ul>
 

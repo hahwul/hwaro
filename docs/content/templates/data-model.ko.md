@@ -90,8 +90,8 @@ data/
 
 ```jinja
 {% for product in site.data.products %}
-  <h2>{{ product.name }}</h2>
-  <p>{{ product.price }}</p>
+  <h2>{{ product.name | e }}</h2>
+  <p>{{ product.price | e }}</p>
 {% endfor %}
 ```
 
@@ -107,7 +107,7 @@ data/
 ```jinja
 {% for name, user in site.data.users %}
   <h3>{{ name }}</h3>
-  <p>{{ user.bio }}</p>
+  <p>{{ user.bio | e }}</p>
 {% endfor %}
 ```
 
@@ -192,14 +192,14 @@ john-doe:
 ```jinja
 {% for id, author in site.authors %}
   <div class="author">
-    <img src="{{ author.avatar }}" alt="{{ author.name }}">
-    <h3>{{ author.name }}</h3>
-    <p>{{ author.bio }}</p>
+    <img src="{{ author.avatar }}" alt="{{ author.name | e }}">
+    <h3>{{ author.name | e }}</h3>
+    <p>{{ author.bio | e }}</p>
 
     <h4>Recent Posts</h4>
     <ul>
     {% for p in author.pages %}
-      <li><a href="{{ base_url }}{{ p.url }}">{{ p.title }}</a></li>
+      <li><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></li>
     {% endfor %}
     </ul>
   </div>
@@ -209,7 +209,7 @@ john-doe:
 ### 예시
 
 ```jinja
-<title>{{ site.title }}</title>
+<title>{{ site.title | e }}</title>
 <link rel="canonical" href="{{ site.base_url }}{{ page.url }}">
 ```
 
@@ -273,10 +273,10 @@ john-doe:
 ```jinja
 {% for p in section.pages %}
 <article>
-  <h2><a href="{{ base_url }}{{ p.url }}">{{ p.title }}</a></h2>
+  <h2><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></h2>
   <time>{{ p.date }}</time>
   {% if p.description %}
-  <p>{{ p.description }}</p>
+  <p>{{ p.description | e }}</p>
   {% endif %}
 </article>
 {% endfor %}
@@ -287,7 +287,7 @@ john-doe:
 ```jinja
 {% for sub in section.subsections %}
 <div class="category">
-  <a href="{{ base_url }}{{ sub.url }}">{{ sub.title }}</a>
+  <a href="{{ base_url }}{{ sub.url }}">{{ sub.title | e }}</a>
   <span>({{ sub.pages_count }} articles)</span>
 </div>
 {% endfor %}
@@ -307,7 +307,7 @@ john-doe:
 <ul>
 {% for p in section.pages %}
   <li>
-    <a href="{{ base_url }}{{ p.url }}">{{ p.title }}</a>
+    <a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a>
     {% if p.date %}<time>{{ p.date }}</time>{% endif %}
   </li>
 {% endfor %}
@@ -448,11 +448,11 @@ john-doe:
 ```jinja
 <nav class="post-nav">
   {% if page.lower %}
-  <a href="{{ base_url }}{{ page.lower.url }}">← {{ page.lower.title }}</a>
+  <a href="{{ base_url }}{{ page.lower.url }}">← {{ page.lower.title | e }}</a>
   {% endif %}
   
   {% if page.higher %}
-  <a href="{{ base_url }}{{ page.higher.url }}">{{ page.higher.title }} →</a>
+  <a href="{{ base_url }}{{ page.higher.url }}">{{ page.higher.title | e }} →</a>
   {% endif %}
 </nav>
 ```
@@ -467,9 +467,9 @@ john-doe:
 <nav class="breadcrumbs">
   <a href="{{ base_url }}/">Home</a>
   {% for ancestor in page.ancestors %}
-  / <a href="{{ base_url }}{{ ancestor.url }}">{{ ancestor.title }}</a>
+  / <a href="{{ base_url }}{{ ancestor.url }}">{{ ancestor.title | e }}</a>
   {% endfor %}
-  / <span>{{ page.title }}</span>
+  / <span>{{ page.title | e }}</span>
 </nav>
 ```
 
@@ -499,7 +499,7 @@ john-doe:
 
 ```jinja
 {% for v in page.version_links %}
-<a href="{{ base_url }}{{ v.url }}"{% if v.current %} aria-current="page"{% endif %}>{{ v.label }}</a>
+<a href="{{ base_url }}{{ v.url }}"{% if v.current %} aria-current="page"{% endif %}>{{ v.label | e }}</a>
 {% endfor %}
 ```
 
@@ -551,11 +551,11 @@ pros = ["Fast", "Reliable"]
 <span class="badge">Featured</span>
 {% endif %}
 
-<div class="rating">{{ page.extra.rating }} / 5</div>
+<div class="rating">{{ page.extra.rating | e }} / 5</div>
 
 <ul>
 {% for pro in page.extra.pros %}
-  <li>{{ pro }}</li>
+  <li>{{ pro | e }}</li>
 {% endfor %}
 </ul>
 ```
@@ -573,7 +573,7 @@ pros = ["Fast", "Reliable"]
 | current_datetime | String | 현재 날짜와 시간 |
 
 ```jinja
-<footer>&copy; {{ current_year }} {{ site.title }}</footer>
+<footer>&copy; {{ current_year }} {{ site.title | e }}</footer>
 ```
 
 ---
@@ -621,11 +621,11 @@ pros = ["Fast", "Reliable"]
 ```jinja
 <head>
   <link rel="canonical" href="{{ seo.canonical_url }}">
-  <meta property="og:title" content="{{ page.title }}">
+  <meta property="og:title" content="{{ page.title | e }}">
   <meta property="og:type" content="{{ seo.og_type }}">
   <meta property="og:url" content="{{ seo.canonical_url }}">
   {% if page.description %}
-  <meta property="og:description" content="{{ page.description }}">
+  <meta property="og:description" content="{{ page.description | e }}">
   {% endif %}
   {% if seo.og_image %}
   <meta property="og:image" content="{{ seo.og_image }}">
@@ -777,7 +777,7 @@ pros = ["Fast", "Reliable"]
 
 ```jinja
 {% for item in get_menu(name="main") %}
-<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name }}</a>
+<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name | e }}</a>
 {% endfor %}
 ```
 
@@ -836,7 +836,7 @@ pros = ["Fast", "Reliable"]
 {% if page.description is present %}...{% endif %}
 
 {# Default value #}
-{{ page.description | default(value=site.description) }}
+{{ page.description | default(value=site.description) | e }}
 ```
 
 ---

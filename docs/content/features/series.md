@@ -57,11 +57,11 @@ Each page in a series has the following variables:
 ```jinja
 {% if page.series %}
 <nav class="series-nav">
-  <h3>{{ page.series }}</h3>
+  <h3>{{ page.series | e }}</h3>
   <ol>
     {% for p in page.series_pages %}
     <li{% if p.url == page.url %} class="current"{% endif %}>
-      <a href="{{ base_url }}{{ p.url }}">{{ p.title }}</a>
+      <a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a>
     </li>
     {% endfor %}
   </ol>

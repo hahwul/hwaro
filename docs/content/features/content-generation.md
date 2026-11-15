@@ -64,8 +64,8 @@ Templates see the full source record as `page.extra.item`, so there is no need t
 
 ```html
 {% if page.synthesized %}
-<p class="price">{{ page.extra.item.price }} USD</p>
-<p class="stock">{{ page.extra.item.inventory.count }}</p>
+<p class="price">{{ page.extra.item.price | e }} USD</p>
+<p class="stock">{{ page.extra.item.inventory.count | e }}</p>
 {% endif %}
 ```
 

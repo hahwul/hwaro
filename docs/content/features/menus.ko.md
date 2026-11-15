@@ -114,11 +114,11 @@ identifier = "posts"
 <ul>
 {% for item in get_menu(name="main") %}
   <li>
-    <a href="{{ item.href }}">{{ item.name }}</a>
+    <a href="{{ item.href }}">{{ item.name | e }}</a>
     {% if item.children %}
     <ul>
       {% for child in item.children %}
-      <li><a href="{{ child.href }}">{{ child.name }}</a></li>
+      <li><a href="{{ child.href }}">{{ child.name | e }}</a></li>
       {% endfor %}
     </ul>
     {% endif %}
@@ -156,14 +156,14 @@ url = "/ko/posts/"
 
 ```jinja
 {% for item in get_menu(name="main") %}
-<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name }}</a>
+<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name | e }}</a>
 {% endfor %}
 ```
 
 `ancestor=true`를 넘기면 하위 페이지도 일치합니다(섹션 안을 탐색하는 동안 상위 내비게이션 항목을 강조/펼친 상태로 유지할 때 유용).
 
 ```jinja
-<a href="{{ item.href }}"{% if item.url | active_path(ancestor=true) %} class="open"{% endif %}>{{ item.name }}</a>
+<a href="{{ item.href }}"{% if item.url | active_path(ancestor=true) %} class="open"{% endif %}>{{ item.name | e }}</a>
 ```
 
 루트 경로(`/`)와, 다국어 사이트라면 현재 페이지 언어의 홈(`/ko/`)은 `ancestor=true`여도 항상 정확히 일치할 때만 매칭됩니다. 그렇지 않으면 홈 내비게이션 항목이 사이트(또는 그 언어)의 모든 페이지에서 활성/펼침으로 보이게 됩니다. 외부 엔트리는 절대 매칭되지 않습니다(외부 URL에는 조상 관계를 따질 "현재 페이지"가 없음). [필터](/ko/templates/filters/#url-필터)의 URL 필터 절을 참고합니다.

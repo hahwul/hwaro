@@ -258,8 +258,8 @@ Create `templates/shortcodes/alert.html`:
 
 ```jinja
 {% if type and message %}
-<div class="alert alert-{{ type }}">
-  {{ message | safe }}
+<div class="alert alert-{{ type | e }}">
+  {{ message | e }}
 </div>
 {% endif %}
 ```
@@ -286,7 +286,7 @@ Create `templates/shortcodes/youtube.html`:
 {% if id %}
 <div class="video-container">
   <iframe 
-    src="https://www.youtube.com/embed/{{ id }}"
+    src="https://www.youtube.com/embed/{{ id | e }}"
     frameborder="0"
     allowfullscreen>
   </iframe>
@@ -306,9 +306,9 @@ Create `templates/shortcodes/figure.html`:
 
 ```jinja
 <figure>
-  <img src="{{ src }}" alt="{{ alt | default(value='') }}">
+  <img src="{{ src | e }}" alt="{{ alt | default(value='') | e }}">
   {% if caption %}
-  <figcaption>{{ caption }}</figcaption>
+  <figcaption>{{ caption | e }}</figcaption>
   {% endif %}
 </figure>
 ```
@@ -331,7 +331,7 @@ Create `templates/shortcodes/gallery.html`:
   {%- if asset is matching("[.](jpg|png)$") -%}
     {% set image = resize_image(path=asset, width=240, height=180) %}
     <a href="{{ get_url(path=asset) }}" target="_blank">
-      <img src="{{ image.url }}" alt="{{ asset }}" />
+      <img src="{{ image.url }}" alt="{{ asset | e }}" />
     </a>
   {%- endif %}
 {%- endfor %}
@@ -407,7 +407,7 @@ When no `key=value` syntax is used, arguments are assigned as `_0`, `_1`, etc.:
 In the shortcode template, access via `{{ _0 }}`:
 
 ```jinja
-<iframe src="https://www.youtube.com/embed/{{ _0 }}"></iframe>
+<iframe src="https://www.youtube.com/embed/{{ _0 | e }}"></iframe>
 ```
 
 ## Built-in Variables
@@ -421,7 +421,7 @@ Shortcodes have access to:
 
 ```jinja
 {# In shortcode template #}
-<a href="{{ site.base_url }}/{{ url }}">{{ text }}</a>
+<a href="{{ site.base_url }}/{{ url | e }}">{{ text | e }}</a>
 ```
 
 ## Tips
@@ -434,7 +434,7 @@ Always check for required arguments:
 {% if not url %}
 <p class="error">Missing url parameter</p>
 {% else %}
-<a href="{{ url }}">{{ text | default(value="Link") }}</a>
+<a href="{{ url | e }}">{{ text | default(value="Link") | e }}</a>
 {% endif %}
 ```
 

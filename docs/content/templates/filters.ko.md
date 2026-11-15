@@ -139,8 +139,8 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 `active_path`는 URL(보통 [메뉴](/ko/features/menus/) 엔트리의 `item.url`)을 현재 페이지와 비교합니다. 기본은 정확히 일치할 때만 참이고, `ancestor=true`를 넘기면 하위 페이지도 매칭합니다.
 
 ```jinja
-<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name }}</a>
-<a href="{{ item.href }}"{% if item.url | active_path(ancestor=true) %} class="open"{% endif %}>{{ item.name }}</a>
+<a href="{{ item.href }}"{% if item.url | active_path %} aria-current="page"{% endif %}>{{ item.name | e }}</a>
+<a href="{{ item.href }}"{% if item.url | active_path(ancestor=true) %} class="open"{% endif %}>{{ item.name | e }}</a>
 ```
 
 비교 전에 양쪽 모두 끝 슬래시 하나로 정규화되므로 `/posts`와 `/posts/`는 같습니다. 루트 경로(`/`)와 현재 페이지 언어의 홈(`/ko/`)은 `ancestor=true`여도 정확히 일치할 때만 매칭됩니다. 외부 `item.url`(`http://`, `https://`, `//`)은 절대 매칭되지 않으며, `url` 없이 적은 엔트리(그룹 제목)의 빈 `url`도 마찬가지입니다.
@@ -169,7 +169,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 ### 기본값
 
 ```jinja
-{{ page.description | default(value=site.description) }}
+{{ page.description | default(value=site.description) | e }}
 {{ page.image | default(value="/images/default.png") }}
 ```
 
@@ -239,7 +239,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 ```jinja
 {{ "2024-03-05" | regex_replace(pattern="(\d+)-(\d+)-(\d+)", rep="$3/$2/$1") }}  {# 05/03/2024 #}
 {{ "John Smith" | regex_replace(pattern="(?<first>\w+) (?<last>\w+)", rep="$last, $first") }}
-{{ page.title | regex_replace("\s+", " ") }}
+{{ page.title | regex_replace("\s+", " ") | e }}
 ```
 
 패턴이 잘못되었거나 백트래킹이 PCRE2의 매치 한도를 넘으면, 패턴을 알려 주는 템플릿 오류로 빌드가 멈춥니다.
@@ -267,7 +267,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
   <h3>{{ group.grouper }}</h3>
   <ul>
   {% for p in group.list %}
-    <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+    <li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
   {% endfor %}
   </ul>
 {% endfor %}
@@ -281,7 +281,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 ```jinja
 {# Translate UI strings (requires i18n/*.toml files) #}
 <nav>
-  <a href="/">{{ "nav.home" | t }}</a>
+  <a href="/">{{ "nav.home" | t | e }}</a>
   <a href="/blog/">{{ "nav.blog" | t }}</a>
 </nav>
 
@@ -313,7 +313,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 {% endif %}
 
 {% if page.description is empty %}
-<meta name="description" content="{{ site.description }}">
+<meta name="description" content="{{ site.description | e }}">
 {% endif %}
 
 {% if page.image is present %}
