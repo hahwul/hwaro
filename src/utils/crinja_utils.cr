@@ -25,18 +25,25 @@ module Hwaro
         Crinja::Value.new(autoescape ? Crinja::SafeString.new(html) : html)
       end
 
-      # A value hwaro already escaped for an HTML attribute or text node
-      # (markd's escaper, which escapes `& < > "` but NOT `'`). Marking it
-      # safe lets a `'` break out of a single-quoted attribute, so under
-      # autoescape escape the remaining apostrophes before marking it safe.
-      # Markd never emits `&#39;`, so this neither double-escapes nor needs
-      # to preserve one. Off the switch it stays the plain string it was,
-      # byte-identical.
+      # A TEXT value that is usually already escaped for an HTML attribute or
+      # text node (markd's escaper: `& < > "` but NOT `'`), but not always —
+      # a raw-HTML heading's TOC title/id or an image alt holding inline HTML
+      # carries raw `"`/`<`/`&`. Under autoescape it is marked safe, so first
+      # normalise it to fully escaped text in one pass: a character reference
+      # (`&amp;`, `&#39;`, `&copy;`, …) is kept as written, and every other
+      # `& < > " '` is escaped. Already-escaped input keeps its bytes (and so
+      # its meaning, in text and attribute alike); raw specials can no longer
+      # leave a quoted attribute. Off the switch it stays the plain string it
+      # was, byte-identical.
       def preescaped_value(text : String, autoescape : Bool) : Crinja::Value
         return Crinja::Value.new(text) unless autoescape
-        safe = text.includes?('\'') ? text.gsub('\'', "&#39;") : text
+        special = text.to_slice.any? { |byte| Crinja::Markup::SPECIAL.unsafe_fetch(byte) }
+        safe = special ? text.gsub(TEXT_SPECIAL) { |m| m.size > 1 ? m : HTML.escape(m) } : text
         Crinja::Value.new(Crinja::SafeString.new(safe))
       end
+
+      # A terminated character reference, or a lone HTML-special byte.
+      private TEXT_SPECIAL = /&(?:#[0-9]+|#[xX][0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]*);|[&<>"']/
 
       # Convert a YAML::Any value to Crinja::Value.
       #

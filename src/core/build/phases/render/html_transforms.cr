@@ -166,10 +166,11 @@ module Hwaro::Core::Build::Phases::Render
   end
 
   # Convert TocHeader tree to Crinja-compatible array for toc_obj.headers.
-  # `id`, `title` and `permalink` are already-escaped text (the heading's
-  # markup with its tags removed). Promote them as pre-escaped values so a
-  # `'` in a title can't break out of a single-quoted attribute under
-  # `[templates] autoescape` (id/permalink carry no `'`, so a no-op there).
+  # `id`, `title` and `permalink` are TEXT (the heading's markup with its
+  # tags removed, or an existing id attribute) — escaped for Markdown
+  # headings, raw for a raw-HTML one. Promote them as pre-escaped values,
+  # normalised to fully escaped text under `[templates] autoescape`, so a
+  # `"` or `'` can't leave a quoted attribute.
   private def toc_headers_to_crinja(headers : Array(Models::TocHeader), autoescape : Bool = false) : Array(Crinja::Value)
     headers.map do |h|
       Crinja::Value.new({

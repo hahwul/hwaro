@@ -236,9 +236,9 @@ module Hwaro
           end
 
           # `destination`/`title`/`alt`/`lang`/`options`/`code`/`name` are
-          # markd-escaped attribute/text values; escape the remaining `'` so
-          # `alt='{{ alt }}'` can't break out, then mark safe (see
-          # CrinjaUtils.preescaped_value).
+          # TEXT, normally markd-escaped (an image `alt` can still carry raw
+          # inline HTML); normalised to fully escaped text, `'` included, then
+          # marked safe (see CrinjaUtils.preescaped_value).
           private def attr_value(value : String) : Crinja::Value
             Utils::CrinjaUtils.preescaped_value(value, @autoescape)
           end
