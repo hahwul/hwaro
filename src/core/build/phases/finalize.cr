@@ -151,6 +151,20 @@ module Hwaro::Core::Build::Phases::Finalize
     stale.uniq!
     return if stale.empty?
 
+    # On a case-folding filesystem a section or bundle renamed by case only
+    # (`docs/` -> `Docs/`) leaves stale entries and claims spelled the old
+    # way that name the SAME files this build publishes; the respelled
+    # directory above does not change that. A bundle asset copied with its
+    # source mtime reads as unwritten, so deleting the old spelling deleted
+    # the live copy. Same fold-aware keep as the serve prune.
+    exact = Set(String).new
+    folded = {} of String => Array(String)
+    (owned | still_written | generated_output_claims).each { |path| keep_output(path, cwd, exact, folded) }
+    respell = Set(String).new
+    stale.reject! { |path| kept_output?(path, cwd, exact, folded, respell) }
+    respell_folded_output_dirs(respell, output_dir) unless respell.empty?
+    return if stale.empty?
+
     delete_orphaned_outputs(stale, output_dir)
   end
 
