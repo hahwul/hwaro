@@ -1299,4 +1299,23 @@ describe Hwaro::Assets::Pipeline do
       end
     end
   end
+
+  # Every `u` that starts a word was matched against CSS_URL_RE with a
+  # UTF-8 check of the WHOLE stylesheet: quadratic in a large bundle.
+  it "rebases a large stylesheet's url() tokens in linear time" do
+    pipeline = Hwaro::Assets::Pipeline.new(make_config)
+    css = ->(lines : Int32) { ".a{text-decoration:underline;text-transform:uppercase}\n" * lines + "b{background:url(x.png)}\n" }
+    rebase = ->(text : String) { pipeline.test_rebase_css_urls(text, "static/css/a.css", "assets") }
+    rebase.call(css.call(1)).should contain("url(")
+    small = best_cpu_time { rebase.call(css.call(2000)) }
+    large = best_cpu_time { rebase.call(css.call(8000)) }
+    ratio = large / {small, 1.millisecond}.max
+    ratio.should be < 9.0, "#{small.total_milliseconds.round}ms -> #{large.total_milliseconds.round}ms"
+  end
+end
+
+class Hwaro::Assets::Pipeline
+  def test_rebase_css_urls(css : String, file : String, bundle_dir : String) : String
+    rebase_css_urls(css, file, bundle_dir)
+  end
 end
