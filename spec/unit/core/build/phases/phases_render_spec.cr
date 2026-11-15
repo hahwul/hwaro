@@ -980,7 +980,7 @@ describe "build_global_vars / pwa_tags" do
     site = Hwaro::Models::Site.new(config)
     site.build_lookup_index
 
-    tags = Hwaro::Core::Build::Builder.new.test_build_global_vars(site)["pwa_tags"].raw.as(String)
+    tags = Hwaro::Core::Build::Builder.new.test_build_global_vars(site)["pwa_tags"].to_s
     tags.should contain(%(<link rel="manifest" href="/manifest.json">))
     tags.should contain(%(<meta name="theme-color" content="#123456">))
     tags.should contain(%(navigator.serviceWorker.register("/sw.js")))
@@ -993,7 +993,7 @@ describe "build_global_vars / pwa_tags" do
     site = Hwaro::Models::Site.new(config)
     site.build_lookup_index
 
-    tags = Hwaro::Core::Build::Builder.new.test_build_global_vars(site)["pwa_tags"].raw.as(String)
+    tags = Hwaro::Core::Build::Builder.new.test_build_global_vars(site)["pwa_tags"].to_s
     tags.should contain(%(href="/repo/manifest.json"))
     tags.should contain(%(register("/repo/sw.js")))
   end
@@ -1009,7 +1009,7 @@ describe "build_global_vars / pwa_tags" do
     site = Hwaro::Models::Site.new(config)
     site.build_lookup_index
 
-    tags = Hwaro::Core::Build::Builder.new.test_build_global_vars(site)["pwa_tags"].raw.as(String)
+    tags = Hwaro::Core::Build::Builder.new.test_build_global_vars(site)["pwa_tags"].to_s
     tags.should_not contain(%(onload="alert(1)"))
     tags.should contain(%(<meta name="theme-color" content="#ff0000&quot; onload=&quot;alert(1)">))
   end
@@ -1024,7 +1024,7 @@ describe "build_global_vars / pwa_tags" do
     site = Hwaro::Models::Site.new(config)
     site.build_lookup_index
 
-    tags = Hwaro::Core::Build::Builder.new.test_build_global_vars(site)["pwa_tags"].raw.as(String)
+    tags = Hwaro::Core::Build::Builder.new.test_build_global_vars(site)["pwa_tags"].to_s
     script = tags.lines.find!(&.includes?("serviceWorker"))
     script.should_not contain("&quot;")
     script.should contain(%(register("/a\\"b/sw.js")))

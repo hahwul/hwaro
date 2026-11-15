@@ -27,7 +27,8 @@ private def ae_config(on : Bool) : String
     section = "items"
     slug = "id"
     title = "{{ item.name }}"
-    #{on ? "\n[templates]\nautoescape = true\n" : ""}
+    [templates]
+    autoescape = #{on}
     TOML
 end
 
@@ -89,7 +90,7 @@ private def rerun(cache : Bool) : Nil
 end
 
 describe "Template autoescape" do
-  it "is off by default and renders author text as before" do
+  it "renders author text as 0.x did with autoescape = false" do
     ae_build(false) do
       html = File.read("public/posts/p/index.html")
       html.should contain("<title>T #{CANARY}</title>")
@@ -266,6 +267,8 @@ describe "Template autoescape" do
       <<-TOML,
         title = "x"
         base_url = "https://e.example.com"
+        [templates]
+        autoescape = false
         TOML
       content_files: {"p.md" => "+++\ntitle = \"p\"\n[extra.a]\n\"x y\" = \"v\"\n+++\nb\n"},
       template_files: {"page.html" => %(<div{{ page.extra.a | xmlattr }}></div>)},

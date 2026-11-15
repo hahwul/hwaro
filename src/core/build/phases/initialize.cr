@@ -998,7 +998,11 @@ module Hwaro::Core::Build::Phases::Initialize
 
   # `[templates] autoescape` of the config this build runs with.
   private def template_autoescape? : Bool
-    @config.try(&.templates.autoescape) || false
+    if config = @config
+      config.templates.autoescape
+    else
+      Models::TemplatesConfig.new.autoescape
+    end
   end
 
   # Whether a shortcode block `body` is trusted HTML (safe). True unless
