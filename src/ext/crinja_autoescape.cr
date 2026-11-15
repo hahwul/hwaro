@@ -90,7 +90,16 @@ module Crinja::Markup
   # sets `default_for_string` to the switch, so an OFF-mode build never takes
   # the Markup code paths even inside a `{% autoescape true %}` block — its
   # output stays byte-identical to the pre-autoescape engine.
+  #
+  # Inside a text render (`Crinja#__text_render`: a JSON/text output, a
+  # `[[content.generate]]` spec) it is false, so the engine there behaves
+  # exactly as with the switch off.
   def enabled?(env : Crinja) : Bool
+    switch?(env) && !env.__text_render
+  end
+
+  # The site switch alone.
+  def switch?(env : Crinja) : Bool
     env.config.autoescape.default_for_string
   end
 
@@ -315,6 +324,43 @@ class Crinja
   end
 end
 
+class Crinja
+  # Render state that lives exactly as long as the render that set it
+  # (Renderer#render restores both in `ensure`), on the environment so a
+  # `without context` include, which renders on the long-lived global
+  # context, can neither hide it nor leak it:
+  #
+  #   * `__text_render` — this render's output is text (a template whose name
+  #     does not escape, `__no_autoescape`, `render_text`, or an `[outputs]`
+  #     JSON/text/CSV render): nothing in it escapes, includes and imports
+  #     included, and the Markup rules are off (`Markup.enabled?`).
+  #   * `__entry_html` — the caller knows the entry template writes an HTML
+  #     or XML file (`Template#render_entry`): it escapes under the switch
+  #     whatever its name says. Read once, by the entry render.
+  property __text_render : Bool = false
+  property __entry_html : Bool = false
+
+  # Run the block with `__text_render` set to `text`, then restore it.
+  def with_text_render(text : Bool, &)
+    previous = @__text_render
+    @__text_render = text
+    begin
+      yield
+    ensure
+      @__text_render = previous
+    end
+  end
+
+  # `{% import %}` / `{% from %}` render in a fresh environment: it carries the
+  # text-render state, so a context-free import inside a text output does not
+  # escape.
+  def __share_features(source : Crinja) : self
+    previous_def
+    @__text_render = source.__text_render
+    self
+  end
+end
+
 class Crinja::Template
   # Never escape this template's output, nor that of anything it includes.
   # See the file comment.
@@ -323,52 +369,57 @@ class Crinja::Template
   # Render as text: nothing in this render escapes, whatever the template
   # and include names say (a `body_template` produces Markdown).
   def render_text(bindings) : String
-    String.build do |io|
-      env.with_scope(bindings) do |context|
-        context.__text_output = true
-        render(io, env)
-      end
-    end
+    env.with_text_render(true) { render(bindings) }
   end
-end
 
-class Crinja::Context
-  # Set on a render whose output is text (a template that does not escape:
-  # `page.json.jinja`, a `[[content.generate]]` spec). A template it
-  # includes or imports inherits it, so `{% include "partials/x.html" %}`
-  # inside a JSON output does not HTML-escape there. An HTML template's
-  # includes still follow their own names (a `.js` partial does not escape).
-  property __text_output : Bool? = nil
-
-  def text_output? : Bool
-    if (own = @__text_output).nil?
-      parent.try(&.text_output?) || false
-    else
-      own
+  # Render as the entry template of an output file whose type hwaro knows:
+  # HTML/XML escapes under the switch whatever the template's name says;
+  # text never escapes.
+  def render_entry(bindings, html : Bool) : String
+    return render_text(bindings) unless html
+    previous = env.__entry_html
+    env.__entry_html = true
+    begin
+      render(bindings)
+    ensure
+      env.__entry_html = previous
     end
   end
 end
 
 class Crinja::Renderer
-  # Upstream body; only the autoescape decision is hwaro's: `__no_autoescape`
-  # and a text render (see Context#text_output?) never escape.
+  # Upstream body; only the autoescape decision is hwaro's (see the
+  # `Crinja#__text_render` note), and it is undone in `ensure` so no render
+  # state outlives its render.
   def render(io : IO, template : Template)
-    escapes = !env.context.text_output? && !template.__no_autoescape && env.config.autoescape?(template.filename)
-    env.context.autoescape = escapes
-    env.context.__text_output = true unless escapes
+    context = env.context
+    previous_autoescape = context.autoescape
+    previous_text = env.__text_render
+    forced_html = env.__entry_html
+    env.__entry_html = false
+    switch = Crinja::Markup.switch?(env)
+    by_name = env.config.autoescape?(template.filename)
+    text = previous_text || (switch && !forced_html && (template.__no_autoescape || !by_name))
+    env.__text_render = text
+    context.autoescape = !text && (forced_html ? switch : by_name)
+    begin
+      env.context.macros.merge(template.macros)
+      output = render(template.nodes)
 
-    env.context.macros.merge(template.macros)
-    output = render(template.nodes)
+      @extend_parent_templates.each do |parent_template|
+        output = render(parent_template.nodes)
 
-    @extend_parent_templates.each do |parent_template|
-      output = render(parent_template.nodes)
+        env.context.extend_path_stack.pop
+      end
 
-      env.context.extend_path_stack.pop
+      resolve_block_stubs(output)
+
+      output.value(io)
+    ensure
+      context.autoescape = previous_autoescape
+      env.__text_render = previous_text
+      env.__entry_html = forced_html
     end
-
-    resolve_block_stubs(output)
-
-    output.value(io)
   end
 end
 
