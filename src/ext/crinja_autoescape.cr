@@ -49,11 +49,14 @@ struct Crinja::SafeString
     @__rendered_html
   end
 
-  # `==` compares the string alone (upstream), so the hash must too: the
-  # inherited struct hash covered every ivar, so `content` and the equal
-  # `content | safe` (or a String) missed each other as dictionary keys.
+  # The struct hash as it was before the mark existed (`@string`, then
+  # `@plain_value`), so `content` and the equal `content | safe` are one key.
+  # It must not drop `@plain_value` or hash like a String: `unique`, dict
+  # keys and `groupby` would then fold a SafeString into the equal String
+  # and change what `autoescape = false` sites print.
   def hash(hasher)
-    @string.hash(hasher)
+    hasher = @string.hash(hasher)
+    @plain_value.hash(hasher)
   end
 end
 
