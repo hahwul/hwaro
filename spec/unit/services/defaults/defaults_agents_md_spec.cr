@@ -89,4 +89,13 @@ describe Hwaro::Services::Defaults::AgentsMd do
       remote.size.should be < local.size
     end
   end
+
+  # Its own note 7 says to keep `| e` on user content; a snippet an agent
+  # copies must follow it, or it prints titles raw with autoescape = false.
+  it "keeps | e on the titles its template snippets print into HTML" do
+    content = Hwaro::Services::Defaults::AgentsMd.content
+    snippets = content.scan(/```jinja\n(.*?)```/m).map(&.[1]).join
+    bare = snippets.scan(/<a [^>]*>[^<]*\{\{\s*[\w.]*title\s*\}\}/).map(&.[0])
+    bare.should be_empty
+  end
 end
