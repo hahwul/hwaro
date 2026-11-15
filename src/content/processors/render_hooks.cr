@@ -222,9 +222,25 @@ module Hwaro
           )
           end
 
-          # A hook value (all of them are markup or pre-escaped text).
+          # Whether hook output is HTML-escaped (the site switch). Folded
+          # into `render_body_cached`'s memo key so an OFF and an ON render of
+          # the same body never share an entry.
+          def autoescape? : Bool
+            @autoescape
+          end
+
+          # `text`/`highlighted`/`html`/`header_html`/`body_html` are the
+          # element's RENDERED HTML — markup, marked safe as is.
           private def hook_value(value : String) : Crinja::Value
             Utils::CrinjaUtils.html_value(value, @autoescape)
+          end
+
+          # `destination`/`title`/`alt`/`lang`/`options`/`code`/`name` are
+          # markd-escaped attribute/text values; escape the remaining `'` so
+          # `alt='{{ alt }}'` can't break out, then mark safe (see
+          # CrinjaUtils.preescaped_value).
+          private def attr_value(value : String) : Crinja::Value
+            Utils::CrinjaUtils.preescaped_value(value, @autoescape)
           end
 
           def link? : Bool
@@ -281,8 +297,8 @@ module Hwaro
             return stock_link(destination, title, text) unless hook
 
             vars = @page_vars.dup
-            vars["destination"] = hook_value(destination)
-            vars["title"] = hook_value(title)
+            vars["destination"] = attr_value(destination)
+            vars["title"] = attr_value(title)
             vars["text"] = hook_value(text)
             render_hook_template("hooks/render-link", hook, SALT_LINK, vars) { stock_link(destination, title, text) }
           end
@@ -294,9 +310,9 @@ module Hwaro
             return stock_image(destination, alt, title) unless hook
 
             vars = @page_vars.dup
-            vars["destination"] = hook_value(destination)
-            vars["alt"] = hook_value(alt)
-            vars["title"] = hook_value(title)
+            vars["destination"] = attr_value(destination)
+            vars["alt"] = attr_value(alt)
+            vars["title"] = attr_value(title)
             render_hook_template("hooks/render-image", hook, SALT_IMAGE, vars) { stock_image(destination, alt, title) }
           end
 
@@ -329,11 +345,11 @@ module Hwaro
             return stock_codeblock(lang, code) unless hook
 
             vars = @page_vars.dup
-            vars["lang"] = hook_value(lang)
-            vars["options"] = hook_value(options)
-            vars["code"] = hook_value(code)
+            vars["lang"] = attr_value(lang)
+            vars["options"] = attr_value(options)
+            vars["code"] = attr_value(code)
             vars["highlighted"] = hook_value(highlighted)
-            vars["name"] = hook_value(name)
+            vars["name"] = attr_value(name)
             vars["copy"] = Crinja::Value.new(copy)
             render_hook_template("hooks/render-codeblock", hook, SALT_CODEBLOCK, vars) { stock_codeblock(lang, code) }
           end

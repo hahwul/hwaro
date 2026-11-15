@@ -154,7 +154,9 @@ module Hwaro
           io << (markdown_config.try(&.cache_fingerprint) || "-") << ':'
           io << Digest::MD5.hexdigest(content)
           if hooks
-            io << "|hooks:" << hooks.registry_fingerprint << "|" << hooks_key
+            # The escape mode changes hook output, so it must key the memo —
+            # the process-global cache outlives one build's autoescape setting.
+            io << "|hooks:" << hooks.registry_fingerprint << (hooks.autoescape? ? ":ae1|" : ":ae0|") << hooks_key
           end
         end
         @@body_cache_mutex.synchronize do

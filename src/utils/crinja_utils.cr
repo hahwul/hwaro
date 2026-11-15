@@ -25,6 +25,19 @@ module Hwaro
         Crinja::Value.new(autoescape ? Crinja::SafeString.new(html) : html)
       end
 
+      # A value hwaro already escaped for an HTML attribute or text node
+      # (markd's escaper, which escapes `& < > "` but NOT `'`). Marking it
+      # safe lets a `'` break out of a single-quoted attribute, so under
+      # autoescape escape the remaining apostrophes before marking it safe.
+      # Markd never emits `&#39;`, so this neither double-escapes nor needs
+      # to preserve one. Off the switch it stays the plain string it was,
+      # byte-identical.
+      def preescaped_value(text : String, autoescape : Bool) : Crinja::Value
+        return Crinja::Value.new(text) unless autoescape
+        safe = text.includes?('\'') ? text.gsub('\'', "&#39;") : text
+        Crinja::Value.new(Crinja::SafeString.new(safe))
+      end
+
       # Convert a YAML::Any value to Crinja::Value.
       #
       # `depth` guards against a self-referencing YAML anchor, whose parsed
