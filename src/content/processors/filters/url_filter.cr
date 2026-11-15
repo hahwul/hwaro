@@ -16,13 +16,18 @@ module Hwaro
           # taken as is. Off the switch nothing is unescaped (a hook
           # `destination` is a plain String there, and an author's
           # `"…&amp;…" | safe` keeps its bytes), so OFF output is byte-identical.
+          #
+          # Only the five encodings hwaro's escaping emits are reversed, in
+          # one pass (`&amp;lt;` → `&lt;`): `HTML.unescape` also decodes a
+          # semicolonless legacy entity, so `?a=1&copy=2` became `?a=1©=2`.
           def self.url_text(value : Crinja::Value, env : Crinja) : String
-            if value.raw.is_a?(Crinja::SafeString) && Crinja::Markup.enabled?(env)
-              HTML.unescape(value.to_s)
-            else
-              value.to_s
-            end
+            text = value.to_s
+            return text unless value.raw.is_a?(Crinja::SafeString) && Crinja::Markup.enabled?(env) && text.includes?('&')
+            text.gsub(HWARO_ENTITY, HWARO_ENTITIES)
           end
+
+          HWARO_ENTITY   = /&(?:amp|lt|gt|quot|#39);/
+          HWARO_ENTITIES = {"&amp;" => "&", "&lt;" => "<", "&gt;" => ">", "&quot;" => "\"", "&#39;" => "'"}
 
           # A value that already carries its own origin and must therefore be
           # passed through untouched by both filters:
