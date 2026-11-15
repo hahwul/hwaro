@@ -57,6 +57,22 @@ The hash filters digest the string's UTF-8 bytes. Pass `base64=true` to get the 
 | markdownify | Render Markdown | {{ text \| markdownify }} |
 | xml_escape | XML escape | {{ text \| xml_escape }} |
 
+With [`[templates] autoescape`](/templates/syntax/#html-escaping) on, filters treat *safe* values (markup that prints as is) as Jinja2 does:
+
+| Filter | Result under autoescape |
+|--------|-------------------------|
+| `e` / `escape` | Escapes text; a safe value is returned unchanged. Safe either way, so it never escapes twice |
+| `forceescape`, `xml_escape` | Escape the value even when it is safe; the result is safe |
+| `safe` | Marks the value safe (prints as is) |
+| `markdownify`, `tojson`, `jsonify`, `urlize`, `xmlattr` | Return safe HTML (or script-safe JSON); `urlize` escapes the text it links |
+| `upper`, `lower`, `capitalize`, `center`, `indent`, `trim`, `truncate`, `truncate_words`, `replace`, `regex_replace`, `format`, `string`, `default` | A safe input stays safe; text the filter adds (`truncate`'s `end`, `replace`'s new text, `format`'s arguments) is escaped. A plain input stays plain |
+| `join` | Escapes each item and the separator unless they are safe; the result is safe |
+| `strip_html`, `striptags` | Return plain text with entities decoded, so it prints escaped exactly once |
+| every other filter (`slugify`, `t`, `date`, `urlencode`, …) | Returns plain text, escaped when printed |
+
+With autoescape off every filter behaves as before; `safe` still marks a value, which then passes `| e` unchanged.
+
+
 `markdownify` follows the site's [`[markdown]`](/features/markdown-extensions/)
 settings for safe mode and `smart_punctuation`, so its output matches how the
 same text renders in page bodies. The rest of the extension pipeline

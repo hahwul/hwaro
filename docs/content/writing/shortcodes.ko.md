@@ -366,6 +366,8 @@ This is the **body** content of the shortcode.
 <div class="note">{{ body }}</div>
 ```
 
+`body`는 작성자의 콘텐츠이며 [`[templates] autoescape`](/ko/templates/syntax/#html-이스케이프)를 켜든 끄든 그대로 출력됩니다. 다른 인자는 모두 텍스트입니다. 자동 이스케이프에서는 `{{ caption }}`이 이스케이프되어 출력되므로, HTML을 담아야 하는 캡션에는 `{{ caption | safe }}`가 필요합니다.
+
 ### 중첩 숏코드
 
 블록 숏코드는 최대 5단계까지 중첩할 수 있습니다:

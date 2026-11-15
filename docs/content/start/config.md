@@ -333,6 +333,17 @@ exclude = ["*.bak", "drafts/**"]         # extra patterns to skip
 
 The built-in denylist only removes cruft. Legitimate dot-paths such as `.well-known/` and `.domains` are **never** filtered and are always published, identically for cold and `--cache`/incremental builds. Set `use_default_excludes = false` to disable the built-in filtering entirely.
 
+## Templates
+
+```toml
+[templates]
+autoescape = false   # HTML-escape printed values that are not marked safe
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| autoescape | bool | false | Jinja2-style HTML autoescape for templates whose output is HTML or XML. `false` keeps today's behavior; a later release changes the default to `true`. See [HTML Escaping](/templates/syntax/#html-escaping) |
+
 ## Development Server
 
 Options for `hwaro serve` only. They never affect `hwaro build` output.
@@ -384,6 +395,7 @@ Each feature has its own documentation with full configuration details. Below is
 | `[csp]` | [Content Security Policy](/features/csp/) | Content-Security-Policy from inline script/style hashes (`_headers` or `<meta>`) |
 | `[static]` | [Static Files](#static-files) | Filter cruft / exclude paths from the `static/` copy |
 | `[serve]` | [Development Server](#development-server) | Dev-server response headers & fast mode |
+| `[templates]` | [Templates](#templates) | HTML autoescape |
 | `[links]` | [Links](#links) | Broken internal `@/` link handling (warn or fail the build) |
 | `[series]` | [Series](/features/series/) | Group posts into ordered series |
 | `[related]` | [Related Posts](/features/related-posts/) | Related content recommendations |

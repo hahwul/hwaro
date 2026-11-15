@@ -370,6 +370,8 @@ Or use the body as-is for raw content:
 <div class="note">{{ body }}</div>
 ```
 
+`body` is the author's content and prints as is in both modes of [`[templates] autoescape`](/templates/syntax/#html-escaping). Every other argument is text: under autoescape `{{ caption }}` prints escaped, so a caption that should carry HTML needs `{{ caption | safe }}`.
+
 ### Nested Shortcodes
 
 Block shortcodes can be nested up to 5 levels deep:

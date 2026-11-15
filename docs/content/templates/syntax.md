@@ -17,7 +17,7 @@ Print values with double braces:
 {{ content }}
 ```
 
-Values print as they are: hwaro templates do not escape HTML automatically. Text that comes from content or data (titles, descriptions, section and taxonomy names, `extra` fields, data files) goes through `| e` wherever you print it, in element text and in attribute values alike: `<meta name="description" content="{{ page.description | e }}">`. Values hwaro renders as HTML (`content`, `toc`, `og_all_tags` and the other `*_tags` variables) are printed without it.
+Whether a printed value is HTML-escaped depends on `[templates] autoescape`; see [HTML Escaping](#html-escaping).
 
 Attribute, index and call access also work after a parenthesized expression, so you can read a field straight off a filter or function result:
 
@@ -25,6 +25,27 @@ Attribute, index and call access also work after a parenthesized expression, so 
 {{ (section.pages | first).title }}
 {{ (get_section(path="blog").pages | map(attribute="title") | list)[0] }}
 ```
+
+## HTML Escaping
+
+`[templates] autoescape` in `config.toml` decides whether printed values are HTML-escaped. It is `false` by default in this release; a later release turns it on by default.
+
+- **Off:** values print as they are. Text that comes from content or data (titles, descriptions, section and taxonomy names, `extra` fields, data files, i18n strings) goes through `| e` wherever you print it, in element text and in attribute values alike: `<meta name="description" content="{{ page.description | e }}">`.
+- **On** (as in Jinja2): every printed value is escaped unless it is *safe*. Author text is escaped once; `| e` on it is harmless (it never escapes twice). Author HTML you mean to print as markup needs `| safe`: `{{ page.extra.banner | safe }}`.
+
+In both modes the values hwaro renders as HTML (`content`, `toc`, `page.summary`, `og_all_tags`, the other `*_tags` variables, …, listed in [HTML values](/templates/data-model/#html-values)) are safe and print as they are. A template written with `| e` on text and `| safe` on author HTML renders the same either way.
+
+With autoescape on, a template escapes when its output is HTML or XML: files ending in `.html`, `.htm`, `.xhtml`, `.xml`, `.svg`, `.rss` or `.atom` (a trailing `.jinja`, `.j2` or `.jinja2` is ignored), names that carry no type (`page.j2`), built-in shortcodes, and the RSS and Atom feed templates. Text outputs never escape: `.json`, `.txt`, `.csv`, `.js`, `.mjs`, `.css`, `.md` and `.markdown` templates (so `page.json.jinja` and `feed.json.jinja`), and `[[content.generate]]` specs. An included, imported or extended file follows its own name. Inside a template, turn escaping off or on for a region:
+
+```jinja
+{% autoescape false %}{{ legacy_html }}{% endautoescape %}
+```
+
+The block does not reach into a file it includes. Under autoescape, also:
+
+- `a ~ b` (and `a + b` on strings) with a safe operand escapes the other one and is safe. `{{ "<p>" ~ x }}` prints `&lt;p&gt;`: build markup with a `{% set %}…{% endset %}` block or a macro, whose output is safe.
+- `| e` and `| escape` leave a safe value alone. To show HTML as text (in a feed, say), use `| forceescape` or `| xml_escape`, which escape it anyway.
+- `{{ x | tojson }}` is safe JSON with `<`, `>`, `&` and `'` written as `\u003c`-style escapes, ready for a `<script>`.
 
 ## Comments
 

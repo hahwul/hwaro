@@ -207,9 +207,10 @@ sites).
    `{{ asset(name='main.css') }}`; you get concatenation, minification, and
    content-hash fingerprinting (cache busting) for free.
 
-Template output is never autoescaped, so `{{ content }}`,
-`{{ auto_includes_css }}` and friends need no `| safe` (the docs add it as a
-harmless convention; keep it if you see it).
+Values Hwaro renders as HTML (`{{ content }}`, `{{ auto_includes_css }}` and
+friends) print raw with `[templates] autoescape` off (the current default) or
+on, so they need no `| safe` (harmless if present). Escape author text with
+`| e`.
 
 > **SCSS is built in; Tailwind and component frameworks are not.**
 > `[sass] enabled = true` compiles `.scss` with a pure-Crystal compiler that

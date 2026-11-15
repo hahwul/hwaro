@@ -28,7 +28,7 @@ Any other `hooks/render-*` name is unrecognized and logs a warning at build time
 
 ## Context Variables
 
-All values are Crinja `Value`s and, like every other hwaro template, **already HTML-escaped where that matters**. See [Rule 1](#rules) below before reaching for an `| e` filter.
+All values are Crinja `Value`s, **already HTML-escaped where that matters**: each is either the element's rendered HTML or text escaped for an attribute or text node. They are safe values, so they print the same with [`[templates] autoescape`](/templates/syntax/#html-escaping) on or off; only the heading `id` and the code block `copy` are plain text. See [Rule 1](#rules) below before reaching for an `| e` filter. `page.title` and the other `page`/`config` fields are plain text (escaped under autoescape).
 
 ### `render-link.html`
 
@@ -140,7 +140,7 @@ Every `![alt](src "caption")` in your Markdown now renders as a captioned `<figu
 
 ## Rules
 
-1. **Values are pre-escaped, so emit them verbatim.** Autoescape is off in hwaro templates (the same as everywhere else), and `destination`/`title`/`alt`/`lang`/`options`/`code` are already HTML-escaped by the renderer. Piping any of them through `| e` double-escapes; piping `text` or `highlighted` through it corrupts already-rendered HTML.
+1. **Values are pre-escaped, so emit them verbatim.** `destination`/`title`/`alt`/`lang`/`options`/`code` are already HTML-escaped by the renderer. With autoescape off, piping any of them through `| e` double-escapes and piping `text` or `highlighted` through it corrupts already-rendered HTML; with it on they are safe values and `| e` leaves them alone, but `| forceescape` would still escape them again.
 2. **Keep conventional double-quoted `href`/`src` attributes.** Everything downstream (`@/internal-page.md` link resolution, subpath (`base_path`) prefixing of root-relative links, responsive-image `srcset`/`sizes` injection, and `loading="lazy"`) runs as a plain-text pass over the page's rendered body HTML (after every hook, before the page template wraps it), matching on `href="..."` / `src="..."`. A hook that emits an unquoted or single-quoted attribute, or restructures the destination into something other than a normal attribute value, opts that element out of all of it. An `@/`-prefixed `destination` must land inside `href="..."` for `InternalLinkResolver` to find and resolve it.
 3. **`render-heading.html` must emit an `<hN id="{{ id }}">` element.** The TOC (`{{ toc }}` / `page.toc`) and `insert_anchor_links` both post-process the final HTML looking for `<h1>` to `<h6>` tags with an `id` attribute; a hook that renders something other than a heading tag, or drops `id`, silently falls out of both.
 4. **Don't transform `{{ text }}`.** It's already-rendered HTML, and on pages using shortcodes it may contain an internal placeholder comment (`<!--HWARO-SHORTCODE-PLACEHOLDER-N-->`) that gets swapped for the shortcode's output in a later pass. Filtering, truncating, or re-escaping `text` can corrupt or strand that placeholder.
