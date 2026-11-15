@@ -101,6 +101,35 @@ module Crinja::Markup
     enabled?(env) && env.context.autoescape?
   end
 
+  # Whether a producer (`join`, `urlize`, a macro, a recursive loop) that
+  # stringified its inputs WITHOUT escaping may still mark its result safe.
+  # It may when the switch is off (byte-identical to the old engine, which
+  # always marked these safe) or when the current context escapes (the inputs
+  # were escaped). It may NOT inside a `{% autoescape false %}` block with the
+  # switch on: there the result is unescaped text, so printing it elsewhere
+  # must escape it. (Same shape as the `{% set %}` capture rule.)
+  def producer_safe?(env : Crinja) : Bool
+    !enabled?(env) || env.context.autoescape?
+  end
+
+  # A producer's result string wrapped per `producer_safe?`.
+  def producer_value(env : Crinja, string : String) : Value
+    Value.new(producer_safe?(env) ? SafeString.new(string) : string)
+  end
+
+  # markupsafe concatenation of a truncated `prefix` (a slice of `target`,
+  # carrying its safety) and an appended `suffix` Value, as `truncate` /
+  # `truncate_words` need: the result is safe when escaping is active and
+  # either operand is safe, with each operand escaped only if it is plain
+  # (so `"abc" + Markup("<i/>")` → `abc<i/>`, `Markup("<b>") + "…"` →
+  # `<b>…` with `…` escaped). Otherwise a plain concatenation, byte-identical
+  # to the old engine.
+  def append_suffix(env : Crinja, prefix : String, target : Value?, suffix : Value) : Value
+    prefix_safe = active?(env) && safe?(target)
+    return Value.new(prefix + suffix.to_s) unless prefix_safe || (active?(env) && safe?(suffix))
+    Value.new(SafeString.new((prefix_safe ? prefix : escape(prefix)) + escape(suffix)))
+  end
+
   # A filter argument that the filter will INSERT into its text, escaped so
   # it can't smuggle markup into the safe result. A `SafeString` is already
   # trusted; a number or bool keeps its type so `format`/arithmetic still
@@ -147,9 +176,31 @@ module Crinja::Markup
     Callable::Instance.new(proc, filter.defaults, filter.name)
   end
 
+  # `format` on a safe format string: escape every argument (`keep_safe` with
+  # all_varargs), but `%c` turns a numeric argument into a raw character that
+  # bypasses argument escaping (`%c` of 60 → `<`). The argument-level escaping
+  # can't reach that generated character, so when the format string contains a
+  # `%c` conversion, return the whole result PLAIN — the print path then
+  # escapes it once (fail-closed; the safe format string's own markup is
+  # over-escaped, acceptable for this rare case). `%d`/`%x`/`%.2f`/… keep the
+  # safe path and stay byte-identical.
+  def keep_safe_format(filter : Callable::Instance) : Callable::Instance
+    inner = filter.proc
+    proc = ->(arguments : Arguments) do
+      return inner.call(arguments) unless active?(arguments.env) && safe?(arguments.target)
+      varargs = arguments.varargs.map { |arg| escaped_argument(arg) }
+      args = Arguments.new(arguments.env, varargs, arguments.kwargs, arguments.defaults, arguments.target)
+      result = inner.call(args)
+      raw = result.raw
+      return result unless raw.is_a?(String)
+      arguments.target.to_s.includes?("%c") ? Value.new(raw) : Value.new(SafeString.new(raw))
+    end
+    Callable::Instance.new(proc, filter.defaults, filter.name)
+  end
+
   # Filters that keep a safe target safe, with the argument names they insert
-  # as text (escaped first). `indent` inserts a string `width`; `replace` is
-  # handled by a dedicated filter below (mixed safe/unsafe operands).
+  # as text (escaped first). `indent` inserts a string `width`; `replace`/
+  # `format` are handled by dedicated filters/wrappers (mixed safety, `%c`).
   KEEP_SAFE = {
     "upper" => [] of String, "lower" => [] of String, "capitalize" => [] of String,
     "center" => [] of String, "indent" => ["width"], "trim" => [] of String,
@@ -167,11 +218,15 @@ module Crinja::Filter
 end
 
 Crinja.filter({autoescape: true}, :xmlattr) do
+  # Gate the key validation on the SITE switch, not the context: stage 1's
+  # contract is that an OFF build changes no output, and that outranks the
+  # hardening. With the switch on, reject an injecting key.
+  validate = Crinja::Markup.enabled?(env)
   string = Crinja::SafeString.build do |io|
     target.as_h.each do |key, value|
       next if value.none? || value.undefined?
       key_s = key.to_s
-      if key_s.empty? || key_s.matches?(Crinja::Filter::XMLATTR_INVALID_KEY)
+      if validate && (key_s.empty? || key_s.matches?(Crinja::Filter::XMLATTR_INVALID_KEY))
         raise Crinja::RuntimeError.new("xmlattr: invalid attribute name #{key_s.inspect} (no spaces, '/', '>' or '=')")
       end
       io << sprintf %( %s="%s"), HTML.escape(key_s), HTML.escape(value.to_s)
@@ -179,6 +234,37 @@ Crinja.filter({autoescape: true}, :xmlattr) do
   end
   string = string[1..-1] if string.size > 0 && !arguments["autoescape"].truthy?
   string
+end
+
+# `urlize` linked ANY `scheme://` run, so `javascript://x/%0Aalert(1)` became
+# a live `javascript:` link (HTML escaping does not neutralise it). Reuse
+# hwaro's single unsafe-scheme policy (InlineMarkdown.safe_url?, which refuses
+# javascript/vbscript/file and non-image data:) so a refused scheme stays as
+# plain (escaped) text, unlinked. Applies in both modes — a pre-existing util
+# defect. The rest is the vendored `urlize` body unchanged.
+module Crinja::Util
+  def self.urlize(text, trim_url_limit, rel, target)
+    rel_attr = ""
+    rel_attr = %( rel="%s") % HTML.escape(rel.join(' ')) unless rel.empty?
+
+    target_attr = ""
+    target_attr = %( target="%s") % HTML.escape(target) unless target.nil? || target.empty?
+
+    SafeString.build do |io|
+      text.each_line do |line|
+        io << line.gsub(AUTO_LINK_RE) do
+          all = $~
+          url = all[0]
+          next url unless Hwaro::Content::Processors::InlineMarkdown.safe_url?(url)
+          display = url
+          unless trim_url_limit.nil? || display.size < trim_url_limit
+            display = display[0..(trim_url_limit - 3)] + "..."
+          end
+          %(<a href="#{url}"#{rel_attr}#{target_attr}>#{display}</a>)
+        end
+      end
+    end
+  end
 end
 
 class Crinja::Config::Autoescape
@@ -233,29 +319,24 @@ Crinja.filter(:string) do
 end
 
 # markupsafe's `Markup.replace`: when escaping is active and any operand is
-# safe, escape the unsafe operands (the source too when a safe replacement is
-# present), keep the safe ones, and return a safe result. Otherwise the
-# unchanged crinja_filter_fixes behaviour, so OFF-mode output is identical.
+# safe, the SOURCE is escaped (keeping safe source markup), the SEARCH string
+# is matched against that escaped source text WITHOUT escaping (`<b>` escaped
+# to `&lt;b&gt;` would never match), the REPLACEMENT is escaped unless it is
+# safe, the result is safe, and `count` N replaces the first N occurrences in
+# the ORIGINAL source (not the already-substituted text; negative/absent =
+# all). Otherwise the UNCHANGED crinja_filter_fixes behaviour verbatim, so
+# OFF-mode output is byte-identical (its counted-replacement bug and all —
+# see DEFERRED in the report).
 Crinja.filter({old: Crinja::UNDEFINED, new: Crinja::UNDEFINED, count: nil}, :replace) do
   old_arg = arguments["old"]
   new_arg = arguments["new"]
   count = arguments["count"]
   if Crinja::Markup.active?(env) && (Crinja::Markup.safe?(target) || Crinja::Markup.safe?(old_arg) || Crinja::Markup.safe?(new_arg))
     source = Crinja::Markup.escape(target)
-    search = Crinja::Markup.escape(old_arg)
+    search = old_arg.to_s
     replacement = Crinja::Markup.escape(new_arg)
-    result = if count.raw.nil?
-               source.gsub(search, replacement)
-             else
-               string = source
-               count.to_i.times do
-                 running = false
-                 string = string.sub(search) { running = true; replacement }
-                 break unless running
-               end
-               string
-             end
-    Crinja::Value.new(Crinja::SafeString.new(result))
+    limit = count.raw.nil? ? nil : count.to_i
+    Crinja::Value.new(Crinja::SafeString.new(Crinja::Filter.__replace_n(source, search, replacement, limit)))
   else
     search = old_arg.to_s
     if count.raw.nil?
@@ -273,7 +354,30 @@ Crinja.filter({old: Crinja::UNDEFINED, new: Crinja::UNDEFINED, count: nil}, :rep
   end
 end
 
-# Same body as crinja_attribute_path_fix.cr's `join`, plus the separator rule.
+module Crinja::Filter
+  # Replace up to `limit` occurrences of `search` in `source` (nil/negative =
+  # all), counting matches in the ORIGINAL string, not in the partly-replaced
+  # result. Mirrors Python `str.replace(old, new, count)`.
+  def self.__replace_n(source : String, search : String, replacement : String, limit : Int32?) : String
+    return source.gsub(search, replacement) if limit.nil? || limit < 0
+    return source if limit == 0 || search.empty?
+    String.build do |io|
+      pos = 0
+      done = 0
+      while done < limit && (idx = source.index(search, pos))
+        io << source[pos, idx - pos] << replacement
+        pos = idx + search.size
+        done += 1
+      end
+      io << source[pos..]
+    end
+  end
+end
+
+# Same body as crinja_attribute_path_fix.cr's `join`, plus the separator rule
+# and the producer-safety rule: it stringifies items without escaping, so with
+# the switch on inside a `{% autoescape false %}` block its result is plain
+# text (escaped where printed later), not an unconditional SafeString.
 Crinja.filter({separator: "", attribute: nil}, :join) do
   separator = arguments["separator"]
   separator = Crinja::Markup.active?(env) ? Crinja::Markup.escape(separator) : separator.to_string
@@ -283,7 +387,7 @@ Crinja.filter({separator: "", attribute: nil}, :join) do
     do_attribute = attribute.truthy?
     attr_name = attribute.to_s
     dotted = attr_name.includes?('.')
-    Crinja::SafeString.build do |io|
+    joined = String.build do |io|
       target.join(io, separator) do |item|
         if do_attribute
           item = dotted ? Crinja::Filter.__attr_path(attribute, item) : Crinja::Resolver.resolve_attribute(attr_name, item)
@@ -291,6 +395,7 @@ Crinja.filter({separator: "", attribute: nil}, :join) do
         io << env.stringify(item)
       end
     end
+    Crinja::Markup.producer_value(env, joined)
   else
     raise Crinja::TypeError.new("#{target} must be a sequence to join it")
   end
@@ -303,13 +408,18 @@ Crinja.filter({trim_url_limit: nil, nofollow: false, target: nil, rel: nil}, :ur
   rel |= env.policies.fetch("urlize.rel", "noopener").to_s.split(' ')
   rel = rel.reject(&.empty?).to_set
 
-  target_attr = arguments.fetch("target") { env.policies.fetch("urlize.target", nil) }.raw.as(String?)
-  trim_url_limit = arguments["trim_url_limit"].raw.as(Int32?)
+  # Coerce rather than narrow-cast: Crinja parses an integer literal as Int64
+  # (`urlize(trim_url_limit=20)`), which the stock `as(Int32?)` crashed on
+  # (same bug on main), and the link `target=` attribute may be a SafeString.
+  target_opt = arguments["target"]
+  target_attr = (target_opt.none? || target_opt.undefined?) ? env.policies.fetch("urlize.target", nil).as(String?) : target_opt.to_s
+  limit_arg = arguments["trim_url_limit"]
+  trim_url_limit = (limit_arg.none? || limit_arg.undefined?) ? nil : limit_arg.to_i
 
   # Escaped first, as Jinja2 does: the links are found in the escaped text,
   # so their href and label are escaped too.
   text = Crinja::Markup.active?(env) ? Crinja::Markup.escape(target) : target.to_s
-  Crinja::Util.urlize(text, trim_url_limit, rel, target_attr)
+  Crinja::Markup.producer_value(env, Crinja::Util.urlize(text, trim_url_limit, rel, target_attr).to_s)
 end
 
 Crinja::Filter::Library.defaults.map! do |filter|
@@ -321,7 +431,7 @@ Crinja::Filter::Library.defaults.map! do |filter|
     # The `join`/`replace` above replace crinja_filter_fixes' undefined-as-empty ones.
     Crinja::Filter.__undefined_as_empty(filter)
   elsif name == "format"
-    Crinja::Markup.keep_safe(filter, all_varargs: true)
+    Crinja::Markup.keep_safe_format(filter)
   else
     filter
   end
@@ -350,6 +460,45 @@ class Crinja::Operator::Tilde < Crinja::Operator
     else
       op1.to_s + op2.to_s
     end
+  end
+end
+
+# A macro renders its body under the CALLER's context, then marks the result
+# safe. When that render happened with escaping active the body is escaped
+# markup (safe); when it happened inside `{% autoescape false %}` with the
+# switch on the body is raw text, so the result must be plain so printing it
+# elsewhere escapes it (`producer_safe?`). Off the switch, always safe
+# (byte-identical to the old engine).
+class Crinja::Tag::Macro::MacroFunction
+  def call(arguments : Arguments)
+    arguments.defaults = @defaults
+
+    arguments.env.with_scope(arguments.to_h) do |context|
+      context.merge!({
+        "varargs" => arguments.varargs,
+        "kwargs"  => arguments.kwargs,
+      })
+
+      body = String.build do |io|
+        Crinja::Renderer.new(@renderer.template, arguments.env).render(children).value(io)
+      end
+      Crinja::Markup.producer_safe?(arguments.env) ? SafeString.new(body) : body
+    end
+  end
+end
+
+# `{{ loop(children) }}` inside a `{% for … recursive %}` — same producer rule.
+class Crinja::Tag::For::ForLoop::Recursive
+  def call(arguments : Arguments)
+    sub_iterator = arguments.varargs.first
+
+    sub_loop = self.class.new(@loop_runner, sub_iterator)
+    sub_loop.depth0 = depth
+
+    body = String.build do |io|
+      io << @loop_runner.run_loop(sub_loop).value
+    end
+    Crinja::Markup.producer_safe?(arguments.env) ? SafeString.new(body) : body
   end
 end
 
