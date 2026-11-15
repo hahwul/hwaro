@@ -243,7 +243,7 @@ Any template extension works (`.jinja`, `.j2`, `.jinja2`, `.html`). Only the fin
 
 #### Example
 
-Values are **not** pre-escaped. Applying `xml_escape` (or emitting CDATA) is the template author's job, and `summary` is plain text, so HTML-escape it (`escape`) first where the element is HTML, such as an RSS `<description>`; in a `feed.json` template, use the `tojson` filter:
+Values are **not** pre-escaped. Under the default [`[templates] autoescape`](/templates/syntax/#html-escaping) an RSS or Atom template escapes what it prints, and `xml_escape` never escapes twice there, so keep it (or CDATA): the template then also works with `autoescape = false`, where escaping is the template author's job. `content_html` is HTML that prints as is, so escape it or wrap it in CDATA. `summary` is plain text, so HTML-escape it (`escape`) first where the element is HTML, such as an RSS `<description>`; in a `feed.json` template, use the `tojson` filter:
 
 ```jinja
 <?xml version="1.0" encoding="UTF-8"?>

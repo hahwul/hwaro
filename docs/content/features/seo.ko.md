@@ -243,7 +243,7 @@ generate_feed = false   # /ja/rss.xml을 생성하지 않음
 
 #### 예시
 
-값은 **미리 이스케이프되지 않습니다.** `xml_escape`를 적용하거나 CDATA로 감싸는 일은 템플릿 작성자의 몫입니다. `summary`는 일반 텍스트이므로 RSS `<description>`처럼 HTML을 담는 요소에는 먼저 `escape`를 적용하세요. `feed.json` 템플릿에서는 `tojson` 필터를 쓰세요:
+값은 **미리 이스케이프되지 않습니다.** 기본값인 [`[templates] autoescape`](/ko/templates/syntax/#html-이스케이프)에서는 RSS·Atom 템플릿이 출력하는 값을 이스케이프하고, `xml_escape`는 거기서 두 번 이스케이프하지 않으므로 그대로 두세요(또는 CDATA). 그러면 `autoescape = false`에서도 같은 템플릿이 동작하며, 그때 이스케이프는 템플릿 작성자의 몫입니다. `content_html`은 그대로 출력되는 HTML이므로 이스케이프하거나 CDATA로 감싸세요. `summary`는 일반 텍스트이므로 RSS `<description>`처럼 HTML을 담는 요소에는 먼저 `escape`를 적용하세요. `feed.json` 템플릿에서는 `tojson` 필터를 쓰세요:
 
 ```jinja
 <?xml version="1.0" encoding="UTF-8"?>
