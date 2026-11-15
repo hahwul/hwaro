@@ -134,7 +134,7 @@ module Hwaro::Core::Build::Phases::OutputFormats
       template_content = templates[template_name]
       content = apply_template(template_content, html_content, page, site, "", toc_html, templates, toc_headers,
         global_vars: global_vars, crinja_env_override: crinja_env_override, template_cache_override: template_cache_override,
-        template_name: template_name)
+        template_name: template_name, text_output: fmt != "xml")
       write_format_output(page, output_dir, fmt, content, verbose)
     end
   end

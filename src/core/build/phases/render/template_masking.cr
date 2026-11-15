@@ -22,7 +22,13 @@ module Hwaro::Core::Build::Phases::Render
     pagination_seo_links : String = "",
     prebuilt_vars : Hash(String, Crinja::Value)? = nil,
     template_name : String? = nil,
+    text_output : Bool = false,
   ) : String
+    # `text_output`: the file this render writes is JSON/text/CSV (an
+    # `[outputs]` format). Otherwise it is HTML or XML, and the entry template
+    # escapes under `[templates] autoescape` whatever its name says — front
+    # matter may pick any template (`template = "plain.txt"`). Shortcodes
+    # expanded for a text output follow the text policy too.
     # Use per-worker env when provided (parallel path), otherwise shared env
     env = crinja_env_override || crinja_env
     cache = template_cache_override || @compiled_templates_cache
@@ -42,7 +48,7 @@ module Hwaro::Core::Build::Phases::Render
                features: template_name.try { |tn| @template_var_features[tn]? })
            end
 
-    begin
+    env.with_text_render(text_output) do
       # Process shortcodes in template directly (skip per-line fence detection
       # since templates don't contain markdown fenced code blocks). Templates
       # known to contain no shortcode tokens (precomputed in load_templates)
@@ -64,15 +70,13 @@ module Hwaro::Core::Build::Phases::Render
       # Most pages share the same base template string, so this avoids
       # re-parsing the template AST on every page render.
       #
-      # A compiled template carries its filename, and that filename decides
-      # autoescape at render time — so a `page.html` and a `page.json.jinja`
-      # with byte-identical source must NOT share one compiled template, or
-      # whichever compiled first imposes its escaping on the other (HTML left
-      # raw, or JSON escaped). Fold the template's effective autoescape into
-      # the key: a no-op with the switch off (always false), so OFF-mode keys
-      # — and the cache's behaviour — are unchanged.
+      # Fold the render's effective escaping into the key, so the same source
+      # rendered for an HTML file and for a text output keeps two compiled
+      # templates (render-time memos hang off the compiled nodes). A no-op
+      # with the switch off (never escapes), so OFF-mode keys — and the
+      # cache's behaviour — are unchanged.
       cache_key = processed_template.hash
-      cache_key ^= AUTOESCAPE_CACHE_SALT if compiled_template_autoescape?(env, template_name)
+      cache_key ^= AUTOESCAPE_CACHE_SALT if !text_output && Crinja::Markup.switch?(env)
       crinja_template = if cached = cache[cache_key]?
                           @cache_manager.record_hit("compiled_templates")
                           cached
@@ -82,7 +86,7 @@ module Hwaro::Core::Build::Phases::Render
                           cache[cache_key] = compiled
                           compiled
                         end
-      crinja_template.render(vars)
+      crinja_template.render_entry(vars, html: !text_output)
     rescue ex : Crinja::Error
       # Classify as a template error so `hwaro build --json` surfaces a
       # stable HWARO_E_TEMPLATE code (exit 4). Previously these errors
@@ -286,15 +290,6 @@ module Hwaro::Core::Build::Phases::Render
   # entry. Shortcode and hook entries in the same cache carry their own
   # salts, so they are unaffected.
   private AUTOESCAPE_CACHE_SALT = 0xAE5CA_E5CA_AE5CA_u64
-
-  # The autoescape `compile_template` will give the template it compiles for
-  # `template_name`: its filename is the on-disk path (its extension decides)
-  # or nil (`from_string`, so the string default), exactly as the renderer
-  # reads it. `false` whenever the site switch is off.
-  private def compiled_template_autoescape?(env : Crinja, template_name : String?) : Bool
-    path = template_name.try { |tn| @template_paths[tn]? }
-    env.config.autoescape?(path)
-  end
 
   # Compile a template string, attaching its source filename when the template
   # came from disk. Crinja errors then report `templates/foo.html:line:col`
