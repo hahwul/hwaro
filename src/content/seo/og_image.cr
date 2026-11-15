@@ -1595,12 +1595,26 @@ module Hwaro
         # manifest forward because they only saw a slice of the pages.
         private def self.prune_orphaned_images(img_dir : String, output_dir : String, old_entries : Hash(String, String), new_entries : Hash(String, String), verbose : Bool) : Nil
           removed = 0
+          # A page renamed by case only (`config.md` -> `Config.md`) on a
+          # case-folding filesystem (APFS, NTFS): the image just written for
+          # `Config` IS the file the stale `config` names, so deleting the
+          # old spelling deleted the live image. The rename over it kept the
+          # old spelling too, so give it the one the page URL asks for (a
+          # case-sensitive host 404s `Config.png` stored as `config.png`).
+          live = new_entries.keys.group_by { |slug| Utils::PathUtils.output_fold_key(slug) }
           old_entries.each_key do |slug|
             next if new_entries.has_key?(slug)
             {"#{slug}.png", "#{slug}.svg"}.each do |filename|
               path = File.join(img_dir, filename)
               next unless File.file?(path)
               next unless Utils::OutputGuard.within_output_dir?(path, output_dir)
+              ext = File.extname(filename)
+              next if live[Utils::PathUtils.output_fold_key(slug)]?.try &.any? do |other|
+                        other_path = File.join(img_dir, "#{other}#{ext}")
+                        next false unless File.file?(other_path) && File.same?(path, other_path)
+                        respell_image(path, other_path)
+                        true
+                      end
               begin
                 File.delete(path)
                 removed += 1
@@ -1613,6 +1627,16 @@ module Hwaro
             end
           end
           Logger.info "  Removed #{removed} stale OG image(s)" if removed > 0
+        end
+
+        # Rename `path` to `spelling`, the same file on a case-folding
+        # filesystem, through a temp name (a direct rename is a no-op there).
+        private def self.respell_image(path : String, spelling : String) : Nil
+          tmp = File.join(File.dirname(path), "hwaro-respell-#{Process.pid}.tmp")
+          File.rename(path, tmp)
+          File.rename(tmp, spelling)
+        rescue ex : File::Error
+          Logger.debug "  OG image: could not respell #{path}: #{ex.message}"
         end
 
         # The files the last `generate` call left published: every image its
