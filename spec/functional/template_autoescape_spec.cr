@@ -71,6 +71,19 @@ private AE_TEMPLATES = {
   "feed.json.jinja"        => %({"items": [{% for p in pages %}"{{ p.title }}"{% endfor %}]}),
 }
 
+# Every construct whose result depends on the escaping rules, for a text
+# render. `t` is whatever title the including context has.
+private TEXT_KIT = <<-JINJA.gsub('\n', "")
+  {% set t = page.title if page is defined else (p.title if p is defined else item.name) %}
+  {% set x %}A&B {{ t }}{% endset %}{{ x }}|{{ x | e }}|{{ ["A&B", t] | join(", ") }}|{{ ["A&B"] | join | e }}|
+  {% macro m(v) %}<{{ v }}>{% endmacro %}{{ m(t) }}|{{ m("A&B") | e }}|
+  {% for n in [{"t": "a&b", "c": [{"t": "c'd", "c": []}]}] recursive %}[{{ n.t }}{{ loop(n.c) }}]{% endfor %}|
+  {{ t | replace("N", "<N>") }}|{{ t | replace("N", "<N>", 1) }}|{{ t | truncate(5, true, "<…>", 0) }}|
+  {{ "%s<%d>" | format(t, 3) }}|{{ "see http://x.test/?a=1&b=<2>" | urlize }}|{{ {"x y": "v&w", "k": t} | xmlattr }}|
+  {{ "/x?a=1&amp;b=2" | safe | relative_url }}|{{ t ~ "<s>" }}|{{ t ~ ("<s>" | safe) }}|{{ [t, "x&y"] | string }}|{{ [t, "x&y"] }}|
+  {{ (content | e) if content is defined else "" }}
+  JINJA
+
 private def ae_build(on : Bool, &)
   build_site(
     ae_config(on),
@@ -446,6 +459,7 @@ describe "Template autoescape" do
       section = "items"
       slug = "id"
       title = "{{ item.name }} {% include 'partials/n.html' %}"
+      description = "{% include 'partials/kit.html' %}"
       body_template = "gen.html"
       TOML
     outputs = [base, base + "\n[templates]\nautoescape = false\n"].map do |toml|
@@ -453,14 +467,15 @@ describe "Template autoescape" do
         toml,
         content_files: {"posts/p.md" => "+++\ntitle = \"T #{q}\"\ndescription = \"D #{q}\"\ntags = [\"t #{q}\"]\naliases = [\"/old/\"]\n[extra]\nnote = \"N #{q}\"\n+++\nBody #{CANARY}\n"},
         template_files: {
-          "page.html"       => "<h1>{{ page.title }}</h1>{{ content }}",
-          "section.html"    => "{{ content }}",
-          "partials/n.html" => "{{ item.name }}",
-          "gen.html"        => "Gen {{ item.name }} {% include 'partials/n.html' %}",
-          "page.json.jinja" => %({"t": "{{ page.title }}", "n": "{{ page.extra.note }}", "d": "{{ page.description }}"}),
-          "page.txt.jinja"  => "{{ page.title }}|{{ page.extra.note }}|{% for t in page.tags %}{{ t }}{% endfor %}",
-          "page.csv.jinja"  => "{{ page.title }},{{ page.extra.note }}",
-          "feed.json.jinja" => %({"items": [{% for p in pages %}"{{ p.title }} {{ p.description }}"{% endfor %}]}),
+          "page.html"         => "<h1>{{ page.title }}</h1>{{ content }}",
+          "section.html"      => "{{ content }}",
+          "partials/n.html"   => "{{ item.name }}",
+          "gen.html"          => "Gen {{ item.name }} {% include 'partials/n.html' %} {% include 'partials/kit.html' %}",
+          "partials/kit.html" => TEXT_KIT,
+          "page.json.jinja"   => %({"t": "{{ page.title }}", "n": "{{ page.extra.note }}", "d": "{{ page.description }}", "k": "{% include 'partials/kit.html' %}"}),
+          "page.txt.jinja"    => "{{ page.title }}|{{ page.extra.note }}|{% for t in page.tags %}{{ t }}{% endfor %}|" + TEXT_KIT + "|{{ content }}",
+          "page.csv.jinja"    => "{{ page.title }},{{ page.extra.note }},{% include 'partials/kit.html' %}",
+          "feed.json.jinja"   => %({"items": [{% for p in pages %}"{{ p.title }} {{ p.description }} {% include 'partials/kit.html' %}"{% endfor %}]}),
         },
         data_files: {"items.json" => %([{"id": "i1", "name": "N #{q}"}])},
       ) do |dir|
@@ -476,5 +491,65 @@ describe "Template autoescape" do
     end
     default["/posts/p/index.txt"].should start_with("T #{CANARY}|N #{CANARY}|")
     default.each { |path, bytes| bytes.should eq(off[path]), path }
+  end
+
+  # Review round 4, end to end.
+
+  it "r4#1 a text include without context does not turn escaping off for the page or later pages" do
+    q = CANARY.gsub('"', "\\\"")
+    build_site(
+      %(title = "x"\nbase_url = "https://e.example.com"\n),
+      content_files: {"a.md" => "+++\ntitle = \"T #{q}\"\n+++\nb\n", "b.md" => "+++\ntitle = \"T #{q}\"\n+++\nb\n"},
+      template_files: {"page.html"       => %({% include "empty.txt.jinja" without context %}{% include "title.html" %}|{{ page.title }}),
+                       "empty.txt.jinja" => "",
+                       "title.html"      => "{{ page.title }}"},
+    ) do
+      File.read("public/a/index.html").should eq("T #{ESCAPED}|T #{ESCAPED}")
+      File.read("public/b/index.html").should eq("T #{ESCAPED}|T #{ESCAPED}")
+    end
+  end
+
+  it "r4#2 escapes an HTML page whose front matter picks a text-named template" do
+    q = CANARY.gsub('"', "\\\"")
+    build_site(
+      %(title = "x"\nbase_url = "https://e.example.com"\n[outputs]\npage = ["txt"]\n),
+      content_files: {"a.md" => "+++\ntitle = \"T #{q}\"\ntemplate = \"plain.txt\"\n+++\nb\n",
+                      "b.md" => "+++\ntitle = \"T #{q}\"\ntemplate = \"page.txt\"\n+++\nb\n"},
+      template_files: {"page.html"       => "<h1>{{ page.title }}</h1>",
+                       "plain.txt.jinja" => "<h1>{{ page.title }}</h1>",
+                       "page.txt.jinja"  => "<h1>{{ page.title }}</h1>"},
+    ) do
+      File.read("public/a/index.html").should eq("<h1>T #{ESCAPED}</h1>")
+      File.read("public/b/index.html").should eq("<h1>T #{ESCAPED}</h1>")
+      # the [outputs] text file rendered from the same template stays text
+      File.read("public/b/index.txt").should eq("<h1>T #{CANARY}</h1>")
+    end
+  end
+
+  it "r4#3 expands a shortcode in a text output under the text policy" do
+    build_site(
+      %(title = "x"\nbase_url = "https://e.example.com"\n[outputs]\npage = ["txt"]\n),
+      content_files: {"p.md" => "+++\ntitle = \"p\"\n+++\nb\n"},
+      template_files: {"page.html"            => %(<p>{{ echo(label="A&B") }}</p>),
+                       "page.txt.jinja"       => %({{ echo(label="A&B") }}),
+                       "shortcodes/echo.html" => "{{ label }}"},
+    ) do
+      File.read("public/p/index.txt").should eq("A&B")
+      File.read("public/p/index.html").should eq("<p>A&amp;B</p>")
+    end
+  end
+
+  it "r4#5 | e on content and summaries escapes the HTML as before 1.0, in HTML and text outputs" do
+    tpl = "{{ content | e }}|{{ page.summary | escape | xml_escape }}|{% set c %}<i>{% endset %}{{ c | e }}|{{ \"<b>\" | safe | e }}"
+    outputs = ["", "[templates]\nautoescape = false\n"].map do |extra|
+      build_site(
+        %(title = "x"\nbase_url = "https://e.example.com"\n[outputs]\npage = ["txt"]\n#{extra}),
+        content_files: {"p.md" => "+++\ntitle = \"p\"\n+++\nLead & <b>bold</b>\n\n<!-- more -->\n\nRest\n"},
+        template_files: {"page.html" => tpl, "page.txt.jinja" => tpl},
+      ) { {File.read("public/p/index.html"), File.read("public/p/index.txt")} }
+    end
+    outputs[0].should eq(outputs[1])
+    outputs[0][0].should start_with("&lt;p&gt;Lead &amp;amp; &lt;b&gt;bold&lt;/b&gt;&lt;/p&gt;")
+    outputs[0][0].should end_with("|<i>|<b>")
   end
 end
