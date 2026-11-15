@@ -1122,10 +1122,20 @@ module Hwaro
               if context.has_key?(key)
                 (saved ||= {} of String => Crinja::Value)[key] = context[key]
               end
-              # A block body is the author's content (Markdown/HTML, with
-              # nested shortcodes as placeholder comments), printed as it is
-              # written; every other argument is text.
-              context[key] = key == "body" ? Utils::CrinjaUtils.html_value(value, template_autoescape?) : Crinja::Value.new(value)
+              # A block body is the author's content. With `[markdown] safe =
+              # false` (the default) the author may write raw HTML in a page
+              # body anyway, so `{{ body }}` stays safe markup. With `safe =
+              # true` it is PLAIN text, so under autoescape `{{ body }}` can't
+              # be a way around safe mode — `{{ body | markdownify }}`, which
+              # honours safe mode, is the way to render it. Every other
+              # argument is text.
+              context[key] = if key == "body" && !shortcode_body_safe?
+                               Crinja::Value.new(value)
+                             elsif key == "body"
+                               Utils::CrinjaUtils.html_value(value, template_autoescape?)
+                             else
+                               Crinja::Value.new(value)
+                             end
             end
 
             # Cache compiled shortcode templates by name and source hash to

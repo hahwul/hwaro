@@ -1001,6 +1001,14 @@ module Hwaro::Core::Build::Phases::Initialize
     @config.try(&.templates.autoescape) || false
   end
 
+  # Whether a shortcode block `body` is trusted HTML (safe). True unless
+  # `[markdown] safe = true`, where author HTML is stripped and the body must
+  # stay plain text so autoescape escapes it. Defaults to true when no config
+  # is loaded (spec paths), matching the common non-safe-mode default.
+  private def shortcode_body_safe? : Bool
+    !@config.try(&.markdown.safe)
+  end
+
   # Loader for `{% include %}`/`{% extends %}` resolution. Once templates
   # are loaded, references resolve against the in-memory snapshot (see
   # SnapshotTemplateLoader) so a rebuild can't observe half-written files
