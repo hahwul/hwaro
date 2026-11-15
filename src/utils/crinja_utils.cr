@@ -37,13 +37,66 @@ module Hwaro
       # was, byte-identical.
       def preescaped_value(text : String, autoescape : Bool) : Crinja::Value
         return Crinja::Value.new(text) unless autoescape
-        special = text.to_slice.any? { |byte| Crinja::Markup::SPECIAL.unsafe_fetch(byte) }
-        safe = special ? text.gsub(TEXT_SPECIAL) { |m| m.size > 1 ? m : HTML.escape(m) } : text
-        Crinja::Value.new(Crinja::SafeString.new(safe))
+        Crinja::Value.new(Crinja::SafeString.new(escape_text(text)))
       end
 
-      # A terminated character reference, or a lone HTML-special byte.
-      private TEXT_SPECIAL = /&(?:#[0-9]+|#[xX][0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]*);|[&<>"']/
+      # `text` with every `& < > " '` escaped except a terminated character
+      # reference's `&`, which is kept with the reference. The same String
+      # when there is nothing to escape. A byte scan, not a regex `gsub`:
+      # it runs on every hook value and TOC field.
+      private def escape_text(text : String) : String
+        bytes = text.to_slice
+        first = bytes.index { |byte| Crinja::Markup::SPECIAL.unsafe_fetch(byte) }
+        return text unless first
+        String.build(text.bytesize + 16) do |io|
+          io.write bytes[0, first]
+          i = run = first
+          while i < bytes.size
+            byte = bytes[i]
+            unless Crinja::Markup::SPECIAL.unsafe_fetch(byte)
+              i += 1
+              next
+            end
+            if byte === '&' && (ref = reference_length(bytes, i)) > 0
+              i += ref
+              next
+            end
+            io.write bytes[run, i - run]
+            io << (case byte
+            when '&' then "&amp;"
+            when '<' then "&lt;"
+            when '>' then "&gt;"
+            when '"' then "&quot;"
+            else          "&#39;"
+            end)
+            i += 1
+            run = i
+          end
+          io.write bytes[run, bytes.size - run]
+        end
+      end
+
+      # Byte length of the terminated reference (`&amp;`, `&#39;`, `&#x27;`,
+      # `&copy;`) starting at the `&` at `at`, or 0 when there is none.
+      private def reference_length(bytes : Bytes, at : Int32) : Int32
+        i = at + 1
+        if i < bytes.size && bytes[i] === '#'
+          i += 1
+          hex = i < bytes.size && (bytes[i] === 'x' || bytes[i] === 'X')
+          i += 1 if hex
+          start = i
+          while i < bytes.size && (hex ? bytes[i].unsafe_chr.hex? : bytes[i].unsafe_chr.ascii_number?)
+            i += 1
+          end
+        else
+          start = i
+          return 0 unless i < bytes.size && bytes[i].unsafe_chr.ascii_letter?
+          while i < bytes.size && bytes[i].unsafe_chr.ascii_alphanumeric?
+            i += 1
+          end
+        end
+        i > start && i < bytes.size && bytes[i] === ';' ? i - at + 1 : 0
+      end
 
       # Convert a YAML::Any value to Crinja::Value.
       #

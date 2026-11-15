@@ -444,6 +444,9 @@ describe Hwaro::Utils::CrinjaUtils do
         "<em>x</em> it's"                    => "&lt;em&gt;x&lt;/em&gt; it&#39;s",
         "a&copy=2 & &x &;"                   => "a&amp;copy=2 &amp; &amp;x &amp;;",
         "plain"                              => "plain",
+        "&#; &#x; &#12 &#xZ; &a"             => "&amp;#; &amp;#x; &amp;#12 &amp;#xZ; &amp;a",
+        "end &"                              => "end &amp;",
+        "가<나>&amp;다"                         => "가&lt;나&gt;&amp;다",
       }.each do |input, expected|
         value = Hwaro::Utils::CrinjaUtils.preescaped_value(input, true)
         value.raw.should be_a(Crinja::SafeString)
