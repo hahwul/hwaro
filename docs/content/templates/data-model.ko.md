@@ -801,7 +801,7 @@ pros = ["Fast", "Reliable"]
 다음 변수에는 hwaro가 렌더링한 HTML(또는 이미 이스케이프한 텍스트)이 들어 있습니다. 이들은 *안전(safe)* 값이라 그대로 출력되며, [`[templates] autoescape`](/ko/templates/syntax/#html-이스케이프)에서도 다시 이스케이프되지 않습니다.
 
 - 콘텐츠: `content`, `term_content`, `page.summary` / `page_summary`(`<!-- more -->` 요약이나 자동 발췌. `page.description`으로 대체될 때는 HTML이 아니라 그 텍스트입니다), `section.list` / `section_list`, 목록 속 모든 페이지 객체의 `summary`
-- 내비게이션: `toc`, `toc_obj.html`, `toc_obj.headers[].title`, `.id`, `.permalink`(태그를 뺀, 이미 이스케이프된 제목 텍스트), `pagination`, `pagination_obj.html`
+- 내비게이션: `toc`, `toc_obj.html`, `toc_obj.headers[].title`, `.id`, `.permalink`(태그를 뺀, 이미 이스케이프된 제목 텍스트. 자동 이스케이프에서는 HTML로 직접 쓴 헤딩의 따옴표, `<`, `&`도 이스케이프됩니다), `pagination`, `pagination_obj.html`
 - head 태그: `og_tags`, `twitter_tags`, `og_all_tags`, `canonical_tag`, `hreflang_tags`, `alternate_output_tags`, `pagination_seo_links`, `jsonld`와 모든 `jsonld_*`, `highlight_css`, `highlight_js`, `highlight_tags`, `math_tags`, `mermaid_tags`, `pwa_tags`, `search_tags`, `auto_includes`, `auto_includes_css`, `auto_includes_js`
 - 렌더 훅: 헤딩의 `id`와 코드 블록의 `copy`를 뺀 모든 훅 변수([렌더 훅](/ko/templates/render-hooks/#컨텍스트-변수) 참고). 숏코드: `body`
 - 피드 템플릿: `content_html`, 그리고 `content_is_html`일 때의 `content`
