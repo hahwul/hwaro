@@ -411,6 +411,13 @@ describe "Crinja autoescape" do
       "vars.html"    => %({% set label %}{{ "A&B" }}{% endset %}),
       "inc.txt"      => %({% include "literal.html" without context %}),
       "from.txt"     => %({% from "vars.html" import label %}{{ label }}),
+      "mod.txt"      => %({% set banner %}{{ u }}{% endset %}{% set tag %}<b>{% endset %}{% macro show(t) %}<i>{{ t }}</i>{% endmacro %}),
+      "imp.html"     => %({% import "mod.txt" as m %}{{ m.banner }}|{{ m.tag }}|{{ m.show(u) }}),
+      "imp_ctx.html" => %({% import "mod.txt" as m with context %}{{ m.banner }}),
+      "fro.html"     => %({% from "mod.txt" import tag, show %}{{ tag }}|{{ show(u) }}),
+      "fro_ctx.html" => %({% from "mod.txt" import banner with context %}{{ banner }}),
+      "imp.txt"      => %({% import "mod.txt" as m %}{{ m.banner }}|{{ m.tag }}),
+      "imp2.html"    => %({% import "vars.html" as m %}{% from "vars.html" import label %}{{ m.label }}|{{ label }}),
     }
     with_env = ->(block : Crinja -> Nil) do
       Dir.mktmpdir do |dir|
@@ -446,6 +453,25 @@ describe "Crinja autoescape" do
         env.get_template("literal.html").render(ae_vars).should eq("A&amp;B")
         nil
       })
+    end
+
+    it "a text module hands an escaping importer its captures as plain text; macros run in the caller" do
+      with_env.call(->(env : Crinja) {
+        env.get_template("imp.html").render(ae_vars).should eq("#{ESCAPED}|&lt;b&gt;|<i>#{ESCAPED}</i>")
+        env.get_template("imp_ctx.html").render(ae_vars).should eq(ESCAPED)
+        env.get_template("fro.html").render(ae_vars).should eq("&lt;b&gt;|<i>#{ESCAPED}</i>")
+        env.get_template("fro_ctx.html").render(ae_vars).should eq(ESCAPED)
+        # text importing text, and HTML importing HTML, are unchanged
+        env.get_template("imp.txt").render(ae_vars).should eq("#{CANARY}|<b>")
+        env.get_template("imp2.html").render(ae_vars).should eq("A&amp;B|A&amp;B")
+        nil
+      })
+      Dir.mktmpdir do |dir|
+        files.each { |name, source| File.write(File.join(dir, name), source) }
+        env = Hwaro::Content::Processors::TemplateEngine.new(false).env
+        env.loader = Crinja::Loader::FileSystemLoader.new(dir)
+        env.get_template("imp.html").render(ae_vars).should eq("#{CANARY}|<b>|<i>#{CANARY}</i>")
+      end
     end
 
     it "r4#2 an entry template rendered for an HTML file escapes whatever its name" do

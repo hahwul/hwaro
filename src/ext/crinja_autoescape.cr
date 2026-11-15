@@ -264,6 +264,24 @@ module Crinja::Markup
     env.config.autoescape.default_for_string
   end
 
+  # Whether `template` renders as text by itself (under the switch, its name
+  # does not escape or it opts out), when no caller forces HTML.
+  def text_template?(env : Crinja, template : Template, by_name : Bool = env.config.autoescape?(template.filename)) : Bool
+    switch?(env) && (template.__no_autoescape || !by_name)
+  end
+
+  # A top-level value `{% import %}` / `{% from %}` takes from `template`. A
+  # module that rendered as text for an importer that is not a text render
+  # hands its safe values over as plain Strings: nothing escaped them there
+  # (a capture made without escaping is plain text, as in Jinja2), so the
+  # importer escapes them where it prints them. Macros run in the caller's
+  # render and are not affected.
+  def imported_value(env : Crinja, template : Template, value : Value) : Value
+    return value if env.__text_render || !text_template?(env, template)
+    raw = value.raw
+    raw.is_a?(SafeString) ? Value.new(raw.to_s) : value
+  end
+
   # Whether printed values are being escaped right here: the switch is on AND
   # the current context escapes (a `{% autoescape false %}` block turns it
   # off). Every Markup filter/operator rule keys off this.
@@ -588,7 +606,7 @@ class Crinja::Renderer
     env.__entry_html = false
     switch = Crinja::Markup.switch?(env)
     by_name = env.config.autoescape?(template.filename)
-    text = previous_text || (switch && !forced_html && (template.__no_autoescape || !by_name))
+    text = previous_text || (!forced_html && Crinja::Markup.text_template?(env, template, by_name))
     env.__text_render = text
     context.autoescape = !text && (forced_html ? switch : by_name)
     begin
