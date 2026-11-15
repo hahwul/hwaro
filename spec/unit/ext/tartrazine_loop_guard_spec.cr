@@ -115,6 +115,17 @@ describe "Tartrazine loop guards (ext/tartrazine_loop_guard)" do
     html.should be_nil
   end
 
+  # A character no rule matches becomes an Error token. Stock tartrazine cut
+  # that token at one BYTE, so `→` came out as three U+FFFD.
+  it "keeps a multi-byte character that no rule matches intact" do
+    with_guard_grammar(guard_grammar("letters", %(<rule pattern="[a-z]+"><token type="Keyword"/></rule>))) do
+      finished, html = highlight_within("a→é✓b", "letters")
+      finished.should be_true
+      html.to_s.should_not contain('\u{FFFD}')
+      {"→", "é", "✓"}.each { |char| html.to_s.should contain(char) }
+    end
+  end
+
   it "leaves ordinary nested delegation alone" do
     finished, html = highlight_within(%(<style>a { color: red }</style>), "html")
     finished.should be_true
