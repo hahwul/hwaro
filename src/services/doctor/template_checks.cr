@@ -49,6 +49,17 @@ module Hwaro
         names
       end
 
+      # A site with its own templates that does not set `[templates]
+      # autoescape` gets the 1.0 default (on) silently: author text its
+      # templates printed raw is now escaped, and author HTML printed as
+      # markup needs `| safe`. Say so once, until the key is written down.
+      private def check_autoescape_explicit(issues : Array(Issue), config : Models::Config) : Nil
+        return if config.raw["templates"]?.try(&.as_h?).try(&.has_key?("autoescape"))
+        issues << Issue.new(id: "templates-autoescape-unset", level: :info, category: "config", file: @config_path,
+          message: "[templates] autoescape is not set: since hwaro 1.0 templates HTML-escape every printed value by default. " \
+                   "Author HTML printed as markup needs `| safe`; set `autoescape = true` to confirm, or `autoescape = false` to render as before 1.0.")
+      end
+
       # Every file the template loader would pick up. `.html` alone missed
       # the other extensions `Builder::TEMPLATE_EXTENSION_REGEX` accepts
       # (`.j2`, `.jinja`, `.jinja2`, `.ecr`), so a site whose templates are
