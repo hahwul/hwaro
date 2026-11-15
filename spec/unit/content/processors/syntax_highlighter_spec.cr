@@ -647,3 +647,19 @@ describe Hwaro::Content::Processors::ServerHighlighter do
     end
   end
 end
+
+describe Hwaro::Content::Processors::HighlightingRenderer do
+  # Safe mode re-reads every tag of trusted extension markup (a table) with
+  # anchored regexes; PCRE2 searched the rest of the node for each regex's
+  # required character first, once per `<`: quadratic in the table.
+  it "keeps a long table in safe mode in linear time" do
+    table = ->(rows : Int32) { "|a|b|\n|-|-|\n" + "|c|d|\n" * rows }
+    render = ->(md : String) { Hwaro::Content::Processors::Markdown.new.render(md, highlight: false, safe: true)[0] }
+    best = ->(md : String) { best_cpu_time { render.call(md) } }
+    render.call(table.call(50)).should contain("<td>c</td>")
+    small = best.call(table.call(1000))
+    large = best.call(table.call(4000))
+    ratio = large / {small, 1.millisecond}.max
+    ratio.should be < 9.0, "#{small.total_milliseconds.round}ms -> #{large.total_milliseconds.round}ms"
+  end
+end

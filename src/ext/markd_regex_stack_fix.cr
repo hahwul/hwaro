@@ -52,6 +52,10 @@
 # * each title/label attempt rescanned to the end of an unclosed run — the
 #   scanner's per-position results are computed once per paragraph.
 #
+# Two more line-length-quadratic cases: a backtick run that opens no fence
+# (`CODE_FENCE`, `Rule::CodeBlock#match`), and PCRE2's required-character
+# search before every anchored inline match (`NO_START_OPT`).
+#
 # Remove when: upstream markd stops repeating groups over unbounded input.
 
 require "markd"
@@ -61,7 +65,7 @@ require "./markd_entity_fix" # Rule::NAMED_HTML_ENTITY
 # shard bump that changes them would be silently reverted. Fail the build
 # loudly instead; re-verify against the new source, then bump the pin.
 {% if Markd::VERSION != "0.5.0" %}
-  {% raise "src/ext/markd_regex_stack_fix.cr replaces Markd::Parser::Inline#match/#html_tag/#link_title/#link_label/#link_destination/#reference, Markd::Parser::Block#add_line, Markd::Node#text and Markd::Rule::HTMLBlock#match/Paragraph#token verbatim from markd 0.5.0, but markd #{Markd::VERSION} is vendored. Re-check the patch against the new upstream source and update the version pin." %}
+  {% raise "src/ext/markd_regex_stack_fix.cr replaces Markd::Parser::Inline#match/#html_tag/#link_title/#link_label/#link_destination/#reference, Markd::Parser::Block#add_line, Markd::Node#text and Markd::Rule::HTMLBlock#match/CodeBlock#match/Paragraph#token verbatim from markd 0.5.0, but markd #{Markd::VERSION} is vendored. Re-check the patch against the new upstream source and update the version pin." %}
 {% end %}
 
 module Hwaro
@@ -77,11 +81,25 @@ module Hwaro
     # Compile-time ANCHORED: matches only at the start offset handed to
     # `match_at_byte_index`, so the parser never has to copy the rest of the
     # paragraph to anchor a `^` pattern.
-    HTML_TAG = Regex.new(HTML_TAG_STRING, Regex::Options::IGNORE_CASE | Regex::Options::ANCHORED)
+    #
+    # `(*NO_START_OPT)`: before an anchored match PCRE2 first searches the
+    # subject for the pattern's required character (the `>` of a tag or
+    # autolink, the `;` of an entity) — to the end of the paragraph when
+    # there is none, once per `<` / `&`, so `<<<…` or `&amp&amp…` without a
+    # closer was quadratic. The start optimizations never change a result.
+    NO_START_OPT = "(*NO_START_OPT)"
+
+    HTML_TAG = Regex.new(NO_START_OPT + HTML_TAG_STRING, Regex::Options::IGNORE_CASE | Regex::Options::ANCHORED)
 
     LINK_DESTINATION_BRACES = Regex.new(
-      "(?:[<](?:[^<>\\t\\n\\\\\\x00]|" + Markd::Rule::ESCAPED_CHAR_STRING + ")*+[>])",
+      NO_START_OPT + "(?:[<](?:[^<>\\t\\n\\\\\\x00]|" + Markd::Rule::ESCAPED_CHAR_STRING + ")*+[>])",
       Regex::Options::ANCHORED)
+
+    # Rule::CodeBlock::CODE_FENCE with the backtick run possessive: a shorter
+    # run leaves a backtick in front of the `(?!.*`)` lookahead, so giving
+    # backticks back can never produce a match — it only rescanned the rest of
+    # the line once per backtick (quadratic in a long run that opens no fence).
+    CODE_FENCE = /^`{3,}+(?!.*`)|^~{3,}/
 
     HTML_BLOCK_OPEN = Markd::Rule::HTML_BLOCK_OPEN[0...-1] + [
       Regex.new("^(?:" + OPEN_TAG + "|" + Markd::Rule::CLOSE_TAG + ")\\s*$", Regex::Options::IGNORE_CASE),
@@ -98,7 +116,7 @@ module Hwaro
 
     def self.anchored(regex : Regex) : Regex
       raise ArgumentError.new("expected a ^-anchored rule: #{regex.source}") unless regex.source.starts_with?('^')
-      Regex.new(regex.source.lchop('^'), regex.options | Regex::Options::ANCHORED)
+      Regex.new(NO_START_OPT + regex.source.lchop('^'), regex.options | Regex::Options::ANCHORED)
     end
 
     # Rule::EMAIL_AUTO_LINK with its domain-label loop possessive: every
@@ -106,8 +124,8 @@ module Hwaro
     # leaves a `.` or an alphanumeric where the closing `>` must be, so
     # backtracking can never produce a match.
     EMAIL_AUTO_LINK = Regex.new(
-      "<([a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?" \
-      "(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*+)>",
+      NO_START_OPT + "<([a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?" \
+                     "(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*+)>",
       Regex::Options::ANCHORED)
 
     # Upstream's own tag regexes, for the fallback below.
@@ -559,6 +577,39 @@ module Markd::Rule
       container.text = text.byte_slice(offset) if offset > 0
 
       container.unlink if has_reference_defs && container.text.each_char.all? &.ascii_whitespace?
+    end
+  end
+
+  struct CodeBlock
+    # Upstream body; only the fence regex is hwaro's (see CODE_FENCE).
+    def match(parser : Parser, container : Node) : MatchValue
+      if !parser.indented &&
+         (match = parser.line[parser.next_nonspace..-1].match(Hwaro::MarkdRegexStackFix::CODE_FENCE))
+        # fenced
+        fence_length = match[0].size
+
+        parser.close_unmatched_blocks
+        node = parser.add_child(Node::Type::CodeBlock, parser.next_nonspace)
+        node.fenced = true
+        node.fence_length = fence_length
+        node.fence_char = match[0][0].to_s
+        node.fence_offset = parser.indent
+
+        parser.advance_next_nonspace
+        parser.advance_offset(fence_length, false)
+
+        MatchValue::Leaf
+      elsif parser.indented && !parser.blank && (tip = parser.tip) &&
+            !tip.type.paragraph?
+        # indented
+        parser.advance_offset(Rule::CODE_INDENT, true)
+        parser.close_unmatched_blocks
+        parser.add_child(Node::Type::CodeBlock, parser.offset)
+
+        MatchValue::Leaf
+      else
+        MatchValue::None
+      end
     end
   end
 

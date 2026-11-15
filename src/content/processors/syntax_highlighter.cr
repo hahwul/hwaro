@@ -646,14 +646,17 @@ module Hwaro
         private def keep_trusted(text : String) : String?
           start = text.byte_index('<')
           return unless start && text.byte_slice(0, start).blank? && trusted_at(text, start, dry_run: true)
+          # PCRE2 re-validates the UTF-8 of the WHOLE subject on every match
+          # unless told not to: once per `<`, quadratic in a long table.
+          options = text.valid_encoding? ? Regex::MatchOptions::ANCHORED | Regex::MatchOptions::NO_UTF_CHECK : Regex::MatchOptions::ANCHORED
           String.build do |io|
             pos = 0
             while lt = text.byte_index('<', pos)
               io.write(text.to_slice[pos, lt - pos])
-              if m = trusted_at(text, lt)
+              if m = trusted_at(text, lt, options: options)
                 # Unmarked here already, so render hooks never see a mark.
                 io << MarkdownExtensions.untrust(m[0])
-              elsif m = RAW_HTML_RE.match_at_byte_index(text, lt, Regex::MatchOptions::ANCHORED)
+              elsif m = RAW_HTML_RE.match_at_byte_index(text, lt, options)
                 io << "<!-- raw HTML omitted -->"
               else
                 io << "&lt;"
@@ -666,17 +669,17 @@ module Hwaro
           end
         end
 
-        private def trusted_at(text : String, pos : Int32, dry_run : Bool = false) : Regex::MatchData?
-          if m = TRUSTED_OPEN_RE.match_at_byte_index(text, pos, Regex::MatchOptions::ANCHORED)
+        private def trusted_at(text : String, pos : Int32, dry_run : Bool = false, options : Regex::MatchOptions = Regex::MatchOptions::ANCHORED) : Regex::MatchData?
+          if m = TRUSTED_OPEN_RE.match_at_byte_index(text, pos, options)
             @trusted_open[m[1].downcase] += 1 unless dry_run
             m
-          elsif m = TRUSTED_COMMENT_RE.match_at_byte_index(text, pos, Regex::MatchOptions::ANCHORED)
+          elsif m = TRUSTED_COMMENT_RE.match_at_byte_index(text, pos, options)
             m
-          elsif !dry_run && (m = InlineMarkdown::SHORTCODE_PLACEHOLDER_RE.match_at_byte_index(text, pos, Regex::MatchOptions::ANCHORED))
+          elsif !dry_run && (m = InlineMarkdown::SHORTCODE_PLACEHOLDER_RE.match_at_byte_index(text, pos, options))
             # Kept inside trusted markup; a node starting with one keeps the
             # `keep_shortcode_placeholders` handling.
             m
-          elsif (m = CLOSE_TAG_RE.match_at_byte_index(text, pos, Regex::MatchOptions::ANCHORED)) && @trusted_open[name = m[1].downcase] > 0
+          elsif (m = CLOSE_TAG_RE.match_at_byte_index(text, pos, options)) && @trusted_open[name = m[1].downcase] > 0
             @trusted_open[name] -= 1 unless dry_run
             m
           end

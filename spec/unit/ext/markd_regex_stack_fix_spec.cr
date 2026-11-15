@@ -201,5 +201,39 @@ describe Hwaro::MarkdRegexStackFix do
     it "renders a very long email-like autolink without a JIT stack error" do
       render_within("<a@" + "b." * 100000 + "c>\n", 10.0).should start_with("<p>")
     end
+
+    # A line that starts with a run of backticks and holds another backtick
+    # later is no code fence, but upstream's `^`{3,}(?!.*`)` found that out
+    # by giving the run back one backtick at a time, rescanning the rest of
+    # the line after each: quadratic in the line.
+    it "reads a long backtick run that opens no fence in linear time" do
+      line = ->(n : Int32) { "`" * n + "x" + "`" * (n - 1) + "\n" }
+      best = ->(markdown : String) { best_cpu_time { Markd.to_html(markdown) } }
+      Markd.to_html(line.call(500)) # warm up
+      small = best.call(line.call(4000))
+      large = best.call(line.call(16000))
+      ratio = large / {small, 1.millisecond}.max
+      ratio.should be < 9.0, "#{small.total_milliseconds.round}ms -> #{large.total_milliseconds.round}ms"
+    end
+
+    # PCRE2 looks ahead for a pattern's required character (the `>` of an
+    # autolink or tag, the `;` of an entity) before trying an anchored match,
+    # so every `<` / `&` on a long line without one rescanned the rest of it.
+    it "renders long runs of `<` and `&` with no closing `>` or `;` in linear time" do
+      best = ->(markdown : String) { best_cpu_time { Markd.to_html(markdown) } }
+      ["<", "&amp"].each do |unit|
+        Markd.to_html(unit * 500 + "\n") # warm up
+        small = best.call(unit * 40000 + "\n")
+        large = best.call(unit * 160000 + "\n")
+        ratio = large / {small, 1.millisecond}.max
+        ratio.should be < 9.0, "#{unit.inspect}: #{small.total_milliseconds.round}ms -> #{large.total_milliseconds.round}ms"
+      end
+    end
+  end
+
+  it "opens code fences exactly like Rule::CodeBlock::CODE_FENCE" do
+    random_strings(23, ["`", "~", "x", " ", "``", "```"]).each do |line|
+      upstream_length(Fix::CODE_FENCE, line).should eq(upstream_length(Markd::Rule::CodeBlock::CODE_FENCE, line)), line.inspect
+    end
   end
 end

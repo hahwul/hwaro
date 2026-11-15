@@ -189,6 +189,9 @@ module Hwaro
         return css if source_dir == bundle_dir
         bytes = css.to_slice
         n = bytes.size
+        # PCRE2 re-validates the UTF-8 of the WHOLE subject on every match
+        # unless told not to: once per word starting with `u`, quadratic.
+        url_opts = css.valid_encoding? ? Regex::MatchOptions::ANCHORED | Regex::MatchOptions::NO_UTF_CHECK : Regex::MatchOptions::ANCHORED
         String.build(css.bytesize) do |io|
           i = 0
           copied = 0 # bytes[copied...i] are pending verbatim output
@@ -200,7 +203,7 @@ module Hwaro
               close = css.byte_index("*/", i + 2)
               i = close ? close + 2 : n
             elsif (b == 'u'.ord || b == 'U'.ord) && (i == 0 || !css_ident_byte?(bytes[i - 1])) &&
-                  (m = CSS_URL_RE.match_at_byte_index(css, i, Regex::MatchOptions::ANCHORED))
+                  (m = CSS_URL_RE.match_at_byte_index(css, i, url_opts))
               stop = i + m[0].bytesize
               io.write(bytes[copied, i - copied])
               io << rebase_css_url(m[0], m[1], m[2], source_dir, bundle_dir)

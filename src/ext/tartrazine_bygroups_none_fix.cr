@@ -16,7 +16,8 @@
 #
 # A `None` node now becomes a placeholder action that consumes its group and
 # emits nothing (`<pop depth="0"/>` is a no-op). Only LiquidLexer.xml uses
-# the construct in the lexers bundled today.
+# the construct in the lexers bundled today; ruby.xml writes the same skip as
+# `<token type="None"/>` (see `hwaro_none_token?`).
 #
 # Remove when: upstream's Action#initialize keeps `None` placeholders.
 
@@ -26,17 +27,25 @@ struct Tartrazine::Action
   # Parsed once; the placeholder carries no per-use state.
   HWARO_SKIP_XML = XML.parse(%(<pop depth="0"/>)).first_element_child.as(XML::Node)
 
+  # The same skip written as an element, `<token type="None"/>`: Ruby's
+  # whitespace-delimited percent literal is bygroups(Text, String.Other, None)
+  # with the None group (the delimiter) INSIDE the string group, so emitting
+  # it printed the closing delimiter twice (`% x  y` → `% x   y`).
+  def self.hwaro_none_token?(node : XML::Node) : Bool
+    node.element? && node.name == "token" && node["type"]? == "None"
+  end
+
   def initialize(t : String, xml : XML::Node?)
     previous_def
     return unless xml && @type.bygroups?
-    return unless xml.children.any? { |node| node.text? && node.content.strip == "None" }
+    return unless xml.children.any? { |node| (node.text? && node.content.strip == "None") || Action.hwaro_none_token?(node) }
 
     elements = @actions.dup
     @actions.clear
     index = 0
     xml.children.each do |node|
       if node.element?
-        @actions << elements[index]
+        @actions << (Action.hwaro_none_token?(node) ? Tartrazine::Action.new("pop", HWARO_SKIP_XML) : elements[index])
         index += 1
       elsif node.text? && node.content.strip == "None"
         @actions << Tartrazine::Action.new("pop", HWARO_SKIP_XML)
