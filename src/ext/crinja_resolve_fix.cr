@@ -115,7 +115,7 @@ module Crinja::Resolver
         if idx = name.to_s.to_i?
           char = raw.to_s[idx]?
           return Crinja::Value.new(Crinja::Undefined.new(name.to_s)) unless char
-          return Crinja::Value.new(raw.is_a?(Crinja::SafeString) ? Crinja::SafeString.new(char.to_s) : char.to_s)
+          return Crinja::Value.new(raw.is_a?(Crinja::SafeString) ? raw.derive(char.to_s) : char.to_s)
         end
       end
       if raw.is_a?(String) || raw.is_a?(Crinja::SafeString) || raw.is_a?(Crinja::Tuple)

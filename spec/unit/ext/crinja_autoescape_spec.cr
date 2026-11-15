@@ -492,6 +492,44 @@ describe "Crinja autoescape" do
     end
   end
 
+  # The mark means "a String in 0.x": what 0.x derived from `content` was a
+  # String too, so `| e` on it escapes as it did there.
+  describe "the rendered-HTML mark survives derivation" do
+    exprs = ["c[0]", "c[-1]", "c[:6]", "c[2:9]", "c[::-1]", "c | upper", "c | lower", "c | capitalize", "c | center(30)",
+             "c | indent(2, true)", "c | trim", "c | truncate(8)", "c | truncate(8, true, '~')", "c | truncate(500)",
+             "c | truncate_words(1)", "c | truncate_words(50)", "c | replace('p', 'q')", "c | regex_replace('y', 'Z')",
+             "c | format", "c | string", "c | default('d')", "c | append('z')", "c | prepend('z')", "c ~ 'z'", "'z' ~ c",
+             "c + 'z'", "c ~ c", "c | markdownify", "c | xml_escape", "c[:6] | upper | truncate(4, true, '~')"]
+    html = "<p>x &amp; y</p>"
+
+    it "| e on a value derived from rendered HTML prints what 0.x printed (HTML and text renders)" do
+      on_vars = {"c" => Hwaro::Utils::CrinjaUtils.html_value(html, true)} of String => Crinja::Value
+      off_vars = {"c" => Hwaro::Utils::CrinjaUtils.html_value(html, false)} of String => Crinja::Value
+      on_env = Hwaro::Content::Processors::TemplateEngine.new(true).env
+      off_env = Hwaro::Content::Processors::TemplateEngine.new(false).env
+      exprs.each do |expr|
+        src = "{{ (#{expr}) | e }}|{{ (#{expr}) | escape }}"
+        want = off_env.from_string(src).render(off_vars)
+        on_env.from_string(src).render(on_vars).should eq(want), expr
+        on_env.from_string(src).render_text(on_vars).should eq(want), "#{expr} (text render)"
+      end
+    end
+
+    it "still prints the derived markup itself, and | safe still drops the mark" do
+      vars = {"c" => Hwaro::Utils::CrinjaUtils.html_value(html, true)} of String => Crinja::Value
+      env = Hwaro::Content::Processors::TemplateEngine.new(true).env
+      env.from_string("{{ c[:3] }}|{{ c | truncate(500) }}|{{ c ~ '<' }}|{{ c | safe | e }}|{{ c | e | e }}").render(vars)
+        .should eq("<p>|<p>x &amp; y</p>|<p>x &amp; y</p>&lt;|<p>x &amp; y</p>|&lt;p&gt;x &amp;amp; y&lt;/p&gt;")
+    end
+
+    it "tojson and jsonify output is marked, so the 0.x attribute idiom | e keeps quotes inside the attribute" do
+      env = Hwaro::Content::Processors::TemplateEngine.new(true).env
+      out = env.from_string(%(<div data-x="{{ {"t": u} | tojson | e }}" data-y="{{ {"t": u} | jsonify | escape }}">)).render(ae_vars)
+      out.count('"').should eq(4)
+      env.from_string(%({{ {"t": u} | tojson }})).render(ae_vars).should contain(%("t":))
+    end
+  end
+
   it "r4#8 an engine built without saying otherwise escapes" do
     Hwaro::Content::Processors::TemplateEngine.new.env.from_string("{{ u }}").render(ae_vars).should eq(ESCAPED)
   end

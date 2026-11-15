@@ -41,8 +41,9 @@ module Hwaro
                      else
                        Markd.to_html(target.to_s)
                      end
-              # HTML hwaro renders: safe under autoescape.
-              Crinja::Markup.active?(env) ? Crinja::SafeString.new(html) : html
+              # HTML hwaro renders: safe under autoescape, and marked as
+              # `content` is (0.x returned a String, so `| e` escapes it).
+              Crinja::Markup.active?(env) ? Crinja::SafeString.new(html, false, true) : html
             end
 
             # XML escape filter (single-pass via TextUtils)
@@ -51,7 +52,7 @@ module Hwaro
             # escaped a second time.
             env.filters["xml_escape"] = Crinja.filter do
               escaped = Hwaro::Utils::TextUtils.escape_xml(target.to_s)
-              Crinja::Markup.active?(env) ? Crinja::SafeString.new(escaped) : escaped
+              Crinja::Markup.active?(env) ? Crinja::Markup.derived(escaped, target) : escaped
             end
 
             # Safe filter

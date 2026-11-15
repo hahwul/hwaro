@@ -43,7 +43,7 @@ A template escapes when its output is HTML or XML: files ending in `.html`, `.ht
 The block does not reach into a file it includes. Under autoescape, also:
 
 - `a ~ b` (and `a + b` on strings) with a safe operand escapes the other one and is safe. `{{ "<p>" ~ x }}` prints `&lt;p&gt;`: build markup with a `{% set %}…{% endset %}` block or a macro, whose output is safe.
-- `| e` and `| escape` leave a safe value alone, except HTML hwaro rendered (`content`, `page.summary`, the HTML values listed in the data model), which they still escape as before 1.0, so `{{ p.summary | escape }}` in a feed shows the markup as text. `| forceescape` and `| xml_escape` escape any value.
+- `| e` and `| escape` leave a safe value alone, except HTML hwaro rendered (`content`, `page.summary`, the HTML values listed in the data model), which they still escape as before 1.0, so `{{ p.summary | escape }}` in a feed shows the markup as text. The same holds for what you derive from it, as in 0.x: `{{ content[:300] | e }}`, `{{ p.summary | truncate(200) | escape }}`, `{{ (content ~ "…") | e }}`, and for `markdownify` and `tojson` output, so `data-x="{{ v | tojson | e }}"` still keeps its quotes inside the attribute. `| forceescape` and `| xml_escape` escape any value.
 - `{{ x | tojson }}` is safe JSON with `<`, `>`, `&` and `'` written as `\u003c`-style escapes, ready for a `<script>`.
 
 ### Coming from 0.x

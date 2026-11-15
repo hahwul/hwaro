@@ -211,7 +211,7 @@ module Hwaro
               if truncated
                 Crinja::Markup.append_suffix(env, words[0...length].join(" "), target, arguments["end"])
               elsif Crinja::Markup.active?(env) && Crinja::Markup.safe?(target)
-                Crinja::Value.new(Crinja::SafeString.new(text))
+                Crinja::Value.new(Crinja::Markup.derived(text, target))
               else
                 text
               end

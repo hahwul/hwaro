@@ -37,8 +37,12 @@
 # template's `{{ p.summary | escape | xml_escape }}` and `{{ content | e }}`
 # show the markup as text. Any other safe value (a capture, a macro result,
 # `| safe`, pre-escaped text such as a hook `destination`) passes `| e`
-# unchanged, as in Jinja2. A filter that builds a new SafeString drops the
-# mark.
+# unchanged, as in Jinja2. The mark means "a String in 0.x", so it survives
+# what 0.x derived as a String: a slice or character of a marked value, the
+# keep-safe filters, `truncate`, `replace`, `~`/`+`/`append` with a marked
+# operand (`SafeString#derive`, `Markup.derived`), and `markdownify`/`tojson`
+# output. What 0.x already made a SafeString (`| e`, `| safe`, captures,
+# macros, `join`, `urlize`) stays unmarked.
 struct Crinja::SafeString
   @__rendered_html = false
 
@@ -47,6 +51,25 @@ struct Crinja::SafeString
 
   def rendered_html? : Bool
     @__rendered_html
+  end
+
+  # A safe `string` derived from this one (a slice, a character, a filter
+  # result). It keeps the mark: anything 0.x derived from `content` was a
+  # String too, so `{{ content[:300] | e }}` and `{{ page.summary |
+  # truncate(200) | escape }}` still escape.
+  def derive(string : String) : SafeString
+    SafeString.new(string, false, @__rendered_html)
+  end
+
+  # Upstream slices a SafeString into a new, unmarked one.
+  def [](*args)
+    result = previous_def
+    result.is_a?(SafeString) ? derive(result.to_s) : result
+  end
+
+  def []?(*args)
+    result = previous_def
+    result.is_a?(SafeString) ? derive(result.to_s) : result
   end
 
   # The struct hash as it was before the mark existed (`@string`, then
@@ -210,6 +233,19 @@ module Crinja::Markup
     !value.nil? && value.raw.is_a?(SafeString)
   end
 
+  # Whether `value` is HTML hwaro rendered (see `SafeString#derive`).
+  def marked?(value : Value?) : Bool
+    return false if value.nil?
+    raw = value.raw
+    raw.is_a?(SafeString) && raw.rendered_html?
+  end
+
+  # A safe result built from `sources`: it carries the rendered-HTML mark
+  # when any of them does.
+  def derived(string : String, *sources : Value?) : SafeString
+    SafeString.new(string, false, sources.any? { |source| marked?(source) })
+  end
+
   # Whether `[templates] autoescape` is on for this environment (the site
   # switch), independent of a `{% autoescape %}` tag. `configure_autoescape`
   # sets `default_for_string` to the switch, so an OFF-mode build never takes
@@ -261,7 +297,7 @@ module Crinja::Markup
   def append_suffix(env : Crinja, prefix : String, target : Value?, suffix : Value) : Value
     prefix_safe = active?(env) && safe?(target)
     return Value.new(prefix + suffix.to_s) unless prefix_safe || (active?(env) && safe?(suffix))
-    Value.new(SafeString.new((prefix_safe ? prefix : escape(prefix)) + escape(suffix)))
+    Value.new(derived((prefix_safe ? prefix : escape(prefix)) + escape(suffix), target, suffix))
   end
 
   # A filter argument that the filter will INSERT into its text, escaped so
@@ -305,7 +341,7 @@ module Crinja::Markup
       end
       result = inner.call(arguments)
       raw = result.raw
-      raw.is_a?(String) ? Value.new(SafeString.new(raw)) : result
+      raw.is_a?(String) ? Value.new(derived(raw, arguments.target)) : result
     end
     Callable::Instance.new(proc, filter.defaults, filter.name)
   end
@@ -339,7 +375,7 @@ module Crinja::Markup
       args = Arguments.new(arguments.env, varargs, arguments.kwargs, arguments.defaults, arguments.target)
       result = inner.call(args)
       raw = result.raw
-      raw.is_a?(String) ? Value.new(SafeString.new(raw)) : result
+      raw.is_a?(String) ? Value.new(derived(raw, arguments.target)) : result
     end
     Callable::Instance.new(proc, filter.defaults, filter.name)
   end
@@ -354,7 +390,7 @@ module Crinja::Markup
       target = arguments.target || Value.new(nil)
       string = arguments["string"]
       return inner.call(arguments) unless active?(arguments.env) && (safe?(target) || safe?(string))
-      Value.new(SafeString.new(prepend ? escape(string) + escape(target) : escape(target) + escape(string)))
+      Value.new(derived(prepend ? escape(string) + escape(target) : escape(target) + escape(string), target, string))
     end
     Callable::Instance.new(proc, filter.defaults, filter.name)
   end
@@ -603,7 +639,7 @@ Crinja.filter({old: Crinja::UNDEFINED, new: Crinja::UNDEFINED, count: nil}, :rep
     search = old_arg.to_s
     replacement = Crinja::Markup.escape(new_arg)
     limit = count.raw.nil? ? nil : count.to_i
-    Crinja::Value.new(Crinja::SafeString.new(Crinja::Filter.__replace_n(source, search, replacement, limit)))
+    Crinja::Value.new(Crinja::Markup.derived(Crinja::Filter.__replace_n(source, search, replacement, limit), target, new_arg))
   else
     search = old_arg.to_s
     if count.raw.nil?
@@ -733,7 +769,7 @@ end
 class Crinja::Operator::Tilde < Crinja::Operator
   def value(env : Crinja, op1, op2)
     if Crinja::Markup.active?(env) && (Crinja::Markup.safe?(op1) || Crinja::Markup.safe?(op2))
-      SafeString.new(Crinja::Markup.escape(op1) + Crinja::Markup.escape(op2))
+      Crinja::Markup.derived(Crinja::Markup.escape(op1) + Crinja::Markup.escape(op2), op1, op2)
     else
       op1.to_s + op2.to_s
     end
@@ -778,7 +814,7 @@ class Crinja::Operator::Plus < Crinja::Operator
         op1.as_a << Value.new adding
       end
     elsif Crinja::Markup.active?(env) && (Crinja::Markup.safe?(op1) || Crinja::Markup.safe?(op2))
-      SafeString.new(Crinja::Markup.escape(op1) + Crinja::Markup.escape(op2))
+      Crinja::Markup.derived(Crinja::Markup.escape(op1) + Crinja::Markup.escape(op2), op1, op2)
     else
       op1.to_s + op2.to_s
     end

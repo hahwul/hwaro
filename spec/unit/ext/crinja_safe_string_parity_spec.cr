@@ -57,7 +57,7 @@ private CONSTRUCTS = [
   "{% set d = {x: 1} %}{{ d[y] }}|{{ d[x] }}", "{% set d = {y: 1} %}{{ d[x] }}|{{ x in d }}",
   # (a SafeString and the equal String are distinct keys, as in 0.x: KEY_CASES below)
   "{% if x == y %}eq{% endif %}{% if y == x %}qe{% endif %}{% if x != y %}ne{% endif %}", "{{ [x, y, 'a'] | sort | join('|') }}",
-  "{% for g in [{'k': x}, {'k': y}] | groupby('k') %}{{ g.grouper }}:{{ g.list | length }};{% endfor %}",
+  "{% for k, v in [{'k': x}, {'k': y}] | groupby('k') %}{{ k }}:{{ v | length }};{% endfor %}",
   "{% for i in [1, 2] %}{{ loop.cycle(x, 'o') }}{% endfor %}", "{% set s = x %}{{ s }}",
   "{% macro m(v) %}[{{ v }}]{% endmacro %}{{ m(x) }}", "{{ x | first }}", "{{ x | last }}", "{{ x | list | length }}",
   "{{ x | reverse }}", "{{ x | wordcount }}", "{{ x | upper }}", "{{ x.upper() }}", "{{ x | slice(2) | list | length }}",

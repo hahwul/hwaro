@@ -102,7 +102,7 @@ class Crinja::Evaluator
     when String
       Crinja.slice_string(raw, start, stop, step)
     when SafeString
-      SafeString.new(Crinja.slice_string(raw.to_s, start, stop, step))
+      raw.derive(Crinja.slice_string(raw.to_s, start, stop, step))
     else
       raise TypeError.new(object, "#{raw.class} cannot be sliced")
     end
