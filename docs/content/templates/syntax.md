@@ -199,6 +199,8 @@ Include partial templates:
 {% include "partials/footer.html" %}
 ```
 
+An included file escapes by its own name, not by the page's: `{% include "partials/x.txt.jinja" %}` (or a `.js`, `.css`, `.json`, `.md` or `.csv` partial) inside an HTML page prints its values unescaped, so put `| e` on author text such a partial prints into HTML.
+
 ## Macros
 
 Define reusable snippets with `{% macro %}`, usually in a partial, and import them where you need them:

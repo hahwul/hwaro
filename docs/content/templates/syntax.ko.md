@@ -199,6 +199,8 @@ Jinja2처럼 `[start:stop:step]`으로 리스트나 문자열의 일부를 꺼�
 {% include "partials/footer.html" %}
 ```
 
+include한 파일은 페이지가 아니라 자기 이름에 따라 이스케이프합니다. HTML 페이지 안의 `{% include "partials/x.txt.jinja" %}`(또는 `.js`, `.css`, `.json`, `.md`, `.csv` 조각)는 값을 이스케이프하지 않고 출력하므로, 이런 조각이 HTML에 출력하는 작성자 텍스트에는 `| e`를 붙이세요.
+
 ## 매크로
 
 `{% macro %}`로 재사용할 조각을 정의하고(보통 부분 템플릿에 둡니다), 필요한 곳에서 가져와 씁니다.
