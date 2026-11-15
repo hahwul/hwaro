@@ -370,7 +370,7 @@ Or use the body as-is for raw content:
 <div class="note">{{ body }}</div>
 ```
 
-`body` is the author's content and prints as is in both modes of [`[templates] autoescape`](/templates/syntax/#html-escaping). Every other argument is text: under autoescape `{{ caption }}` prints escaped, so a caption that should carry HTML needs `{{ caption | safe }}`.
+`body` is the author's page content. With `[markdown] safe = false` (the default) it prints as is in both modes of [`[templates] autoescape`](/templates/syntax/#html-escaping), since the author may write raw HTML in the body anyway. With `[markdown] safe = true` the body is plain text, so `{{ body }}` is escaped under autoescape and `{{ body }}` can't bypass safe mode — use `{{ body | markdownify }}`, which honours safe mode, to render it. Every other argument is text: under autoescape `{{ caption }}` prints escaped, so a caption that should carry HTML needs `{{ caption | safe }}`.
 
 ### Nested Shortcodes
 

@@ -366,7 +366,7 @@ This is the **body** content of the shortcode.
 <div class="note">{{ body }}</div>
 ```
 
-`body`는 작성자의 콘텐츠이며 [`[templates] autoescape`](/ko/templates/syntax/#html-이스케이프)를 켜든 끄든 그대로 출력됩니다. 다른 인자는 모두 텍스트입니다. 자동 이스케이프에서는 `{{ caption }}`이 이스케이프되어 출력되므로, HTML을 담아야 하는 캡션에는 `{{ caption | safe }}`가 필요합니다.
+`body`는 작성자의 페이지 콘텐츠입니다. `[markdown] safe = false`(기본값)이면 작성자가 본문에 원시 HTML을 쓸 수 있으므로 [`[templates] autoescape`](/ko/templates/syntax/#html-이스케이프)를 켜든 끄든 그대로 출력됩니다. `[markdown] safe = true`이면 `body`는 일반 텍스트라서 자동 이스케이프에서 `{{ body }}`가 이스케이프되고, `{{ body }}`로는 safe 모드를 우회할 수 없습니다. safe 모드를 지키며 렌더링하려면 `{{ body | markdownify }}`를 쓰세요. 다른 인자는 모두 텍스트입니다. 자동 이스케이프에서는 `{{ caption }}`이 이스케이프되어 출력되므로, HTML을 담아야 하는 캡션에는 `{{ caption | safe }}`가 필요합니다.
 
 ### 중첩 숏코드
 
