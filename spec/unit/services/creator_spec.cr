@@ -205,6 +205,30 @@ describe Hwaro::Services::Creator do
       end
     end
 
+    # Archetypes are text: `[templates] autoescape` (on by default) never
+    # HTML-escapes what `hwaro new` writes.
+    it "never HTML-escapes archetype placeholders, under the default config" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "S"\nbase_url = "https://e.example.com"\n))
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("archetypes")
+          File.write("archetypes/custom.md", "+++\ntitle = \"{{ title }}\"\ndescription = \"{{ description }}\"\n+++\n\n# {{ title }}\n")
+
+          text = %(Tom & Jerry <x> 'y')
+          options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: text, description: text, archetype: "custom")
+          Hwaro::Services::Creator.new.run(options)
+
+          content = File.read("content/post.md")
+          content.should contain("# #{text}\n")
+          content.should_not contain("&amp;")
+          fm = content.split("+++")[1]
+          TOML.parse(fm)["title"].as_s.should eq(text)
+          TOML.parse(fm)["description"].as_s.should eq(text)
+        end
+      end
+    end
+
     # Regression: the front-matter escaping was applied to the body too, so the
     # documented `# {{ title }}` heading printed `# My \"Quoted\" Post`.
     it "substitutes body placeholders unescaped" do

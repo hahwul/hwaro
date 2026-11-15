@@ -409,4 +409,72 @@ describe "Template autoescape" do
       File.read("public/p/index.html").should contain("<h1>T #{ESCAPED}</h1>")
     end
   end
+
+  # Every output that is not HTML/XML comes out byte-identical under the
+  # default (escaping on) and `autoescape = false`. Text a template renders
+  # (output formats, the JSON feed, content.generate) never escapes, and the
+  # surfaces hwaro writes itself (search index, robots, llms.txt, manifest,
+  # OG images) do not go through template escaping at all.
+  it "writes every non-HTML output byte-identical under the default and autoescape = false" do
+    q = CANARY.gsub('"', "\\\"")
+    base = <<-TOML
+      title = "S #{q}"
+      description = "D #{q}"
+      base_url = "https://e.example.com"
+      [feeds]
+      enabled = true
+      type = "json"
+      [search]
+      enabled = true
+      [robots]
+      enabled = true
+      [llms]
+      enabled = true
+      full_enabled = true
+      instructions = "I #{q}"
+      [pwa]
+      enabled = true
+      name = "P #{q}"
+      [og.auto_image]
+      enabled = true
+      [outputs]
+      page = ["json", "txt", "csv"]
+      [[taxonomies]]
+      name = "tags"
+      [[content.generate]]
+      source = "items"
+      section = "items"
+      slug = "id"
+      title = "{{ item.name }} {% include 'partials/n.html' %}"
+      body_template = "gen.html"
+      TOML
+    outputs = [base, base + "\n[templates]\nautoescape = false\n"].map do |toml|
+      build_site(
+        toml,
+        content_files: {"posts/p.md" => "+++\ntitle = \"T #{q}\"\ndescription = \"D #{q}\"\ntags = [\"t #{q}\"]\naliases = [\"/old/\"]\n[extra]\nnote = \"N #{q}\"\n+++\nBody #{CANARY}\n"},
+        template_files: {
+          "page.html"       => "<h1>{{ page.title }}</h1>{{ content }}",
+          "section.html"    => "{{ content }}",
+          "partials/n.html" => "{{ item.name }}",
+          "gen.html"        => "Gen {{ item.name }} {% include 'partials/n.html' %}",
+          "page.json.jinja" => %({"t": "{{ page.title }}", "n": "{{ page.extra.note }}", "d": "{{ page.description }}"}),
+          "page.txt.jinja"  => "{{ page.title }}|{{ page.extra.note }}|{% for t in page.tags %}{{ t }}{% endfor %}",
+          "page.csv.jinja"  => "{{ page.title }},{{ page.extra.note }}",
+          "feed.json.jinja" => %({"items": [{% for p in pages %}"{{ p.title }} {{ p.description }}"{% endfor %}]}),
+        },
+        data_files: {"items.json" => %([{"id": "i1", "name": "N #{q}"}])},
+      ) do |dir|
+        public = File.join(dir, "public")
+        files = Dir.glob(File.join(public, "**", "*")).reject { |f| File.directory?(f) || f.ends_with?(".html") || f.ends_with?(".xml") }
+        files.to_h { |f| {f.sub(public, ""), File.read(f)} }
+      end
+    end
+    default, off = outputs
+    default.keys.sort!.should eq(off.keys.sort!)
+    %w[/posts/p/index.json /posts/p/index.txt /posts/p/index.csv /feed.json /search.json /llms.txt /llms-full.txt /robots.txt /manifest.json].each do |path|
+      default.has_key?(path).should be_true, "#{path} was not written"
+    end
+    default["/posts/p/index.txt"].should start_with("T #{CANARY}|N #{CANARY}|")
+    default.each { |path, bytes| bytes.should eq(off[path]), path }
+  end
 end
