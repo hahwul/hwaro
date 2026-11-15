@@ -125,6 +125,7 @@ A `date` outside the documented forms (`YYYY-MM-DD`, `YYYY-MM-DD HH:MM:SS`, RFC 
 - **Images.** Animated PNGs are published unchanged instead of being resized. Images are identified by content, not by extension, and a file that claims an impossible size is skipped instead of stopping the build.
 - **Math, Mermaid and client-side highlighting tags** reference exact versions and carry `integrity` and `crossorigin`.
 - **Code blocks** keep a non-ASCII character that the language's highlighter does not recognise (`→`, `✓`, a combining accent) instead of printing it as `���`.
+- **Python, C++ and similar code blocks on the macOS release binaries.** Docstrings are highlighted as doc strings and C++ raw strings keep their `R` prefix, as builds linked with a newer PCRE2 already did. Python, Python 2, C++, Arduino, GDScript 3, Hy and Mojo blocks can change classes.
 - **Page URLs** percent-encode `<` and `>`.
 - **`truncate`, excerpts and summaries** never cut inside a character (Hangul written as jamo, combining marks, emoji sequences), so a cut may land one character earlier.
 - **Sitemaps above 50,000 URLs** are split into `sitemap-1.xml`, `sitemap-2.xml`, … behind a sitemap index.
