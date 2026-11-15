@@ -49,7 +49,7 @@ describe "registration order" do
       "sass (sources & enablement)",
       "required files (page.html, section.html)",
       "template syntax",
-      "autoescape (set explicitly)",
+      "autoescape choice",
       "directory present",
       "front matter (TOML/YAML parse)",
       "front matter menus (declared in config)",
