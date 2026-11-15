@@ -180,9 +180,9 @@ module Crinja::Markup
   # all_varargs), but `%c` turns a numeric argument into a raw character that
   # bypasses argument escaping (`%c` of 60 → `<`). The argument-level escaping
   # can't reach that generated character, so when the format string contains a
-  # `%c` conversion, return the whole result PLAIN — the print path then
-  # escapes it once (fail-closed; the safe format string's own markup is
-  # over-escaped, acceptable for this rare case). `%d`/`%x`/`%.2f`/`%%`… keep
+  # `%c` conversion, format the ORIGINAL arguments and return the result
+  # PLAIN — the print path then escapes it once (fail-closed; the safe format
+  # string's own markup is over-escaped, acceptable for this rare case). `%d`/`%x`/`%.2f`/`%%`… keep
   # the safe path and stay byte-identical.
   #
   # A `%c` conversion as Crystal's sprintf reads it: flags, width, a `1$`
@@ -199,12 +199,13 @@ module Crinja::Markup
     inner = filter.proc
     proc = ->(arguments : Arguments) do
       return inner.call(arguments) unless active?(arguments.env) && safe?(arguments.target)
+      # Plain result, ORIGINAL arguments: escaped exactly once where printed.
+      return inner.call(arguments) if char_conversion?(arguments.target.to_s)
       varargs = arguments.varargs.map { |arg| escaped_argument(arg) }
       args = Arguments.new(arguments.env, varargs, arguments.kwargs, arguments.defaults, arguments.target)
       result = inner.call(args)
       raw = result.raw
-      return result unless raw.is_a?(String)
-      char_conversion?(arguments.target.to_s) ? Value.new(raw) : Value.new(SafeString.new(raw))
+      raw.is_a?(String) ? Value.new(SafeString.new(raw)) : result
     end
     Callable::Instance.new(proc, filter.defaults, filter.name)
   end
