@@ -573,6 +573,24 @@ describe "warm --cache builds" do
       end
     end
 
+    # Once the page whose alias shadowed the static file is gone, a cold
+    # build publishes the static file there. The stale stub's path is the
+    # static copy's, which this build claims: pruning the stub deleted it.
+    it "keeps the static file an alias stub stops shadowing" do
+      with_cached_site do
+        FileUtils.mkdir_p("static/legacy")
+        File.write("static/legacy/index.html", "<p>STATIC LEGACY</p>")
+        cached_build
+        File.read("public/legacy/index.html").should contain("0; url=")
+
+        File.delete("content/posts/gone.md")
+        cached_build
+
+        File.exists?("public/legacy/index.html").should be_true
+        File.read("public/legacy/index.html").should eq("<p>STATIC LEGACY</p>")
+      end
+    end
+
     # The static copy runs before any render. A build that then failed (a
     # front matter typo anywhere) left the static bytes on the page's output
     # with the previous cache file still vouching for that page, so the next
@@ -988,6 +1006,47 @@ describe "orphaned output deletion" do
 
       File.read(victim).should eq("keep")
       Dir.exists?(outside_dir).should be_true
+    end
+  end
+end
+
+# A section renamed by case only on a case-folding filesystem (macOS, Windows):
+# the previous build's entries and claims spell the bundle asset's path the old
+# way, and on that filesystem they name the very file this build publishes. The
+# asset copy keeps its source mtime, so it reads as unwritten and the prune
+# deleted it from both the default-language and the translated URL.
+describe "cache: case-only section rename" do
+  it "keeps the bundle asset copies a cold build publishes" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("probe", "")
+        pending!("needs a case-insensitive filesystem") unless Hwaro::Utils::PathUtils.case_folding_fs?(File.join(dir, "probe"))
+        File.write("config.toml", <<-TOML)
+          title = "T"
+          base_url = "http://localhost"
+          default_language = "en"
+          [languages.en]
+          language_name = "English"
+          [languages.ko]
+          language_name = "Korean"
+          TOML
+        FileUtils.mkdir_p("content/docs/b")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("templates/section.html", "{{ content }}")
+        File.write("content/docs/_index.md", "+++\ntitle = \"Docs\"\n+++\n")
+        File.write("content/docs/b/index.md", "+++\ntitle = \"B\"\n+++\n![x](pic.png)\n")
+        File.write("content/docs/b/index.ko.md", "+++\ntitle = \"B ko\"\n+++\n![x](pic.png)\n")
+        File.write("content/docs/b/pic.png", "PNG")
+        cached_build
+
+        File.rename("content/docs", "content/Docs")
+        cached_build
+
+        File.exists?("public/Docs/b/pic.png").should be_true
+        File.exists?("public/ko/Docs/b/pic.png").should be_true
+        Dir.children("public").should contain("Docs")
+      end
     end
   end
 end

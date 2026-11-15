@@ -1493,6 +1493,33 @@ describe Hwaro::Content::Seo::OgImage do
       end
     end
 
+    # A case-only rename (`/my-post/` -> `/My-Post/`) on a case-folding
+    # filesystem writes the new image over the old one: the same file. The
+    # prune of the old slug must not delete it. On a case-sensitive
+    # filesystem the old file is a different one and is removed as usual.
+    it "keeps the image of a page renamed by case only" do
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.title = "My Site"
+        config.og.auto_image.enabled = true
+        config.og.auto_image.format = "svg"
+
+        page = Hwaro::Models::Page.new("my-post.md")
+        page.title = "My Post"
+        page.url = "/my-post/"
+        page.render = true
+        Hwaro::Content::Seo::OgImage.generate([page], config, dir)
+
+        page.image = nil
+        page.url = "/My-Post/"
+        Hwaro::Content::Seo::OgImage.generate([page], config, dir)
+
+        img_dir = File.join(dir, "og-images")
+        Dir.children(img_dir).should contain("My-Post.svg")
+        Dir.children(img_dir).should_not contain("my-post.svg")
+      end
+    end
+
     # Partial mode is the `--fast-start` two-pass path: the priority
     # pass writes a manifest, the deferred pass writes another for the
     # remainder. The second call must NOT truncate the first call's

@@ -45,9 +45,13 @@ module Hwaro::Core::Build::Phases::Generate
   # The render phase uses the same predicate to decide whether cache-hit pages
   # need their `content` hydrated for the generators (see
   # `hydrate_cached_page_content`), so the two decisions cannot drift.
+  #
+  # Nor after a config (or other global) change: it re-renders every page, so
+  # "no page re-rendered" only means "unchanged" when the site has pages. A
+  # site with none kept the previous title and base_url in rss.xml/llms.txt.
   def generate_outputs_unchanged?(ctx : Lifecycle::BuildContext) : Bool
     ctx.options.cache && ctx.stats.pages_rendered == 0 && !ctx.page_or_section_set_changed &&
-      !static_copy_over_skippable_output?(ctx)
+      !@cache.try(&.globals_invalidated?) && !static_copy_over_skippable_output?(ctx)
   end
 
   # Did this build's static copy land on a file one of the skippable

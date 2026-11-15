@@ -306,6 +306,12 @@ module Hwaro
         # no page's dependency closure covers, such as a deleted feed override.
         getter? templates_changed : Bool = false
 
+        # True when this build discarded every entry for a global reason (a
+        # config, output-directory, template-set or render-input change). The
+        # Generate phase reads it: "no page re-rendered" stands in for "nothing
+        # changed" only when there were pages to re-render.
+        getter? globals_invalidated : Bool = false
+
         # True when in-memory state diverges from what's on disk, so #save
         # can skip rewriting the whole JSON on no-op warm builds. Set under
         # @mutex wherever entries or metadata actually change.
@@ -437,6 +443,7 @@ module Hwaro
           if invalidated
             @mutex.synchronize { discard_entries_recording_outputs }
           end
+          @globals_invalidated = invalidated
 
           # The generated-output claims are paths RELATIVE to the output
           # directory, so they are meaningless once that directory changes:
@@ -485,6 +492,7 @@ module Hwaro
             next false if stored.empty? || stored == digest
             Logger.info "  Cache: template inputs (env, load_data, images, assets) changed — invalidating all entries."
             discard_entries_recording_outputs
+            @globals_invalidated = true
             @dirty = true
             true
           end

@@ -414,4 +414,33 @@ describe "ParseContent re-parse of a page with an auto OG image" do
       end
     end
   end
+
+  # The root page has no URL segment to name its image after, so the image
+  # is named after its title: a title edit renames it, and the preserved URL
+  # pointed at the pruned file.
+  it "renames the root page's preserved og:image URL with a title edit" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"\n[og.auto_image]\nenabled = true\nformat = "svg"\n))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.image }}")
+        File.write("content/index.md", "+++\ntitle = \"Old Home\"\n+++\n")
+        File.write("content/a.md", "+++\ntitle = \"A\"\n+++\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/index.md"], options)
+        File.read("public/index.html").should eq("/og-images/old-home.svg")
+
+        File.write("content/index.md", "+++\ntitle = \"New Home\"\n+++\n")
+        builder.run_incremental(["content/index.md"], options)
+        File.read("public/index.html").should eq("/og-images/new-home.svg")
+        File.exists?("public/og-images/new-home.svg").should be_true
+      end
+    end
+  end
 end

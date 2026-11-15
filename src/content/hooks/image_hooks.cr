@@ -970,6 +970,11 @@ module Hwaro
 
           width_urls = {} of Int32 => String
           path_map.each { |width, dest| width_urls[width] = url_prefix + File.basename(dest) }
+          previous = @@resize_map_mutex.synchronize do
+            urls = @@resize_map[original_url]?.try(&.values) || [] of String
+            extra.each_key { |format| @@format_maps[format]?.try(&.[original_url]?).try { |map| urls.concat(map.values) } }
+            urls
+          end
           @@resize_map_mutex.synchronize do
             @@resize_map[original_url] = width_urls
             extra.each do |format, map|
@@ -978,6 +983,14 @@ module Hwaro
           end
           if lqip_uri
             @@lqip_map_mutex.synchronize { @@lqip_map[original_url] = {"lqip" => lqip_uri, "dominant_color" => dom_color} }
+          end
+          # A smaller replacement image has fewer widths (a width over the
+          # source's is clamped to it): the previous image's wider variants
+          # are not cut again, and a cold build does not publish them.
+          current = (path_map.values + extra.values.flat_map(&.values)).map { |dest| File.basename(dest) }.to_set
+          previous.each do |url|
+            name = File.basename(url)
+            File.delete?(File.join(dest_dir, name)) unless current.includes?(name)
           end
           1
         rescue ex
