@@ -315,4 +315,48 @@ describe "Template autoescape" do
       File.read("public/p/index.txt").should eq("<x>")        # txt entry → raw
     end
   end
+
+  # Review round 3 regressions, end to end.
+
+  it "r3#2 a hook destination keeps a semicolonless &name query parameter" do
+    build_site(
+      <<-TOML,
+        title = "x"
+        base_url = "https://example.test"
+        [templates]
+        autoescape = true
+        TOML
+      content_files: {"p.md" => "+++\ntitle = \"p\"\n+++\n[a](/p?a=1&b=2) [b](/p?a=1&copy=2) [c](/p?a=1&amp;copy;)\n"},
+      template_files: {"page.html"              => "{{ content }}",
+                       "hooks/render-link.html" => %(<a href="{{ destination | relative_url }}">{{ text }}</a>)},
+    ) do
+      html = File.read("public/p/index.html")
+      html.should contain(%(href="/p?a=1&amp;b=2"))
+      html.should contain(%(href="/p?a=1&amp;copy=2"))
+      html.should contain(%(href="/p?a=1&amp;copy;"))
+      html.should_not contain("©")
+    end
+  end
+
+  it "r3#3 TOC fields and an image hook's alt are fully escaped text, not raw HTML" do
+    build_site(
+      <<-TOML,
+        title = "x"
+        base_url = "https://example.test"
+        [templates]
+        autoescape = true
+        TOML
+      content_files: {"p.md" => "+++\ntitle = \"p\"\ntoc = true\n+++\n<h2>\" onmouseover=\"alert(1)</h2>\n\n## Plain &amp; it's\n\n<h2 id=\"<em>owned</em>\">Q</h2>\n\n![<span title=\" onerror=alert(1) x=\">](/missing.png)\n"},
+      template_files: {"page.html"               => %({% for h in toc_obj.headers %}<a title="{{ h.title }}" href="{{ h.permalink }}" data-id="{{ h.id }}">x</a>{% endfor %}{{ content }}),
+                       "hooks/render-image.html" => %(<img src="{{ destination }}" alt="{{ alt }}">)},
+    ) do
+      html = File.read("public/p/index.html")
+      html.should contain(%(<a title="&quot; onmouseover=&quot;alert(1)"))
+      html.should contain(%(<a title="Plain &amp; it&#39;s"))
+      html.should_not contain(%(data-id="<em))
+      html.should contain(%(alt="&lt;span title=&quot; onerror=alert(1) x=&quot;&gt;"))
+      html.should_not contain(%(title="" onmouseover))
+      html.should_not contain(%(alt="<span))
+    end
+  end
 end

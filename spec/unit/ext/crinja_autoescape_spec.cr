@@ -362,6 +362,19 @@ describe "Crinja autoescape" do
       off("{% autoescape true %}{{ [[u]] | join }}{% endautoescape %}").should eq("['#{ESCAPED}']")
     end
 
+    it "r3#1 a %c format escapes its plain arguments once, not twice" do
+      on(%({{ ("%s%c" | safe) | format(u, 60) }})).should eq(ESCAPED + "&lt;")
+      on(%({{ ("%s%c" | safe) | format(s, 62) }})).should eq(HTML.escape("<i>s&amp;</i>>"))
+    end
+
+    it "r3#2 the URL filters reverse only hwaro's own five encodings, once" do
+      on(%({{ ("https://x.test/?a=1&copy=2" | safe) | relative_url }})).should eq("https://x.test/?a=1&amp;copy=2")
+      on(%({{ ("/p?a=1&amp;copy=2" | safe) | absolute_url }})).should eq("/p?a=1&amp;copy=2")
+      on(%({{ ("/p?a=1&amp;lt;" | safe) | relative_url }})).should eq("/p?a=1&amp;lt;")
+      on(%({{ url_for(path=("/p?q=&quot;x&#39;&lt;&gt;" | safe)) }})).should eq("/p?q=&quot;x&#39;&lt;&gt;")
+      on(%({{ ("/p?a=&eacute;&#x27;" | safe) | relative_url }})).should eq("/p?a=&amp;eacute;&amp;#x27;")
+    end
+
     it "r2b#D replace with a count handles multi-byte text" do
       on(%({% set a %}가나가나가{% endset %}{{ a | replace("가", "<b>", 2) }})).should eq("&lt;b&gt;나&lt;b&gt;나가")
       on(%({% set a %}é<i>é</i>é{% endset %}{{ a | replace("é", "ü", 1) }})).should eq("ü<i>é</i>é")

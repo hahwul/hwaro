@@ -429,4 +429,26 @@ describe Hwaro::Utils::CrinjaUtils do
       Hwaro::Utils::CrinjaUtils.from_yaml(deep).should_not be_nil
     end
   end
+
+  describe ".preescaped_value" do
+    it "is the plain string with the switch off" do
+      value = Hwaro::Utils::CrinjaUtils.preescaped_value(%(" <x> & '), false)
+      value.raw.should eq(%(" <x> & '))
+    end
+
+    it "with the switch on, is fully escaped text: references kept, raw specials escaped" do
+      {
+        "a &amp; b &lt;c&gt; &quot;d&quot;"  => "a &amp; b &lt;c&gt; &quot;d&quot;",
+        "&#39; &#x27; &#34; &copy; &eacute;" => "&#39; &#x27; &#34; &copy; &eacute;",
+        %(" onmouseover="x)                  => "&quot; onmouseover=&quot;x",
+        "<em>x</em> it's"                    => "&lt;em&gt;x&lt;/em&gt; it&#39;s",
+        "a&copy=2 & &x &;"                   => "a&amp;copy=2 &amp; &amp;x &amp;;",
+        "plain"                              => "plain",
+      }.each do |input, expected|
+        value = Hwaro::Utils::CrinjaUtils.preescaped_value(input, true)
+        value.raw.should be_a(Crinja::SafeString)
+        value.to_s.should eq(expected), input
+      end
+    end
+  end
 end
