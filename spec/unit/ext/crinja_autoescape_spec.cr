@@ -312,4 +312,60 @@ describe "Crinja autoescape" do
       on("{{ s | urlize(trim_url_limit=20) }}").should eq("<i>s&amp;</i>")
     end
   end
+
+  # Review round 2b regressions.
+  describe "review round 2b" do
+    it "r2b#A format catches a %c conversion with a width, flags or a position" do
+      vars = ae_vars.merge({"x" => Crinja::Value.new("img src=x onerror=alert(1)")})
+      [%("%1c%s%1c"), %("%-1c%s%-1c"), %("%1$c%2$s%3$c"), %("% 01c%s%01c")].each do |fmt|
+        out = ae_render(%({{ #{fmt} | safe | format(60, x, 62) }}), vars: vars)
+        out.should_not contain("<img"), fmt
+      end
+      # A `%%` is a literal percent, not a conversion: the safe path holds.
+      on(%({{ "<i>100%%certain %d</i>" | safe | format(1) }})).should eq("<i>100%certain 1</i>")
+      ["%d", "%05d", "%.2f", "%x", "%%"].each do |conv|
+        src = %({{ "<i>#{conv}</i>" | safe | format(255) }})
+        on(src).should eq(off(src)), conv
+      end
+      # A named `%<a>c` needs a hash argument, which `format`'s varargs never are.
+      expect_raises(Crinja::Error) { on(%({{ "%<a>c" | safe | format({"a": 60}) }})) }
+    end
+
+    it "r2b#B the URL filters leave a pre-escaped URL alone with the switch off" do
+      pre = %("/a?x=1&amp;y=2" | safe)
+      off("{{ #{pre} | absolute_url }}").should eq("/a?x=1&amp;y=2")
+      off("{{ #{pre} | relative_url }}").should eq("/a?x=1&amp;y=2")
+      off("{{ url_for(path=#{pre}) }}").should eq("/a?x=1&amp;y=2")
+      off("{{ get_url(path=#{pre}) }}").should eq("/a?x=1&amp;y=2")
+      on("{{ #{pre} | absolute_url }}").should eq("/a?x=1&amp;y=2")
+    end
+
+    it "r2b#C1 a printed non-string inside {% autoescape true %} is unchanged with the switch off" do
+      off("{% autoescape true %}{{ [u] }}{% endautoescape %}").should eq("['#{ESCAPED}']")
+      off("{% autoescape true %}{{ d }}{% endautoescape %}").should eq("{'k' => '&lt;v&gt;&amp;&#39;'}")
+    end
+
+    it "r2b#C2 every env.stringify caller escapes a container's whole representation" do
+      inner = "['#{CANARY}']"
+      on("{{ [[u]] | join }}").should eq(HTML.escape(inner))
+      on("{{ [d] | join }}").should eq(HTML.escape("{'k' => '<v>&''}"))
+      # the other ways a container reaches the output
+      ["{{ [u] | string }}", "{{ [u] ~ '' }}", %({{ "%s" | safe | format([u]) }}),
+       "{% filter upper %}{{ [u] }}{% endfilter %}", "{% set x %}{{ [u] }}{% endset %}{{ x }}",
+       "{% for i in [1] %}{{ loop.cycle([u]) }}{% endfor %}", "{{ [u] + [u] }}"].each do |c|
+        out = on(c)
+        out.should_not contain("'"), c
+        out.should_not contain("<"), c
+      end
+      # off, and off inside {% autoescape true %}: the finalizer's own bytes
+      off("{{ [[u]] | join }}").should eq(inner)
+      off("{% autoescape true %}{{ [[u]] | join }}{% endautoescape %}").should eq("['#{ESCAPED}']")
+    end
+
+    it "r2b#D replace with a count handles multi-byte text" do
+      on(%({% set a %}가나가나가{% endset %}{{ a | replace("가", "<b>", 2) }})).should eq("&lt;b&gt;나&lt;b&gt;나가")
+      on(%({% set a %}é<i>é</i>é{% endset %}{{ a | replace("é", "ü", 1) }})).should eq("ü<i>é</i>é")
+      on(%({% set a %}가가{% endset %}{{ a | replace("가", "", 5) }})).should eq("")
+    end
+  end
 end
