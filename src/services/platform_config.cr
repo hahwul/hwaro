@@ -279,7 +279,7 @@ module Hwaro
       private def generate_gitlab_ci : String
         lines = [] of String
         lines << "image:"
-        lines << "  name: ghcr.io/hahwul/hwaro:latest"
+        lines << "  name: ghcr.io/hahwul/hwaro:#{Hwaro.release_channel}"
         lines << "  entrypoint: [\"\"]"
         lines << ""
         lines << "pages:"
@@ -330,7 +330,7 @@ module Hwaro
         lines << "  deploy:"
         lines << "    runs-on: docker"
         lines << "    container:"
-        lines << "      image: ghcr.io/hahwul/hwaro:latest"
+        lines << "      image: ghcr.io/hahwul/hwaro:#{Hwaro.release_channel}"
         lines << "    env:"
         lines << "      # Project site: \"pages\" (default). User/org site (repo named"
         lines << "      # \"pages\"): override to your default branch, e.g. \"main\"."

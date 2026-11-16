@@ -56,7 +56,10 @@ runs:
           # Annotated tags list the commit on their peeled `^{}` line,
           # lightweight tags on the tag line itself; match either. No early
           # `exit` in awk: under pipefail a SIGPIPE'd git would fail the step.
-          TAG=$(git ls-remote --tags https://github.com/hahwul/hwaro.git 'v*' |
+          # Only full release tags (`vX.Y.Z`): the moving major tag (`v1`)
+          # points at the same commit as the newest release and would map a
+          # SHA pin to an image that changes with the next release.
+          TAG=$(git ls-remote --tags https://github.com/hahwul/hwaro.git 'v*.*.*' |
             awk -v sha="$REF" '!found && $1 == sha { sub("^refs/tags/", "", $2); sub("\\^\\{\\}$", "", $2); print $2; found = 1 }')
           if [[ -z "$TAG" ]]; then
             echo "::error::hahwul/hwaro@${REF} is not a release commit. Pin the SHA of a release tag (vX.Y.Z); only releases have a Hwaro image."

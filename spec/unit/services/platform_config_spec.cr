@@ -499,6 +499,15 @@ describe Hwaro::Services::PlatformConfig do
       end
     end
 
+    describe "github-pages" do
+      it "follows the release line, never the development branch" do
+        result = Hwaro::Services::PlatformConfig.new(Hwaro::Models::Config.new).generate("github-pages")
+
+        result.scan("uses: hahwul/hwaro@v#{Hwaro.release_channel}").size.should eq(2)
+        result.should_not contain("hahwul/hwaro@main")
+      end
+    end
+
     describe "gitlab-ci" do
       it "generates a valid GitLab CI configuration with entrypoint override and correct default branch rule" do
         config = Hwaro::Models::Config.new
@@ -506,7 +515,7 @@ describe Hwaro::Services::PlatformConfig do
         result = generator.generate("gitlab-ci")
 
         result.should contain("image:")
-        result.should contain("name: ghcr.io/hahwul/hwaro:latest")
+        result.should contain("name: ghcr.io/hahwul/hwaro:#{Hwaro.release_channel}")
         result.should contain("entrypoint: [\"\"]")
         result.should contain("rules:")
         result.should contain("- if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH")
@@ -521,7 +530,7 @@ describe Hwaro::Services::PlatformConfig do
 
         result.should contain("name: Hwaro Deploy")
         result.should contain("runs-on: docker")
-        result.should contain("ghcr.io/hahwul/hwaro:latest")
+        result.should contain("ghcr.io/hahwul/hwaro:#{Hwaro.release_channel}")
         result.should contain("hwaro build")
         result.should contain("CODEBERG_TOKEN")
         result.should contain("codeberg.org/${{ github.repository }}.git")
