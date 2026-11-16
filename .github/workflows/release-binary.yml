@@ -104,6 +104,33 @@ jobs:
           mkdir -p build
           crystal build src/main.cr -o "build/hwaro-${GITHUB_REF_SLUG}-windows-${ARCH}.exe" --release --no-debug --static
           rm -f build/*.pdb build/*.lib build/*.exp
+      # Runs what was just built, the way a user will, before anything is
+      # uploaded: a binary that cannot start or cannot build a site must not
+      # reach the release. The site is the one ci.yml's package-macos job
+      # builds: a URL in a YAML flow sequence needs a current libyaml, and a
+      # heading id with a combining mark needs PCRE2 10.43 or later.
+      - name: Smoke-test the built binary
+        run: |
+          set -euo pipefail
+          if [ "${{ matrix.platform }}" = macos ]; then
+            mkdir -p smoke/bin
+            tar -xzf build/*.tar.gz -C smoke/bin
+            BIN="$PWD/smoke/bin/hwaro"
+          else
+            BIN="$PWD/$(ls build/hwaro-* | head -1)"
+          fi
+          "$BIN" --version
+          site=smoke/site
+          mkdir -p "$site/content" "$site/templates"
+          printf 'title = "t"\nbase_url = "http://x.test"\n' > "$site/config.toml"
+          printf -- '---\ntitle: Home\nlinks: [https://example.com/a, https://example.com/b]\n---\n## Cafe\xcc\x81 {#Cafe\xcc\x81}\n' > "$site/content/index.md"
+          for t in index page section; do printf '{{ content }}\n' > "$site/templates/$t.html"; done
+          (cd "$site" && "$BIN" build -q -o out)
+          grep -q 'id="Caf' "$site/out/index.html" || {
+            echo "::error::the built binary did not read the heading id (old PCRE2 linked?)"
+            cat "$site/out/index.html"
+            exit 1
+          }
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
