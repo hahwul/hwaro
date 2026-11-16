@@ -48,7 +48,7 @@ jobs:
   deploy:
     runs-on: docker
     container:
-      image: ghcr.io/hahwul/hwaro:latest
+      image: ghcr.io/hahwul/hwaro:1
     env:
       # Project site: "pages" (default). User/org site (repo named
       # "pages"): override to your default branch, e.g. "main".

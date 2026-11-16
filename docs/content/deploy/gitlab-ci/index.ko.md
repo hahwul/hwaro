@@ -20,7 +20,7 @@ hwaro tool platform gitlab-ci
 
 ```yaml
 image:
-  name: ghcr.io/hahwul/hwaro:latest
+  name: ghcr.io/hahwul/hwaro:1
   entrypoint: [""]
 
 pages:

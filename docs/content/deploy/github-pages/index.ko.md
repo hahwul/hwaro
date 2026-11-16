@@ -48,7 +48,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Build Only
-        uses: hahwul/hwaro@main
+        uses: hahwul/hwaro@v1
         with:
           build_only: true
 
@@ -60,7 +60,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Build and Deploy
-        uses: hahwul/hwaro@main
+        uses: hahwul/hwaro@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -82,7 +82,7 @@ Hwaro 사이트가 하위 디렉터리(예: `docs/`)에 있다면 `build_dir`를
 
 ```yaml
 - name: Build and Deploy
-  uses: hahwul/hwaro@main
+  uses: hahwul/hwaro@v1
   with:
     build_dir: "docs"
     token: ${{ secrets.GITHUB_TOKEN }}
@@ -90,7 +90,7 @@ Hwaro 사이트가 하위 디렉터리(예: `docs/`)에 있다면 `build_dir`를
 
 ### 버전 고정
 
-`@main`은 최신 개발 빌드를 따라갑니다. 버전을 고정하려면 릴리스 태그(`hahwul/hwaro@v0.22.0`)나 릴리스 태그의 전체 커밋 SHA(`hahwul/hwaro@534398a0749d5c9e68a04bfbc8834769f8385455 # v0.22.0`)를 사용합니다. 액션은 해당 릴리스용으로 퍼블리시된 Docker 이미지를 실행합니다. 이미지는 릴리스에만 있으므로, 릴리스 커밋이 아닌 SHA를 지정하면 오류로 실패합니다.
+`@v1`은 1.x 릴리스를 따라갑니다. 수정과 새 기능은 받고, 릴리스되지 않은 빌드나 다음 메이저 버전은 받지 않습니다([안정성](/ko/start/stability/#내-사이트가-따라갈-릴리스-고르기) 참고). 특정 릴리스에 고정하려면 그 태그(`hahwul/hwaro@v1.0.0`)나 그 태그의 전체 커밋 SHA(`hahwul/hwaro@<40자 SHA> # v1.0.0`)를 사용합니다. `@main`은 개발 브랜치를 따라갑니다. 액션은 해당 릴리스용으로 퍼블리시된 Docker 이미지를 실행합니다. 이미지는 릴리스에만 있으므로, 릴리스 커밋이 아닌 SHA를 지정하면 오류로 실패합니다.
 
 ### OG 이미지 캐시
 
