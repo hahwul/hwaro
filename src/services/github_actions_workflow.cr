@@ -28,7 +28,7 @@ module Hwaro
                   uses: actions/checkout@v6
 
                 - name: Build Only
-                  uses: hahwul/hwaro@main
+                  uses: hahwul/hwaro@v#{Hwaro.release_channel}
                   with:
                     build_only: true
 
@@ -40,7 +40,7 @@ module Hwaro
                   uses: actions/checkout@v6
 
                 - name: Build and Deploy
-                  uses: hahwul/hwaro@main
+                  uses: hahwul/hwaro@v#{Hwaro.release_channel}
                   with:
                     token: ${{ secrets.GITHUB_TOKEN }}
 

@@ -8,6 +8,14 @@ describe Hwaro do
     end
   end
 
+  describe ".release_channel" do
+    it "is the major version for a release and the version itself for a prerelease" do
+      Hwaro.release_channel("1.4.2").should eq("1")
+      Hwaro.release_channel("12.0.0").should eq("12")
+      Hwaro.release_channel("1.0.0-rc.1").should eq("1.0.0-rc.1")
+    end
+  end
+
   describe Hwaro::Config::Options::BuildOptions do
     it "has default values" do
       options = Hwaro::Config::Options::BuildOptions.new

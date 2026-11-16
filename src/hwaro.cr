@@ -155,4 +155,13 @@ require "./cli/runner"
 
 module Hwaro
   VERSION = "1.0.0-rc.1"
+
+  # The release line a generated CI config follows: the major version (`1`),
+  # published as the `v1` action tag and the `:1` image tag, which move to
+  # each 1.x release. A site then gets fixes and features but never an
+  # unreleased build or the next major. A prerelease names itself
+  # (`1.0.0-rc.1`): no major tag ever points at one.
+  def self.release_channel(version : String = VERSION) : String
+    version.includes?('-') ? version : version.partition('.')[0]
+  end
 end

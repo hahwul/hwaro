@@ -97,7 +97,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     permissions:
-      contents: read
+      # write: the release run moves the major version tag (last step).
+      contents: write
       packages: write
     steps:
       - name: Download digests
@@ -143,8 +144,9 @@ jobs:
             # main 브랜치 push → :main
             type=ref,event=branch
 
-            # GitHub Release (태그 push) → v1.2.3, 1.2, latest
+            # GitHub Release (태그 push) → v1.2.3, 1.2, 1, latest
             # A prerelease tag (v1.0.0-rc.1) gets its own version tag only.
+            type=semver,pattern={{major}},enable=${{ github.event_name == 'release' && !contains(github.event.release.tag_name, '-') }}
             type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
             type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'release' && !contains(github.event.release.tag_name, '-') }}
             type=raw,value=latest,enable=${{ github.event_name == 'release' && !contains(github.event.release.tag_name, '-') }}
@@ -162,3 +164,25 @@ jobs:
       - name: Inspect image
         run: |
           docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+
+      # `hwaro tool platform` writes `uses: hahwul/hwaro@v1` and
+      # `image: ghcr.io/hahwul/hwaro:1`: the release line a site follows. The
+      # action at `v1` runs the `:1` image pushed above, so the tag moves only
+      # once that image exists, and never for a prerelease.
+      # ponytail: the newest RELEASE wins, like `latest` above; a 1.2.x patch
+      # published after 1.3.0 would move both back. Compare versions here if
+      # old lines ever get patch releases.
+      - name: Move the major version tag
+        if: github.event_name == 'release' && !contains(github.event.release.tag_name, '-')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.event.release.tag_name }}
+        run: |
+          major="${TAG_NAME%%.*}" # v1.2.3 -> v1
+          case "$major" in
+            v[0-9]*) ;;
+            *) echo "::error::unexpected release tag '$TAG_NAME'"; exit 1 ;;
+          esac
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$major" -f sha="$GITHUB_SHA" -F force=true ||
+            gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$major" -f sha="$GITHUB_SHA"
+          echo "$major -> $GITHUB_SHA ($TAG_NAME)"
