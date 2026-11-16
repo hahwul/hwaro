@@ -131,6 +131,10 @@ module Hwaro
       # New: Assets - static files in this page directory
       property assets : Array(String)
 
+      # Bundle files `[content.files]` leaves out of the build, relative to
+      # the page directory (nil when there are none): a link to one is dead.
+      getter unpublished_assets : Array(String)? = nil
+
       # New: Authors field (array of author names)
       property authors : Array(String)
 
@@ -475,6 +479,7 @@ module Hwaro
         return [] of String unless Dir.exists?(page_dir)
         return [] of String if Path[page_dir].normalize == Path[content_dir].normalize
 
+        @unpublished_assets = nil
         @assets = Dir.glob(File.join(Utils::PathUtils.glob_escape(page_dir), "**", "*")).sort!.compact_map do |file|
           next unless Utils::PathUtils.file?(file)
           next if Utils::FileSafe.temp_name?(File.basename(file))
@@ -490,9 +495,11 @@ module Hwaro
           # allowlist entry — dropping them here left a slugged bundle's
           # `data.json` at its source path only, 404ing from the page.
           if content_files
-            next if content_files.denied?(relative)
             ext = File.extname(relative).downcase
-            next if content_files.enabled? && ext != ".json" && ext != ".xml" && !content_files.publish?(relative)
+            if content_files.denied?(relative) || (content_files.enabled? && ext != ".json" && ext != ".xml" && !content_files.publish?(relative))
+              (@unpublished_assets ||= [] of String) << Path[file].relative_to(page_dir).to_posix.to_s
+              next
+            end
           end
 
           relative

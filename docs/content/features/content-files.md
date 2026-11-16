@@ -117,6 +117,8 @@ Reference colocated files with relative paths:
 ![Diagram](diagram.svg)
 ```
 
+A file the rules above leave out is not copied, so a link to it is dead. When a page bundle links or embeds such a file of its own (`[Download](report.pdf)` with `pdf` missing from `allow_extensions`), the build warns `<page> links to report.pdf, which the build does not publish` once per page and file. [`hwaro tool check-links`](/start/tools/check-links/) reports the same links.
+
 ### In Templates
 
 For page bundles, colocated assets are also available via `page.assets`:
