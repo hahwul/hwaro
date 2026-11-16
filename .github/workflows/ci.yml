@@ -307,7 +307,7 @@ jobs:
         with:
           crystal: 1.22.0
       - name: Install build dependencies
-        run: brew install openssl@3 pkg-config
+        run: brew install openssl@3 pkg-config pcre2 libyaml
       # Same warm-compile cache as the tests job, on its own key -- macOS
       # runners are the slowest in the matrix and this job compiles the whole
       # program just to look at what it links.
@@ -328,6 +328,9 @@ jobs:
         run: |
           set -euo pipefail
           export PKG_CONFIG_PATH="$(brew --prefix openssl@3)/lib/pkgconfig"
+          # As release-binary.yml: Homebrew's PCRE2 and libyaml, not the old
+          # ones embedded in the official Crystal tarball.
+          export CRYSTAL_LIBRARY_PATH="$(brew --prefix pcre2)/lib:$(brew --prefix libyaml)/lib:$(crystal env CRYSTAL_LIBRARY_PATH)"
           mkdir -p build
           crystal build src/main.cr -o build/hwaro --no-debug
       - name: Trim the Crystal cache
@@ -378,7 +381,8 @@ jobs:
             echo "::error::tarball bundled no dylibs; packaging silently stopped working"
             exit 1
           }
-          for want in libssl libcrypto; do
+          # libyaml's file is libyaml-0.2.dylib: the glob below needs the `-0`.
+          for want in libssl libcrypto libpcre2-8 libyaml-0; do
             test -n "$(echo "verify/lib/$want".*.dylib)" || {
               echo "::error::tarball is missing $want"
               exit 1
@@ -397,6 +401,22 @@ jobs:
             exit 1
           }
           verify/hwaro version
+
+          # The libraries are the point of bundling them: prove the packaged
+          # binary behaves like one. libyaml 0.1.6 rejects a URL inside a flow
+          # sequence, and PCRE2 before 10.43 leaves a heading id that carries
+          # a combining mark unrecognised.
+          site="$(mktemp -d)"
+          mkdir -p "$site/content" "$site/templates"
+          printf 'title = "t"\nbase_url = "http://x.test"\n' > "$site/config.toml"
+          printf -- '---\ntitle: Home\nlinks: [https://example.com/a, https://example.com/b]\n---\n## Cafe\xcc\x81 {#Cafe\xcc\x81}\n' > "$site/content/index.md"
+          for t in index page section; do printf '{{ content }}\n' > "$site/templates/$t.html"; done
+          (cd "$site" && "$OLDPWD/verify/hwaro" build -q -o "$site/out")
+          grep -q 'id="Caf' "$site/out/index.html" || {
+            echo "::error::packaged binary did not read the heading id (old PCRE2 linked?)"
+            cat "$site/out/index.html"
+            exit 1
+          }
   build-snapcraft:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
