@@ -6,14 +6,23 @@
 # the minimum Crystal from shard.yml at eval time, so there is nothing to drift.
 # The Chocolatey nuspec is a template filled from the release tag.
 VERSION_FILES = {
-  "shard.yml"              => /^version:\s*([\d.]+)/m,
+  "shard.yml"              => /^version:\s*([\d.]+(?:-[\w.]+)?)/m,
   "src/hwaro.cr"           => /VERSION\s*=\s*"([^"]+)"/,
-  "snap/snapcraft.yaml"    => /^version:\s*['"]?([\d.]+)/m,
+  "snap/snapcraft.yaml"    => /^version:\s*['"]?([\d.]+(?:-[\w.]+)?)/m,
   "spec/hwaro_spec.cr"     => /VERSION\.should eq\("([^"]+)"\)/,
   "packaging/aur/PKGBUILD" => /^pkgver=([\d.]+)/m,
   # Mirrors the Netlify config `tool platform` generates from Hwaro::VERSION.
   "docs/content/start/tools/platform.md"    => /# HWARO_VERSION = "([^"]+)"/,
   "docs/content/start/tools/platform.ko.md" => /# HWARO_VERSION = "([^"]+)"/,
+}
+
+# Files that stay on the last release while the others carry a prerelease
+# (1.0.0-rc.1): the AUR package is not published for one (`pkgver` cannot hold
+# a hyphen), and the docs describe the released version.
+RELEASE_ONLY = {
+  "packaging/aur/PKGBUILD",
+  "docs/content/start/tools/platform.md",
+  "docs/content/start/tools/platform.ko.md",
 }
 
 # Versions found in each file; empty when the file or the pattern is missing.
@@ -35,7 +44,8 @@ def report_versions : String?
     return
   end
 
-  unique = versions.values.flatten.uniq!
+  unique = versions.reject { |path, _| RELEASE_ONLY.includes?(path) }.values.flatten.uniq!
+  unique = versions.values.flatten.uniq! unless unique.size == 1 && unique.first.includes?('-')
   return unique.first if unique.size == 1
   puts "Versions do not match: #{unique.join(", ")}"
 end
