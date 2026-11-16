@@ -95,4 +95,29 @@ describe "Crinja resolver patches" do
       template.render({"items" => ["a", "b"]}).should eq("<a><b>")
     end
   end
+
+  describe "naming a missed member/index access" do
+    it "does not leak an earlier template's name into a later, unrelated error" do
+      env = Crinja.new
+      leak = %({% set top = nothere %}{% set dd = {"t": top} %}{% set ee = [top] %}[{{ dd.t }}{{ ee[0] }}])
+      env.from_string(leak).render.should eq("[]")
+
+      ex = expect_raises(Crinja::TypeError) do
+        env.from_string("{% call undefined_macro() %}x{% endcall %}").render
+      end
+      ex.message.not_nil!.should_not contain("dd.t")
+      ex.message.not_nil!.should_not contain("ee[0]")
+      Crinja::Value::UNDEFINED.as_undefined.name.should eq("")
+    end
+
+    it "still names a stored undefined by the expression that reached it" do
+      env = Crinja.new
+      env.from_string(%({% set d = {"t": nothere} %}{{ d.t }})).render
+      ex = expect_raises(Crinja::TypeError) do
+        env.from_string(%({% set e = [nothere] %}{{ e[0]() }})).render
+      end
+      ex.message.not_nil!.should contain("e[0] is undefined")
+      env.from_string(%({% set d = {"t": nothere} %}[{{ d.t is defined }}|{{ d.t | default("D") }}|{{ d.t }}])).render.should eq("[false|D|]")
+    end
+  end
 end
