@@ -109,7 +109,7 @@ module Hwaro
           if dir = @bundle_dirs[prefix]?
             candidate = File.join(dir, path[prefix.size..])
             return true if File.file?(candidate) && !ContentWalk.markdown?(candidate) && !nested_bundle?(dir, candidate) &&
-                           !@ignore.ignored?(candidate)
+                           !@ignore.ignored?(candidate) && !@ignore.unpublished?(candidate)
           end
           break if prefix == "/"
         end

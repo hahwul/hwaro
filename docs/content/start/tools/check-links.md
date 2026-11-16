@@ -89,7 +89,10 @@ so this also holds before the first build:
   but `/about.md` does not: the build never publishes a Markdown source under
   its own name.
 - Files beside a page bundle or section index are live under that page's URL,
-  including its translated copies (`/ko/posts/my-trip/photo.jpg`).
+  including its translated copies (`/ko/posts/my-trip/photo.jpg`). A file
+  that `[content.files]` leaves out of the build (an extension missing from
+  `allow_extensions`, or a disallow rule) is reported as not published, even
+  though it exists beside the page.
 - Relative links resolve against the page's URL, as a browser resolves them,
   not against the source file's folder. From `content/posts/a.md` (served at
   `/posts/a/`), `../b/` reaches `/posts/b/`, and `![](photo.png)` asks for

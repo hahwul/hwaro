@@ -97,3 +97,38 @@ describe "check-links build-output oracle" do
     end
   end
 end
+
+# A file beside a page exists in content/ whether or not the build publishes
+# it. With `[content.files] allow_extensions` naming only images, a linked
+# `doc.pdf` never reaches the output: the link is dead, and was reported
+# healthy because its source is there.
+private def dead_bundle_files(config_extra : String) : Hash(String, String?)
+  Dir.mktmpdir do |dir|
+    content = File.join(dir, "content")
+    FileUtils.mkdir_p(File.join(content, "b"))
+    File.write(File.join(dir, "config.toml"), %(title = "T"\nbase_url = "http://x"\n#{config_extra}))
+    page = File.join(content, "b", "index.md")
+    File.write(page, "---\ntitle: B\n---\nbody")
+    names = %w[doc.pdf pic.png data.json]
+    names.each { |name| File.write(File.join(content, "b", name), "x") }
+    links = names.map { |name| Hwaro::CLI::Commands::Tool::DeadlinkCommand::Link.new(file: page, url: name, kind: :internal) }
+    oracle = Hwaro::Utils::BuildOutput.oracle("public", root: dir, sources: [content], tool: "check-links")
+    Hwaro::CLI::Commands::Tool::DeadlinkCommand.new.resolve_with_oracle_for_test(links, content, oracle).to_h { |r| {r.link.url, r.error} }
+  end
+end
+
+describe "check-links and content files the build leaves out" do
+  it "reports a link to a file the allow-list leaves out, and says why" do
+    dead = dead_bundle_files(%([content.files]\nallow_extensions = ["png"]\n))
+    dead.keys.should eq(["doc.pdf"])
+    dead["doc.pdf"].to_s.should contain("the build does not publish it")
+  end
+
+  it "reports a link to a file a deny rule excludes" do
+    dead_bundle_files(%([content.files]\ndisallow_extensions = ["pdf"]\n)).keys.should eq(["doc.pdf"])
+  end
+
+  it "keeps resolving by the source when no rule decides" do
+    dead_bundle_files("").should be_empty
+  end
+end

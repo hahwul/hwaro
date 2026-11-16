@@ -120,8 +120,8 @@ sudo mv hwaro-v*-linux-x86_64 /usr/local/bin/hwaro
 ### macOS
 
 The macOS download is a tarball, not a bare binary. It extracts to `hwaro`
-plus a `lib/` directory holding the bundled OpenSSL, and the binary loads
-those through `@executable_path/lib`, so **`lib/` has to travel with it**.
+plus a `lib/` directory holding the bundled libraries (OpenSSL, PCRE2 and
+libyaml), and the binary loads those through `@executable_path/lib`, so **`lib/` has to travel with it**.
 Move the whole extracted directory, not just the binary:
 
 ```bash

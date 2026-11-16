@@ -123,6 +123,20 @@ module Hwaro
           @rules.ignored?(relative)
         end
 
+        # True when the rules alone settle that the build leaves `path` (a
+        # non-Markdown file under content/) out: a deny rule, or an
+        # `allow_extensions` list that does not name its extension — bundle
+        # files go through the same list (`Page#collect_assets`). The source
+        # being there is not the build publishing it, so such a file is no
+        # link target. Raw JSON/XML needs no allow-list entry
+        # (`Phases::ReadContent#publishes_content_file?`).
+        def unpublished?(path : String) : Bool
+          relative = Path[File.expand_path(path)].relative_to(@root).to_posix.to_s
+          return true if @rules.denied?(relative)
+          return false if File.extname(relative).downcase.in?(".json", ".xml")
+          @rules.enabled? && !@rules.publish?(relative)
+        end
+
         # No `.`/`..` segment for the prefix shortcut to get wrong.
         private def plain?(rest : String) : Bool
           !(rest.starts_with?('.') || rest.includes?("/.") || rest.includes?("//"))

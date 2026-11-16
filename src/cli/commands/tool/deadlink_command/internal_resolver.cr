@@ -91,6 +91,7 @@ module Hwaro
 
               unless exists
                 error = unpublished_page_error(resolved_url, content_dir, base_dir, language_codes, routes)
+                error ||= unpublished_file_error(resolved_url, content_dir, base_dir)
                 error ||= link.kind == :image ? "Image not found" : "Internal link target not found"
                 results << Result.new(link: link, status: -1, error: error)
               end
@@ -441,7 +442,7 @@ module Hwaro
               # A Markdown source is published as a page, never under its own
               # name, so `/posts/a.md` is not a route even though the file
               # exists.
-              return true if File.exists?(target) && !Services::ContentWalk.markdown?(target_no_slash) && !content_ignored?(target)
+              return true if File.exists?(target) && !Services::ContentWalk.markdown?(target_no_slash) && !content_ignored?(target) && !@content_ignore.unpublished?(target)
             elsif serves_page?(sources, url, routes)
               return true
             end
@@ -592,6 +593,14 @@ module Hwaro
             by_stem[File.basename(stem)]? || [] of String
           rescue File::Error
             [] of String
+          end
+
+          # Why a link that names a real file under content/ is still dead:
+          # `[content.files]` leaves the file out of the build.
+          private def unpublished_file_error(url : String, content_dir : String, base_dir : String) : String?
+            target = content_target(url, content_dir, base_dir)
+            return if Services::ContentWalk.markdown?(target) || !File.file?(target) || !@content_ignore.unpublished?(target)
+            "File exists but the build does not publish it: check [content.files] allow_extensions and the disallow rules"
           end
 
           # A source `[content] ignore` hides is no link target: the build
