@@ -154,7 +154,7 @@ require "./content/hooks"
 require "./cli/runner"
 
 module Hwaro
-  VERSION = "1.0.0-rc.1"
+  VERSION = "1.0.0"
 
   # The release line a generated CI config follows: the major version (`1`),
   # published as the `v1` action tag and the `:1` image tag, which move to
