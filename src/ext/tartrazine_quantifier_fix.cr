@@ -14,24 +14,39 @@
 # versions read the same way. A brace inside a character class, an escaped
 # brace and a `\Q…\E` literal are left alone.
 #
-# Remove when: every supported toolchain links PCRE2 >= 10.43.
+# The lexers converted from Chroma (Go regexp2) also use two forms no PCRE2
+# compiles, so the whole lexer failed to load and its code blocks came out
+# unhighlighted: `\uhhhh` (Agda, Object Pascal, WGSL), now `\x{hhhh}`, and
+# a quantified assertion `\b?` (AL), now `(?:\b)?`. A pattern that used
+# either never compiled, so no lexer that worked before changes.
+#
+# Remove when: every supported toolchain links PCRE2 >= 10.43 (`{,n}`) and
+# upstream spells `\u` and `\b?` the PCRE2 way.
 
 require "tartrazine"
 
 module BytesRegex
-  # `pattern` with each `{,n}` quantifier spelled `{0,n}`.
-  def self.hwaro_portable_quantifiers(pattern : String) : String
-    return pattern unless pattern.includes?("{,")
+  # `pattern` with each `{,n}` quantifier spelled `{0,n}`, each `\uhhhh`
+  # spelled `\x{hhhh}` and each quantified assertion (`\b?`) grouped.
+  def self.hwaro_portable_pattern(pattern : String) : String
+    return pattern unless pattern.includes?("{,") || pattern.includes?('\\')
     String.build(pattern.bytesize + 4) do |io|
       reader = Char::Reader.new(pattern)
       in_class = false
       while reader.has_next?
         char = reader.current_char
         if char == '\\'
-          io << char
           nxt = reader.next_char
-          break unless reader.has_next?
-          io << nxt
+          if nxt == 'u' && (hex = bsux_digits(pattern, reader.pos))
+            io << "\\x{" << hex << '}'
+            reader.pos += 4
+          elsif !in_class && nxt.in?('b', 'B', 'A', 'Z', 'z', 'G') && reader.peek_next_char.in?('?', '*', '+')
+            io << "(?:\\" << nxt << ')'
+          else
+            io << char
+            break unless reader.has_next?
+            io << nxt
+          end
           if nxt == 'Q'
             # \Q…\E: literal up to \E (or the end of the pattern).
             loop do
@@ -77,6 +92,12 @@ module BytesRegex
     end
   end
 
+  # The four hex digits after the `u` of a `\uhhhh` at byte `pos`, or nil.
+  private def self.bsux_digits(pattern : String, pos : Int32) : String?
+    return unless (1..4).all? { |i| pattern.byte_at?(pos + i).try(&.unsafe_chr.hex?) }
+    pattern.byte_slice(pos + 1, 4)
+  end
+
   # The digits of a `{,n}` starting at byte `pos`, or nil.
   private def self.quantifier_upper_bound(pattern : String, pos : Int32) : String?
     return unless pattern.byte_at?(pos + 1) == ','.ord
@@ -90,7 +111,7 @@ module BytesRegex
 
   class Regex
     def initialize(pattern : String, multiline = false, dotall = false, ignorecase = false, anchored = false)
-      previous_def(BytesRegex.hwaro_portable_quantifiers(pattern), multiline, dotall, ignorecase, anchored)
+      previous_def(BytesRegex.hwaro_portable_pattern(pattern), multiline, dotall, ignorecase, anchored)
     end
   end
 end
