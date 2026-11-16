@@ -514,6 +514,7 @@ module Hwaro::Core::Build::Phases::Initialize
     files_to_copy = [] of {String, String, Time}
     glob_match = File::MatchOptions.glob_default | File::MatchOptions::DotFiles
     now = Time.utc.to_unix_ms
+    @static_dirs.clear
 
     Dir.glob(File.join(src_dir, "**", "*"), match: glob_match) do |src_path|
       # lstat first: for the common regular-file case one syscall covers
@@ -530,6 +531,8 @@ module Hwaro::Core::Build::Phases::Initialize
       # publishing raw.
       next if @config.try(&.sass_source?(relative))
 
+      # POSIX separators, to compare with output file keys.
+      @static_dirs << Path[relative].parent.to_posix.to_s
       dest_path = File.join(output_dir, relative)
       # Claimed BEFORE the unchanged-skip below: the claim list records what
       # this build PUBLISHES, not what it copied. A `--cache` build never

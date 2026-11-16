@@ -419,6 +419,9 @@ module Hwaro
         # writers (paginator, taxonomy pages) consult it so they never
         # overwrite an authored page — see `page_output_owner`.
         @page_output_files : Hash(String, String) = {} of String => String
+        # Directories holding a published file under `static/`, relative to
+        # it, as the last walk saw them (see `warn_static_dir_case`).
+        @static_dirs : Set(String) = Set(String).new
         # Unresolved `@/` internal links collected during the render fan-out
         # when `[links] broken_internal = "error"` (each entry is a formatted
         # "source.md → @/target (reason)" line). Guarded by
