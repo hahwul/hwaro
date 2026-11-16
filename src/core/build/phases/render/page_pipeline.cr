@@ -243,6 +243,7 @@ module Hwaro::Core::Build::Phases::Render
 
       # Replace shortcode placeholders with their rendered HTML content
       html_content = replace_shortcode_placeholders(html_content, shortcode_results)
+      warn_unpublished_bundle_links(page, html_content)
 
       # Resolve internal @/ links to actual page URLs
       if pages_by_path = @pages_by_path
@@ -441,6 +442,19 @@ module Hwaro::Core::Build::Phases::Render
     page_vars = Content::Processors::RenderHooks.page_vars(page, site.config)
     Content::Processors::RenderHooks::HookRenderContext.new(registry, env, cache, cache_mutex, page_vars,
       site.config.markdown.mermaid, site.config.markdown.admonitions, site.config.templates.autoescape)
+  end
+
+  # A bundle file `[content.files]` leaves out is never copied, so a link or
+  # image naming it (`report.pdf`, `./report.pdf#page=2`) is dead. Only pages
+  # whose bundle holds such a file (`Page#unpublished_assets`) look at their
+  # HTML.
+  private def warn_unpublished_bundle_links(page : Models::Page, html : String) : Nil
+    return unless files = page.unpublished_assets
+    files.each do |file|
+      names = [file, HTML.escape(URI.encode_path(file))].uniq!.join('|') { |name| Regex.escape(name) }
+      next unless html.matches?(/(?:href|src)="(?:\.\/)?(?:#{names})["?#]/)
+      Logger.warn "#{page.path} links to #{file}, which the build does not publish: add its extension to [content.files] allow_extensions (or lift the disallow rule that matches it)"
+    end
   end
 
   # Render-path fallback when a page/section has no template: warn, record a

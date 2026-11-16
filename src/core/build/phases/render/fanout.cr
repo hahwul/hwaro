@@ -133,7 +133,11 @@ module Hwaro::Core::Build::Phases::Render
     verbose : Bool,
     io_signatures : Hash(String, String) = {} of String => String,
   )
-    report_render_failures(failures, verbose, io_signatures) unless failures.empty?
+    # A lone failure that IS the error raised below is printed by whoever
+    # reports that error (the CLI, the serve watcher, `--json`'s payload);
+    # summarising it first printed the same message and excerpt twice.
+    restated = failures.size == 1 && classified_error.try(&.message) == failures.first[:message]
+    report_render_failures(failures, verbose, io_signatures) unless failures.empty? || restated
 
     if err = classified_error
       raise err

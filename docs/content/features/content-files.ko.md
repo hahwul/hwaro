@@ -117,6 +117,8 @@ disallow_paths = ["drafts/**", "**/_*", "private/**"]
 ![Diagram](diagram.svg)
 ```
 
+위 규칙에서 제외된 파일은 복사되지 않으므로, 그 파일로 가는 링크는 깨진 링크가 됩니다. 페이지 번들이 자기 디렉터리의 이런 파일을 링크하거나 삽입하면(`allow_extensions`에 `pdf`가 없는데 `[Download](report.pdf)`를 쓴 경우) 빌드가 페이지와 파일마다 한 번씩 `<page> links to report.pdf, which the build does not publish` 경고를 출력합니다. [`hwaro tool check-links`](/ko/start/tools/check-links/)도 같은 링크를 보고합니다.
+
 ### 템플릿에서
 
 페이지 번들에서는 함께 둔 에셋을 `page.assets`로도 쓸 수 있습니다:

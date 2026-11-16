@@ -350,6 +350,8 @@ console.log("Hello");
 
 Table cells support inline Markdown: **bold**, *italic*, `code spans`, `[links](url)`, `![images](url)`, and ~~strikethrough~~. Links and images take the same destinations as in a paragraph: balanced parentheses (`[W](https://en.wikipedia.org/wiki/Foo_(bar))`), an optional title (`[T](/x/ "the title")`) and `<angle>` destinations; a backslash escapes punctuation (`\*not emphasis\*`). The same applies to definition list and footnote bodies.
 
+Raw HTML is not rendered there: a tag written in a cell (`<em>`, `<br>`) is escaped and shows as literal text, whatever `[markdown] safe` is set to. The same holds in definition lists and footnote bodies.
+
 ```markdown
 | Feature        | Example                          |
 |----------------|----------------------------------|

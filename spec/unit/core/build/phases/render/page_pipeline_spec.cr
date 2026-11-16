@@ -60,3 +60,30 @@ describe "content links under a base path a section shares" do
     end
   end
 end
+
+# `[content.files] allow_extensions` (every scaffold names images only) leaves
+# a bundle's PDF out of the build, so a link to it is dead; say so.
+describe "links to bundle files the build does not publish" do
+  it "warns once per page and file, naming the file and allow_extensions" do
+    log = with_captured_log do
+      build_site(
+        %(title = "T"\nbase_url = "http://localhost"\n\n[content.files]\nallow_extensions = ["png"]\n),
+        content_files: {
+          "posts/x/index.md"   => "+++\ntitle = \"X\"\n+++\n[pdf](report.pdf) [again](./report.pdf#page=2) ![c](chart.png)\n",
+          "posts/x/report.pdf" => "pdf",
+          "posts/x/chart.png"  => "png",
+          "posts/x/unused.zip" => "zip",
+          "posts/y/index.md"   => "+++\ntitle = \"Y\"\n+++\n[pdf](report.pdf)\n",
+        },
+        template_files: {"page.html" => "{{ content }}"},
+      ) do
+        File.exists?("public/posts/x/report.pdf").should be_false
+        File.exists?("public/posts/x/chart.png").should be_true
+      end
+    end
+    warnings = log.lines.select(&.includes?("does not publish"))
+    warnings.size.should eq(1)
+    warnings.first.should contain("posts/x/index.md links to report.pdf")
+    warnings.first.should contain("[content.files] allow_extensions")
+  end
+end

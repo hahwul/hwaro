@@ -148,3 +148,33 @@ describe "Builder serve passes and resize_image op variants" do
     end
   end
 end
+
+# A page's stale output is recorded absolute, a taxonomy term's relative; the
+# log line printed both spellings until it was made relative to the cwd.
+describe "Builder#delete_orphaned_outputs log" do
+  it "prints every removed path relative to the working directory" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", "title = \"T\"\nbase_url = \"http://localhost\"\n\n[[taxonomies]]\nname = \"tags\"\n")
+        FileUtils.mkdir_p("templates")
+        FileUtils.mkdir_p("content")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("content/a.md", "+++\ntitle = \"A\"\ntags = [\"only\"]\n+++\n")
+        File.write("content/b.md", "+++\ntitle = \"B\"\n+++\n")
+        options = Hwaro::Config::Options::BuildOptions.new(highlight: false, cache: true, parallel: false)
+        build = -> do
+          builder = Hwaro::Core::Build::Builder.new
+          Hwaro::Content::Hooks.all.each { |hook| builder.register(hook) }
+          builder.run(options).should be_true
+        end
+        build.call
+        File.exists?("public/a/index.html").should be_true
+        File.delete("content/a.md")
+        log = with_captured_log { build.call }
+        log.should contain("Removed stale output: public/a/index.html")
+        log.should contain("Removed stale output: public/tags/only/index.html")
+        log.should_not contain("Removed stale output: /")
+      end
+    end
+  end
+end

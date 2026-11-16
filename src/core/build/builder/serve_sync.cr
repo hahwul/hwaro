@@ -378,11 +378,14 @@ module Hwaro
         # this only through `prune_unclaimed_outputs`, which decides WHAT is
         # stale; this only does the deleting.
         private def delete_orphaned_outputs(paths : Array(String), output_dir : String)
+          # Page outputs arrive absolute, generated claims relative: print
+          # both relative to the working directory.
+          cwd = Dir.current
           paths.each do |path|
             next unless Utils::OutputGuard.safe_to_delete_file?(path, output_dir)
             next unless File.exists?(path)
             File.delete(path)
-            Logger.info "  Removed stale output: #{path}"
+            Logger.info "  Removed stale output: #{Utils::PathUtils.relative_path(path, cwd) || path}"
 
             dir = File.dirname(path)
             while Utils::OutputGuard.safe_to_delete_directory?(dir, output_dir) && Dir.exists?(dir) && Dir.empty?(dir)
