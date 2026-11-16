@@ -55,6 +55,9 @@ jobs:
             exit 1
           fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+          # `~` sorts a prerelease before its release (1.0.0~rc.1 < 1.0.0); a
+          # hyphen would read as a Debian revision and sort after it.
+          echo "DEB_VERSION=$(printf '%s' "$VERSION" | sed 's/-/~/')" >> $GITHUB_ENV
           echo "Resolved version: $VERSION"
       - name: Download prebuilt binary
         env:
@@ -77,7 +80,7 @@ jobs:
         run: |
           cat > hwaro_${{ env.VERSION }}_${{ matrix.arch }}/DEBIAN/control << EOF
           Package: hwaro
-          Version: ${{ env.VERSION }}
+          Version: ${{ env.DEB_VERSION }}
           Architecture: ${{ matrix.arch }}
           Maintainer: HAHWUL <hahwul@gmail.com>, KSG <ksg97031@gmail.com>
           Description: Lightweight and fast Static Site Generator(SSG) written in Crystal.

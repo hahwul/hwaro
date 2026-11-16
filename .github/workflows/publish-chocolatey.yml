@@ -103,7 +103,8 @@ jobs:
       - name: Smoke-test local package
         shell: pwsh
         run: |
-          choco install hwaro --source . -y --no-progress
+          # --pre: without it a prerelease package (1.0.0-rc.1) is not found.
+          choco install hwaro --source . -y --no-progress --pre
           if ($LASTEXITCODE -ne 0) { throw 'Local Chocolatey install failed.' }
           $text = (& hwaro --version 2>&1) -join "`n"
           $code = $LASTEXITCODE
@@ -112,8 +113,10 @@ jobs:
             throw "hwaro --version did not print expected version $env:VERSION."
           }
 
+      # A prerelease tag (v1.0.0-rc.1) stops here on a release run: packed and
+      # smoke-tested above, not pushed.
       - name: Push package
-        if: ${{ github.event_name == 'workflow_run' || inputs.dry_run != true }}
+        if: ${{ (github.event_name == 'workflow_run' && !contains(github.event.workflow_run.head_branch, '-')) || (github.event_name == 'workflow_dispatch' && inputs.dry_run != true) }}
         env:
           CHOCOLATEY_KEY: ${{ secrets.CHOCOLATEY_KEY }}
         shell: pwsh

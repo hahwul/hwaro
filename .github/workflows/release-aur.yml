@@ -23,10 +23,13 @@ permissions:
   contents: read
 jobs:
   publish-aur:
+    # A prerelease tag (v1.0.0-rc.1) is skipped: `pkgver` cannot hold a hyphen,
+    # and the AUR package has no prerelease channel.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'release')
+       github.event.workflow_run.event == 'release' &&
+       !contains(github.event.workflow_run.head_branch, '-'))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source code
