@@ -108,6 +108,8 @@ This is a statement[^1] with multiple references[^note].
 [^note]: Named footnote content.
 ```
 
+A footnote body takes inline Markdown (`**bold**`, `*italic*`, `` `code` ``, links, images, `~~strikethrough~~`). Raw HTML in it (`<em>`, `<kbd>`) is escaped and shows as literal text, whatever `[markdown] safe` is set to.
+
 ### Output
 
 References become superscript links:

@@ -108,6 +108,8 @@ This is a statement[^1] with multiple references[^note].
 [^note]: Named footnote content.
 ```
 
+각주 본문에는 인라인 마크다운(`**굵게**`, `*기울임*`, `` `코드` ``, 링크, 이미지, `~~취소선~~`)을 쓸 수 있습니다. 그 안의 원시 HTML(`<em>`, `<kbd>`)은 이스케이프되어 글자 그대로 보이며, `[markdown] safe` 설정과는 관계없습니다.
+
 ### 출력
 
 참조는 위 첨자 링크가 됩니다.
