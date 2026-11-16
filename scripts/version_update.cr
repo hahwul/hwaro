@@ -1,6 +1,6 @@
 require "./version_files"
 
-# Usage: crystal run scripts/version_update.cr [-- X.Y.Z]
+# Usage: crystal run scripts/version_update.cr [-- X.Y.Z | X.Y.Z-rc.N]
 # Without an argument the new version is read from stdin.
 
 puts "Current versions:"
@@ -17,8 +17,8 @@ if new_version.empty?
   exit 0
 end
 
-unless new_version.matches?(/^\d+\.\d+\.\d+$/)
-  puts "❌ Invalid version format. Please use semantic versioning (e.g., 1.2.3)"
+unless new_version.matches?(/^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/)
+  puts "❌ Invalid version format. Please use semantic versioning (e.g., 1.2.3 or 1.2.3-rc.1)"
   exit 1
 end
 
@@ -29,6 +29,7 @@ end
 
 VERSION_FILES.each do |path, pattern|
   next unless File.exists?(path)
+  next if new_version.includes?('-') && RELEASE_ONLY.includes?(path)
   content = File.read(path).gsub(pattern) do |text, md|
     from = md.begin(1) - md.begin(0)
     to = md.end(1) - md.begin(0)
