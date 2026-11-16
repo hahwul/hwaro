@@ -20,6 +20,8 @@
       url: /start/tools/
     - title: Upgrading to 1.0
       url: /start/upgrading/
+    - title: Stability
+      url: /start/stability/
 - title: Writing
   section: writing
   items:

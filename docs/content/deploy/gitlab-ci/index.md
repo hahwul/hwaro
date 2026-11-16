@@ -20,7 +20,7 @@ Or add `.gitlab-ci.yml` to your repository manually:
 
 ```yaml
 image:
-  name: ghcr.io/hahwul/hwaro:latest
+  name: ghcr.io/hahwul/hwaro:1
   entrypoint: [""]
 
 pages:

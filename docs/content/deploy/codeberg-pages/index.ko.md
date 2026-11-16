@@ -48,7 +48,7 @@ jobs:
   deploy:
     runs-on: docker
     container:
-      image: ghcr.io/hahwul/hwaro:latest
+      image: ghcr.io/hahwul/hwaro:1
     env:
       # 프로젝트 사이트: "pages" (기본값). 사용자/조직 사이트("pages"라는
       # 이름의 저장소): 기본 브랜치(예: "main")로 바꿉니다.

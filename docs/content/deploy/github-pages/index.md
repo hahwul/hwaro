@@ -48,7 +48,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Build Only
-        uses: hahwul/hwaro@main
+        uses: hahwul/hwaro@v1
         with:
           build_only: true
 
@@ -60,7 +60,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Build and Deploy
-        uses: hahwul/hwaro@main
+        uses: hahwul/hwaro@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -82,7 +82,7 @@ If your Hwaro site is in a subdirectory (e.g., `docs/`), set `build_dir`:
 
 ```yaml
 - name: Build and Deploy
-  uses: hahwul/hwaro@main
+  uses: hahwul/hwaro@v1
   with:
     build_dir: "docs"
     token: ${{ secrets.GITHUB_TOKEN }}
@@ -90,7 +90,7 @@ If your Hwaro site is in a subdirectory (e.g., `docs/`), set `build_dir`:
 
 ### Pinning a Version
 
-`@main` follows the latest development build. To pin, use a release tag (`hahwul/hwaro@v0.22.0`) or the full commit SHA of a release tag (`hahwul/hwaro@534398a0749d5c9e68a04bfbc8834769f8385455 # v0.22.0`). The action runs the Docker image published for that release; a SHA that is not a release commit fails with an error, because only releases have an image.
+`@v1` follows the 1.x releases: a site gets fixes and new features, and never an unreleased build or the next major version (see [Stability](/start/stability/#choosing-what-your-site-follows)). To pin one release, use its tag (`hahwul/hwaro@v1.0.0`) or the full commit SHA of that tag (`hahwul/hwaro@<40-character SHA> # v1.0.0`). `@main` follows the development branch. The action runs the Docker image published for that release; a SHA that is not a release commit fails with an error, because only releases have an image.
 
 ### OG Image Caching
 

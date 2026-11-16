@@ -14,7 +14,7 @@ This page lists what a site owner can observe when moving from 0.22 to 1.0. A si
 3. Build with 1.0 and read the warnings: `hwaro build -o /tmp/site-1.0`.
 4. Compare the two: `diff -r /tmp/site-0.22 /tmp/site-1.0`. Every difference should be one of the items on this page.
 
-To see only what template escaping changes, follow [Coming from 0.x](/templates/syntax/#coming-from-0x).
+To see only what template escaping changes, follow [Coming from 0.x](/templates/syntax/#coming-from-0x). What later 1.x releases keep working is on the [Stability](/start/stability/) page.
 
 ## Changes that need action
 

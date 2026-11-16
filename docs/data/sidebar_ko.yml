@@ -18,6 +18,8 @@
       url: /ko/start/tools/
     - title: 1.0으로 업그레이드
       url: /ko/start/upgrading/
+    - title: 안정성
+      url: /ko/start/stability/
 - title: 콘텐츠 작성
   section: writing
   items:
