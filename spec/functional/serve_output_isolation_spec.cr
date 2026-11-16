@@ -172,6 +172,28 @@ describe "serve output isolation (issue #756)" do
     end
   end
 
+  # serve reads config.toml before the initial build does; a warning printed
+  # by each read reached the terminal three times at startup.
+  it "Server#serve_build_options leaves the config's warnings to the build" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_isolation_site
+        File.write("config.toml", File.read("config.toml") + "\n[plugins]\nx = 1\n")
+        previous = Hwaro::Logger.io
+        io = IO::Memory.new
+        Hwaro::Logger.io = Hwaro::Logger::GuardedIO.new(io)
+        begin
+          Hwaro::Services::Server.new.isolation_serve_build_options(Hwaro::Config::Options::ServeOptions.new)
+          io.to_s.should_not contain("plugins")
+          Hwaro::Models::Config.load
+          io.to_s.should contain("plugins")
+        ensure
+          Hwaro::Logger.io = previous
+        end
+      end
+    end
+  end
+
   # A cold serve start must not serve a previous session's pages: the dev
   # dir is wiped exactly like any cold build output.
   it "a new serve session wipes stale files from the previous one" do

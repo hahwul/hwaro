@@ -219,3 +219,27 @@ describe "Render output paths: authored vs generated collisions" do
     end
   end
 end
+
+# `static/reference/` and `content/Reference/` are one output directory on
+# macOS and Windows; the build cannot pick a spelling for the author.
+describe "Render output paths: static directory vs page directory letter case" do
+  it "warns when they differ only in letter case, and not when they match" do
+    build = ->(section : String) do
+      with_captured_log do
+        build_site(
+          "title = \"T\"\nbase_url = \"http://localhost\"\n",
+          content_files: {
+            "#{section}/_index.md"   => "+++\ntitle = \"R\"\n+++\n",
+            "#{section}/deep/api.md" => "+++\ntitle = \"A\"\n+++\n",
+          },
+          template_files: {"page.html" => "x", "section.html" => "x"},
+          static_files: {"reference/x.txt" => "x", "reference/deep/y.txt" => "y"},
+        ) { }
+      end
+    end
+    log = build.call("Reference")
+    log.scan("differ only in letter case").size.should eq(1)
+    log.should contain("Output directory 'Reference/' of 'Reference/_index.md' and 'static/reference/'")
+    build.call("reference").should_not contain("differ only in letter case")
+  end
+end

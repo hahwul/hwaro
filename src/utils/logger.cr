@@ -355,6 +355,20 @@ module Hwaro
       end
     end
 
+    # Run the block with this fiber's terminal output dropped. For a config
+    # load made only to read a value early: `Config.load` warns every time,
+    # and the load the command is about (the build's, doctor's config check)
+    # prints the same lines.
+    def self.muted(&)
+      previous = Fiber.current.hwaro_log_capture
+      Fiber.current.hwaro_log_capture = Captured.new
+      begin
+        yield
+      ensure
+        Fiber.current.hwaro_log_capture = previous
+      end
+    end
+
     # Print captured lines (from a fiber that is not itself capturing).
     def self.replay(captured : Captured) : Nil
       captured.each do |io, bytes|

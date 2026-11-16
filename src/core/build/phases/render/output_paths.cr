@@ -89,6 +89,7 @@ module Hwaro::Core::Build::Phases::Render
     # Snapshot before the alias pass: only a page's own HTML counts as
     # authored output for the generated writers (see `page_output_owner`).
     @page_output_files = by_file.dup
+    warn_static_dir_case(by_file)
 
     # A term `_index.md` writes no page, but its aliases redirect to its term
     # page (Builder#write_term_aliases), so they claim like any other.
@@ -147,6 +148,38 @@ module Hwaro::Core::Build::Phases::Render
     end
 
     winners
+  end
+
+  # A `static/` directory and a page directory spelled alike but for letter
+  # case (`static/reference/`, `content/Reference/`) are ONE output directory
+  # on macOS and Windows. Whichever is written first names it there, so the
+  # other side's URLs 404 on a case-sensitive host, and a cold and a `--cache`
+  # build can spell it differently. Neither side is the wrong one, so nothing
+  # is suppressed: the author has to rename. Warned everywhere, like the page
+  # collisions above. `page_files` is `output_file_key` => page path.
+  private def warn_static_dir_case(page_files : Hash(String, String)) : Nil
+    static = {} of String => String
+    @static_dirs.each do |dir|
+      until dir == "."
+        key = Utils::PathUtils.output_fold_key(dir)
+        break if static.has_key?(key)
+        static[key] = dir
+        dir = File.dirname(dir)
+      end
+    end
+    return if static.empty?
+
+    seen = Set(String).new
+    page_files.each do |dir, page_path|
+      until dir == "." || !seen.add?(dir)
+        other = static[Utils::PathUtils.output_fold_key(dir)]?
+        # Compared in NFC: a name in two Unicode forms is not a case clash.
+        if other && Utils::PathUtils.nfc(File.basename(other)) != Utils::PathUtils.nfc(File.basename(dir))
+          Logger.warn "Output directory '#{dir}/' of '#{page_path}' and 'static/#{other}/' differ only in letter case, which name the same directory on macOS and Windows — rename one, or the URLs of the other break there or on a case-sensitive host"
+        end
+        dir = File.dirname(dir)
+      end
+    end
   end
 
   # Pages that write their own HTML, in claim order. Authored pages claim

@@ -366,7 +366,7 @@ module Hwaro
       # here treats "no config" as "nothing extra to watch" rather than an
       # error — the Builder reports the real failure on the initial build.
       private def load_config_or_nil(env : String?) : Models::Config?
-        Hwaro::Models::Config.load(env: env)
+        Logger.muted { Hwaro::Models::Config.load(env: env) }
       rescue Hwaro::HwaroError
         nil
       end

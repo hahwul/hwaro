@@ -226,9 +226,7 @@ module Hwaro
       protected def serve_build_options(options : Config::Options::ServeOptions) : Config::Options::BuildOptions
         build_options = options.to_build_options
         build_options.serve_mode = true
-        # Kept for the watcher (see @startup_config): loading config.toml
-        # emits its env-substitution warnings every time, so a third load at
-        # startup would print each `${VAR} is not set` line three times.
+        # Kept for the watcher (see @startup_config) rather than loaded twice.
         config = load_config_or_nil(build_options.env)
         @startup_config = config
         config.try { |cfg| build_options.apply_build_config!(cfg.build) }
