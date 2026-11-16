@@ -42,7 +42,9 @@ module Hwaro
         return [] of ContentInfo unless File.exists?("config.toml")
 
         config = begin
-          Models::Config.load
+          # Muted like ContentLister#project_config: the caller's own load
+          # (doctor's config check) reports the config's warnings.
+          Logger.muted { Models::Config.load }
         rescue Exception
           # An unloadable config disables generated rows, not the listing.
           return [] of ContentInfo

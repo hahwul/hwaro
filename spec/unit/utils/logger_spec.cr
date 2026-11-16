@@ -783,6 +783,22 @@ describe Hwaro::Logger do
   end
 end
 
+describe "Hwaro::Logger.muted" do
+  it "drops this fiber's output inside the block only" do
+    previous = Hwaro::Logger.io
+    io = IO::Memory.new
+    Hwaro::Logger.io = Hwaro::Logger::GuardedIO.new(io)
+    begin
+      Hwaro::Logger.muted { Hwaro::Logger.warn "inside" }.should be_nil
+      Hwaro::Logger.warn "outside"
+    ensure
+      Hwaro::Logger.io = previous
+    end
+    io.to_s.should contain("outside")
+    io.to_s.should_not contain("inside")
+  end
+end
+
 # A content file named `x<ESC>[2J.md` (or a front matter value) reaches the
 # terminal through log lines; control bytes must be made visible, while the
 # logger's own colours still pass.

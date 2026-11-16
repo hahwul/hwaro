@@ -97,7 +97,8 @@ module Hwaro
           # This must happen after Dir.cd so `hwaro serve -i /other/project` reads the
           # right config. We deliberately do not load config earlier in parse_options.
           begin
-            cfg = Models::Config.load(env: options.env)
+            # Muted: the initial build loads it again and reports.
+            cfg = Logger.muted { Models::Config.load(env: options.env) }
 
             # Merge headers (CLI wins)
             options.allow_hosts = cfg.serve.allowed_hosts + options.allow_hosts

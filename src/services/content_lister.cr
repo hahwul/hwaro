@@ -147,13 +147,7 @@ module Hwaro
       end
 
       private def load_quietly(path : String) : Models::Config?
-        previous = Logger.level
-        Logger.level = Logger::Level::Error
-        begin
-          Models::Config.load(path)
-        ensure
-          Logger.level = previous
-        end
+        Logger.muted { Models::Config.load(path) }
       rescue Exception
         nil
       end
