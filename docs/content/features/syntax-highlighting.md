@@ -74,7 +74,11 @@ injects the theme stylesheet, while `{{ highlight_js }}` becomes empty.
 
 Over 250 languages are supported (via [Tartrazine](https://github.com/ralsina/tartrazine)
 lexers, ported from Pygments/Chroma). Code blocks in languages without a
-lexer fall back to plain, unhighlighted output.
+lexer fall back to plain, unhighlighted output. So do a few bundled lexers
+that use regex or grammar features the engine does not support yet: SCSS,
+fish, V, Batch, PostgreSQL, CQL, Materialize SQL, Org mode, fixed-form
+Fortran, Racket and OpenEdge ABL. A [custom grammar](#custom-grammars) with the same name replaces
+a bundled one.
 
 ## Custom Grammars
 

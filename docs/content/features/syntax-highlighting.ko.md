@@ -68,7 +68,7 @@ mode = "server"
 
 빌드 시점 하이라이터는 Highlight.js 호환 CSS 클래스를 출력하므로, 아래의 모든 테마가 그대로 동작합니다. `{{ highlight_css }}`는 여전히 테마 스타일시트를 주입하고, `{{ highlight_js }}`는 빈 값이 됩니다.
 
-250개가 넘는 언어를 지원합니다(Pygments/Chroma에서 포팅된 [Tartrazine](https://github.com/ralsina/tartrazine) 렉서 사용). 렉서가 없는 언어의 코드 블록은 강조 없는 일반 출력으로 대체됩니다.
+250개가 넘는 언어를 지원합니다(Pygments/Chroma에서 포팅된 [Tartrazine](https://github.com/ralsina/tartrazine) 렉서 사용). 렉서가 없는 언어의 코드 블록은 강조 없는 일반 출력으로 대체됩니다. 엔진이 아직 지원하지 않는 정규식이나 문법 기능을 쓰는 일부 내장 렉서도 마찬가지입니다: SCSS, fish, V, Batch, PostgreSQL, CQL, Materialize SQL, Org 모드, 고정 형식 Fortran, Racket, OpenEdge ABL. 같은 이름의 [사용자 정의 문법](#custom-grammars)으로 내장 렉서를 교체할 수 있습니다.
 
 ## 사용자 정의 문법 {#custom-grammars}
 
