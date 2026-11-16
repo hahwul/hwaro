@@ -193,3 +193,43 @@ class Crinja::Evaluator
     "{…}"
   end
 end
+
+# === 5. Member/index access names a COPY of the Undefined it returns ======
+# Upstream labels a missed `a.b` / `a[0]` by renaming the `Undefined` it got
+# back in place (`value.as_undefined.name = ...`). That object is not always
+# fresh: a plain undefined identifier is the shared `Value::UNDEFINED`
+# singleton, and `{% set d = {"t": nothere} %}{{ d.t }}` hands that very
+# object back. Renaming it wrote `d.t` into every later unnamed undefined, so
+# an unrelated error on another page (`{% call undefined_macro() %}`) said
+# `d.t is undefined`, and render workers raced on the write. The bodies are
+# upstream's with the rename done on a copy (and the visit macro's location
+# rescue kept), so the shared value is never written.
+class Crinja::Evaluator
+  visit MemberExpression do
+    object = value! expression.identifier
+    value = begin
+      Resolver.resolve_attribute(expression.member.name, object)
+    rescue UndefinedError
+      raise UndefinedError.new(name_for_expression(expression))
+    end
+    named_undefined(value, expression)
+  end
+
+  visit IndexExpression do
+    object = value! expression.identifier
+    argument = evaluate expression.argument
+    value = begin
+      Resolver.resolve_attribute(argument, object)
+    rescue UndefinedError
+      raise UndefinedError.new(name_for_expression(expression))
+    end
+    named_undefined(value, expression)
+  end
+
+  private def named_undefined(value : Value, expression) : Value
+    return value unless value.undefined?
+    copy = value.as_undefined.dup
+    copy.name = name_for_expression(expression)
+    Value.new(copy)
+  end
+end
