@@ -83,7 +83,9 @@ URL은 빌드와 같은 방식으로 원본에서 계산하므로 첫 빌드 전
 - `/about/`, `/about`, `/about/index.html`은 모두 `content/about.md`에 닿지만
   `/about.md`는 아닙니다. 빌드는 마크다운 원본을 원래 이름으로 게시하지 않습니다.
 - 페이지 번들이나 섹션 인덱스 옆의 파일은 그 페이지의 URL 아래에서 유효하며,
-  번역본에도 해당합니다(`/ko/posts/my-trip/photo.jpg`).
+  번역본에도 해당합니다(`/ko/posts/my-trip/photo.jpg`). `[content.files]` 설정이
+  빌드에서 제외하는 파일(`allow_extensions`에 없는 확장자, disallow 규칙)은
+  페이지 옆에 있더라도 게시되지 않는 파일로 보고합니다.
 - 상대 링크는 원본 파일의 폴더가 아니라 브라우저처럼 페이지의 URL을 기준으로
   해석합니다. `/posts/a/`로 게시되는 `content/posts/a.md`에서 `../b/`는
   `/posts/b/`에 닿고, `![](photo.png)`는 `/posts/a/photo.png`를 요청합니다.

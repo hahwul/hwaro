@@ -118,7 +118,7 @@ sudo mv hwaro-v*-linux-x86_64 /usr/local/bin/hwaro
 ### macOS
 
 macOS 배포물은 단일 바이너리가 아니라 tarball입니다. 압축을 풀면 `hwaro`와
-번들된 OpenSSL이 담긴 `lib/` 디렉터리가 나오고, 바이너리는 이 dylib들을
+번들된 라이브러리(OpenSSL, PCRE2, libyaml)가 담긴 `lib/` 디렉터리가 나오고, 바이너리는 이 dylib들을
 `@executable_path/lib` 경로로 읽습니다. 따라서 **`lib/`를 항상 바이너리와 함께
 옮겨야 합니다.** 바이너리만 떼어 옮기면 실행되지 않습니다.
 
