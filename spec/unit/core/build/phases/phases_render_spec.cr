@@ -544,6 +544,56 @@ describe Hwaro::Core::Build::Phases::Render do
     end
   end
 
+  # The raised error is printed by the CLI / serve watcher; a summary of a
+  # lone failure printed its message and excerpt a second time.
+  describe "template failure summary" do
+    {true, false}.each do |parallel|
+      it "leaves a lone failure to the raised error (parallel: #{parallel})" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            File.write("config.toml", %(title = "t"\nbase_url = "http://localhost"\n))
+            FileUtils.mkdir_p("content")
+            FileUtils.mkdir_p("templates")
+            File.write("templates/page.html", "{{ content }}{% if %}")
+            File.write("content/about.md", "+++\ntitle = \"A\"\n+++\nbody")
+
+            error = nil
+            log = with_captured_log do
+              error = expect_raises(Hwaro::HwaroError) do
+                Hwaro::Core::Build::Builder.new.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: parallel, highlight: false))
+              end
+            end
+            error.not_nil!.code.should eq(Hwaro::Errors::HWARO_E_TEMPLATE)
+            error.not_nil!.message.to_s.should contain("Template error for about.md:")
+            log.should_not contain("Template error for about.md:")
+          end
+        end
+      end
+    end
+
+    it "still lists every page when several fail with different errors" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("config.toml", %(title = "t"\nbase_url = "http://localhost"\n))
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("templates")
+          File.write("templates/page.html", "{{ content }}{% if %}")
+          File.write("templates/other.html", "{{ content }}{% for %}")
+          File.write("content/a.md", "+++\ntitle = \"A\"\n+++\nbody")
+          File.write("content/b.md", "+++\ntitle = \"B\"\ntemplate = \"other\"\n+++\nbody")
+
+          log = with_captured_log do
+            expect_raises(Hwaro::HwaroError) do
+              Hwaro::Core::Build::Builder.new.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, highlight: false))
+            end
+          end
+          log.should contain("Render failed for a.md:")
+          log.should contain("Render failed for b.md:")
+        end
+      end
+    end
+  end
+
   # An I/O failure names the page's own output file, so no two were ever
   # "the same error": a full disk printed one line per remaining page.
   describe "I/O failures across many pages" do
