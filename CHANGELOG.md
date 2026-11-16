@@ -1,5 +1,54 @@
 # Changelog
 
+## v1.0.0
+
+First stable release. Coming from 0.22, read [Upgrading to 1.0](https://hwaro.hahwul.com/start/upgrading/). What 1.x keeps working: [Stability](https://hwaro.hahwul.com/start/stability/).
+
+### Breaking
+- Templates escape printed values by default; `[templates] autoescape = false` keeps 0.22 output byte for byte (#962, #963, #964)
+- Removed: `[plugins]`, `hwaro tool ci`, `hwaro tool doctor`, `serve --live-reload` (#925)
+- `hwaro serve` needs a `config.toml` and answers only known `Host` names (`--allow-host`, `[serve] allowed_hosts`) (#931, #949)
+- Page URLs and output names are NFC; a site published with decomposed (NFD) URLs needs `aliases` (#961)
+- `{% include … without context %}` keeps its `set`/`macro` inside the partial (#966)
+- A template test argument without parentheses is one value, as in Jinja2; the build warns where the meaning changes (#928)
+- `include_code` / `include_md` refuse `.git/` and dotenv files (#948, #953)
+- `tool unused-assets --delete` needs `--force` outside a terminal (#958)
+
+### Added
+- `[templates] autoescape`, with a `hwaro doctor` note for sites that do not set it (#962, #963)
+- `hahwul/hwaro@v1` and `ghcr.io/hahwul/hwaro:1` follow the 1.x releases; `hwaro tool platform` generates them (#977)
+- Docs: stability policy, security model, upgrade guide (#952, #967, #978)
+- Warnings: unclosed `+++` front matter, misspelled filter/function arguments, `static/` and page directories that differ only in case (#923, #928, #973)
+- The build and `tool check-links` report a link to a file `[content.files]` leaves out (#976, #981)
+- Pinned versions and SRI hashes on CDN scripts (#960)
+- Sitemaps above 50,000 URLs split behind an index (#947)
+
+### Changed
+- Faster builds; `hwaro serve` memory no longer grows across rebuilds (#921, #946)
+- macOS binaries link current PCRE2 and libyaml (#970)
+- Prereleases stay off Homebrew, AUR, Chocolatey, snap `stable` and the `latest` image (#974)
+- Front matter errors name the line; `-q` keeps a command's result; usage errors go to stderr (#915, #922)
+- RSS plain-text descriptions are HTML-escaped; `redirect_to` stubs leave listings and prev/next (#933, #959)
+- Dates honour a written UTC offset; unrecognised dates warn (#951)
+- `truncate`, excerpts and summaries never cut inside a character (#950)
+- Importers keep old URLs, unmapped front matter keys and decoded entities (#927, #965)
+- Generated, imported, exported and deployed files are written through a temp file and rename (#937)
+
+### Fixed
+- Stale output in `serve` and `--cache`: case-only renames, removed aliases, moved redirect targets, title and image edits (#939, #940, #945, #971)
+- Slow or hanging inputs: long backtick/`<`/`&` runs, safe-mode tables, large CSS bundles, the emoji pass, regex stack limits (#943, #972)
+- Code blocks no longer print non-ASCII characters as `���`; Agda, AL, Object Pascal and WGSL blocks are highlighted (#969, #979)
+- Template errors no longer name a variable from another page; a single error prints once (#980, #981)
+- Images: lying size headers, very long images, symlink loops, palette decoding (#935, #942, #954)
+- Feeds, `llms.txt`, service worker, section listings, pagers, `get_section` under i18n (#916, #917, #929)
+- Markdown attributes, escaped heading ids, GFM tables, Markdown after a line-start shortcode (#918, #919)
+- Warnings and the reported failure no longer depend on worker scheduling (#936)
+- `tool convert` corrupting keys and CRLF JSON bodies (#938)
+- Config warnings print once at `serve` start (#973)
+- Network operations are bounded by wall-clock time (#934)
+- Path handling: NUL-in-path crashes, `<` and `>` in page URLs (#956, #957)
+- Wikilink embed language, nested Hugo bundles, Jekyll translated slugs on import (#914)
+
 ## v0.22.1
 
 ### Fixed
