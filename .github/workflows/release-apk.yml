@@ -68,6 +68,8 @@ jobs:
             exit 1
           fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+          # apk spells a prerelease `1.0.0_rc1`; `1.0.0-rc.1` is not a pkgver.
+          echo "PKGVER=$(printf '%s' "$VERSION" | sed -E 's/-([a-z]+)\.?([0-9]*)$/_\1\2/')" >> $GITHUB_ENV
           echo "Resolved version: $VERSION"
 
       - name: Download prebuilt binary
@@ -94,7 +96,7 @@ jobs:
           cat > /home/builder/hwaro/APKBUILD <<APKEOF
           # Maintainer: HAHWUL <hahwul@gmail.com>
           pkgname=hwaro
-          pkgver=${{ env.VERSION }}
+          pkgver=${{ env.PKGVER }}
           pkgrel=0
           pkgdesc="Lightweight and fast Static Site Generator(SSG) written in Crystal."
           url="https://github.com/hahwul/hwaro"

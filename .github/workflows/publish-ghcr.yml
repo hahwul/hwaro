@@ -144,9 +144,10 @@ jobs:
             type=ref,event=branch
 
             # GitHub Release (태그 push) → v1.2.3, 1.2, latest
+            # A prerelease tag (v1.0.0-rc.1) gets its own version tag only.
             type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'release' }}
-            type=raw,value=latest,enable=${{ github.event_name == 'release' }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'release' && !contains(github.event.release.tag_name, '-') }}
+            type=raw,value=latest,enable=${{ github.event_name == 'release' && !contains(github.event.release.tag_name, '-') }}
 
             # 수동 배포 (workflow_dispatch) → 입력한 버전 + latest
             type=raw,value=${{ steps.normalize.outputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}

@@ -19,10 +19,14 @@ permissions:
 jobs:
   publish-formula:
     name: Publish prebuilt formula to tap
+    # A prerelease tag (v1.0.0-rc.1) is never published here: the tap has one
+    # formula, so every `brew upgrade` would move to the release candidate.
+    # Dispatch the workflow by hand to publish one on purpose.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'release')
+       github.event.workflow_run.event == 'release' &&
+       !contains(github.event.workflow_run.head_branch, '-'))
     runs-on: ubuntu-latest
     steps:
       - name: Resolve version
