@@ -19,7 +19,7 @@ module Hwaro::Core::Build::Phases::Render
     return unless clean
     # Decide whether this is an explicit file after decoding the URL path.
     return clean if clean.ends_with?(".html") || clean.ends_with?(".htm")
-    File.join(clean, "index.html")
+    Path.posix(clean, "index.html").to_s
   end
 
   # Record that a page the render loop counted could not be published by any
@@ -239,7 +239,7 @@ module Hwaro::Core::Build::Phases::Render
       output_path = Utils::PathUtils.output_file_key(url)
       suppressed << page.path if output_path.nil?
       if output_path
-        file_key = File.join(output_path, "index.html")
+        file_key = Path.posix(output_path, "index.html").to_s
         if prev_path = by_file[file_key]?
           Logger.warn "Duplicate output path '#{url}' — '#{page.path}' collides with '#{prev_path}' and is not written" unless quiet
           # Point the loser's own URL key at the winner: every sink asks
@@ -307,9 +307,8 @@ module Hwaro::Core::Build::Phases::Render
   # under parallel render or silently replace it after.
   def page_output_owner(output_path : String, output_dir : String) : String?
     return if @page_output_files.empty?
-    prefix = output_dir.rstrip("/") + "/"
-    return unless output_path.starts_with?(prefix)
-    @page_output_files[output_path[prefix.size..]]?
+    return unless key = Utils::PathUtils.relative_path(output_path, output_dir)
+    @page_output_files[key]?
   end
 
   # True when this page is not the deterministic owner of `url_key` (see
@@ -386,7 +385,7 @@ module Hwaro::Core::Build::Phases::Render
     return if page.aliases.empty?
     own_url = Utils::PathUtils.normalize_alias_url(page.url)
     own_path = Utils::PathUtils.output_file_key(page.url)
-    own_file = File.join(own_path, "index.html") if own_path
+    own_file = Path.posix(own_path, "index.html").to_s if own_path
     own_fold = Utils::PathUtils.output_fold_key(own_file) if own_file
     folds_case : Bool? = nil
     page.aliases.each do |alias_path|
