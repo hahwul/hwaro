@@ -14,6 +14,14 @@ module Hwaro::Core::Build::Phases::Render
     segments.join("/")
   end
 
+  private def alias_output_file(alias_path : String) : String?
+    clean = url_output_path(alias_path.lchop("/"))
+    return unless clean
+    # Decide whether this is an explicit file after decoding the URL path.
+    return clean if clean.ends_with?(".html") || clean.ends_with?(".htm")
+    File.join(clean, "index.html")
+  end
+
   # Record that a page the render loop counted could not be published by any
   # sink, so `pages_rendered` can be corrected before it reaches the receipt.
   protected def note_unpublished_page
@@ -121,7 +129,7 @@ module Hwaro::Core::Build::Phases::Render
 
         # A redirect stub is a published file too, so it goes through the same
         # file/fold identity check a page URL does.
-        if file_key = Utils::PathUtils.output_file_key(norm)
+        if file_key = alias_output_file(a)
           if (prev_path = by_file[file_key]?) && prev_path != page.path
             Logger.warn "Duplicate alias output path '#{norm}' — alias on '#{page.path}' collides with '#{prev_path}' and is not written"
             winners[norm] = prev_path
@@ -156,7 +164,7 @@ module Hwaro::Core::Build::Phases::Render
   # other side's URLs 404 on a case-sensitive host, and a cold and a `--cache`
   # build can spell it differently. Neither side is the wrong one, so nothing
   # is suppressed: the author has to rename. Warned everywhere, like the page
-  # collisions above. `page_files` is `output_file_key` => page path.
+  # collisions above. `page_files` maps output files to source paths.
   private def warn_static_dir_case(page_files : Hash(String, String)) : Nil
     static = {} of String => String
     @static_dirs.each do |dir|
@@ -170,7 +178,8 @@ module Hwaro::Core::Build::Phases::Render
     return if static.empty?
 
     seen = Set(String).new
-    page_files.each do |dir, page_path|
+    page_files.each do |file, page_path|
+      dir = File.dirname(file)
       until dir == "." || !seen.add?(dir)
         other = static[Utils::PathUtils.output_fold_key(dir)]?
         # Compared in NFC: a name in two Unicode forms is not a case clash.
@@ -227,9 +236,10 @@ module Hwaro::Core::Build::Phases::Render
       # only consult `output_suppressed`, so without this the build warned
       # "Not publishing", wrote no file, and then advertised the URL in
       # sitemap.xml and search.json anyway — and rendered an OG image for it.
-      file_key = Utils::PathUtils.output_file_key(url)
-      suppressed << page.path if file_key.nil?
-      if file_key
+      output_path = Utils::PathUtils.output_file_key(url)
+      suppressed << page.path if output_path.nil?
+      if output_path
+        file_key = File.join(output_path, "index.html")
         if prev_path = by_file[file_key]?
           Logger.warn "Duplicate output path '#{url}' — '#{page.path}' collides with '#{prev_path}' and is not written" unless quiet
           # Point the loser's own URL key at the winner: every sink asks
@@ -299,8 +309,7 @@ module Hwaro::Core::Build::Phases::Render
     return if @page_output_files.empty?
     prefix = output_dir.rstrip("/") + "/"
     return unless output_path.starts_with?(prefix)
-    key = output_path[prefix.size..].rchop("index.html").rstrip("/")
-    @page_output_files[key]?
+    @page_output_files[output_path[prefix.size..]]?
   end
 
   # True when this page is not the deterministic owner of `url_key` (see
@@ -374,29 +383,22 @@ module Hwaro::Core::Build::Phases::Render
   end
 
   private def generate_aliases(page : Models::Page, site : Models::Site, output_dir : String, verbose : Bool, except : Set(String)? = nil)
+    return if page.aliases.empty?
     own_url = Utils::PathUtils.normalize_alias_url(page.url)
-    # The page's own output FILE, not just its URL string: `/about/`,
-    # `/about//` and `/about/index.html` are three spellings of
-    # `about/index.html`, and only the last one normalizes back to `own_url`.
-    # A raw string compare therefore let `aliases = ["/about//"]` through on
-    # the page whose url is `/about/`, and the self-redirect stub was written
-    # straight over that page's own rendered HTML — exit 0, no warning, the
-    # body gone. (`compute_output_url_winners` cannot catch it either: the
-    # alias and the page share a path, so it reads as the same claimant.)
-    # nil = the page's URL is unpublishable, in which case there is no file
-    # for an alias to destroy and only the string compare applies.
-    own_file_key = Utils::PathUtils.output_file_key(own_url)
+    own_path = Utils::PathUtils.output_file_key(page.url)
+    own_file = File.join(own_path, "index.html") if own_path
+    own_fold = Utils::PathUtils.output_fold_key(own_file) if own_file
+    folds_case : Bool? = nil
     page.aliases.each do |alias_path|
       norm = Utils::PathUtils.normalize_alias_url(alias_path)
       # An alias pointing at the page's own URL would overwrite the real
       # content with a redirect stub to itself.
       next if norm == own_url
-      next if own_file_key && Utils::PathUtils.output_file_key(norm) == own_file_key
       next if collision_suppressed?(page, norm)
       next if except.try(&.includes?(norm))
 
-      alias_clean = url_output_path(alias_path.lchop("/"))
-      unless alias_clean
+      alias_file = alias_output_file(alias_path)
+      unless alias_file
         # NOT counted as an unpublished page: the page itself published
         # fine, only one of its redirect stubs was refused. Counting it
         # here made the receipt claim "N not published" for pages that are
@@ -405,16 +407,13 @@ module Hwaro::Core::Build::Phases::Render
         Logger.warn "Skipping alias #{alias_path.inspect} on #{page.path}: a path segment would escape the output directory."
         next
       end
-      # An alias that already names an HTML file (`/legacy.html`,
-      # `/old/index.html`) is written to that exact path; only "pretty"
-      # aliases (`/old/`) get an `index.html` appended. Previously every
-      # alias got `/index.html` tacked on, so `/legacy/index.html` became
-      # the directory `legacy/index.html/` with an `index.html` inside.
-      dest_path = if alias_clean.ends_with?(".html") || alias_clean.ends_with?(".htm")
-                    File.join(output_dir, alias_clean)
-                  else
-                    File.join(output_dir, alias_clean, "index.html")
-                  end
+      # Encoded paths and case-folded paths can point to the page's own file.
+      next if alias_file == own_file
+      if own_fold && Utils::PathUtils.output_fold_key(alias_file) == own_fold
+        folds_case = Utils::PathUtils.case_folding_fs?(output_dir) if folds_case.nil?
+        next if folds_case
+      end
+      dest_path = File.join(output_dir, alias_file)
       # Same refusal, reported the same way: a silent `next` here left an
       # alias the user declared simply absent from the output with no trace
       # in the log.

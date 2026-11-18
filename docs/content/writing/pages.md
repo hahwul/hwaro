@@ -212,6 +212,9 @@ An absolute (`https://example.com/old/`) or protocol-relative (`//example.com/ol
 value is not something this build can publish, so it is skipped with a warning.
 An alias is used exactly as written, Unicode form included, so it can keep an old
 URL that an older hwaro published under a decomposed (NFD) file name answering.
+When an alias resolves to the same output file as a page, the page takes
+precedence. This also applies to percent-encoded spellings of the file name
+and to case differences on case-insensitive filesystems.
 
 ### Custom Metadata
 

@@ -301,17 +301,40 @@ describe "build: alias targets that name the same file" do
   # they must share a collision key. `aliases = ["/index.html"]` kept its own
   # key, never collided with the homepage's `/`, and wrote its redirect stub
   # straight over `public/index.html`.
-  it "does not let /index.html alias overwrite the homepage" do
+  it "does not let aliases for index.html overwrite the homepage" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do
         dots_project
-        File.write("content/al.md", "+++\ntitle = \"Aliaser\"\naliases = [\"/index.html\"]\n+++\n\naliaser body\n")
+        File.write("content/zz.md", "+++\ntitle = \"Aliaser\"\naliases = [\"/index.html\", \"/%69ndex.html\"]\n+++\n\naliaser body\n")
 
         dots_build.should be_true
 
         home = File.read("public/index.html")
         home.should contain("Homepage body")
         home.should_not contain("http-equiv")
+      end
+    end
+  end
+
+  it "does not let a page's own encoded index alias replace its content" do
+    build_site(
+      DOTS_CONFIG,
+      content_files: {"post.md" => "+++\naliases = [\"/post/index%2Ehtml\"]\n+++\n\nPost body\n"},
+      template_files: {"page.html" => "{{ content }}"},
+    ) do
+      File.read("public/post/index.html").should contain("Post body")
+    end
+  end
+
+  it "keeps a page's own content when an alias differs only by case" do
+    build_site(
+      DOTS_CONFIG,
+      content_files: {"post.md" => "+++\naliases = [\"/POST/INDEX.html\"]\n+++\n\nPost body\n"},
+      template_files: {"page.html" => "{{ content }}"},
+    ) do
+      File.read("public/post/index.html").should contain("Post body")
+      unless Hwaro::Utils::PathUtils.case_folding_fs?("public")
+        File.read("public/POST/INDEX.html").should contain("http-equiv")
       end
     end
   end
