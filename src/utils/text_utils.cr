@@ -416,9 +416,22 @@ module Hwaro
         last_comment_close = nil.as(Int32?)
         looked_for_comment_close = false
 
-        reader = Char::Reader.new(text)
-        while reader.has_next?
-          char = reader.current_char
+        # Byte-indexed: every character this pass acts on by value is ASCII
+        # (`<`, `>`, whitespace, Markdown punctuation), so only a non-ASCII
+        # lead byte is decoded. Decoding every character of an English page
+        # just to learn it is a letter was ~10 % of a prose-heavy cold build.
+        size = bytes.size
+        pos = 0
+        while pos < size
+          byte = bytes.unsafe_fetch(pos)
+          width = 1
+          if byte < 0x80
+            char = byte.unsafe_chr
+          else
+            reader = Char::Reader.new(text, pos)
+            char = reader.current_char
+            width = reader.current_char_width
+          end
           if char == '<'
             # Only enter tag mode for a real HTML tag start (`<a`, `</p`, `<!--`)
             # that is actually closed. A bare `<` in prose/math ("n < 1000",
@@ -428,9 +441,10 @@ module Hwaro
             # come before the next `<` (a tag may span lines); a comment needs
             # a `-->` somewhere after it. Each `<` scans only up to the next
             # `<`, so the whole pass stays linear.
-            nxt = reader.peek_next_char
+            # The next BYTE is enough: a non-ASCII lead byte is none of these.
+            nxt = pos + 1 < size ? bytes.unsafe_fetch(pos + 1).unsafe_chr : '\0'
             if nxt.ascii_letter? || nxt == '/' || nxt == '!'
-              start = reader.pos
+              start = pos
               if nxt == '!' && bytes.size >= start + 4 && bytes[start + 2] === '-' && bytes[start + 3] === '-'
                 unless looked_for_comment_close
                   looked_for_comment_close = true
@@ -456,21 +470,32 @@ module Hwaro
           elsif char == '>'
             in_tag = false
           elsif !in_tag
-            if cjk_word_char?(char)
+            if byte >= 0x80 && cjk_word_char?(char)
               count += 1
               cjk += 1
               in_word = false
-            elsif char.whitespace? || cjk_punctuation?(char) || char.in?('#', '*', '_', '`', '[', ']', '(', ')', '~', '>', '<', '|')
+            elsif byte < 0x80 ? ascii_word_break?(char) : (char.whitespace? || cjk_punctuation?(char))
               in_word = false
             else
               count += 1 unless in_word
               in_word = true
             end
           end
-          reader.next_char
+          pos += width
         end
 
         {count, cjk}
+      end
+
+      # ASCII whitespace and Markdown punctuation: separators, never words.
+      @[AlwaysInline]
+      private def ascii_word_break?(c : Char) : Bool
+        case c
+        when ' ', '\t'..'\r', '#', '*', '_', '`', '[', ']', '(', ')', '~', '>', '<', '|'
+          true
+        else
+          false
+        end
       end
 
       # Han ideographs (with 々〆〇), Hiragana and Katakana (incl. halfwidth).

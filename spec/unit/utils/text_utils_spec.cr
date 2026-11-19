@@ -787,5 +787,11 @@ describe Hwaro::Utils::TextUtils do
     it "splits words on Unicode whitespace" do
       Hwaro::Utils::TextUtils.count_words("one\u00A0two\u3000three\u2003four").should eq(4)
     end
+
+    it "reads non-ASCII and invalid UTF-8 bytes as word characters" do
+      Hwaro::Utils::TextUtils.count_words("a <\u00E9 b> c").should eq(4)
+      Hwaro::Utils::TextUtils.count_words(String.new(Bytes[0x61, 0x20, 0xFF, 0xFE, 0x20, 0x62])).should eq(3)
+      Hwaro::Utils::TextUtils.count_words_and_cjk("x\u{1F600}y \u4E2D").should eq({2, 1})
+    end
   end
 end
