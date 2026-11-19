@@ -317,5 +317,12 @@ describe Hwaro::Services::Importers::HtmlToMarkdown do
       code = Hwaro::Services::Importers::HtmlToMarkdown.convert("<p><code>&#038;amp;</code></p>")
       code.should eq("`&amp;`")
     end
+
+    it "delimits code that itself contains backticks with a longer run" do
+      convert = ->(html : String) { Hwaro::Services::Importers::HtmlToMarkdown.convert(html) }
+      convert.call("<p>Run <code>echo `date`</code> now.</p>").should eq("Run `` echo `date` `` now.")
+      convert.call("<pre><code>```\ninner\n```</code></pre>").should eq("````\n```\ninner\n```\n````")
+      convert.call("<p><code>plain</code></p>").should eq("`plain`")
+    end
   end
 end

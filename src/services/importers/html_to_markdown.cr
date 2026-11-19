@@ -153,7 +153,7 @@ module Hwaro
             pre_attrs, code_attrs, body = $1, $2, $3
             lang = code_language(code_attrs) || code_language(pre_attrs)
             code = decode_html_entities(body)
-            code_stash << "```#{lang}\n#{code.strip}\n```\n\n"
+            code_stash << fence_block(lang, code.strip)
             code_placeholder(code_stash.size - 1)
           end
           result = result.gsub(/<pre([^>]*)>(.*?)<\/pre>/mi) do
@@ -165,7 +165,7 @@ module Hwaro
             body = inner.sub(/\A\s*<code[^>]*>/mi, "").sub(/<\/code>\s*\z/mi, "")
             lang = code_attrs.try { |a| code_language(a) } || code_language(pre_attrs)
             code = decode_html_entities(body)
-            code_stash << "```#{lang}\n#{code.strip}\n```\n\n"
+            code_stash << fence_block(lang, code.strip)
             code_placeholder(code_stash.size - 1)
           end
 
@@ -174,7 +174,7 @@ module Hwaro
           # be touched by the prose escaping in `decode_prose_entities`
           # (Markdown shows `&lt;` inside a code span verbatim).
           result = result.gsub(/<code\b[^>]*>(.*?)<\/code>/mi) do
-            code_stash << "`#{decode_html_entities(strip_tags($1))}`"
+            code_stash << code_span(decode_html_entities(strip_tags($1)))
             inline_code << code_stash.size - 1
             code_placeholder(code_stash.size - 1)
           end
@@ -484,6 +484,25 @@ module Hwaro
         # every imported sample unhighlighted.
         private def self.code_language(attrs : String) : String?
           attr_value(attrs, "class").try(&.[/(?<![\w-])lang(?:uage)?-([\w+#.-]+)/i, 1]?)
+        end
+
+        # A fence one backtick longer than any run inside the code (at least
+        # three): a sample showing a ``` line closed a plain ``` fence early.
+        private def self.fence_block(lang : String?, code : String) : String
+          fence = "`" * Math.max(3, longest_backtick_run(code) + 1)
+          "#{fence}#{lang}\n#{code}\n#{fence}\n\n"
+        end
+
+        # Delimited by more backticks than the code holds, padded when it
+        # starts or ends with one (CommonMark strips one space each side).
+        private def self.code_span(code : String) : String
+          ticks = "`" * (longest_backtick_run(code) + 1)
+          pad = code.starts_with?('`') || code.ends_with?('`') ? " " : ""
+          "#{ticks}#{pad}#{code}#{pad}#{ticks}"
+        end
+
+        private def self.longest_backtick_run(text : String) : Int32
+          text.scan(/`+/).max_of?(&.[0].size) || 0
         end
 
         private def self.attr_value(attrs : String, name : String) : String?
