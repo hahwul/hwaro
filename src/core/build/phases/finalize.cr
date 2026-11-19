@@ -24,9 +24,11 @@ module Hwaro::Core::Build::Phases::Finalize
       if ctx.options.cache
         prune_orphaned_cached_outputs(ctx, build_cache)
         build_cache.save
-      else
-        prune_unclaimed_generated_outputs(ctx)
       end
+      # With `--cache` too: the cache file knows nothing of what a serve
+      # rebuild wrote before it failed (it saved none), the builder does.
+      # A no-op on a process's first build.
+      prune_unclaimed_generated_outputs(ctx)
       @prune_baselines_pending = false
       # Files a failed serve pass relocated away from (a no-op otherwise).
       settle_page_outputs(ctx.options.output_dir)
