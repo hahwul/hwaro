@@ -246,19 +246,63 @@ module Hwaro
         render_taxonomy_index(index_page, sort_terms(taxonomy, index_terms, terms_map, language, site.config.default_language), templates, site, output_dir, builder, verbose, global_vars, slug_map)
         collected << index_page
 
-        terms_map.each do |term, pages|
+        each_term(space, site.config.default_language) do |term, slug, filtered_pages|
+          meta = term_meta.empty? ? nil : term_meta["#{lang_prefix}/#{taxonomy.name}/#{slug}/"]?
+          collected << render_taxonomy_term(taxonomy, term, filtered_pages, templates, site, output_dir, builder, verbose, global_vars, slug, lang_prefix: lang_prefix, language: language, meta: meta, taxonomy_urls: taxonomy_urls)
+        end
+      end
+
+      # The terms `space` writes a page for: each with its slug and the pages
+      # it lists.
+      private def self.each_term(space : TermSpace, default_language : String, & : String, String, Array(Models::Page) ->) : Nil
+        language = space.language
+        space.terms_map.each do |term, pages|
           # Filter pages to the requested language when doing per-lang generation
           filtered_pages = if language
-                             pages.select { |p| (p.language || site.config.default_language) == language }
+                             pages.select { |p| (p.language || default_language) == language }
                            else
                              pages
                            end
           next if filtered_pages.empty?
 
-          slug = slug_map[term]
-          meta = term_meta.empty? ? nil : term_meta["#{lang_prefix}/#{taxonomy.name}/#{slug}/"]?
-          collected << render_taxonomy_term(taxonomy, term, filtered_pages, templates, site, output_dir, builder, verbose, global_vars, slug, lang_prefix: lang_prefix, language: language, meta: meta, taxonomy_urls: taxonomy_urls)
+          yield term, space.slug_map[term], filtered_pages
         end
+      end
+
+      # One URL `generate` publishes: a taxonomy index ("taxonomy"), a term
+      # page ("term"), one of its pager pages ("pagination") or its feed
+      # ("feed").
+      record PlannedUrl, kind : String, url : String
+
+      # Every URL `generate` writes for `site`, in write order, with nothing
+      # rendered or written (`hwaro tool urls`). Walks the generator's own
+      # term spaces, slugs, pagination and feed path, so the two cannot
+      # drift. Term-file aliases are the builder's (`write_term_aliases`).
+      def self.planned_urls(site : Models::Site, output_dir : String) : Array(PlannedUrl)
+        planned = [] of PlannedUrl
+        config = site.config
+        return planned if config.taxonomies.empty?
+
+        build_taxonomy_index(site)
+        term_spaces(config, site.pages, site.taxonomies).each do |space|
+          taxonomy = space.taxonomy
+          index_url = "#{space.lang_prefix}/#{taxonomy.name}/"
+          planned << PlannedUrl.new("taxonomy", index_url) if output_path_for(index_url, output_dir)
+
+          each_term(space, config.default_language) do |term, slug, pages|
+            page = build_term_page(taxonomy, term, slug, space.lang_prefix, space.language)
+            if output_path_for(page.url, output_dir)
+              paginate_taxonomy(taxonomy, pages, page).each do |paginated|
+                number = paginated.page_number
+                planned << PlannedUrl.new(number == 1 ? "term" : "pagination", page_url(page.url, number, page.paginate_path))
+              end
+            end
+            if taxonomy.feed && Content::Seo::Feeds.feed_output_dir_for(output_dir, page.url)
+              planned << PlannedUrl.new("feed", "#{page.url}#{Content::Seo::Feeds.safe_feed_filename("", config.feeds.type)}")
+            end
+          end
+        end
+        planned
       end
 
       # True for `content/<taxonomy>/<dir>/_index[.<lang>].md` with
@@ -477,23 +521,8 @@ module Hwaro
         meta : Models::Section? = nil,
         taxonomy_urls : Set(String) = Set(String).new,
       ) : Models::Section
-        base_url = "#{lang_prefix}/#{taxonomy.name}/#{slug}/"
-
-        index_page = Models::Section.new("taxonomies/#{taxonomy.name}/#{slug}/index.md")
-        index_page.title = "#{taxonomy.name.capitalize}: #{term}"
-        index_page.section = taxonomy.name
-        index_page.url = base_url
-        index_page.is_index = true
-        index_page.render = true
-        index_page.generated = true
-        index_page.in_sitemap = taxonomy.sitemap
-        index_page.taxonomies = {taxonomy.name => [term]}
-        index_page.taxonomy_name = taxonomy.name
-        index_page.taxonomy_term = term
-        index_page.pagination_enabled = false
-        if language
-          index_page.language = language
-        end
+        index_page = build_term_page(taxonomy, term, slug, lang_prefix, language)
+        base_url = index_page.url
         # The term's `_index.md` (see match_term_metadata): its values win,
         # and its body — rendered by the render pass (Builder#render_term_bodies)
         # — is the `term_content` template variable; `content` stays the
@@ -589,6 +618,25 @@ module Hwaro
         end
 
         paginated_pages
+      end
+
+      private def self.build_term_page(taxonomy : Models::TaxonomyConfig, term : String, slug : String, lang_prefix : String, language : String?) : Models::Section
+        page = Models::Section.new("taxonomies/#{taxonomy.name}/#{slug}/index.md")
+        page.title = "#{taxonomy.name.capitalize}: #{term}"
+        page.section = taxonomy.name
+        page.url = "#{lang_prefix}/#{taxonomy.name}/#{slug}/"
+        page.is_index = true
+        page.render = true
+        page.generated = true
+        page.in_sitemap = taxonomy.sitemap
+        page.taxonomies = {taxonomy.name => [term]}
+        page.taxonomy_name = taxonomy.name
+        page.taxonomy_term = term
+        page.pagination_enabled = false
+        if language
+          page.language = language
+        end
+        page
       end
 
       private def self.build_taxonomy_index_page(taxonomy : Models::TaxonomyConfig, base_path : String) : Models::Section
@@ -808,13 +856,19 @@ module Hwaro
       # a term ever escapes `safe_slugify`, but every writer family must answer
       # this question the same way.
       private def self.write_output(page : Models::Section, output_dir : String, content : String, verbose : Bool = false, builder : Core::Build::Builder? = nil)
-        segments, refused = Utils::PathUtils.split_safe_segments(page.url.lchop("/"))
+        return unless output_path = output_path_for(page.url, output_dir)
+        write_to(output_path, output_dir, content, verbose, builder)
+      end
+
+      # The `index.html` a taxonomy page at `url` is written to, or nil
+      # (warned) when a path segment would escape the output directory.
+      private def self.output_path_for(url : String, output_dir : String) : String?
+        segments, refused = Utils::PathUtils.split_safe_segments(url.lchop("/"))
         if refused
-          Logger.warn "Skipping taxonomy page #{page.url.inspect}: a path segment would escape the output directory."
+          Logger.warn "Skipping taxonomy page #{url.inspect}: a path segment would escape the output directory."
           return
         end
-        output_path = File.join(output_dir, segments.join("/"), "index.html")
-        write_to(output_path, output_dir, content, verbose, builder)
+        File.join(output_dir, segments.join("/"), "index.html")
       end
 
       private def self.write_paginated_output(page : Models::Section, page_number : Int32, output_dir : String, content : String, verbose : Bool = false, paginate_path : String = "page", builder : Core::Build::Builder? = nil)

@@ -320,6 +320,16 @@ module Hwaro::Core::Build::Phases::Render
 
   def write_term_aliases(page : Models::Section, site : Models::Site, output_dir : String, verbose : Bool, taxonomy_urls : Set(String)) : Nil
     return if page.aliases.empty?
+    refused = term_alias_refusals(page, taxonomy_urls)
+    clear_page_derived_outputs(page.path)
+    generate_aliases(page, site, output_dir, verbose, except: refused)
+    written = @page_derived_mutex.synchronize { @page_derived_outputs.delete(page.path) }
+    written.try(&.each { |path| claim_generated_output(path) })
+  end
+
+  # The aliases of term file `page` that name a generated taxonomy page
+  # (see above), each warned about once.
+  private def term_alias_refusals(page : Models::Section, taxonomy_urls : Set(String)) : Set(String)
     refused = Set(String).new
     page.aliases.each do |a|
       norm = Utils::PathUtils.normalize_alias_url(a)
@@ -329,10 +339,7 @@ module Hwaro::Core::Build::Phases::Render
       next if norm == page.url || !(taxonomy_urls.includes?(norm) || taxonomy_urls.includes?(pager_base)) || !refused.add?(norm)
       Logger.warn "Duplicate alias output path '#{norm}' — alias on '#{page.path}' collides with the generated taxonomy page '#{norm}' and is not written"
     end
-    clear_page_derived_outputs(page.path)
-    generate_aliases(page, site, output_dir, verbose, except: refused)
-    written = @page_derived_mutex.synchronize { @page_derived_outputs.delete(page.path) }
-    written.try(&.each { |path| claim_generated_output(path) })
+    refused
   end
 
   private def render_page(

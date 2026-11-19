@@ -359,6 +359,10 @@ module Hwaro::Core::Build::Phases::Write
     stats.write(Utils::HtmlStats::FILE)
   end
 
+  private def warn_unpublishable(page : Models::Page) : Nil
+    Logger.warn "Not publishing #{page.path}: its URL #{page.url.inspect} cannot be written inside the output directory (a path segment traverses or escapes it). Rename the file or set an explicit `slug`/`path` in its front matter."
+  end
+
   private def write_output(page : Models::Page, output_dir : String, content : String, verbose : Bool)
     # A page that lost an output-path collision renders normally (its content
     # still feeds listings/feeds/search) but must not race the winner on disk.
@@ -369,7 +373,7 @@ module Hwaro::Core::Build::Phases::Write
     # page vanishing from the output with an exit code of 0 is exactly the
     # failure this warning exists to prevent.
     unless output_path = get_output_path(page, output_dir)
-      Logger.warn "Not publishing #{page.path}: its URL #{page.url.inspect} cannot be written inside the output directory (a path segment traverses or escapes it). Rename the file or set an explicit `slug`/`path` in its front matter."
+      warn_unpublishable(page)
       note_unpublished_page
       return
     end

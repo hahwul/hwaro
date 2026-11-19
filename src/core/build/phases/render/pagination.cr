@@ -21,16 +21,7 @@ module Hwaro::Core::Build::Phases::Render
     error_overlay : Bool = false,
     template_name : String? = nil,
   )
-    # Get pages in this section using the site utility method
-    # Note: sorting is handled by Paginator.paginate (uses section.sort_by setting)
-    section_name = Path[section.path].dirname
-    section_name = "" if section_name == "."
-    # Collision losers are never written — see build_section_pages_crinja.
-    section_pages = site.pages_for_section(section_name, section.language).reject(&.output_suppressed)
-
-    # Create paginator and render
-    paginator = Content::Pagination::Paginator.new(site.config)
-    pagination_result = paginator.paginate(section, section_pages)
+    pagination_result = section_pagination(section, site)
     renderer = Content::Pagination::Renderer.new(site.config)
 
     pagination_result.paginated_pages.each do |paginated_page|
@@ -75,7 +66,21 @@ module Hwaro::Core::Build::Phases::Render
     end
   end
 
-  private def write_paginated_output(page : Models::Page, page_number : Int32, output_dir : String, content : String, verbose : Bool, paginate_path : String = "page")
+  # The pager pages of `section`: its listed pages (the site utility's set;
+  # the Paginator sorts by the section's `sort_by`) cut into pages. Shared by
+  # the renderer, the alias arbitration (`pager_page_owner`) and
+  # `Builder#plan_urls`.
+  private def section_pagination(section : Models::Section, site : Models::Site) : Content::Pagination::PaginationResult
+    section_name = Path[section.path].dirname
+    section_name = "" if section_name == "."
+    # Collision losers are never written — see build_section_pages_crinja.
+    section_pages = site.pages_for_section(section_name, section.language).reject(&.output_suppressed)
+    Content::Pagination::Paginator.new(site.config).paginate(section, section_pages)
+  end
+
+  # Where pager page `page_number` (>= 2) of `page` is written, or nil when
+  # it is not.
+  private def paginated_output_path(page : Models::Page, page_number : Int32, output_dir : String, paginate_path : String = "page") : String?
     # /page/N/ outputs live under the section's claimed URL.
     return if collision_suppressed?(page, page.url)
     url_path = url_output_path(page.url.lchop("/").rstrip("/"))
@@ -86,6 +91,11 @@ module Hwaro::Core::Build::Phases::Render
       Logger.warn "Pagination page #{page_number} of '#{page.path}' is not written: content page '#{owner}' publishes the same path (#{output_path}). Rename that page or set the section's `paginate_path`."
       return
     end
+    output_path
+  end
+
+  private def write_paginated_output(page : Models::Page, page_number : Int32, output_dir : String, content : String, verbose : Bool, paginate_path : String = "page")
+    return unless output_path = paginated_output_path(page, page_number, output_dir, paginate_path)
 
     content = privacy_rewrite(content, page.path)
     ensure_dir(Path[output_path].dirname.to_s)
