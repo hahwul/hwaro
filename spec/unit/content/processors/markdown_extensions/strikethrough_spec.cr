@@ -18,3 +18,12 @@ describe "inline delimiters that never close" do
     elapsed.should be < 500.milliseconds
   end
 end
+
+describe "strikethrough next to an HTML tag holding link syntax" do
+  # The tag was stashed after its `](b)` link destination, so restoring the
+  # destination first left the destination's placeholder in the output.
+  it "keeps the tag's attribute intact" do
+    html, _ = Hwaro::Processor::Markdown.render(%(<span title="see [a](b)">~~old~~ new</span>\n), markdown_config: Hwaro::Models::MarkdownConfig.new)
+    html.should eq %(<p><span title="see [a](b)"><del>old</del> new</span></p>\n)
+  end
+end

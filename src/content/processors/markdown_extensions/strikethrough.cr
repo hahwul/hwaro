@@ -98,14 +98,16 @@ module Hwaro
 
           rewritten = yield stashed
 
-          unless link_destinations.empty?
-            rewritten = rewritten.gsub(LINK_DEST_TOKEN_RE) do |match|
-              link_destinations[$1.to_i]?.try(&.itself) || match
-            end
-          end
+          # Tags first: one stashed after a link destination inside its
+          # attribute (`title="[a](b)"`) holds that destination's token.
           unless html_tags.empty?
             rewritten = rewritten.gsub(HTML_TAG_TOKEN_RE) do |match|
               html_tags[$1.to_i]?.try(&.itself) || match
+            end
+          end
+          unless link_destinations.empty?
+            rewritten = rewritten.gsub(LINK_DEST_TOKEN_RE) do |match|
+              link_destinations[$1.to_i]?.try(&.itself) || match
             end
           end
 
