@@ -9,7 +9,17 @@ module Hwaro
     class Deployer
       # Resolve the deploy source directory from options/config (expanded).
       private def resolve_source_dir(options, deployment) : String
-        expand_local_path(options.source_dir || deployment.source_dir)
+        source = options.source_dir || deployment.source_dir
+        # A blank path expands to the working directory: an unset
+        # `${DEPLOY_SRC:-}` would publish the project itself.
+        if source.blank?
+          raise Hwaro::HwaroError.new(
+            code: Hwaro::Errors::HWARO_E_CONFIG,
+            message: "The deploy source directory is empty.",
+            hint: "Set [deployment] source_dir (or pass '--source DIR') to the built site; use \".\" to deploy the project directory itself.",
+          )
+        end
+        expand_local_path(source)
       end
 
       # Expand a user-supplied local path. `home: true` matters: `path =

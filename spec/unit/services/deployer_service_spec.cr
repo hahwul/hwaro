@@ -63,6 +63,38 @@ describe Hwaro::Services::Deployer do
       end
     end
 
+    # `File.expand_path("")` is the working directory, so a blank source
+    # (`source_dir = "${DEPLOY_SRC:-}"` with the variable unset, `--source ""`)
+    # deployed the whole project: config.toml, content/, .env and all.
+    it "refuses a blank source directory instead of deploying the project root" do
+      Dir.mktmpdir do |dir|
+        project = File.join(dir, "project")
+        FileUtils.mkdir_p(project)
+        Dir.cd(project) do
+          File.write("config.toml", "title = \"secret\"")
+          target = Hwaro::Models::DeploymentTarget.new
+          target.name = "production"
+          target.url = "file://#{dir}/dest"
+
+          from_config = Hwaro::Models::Config.new
+          from_config.deployment.targets << target
+          from_config.deployment.source_dir = " "
+          from_flag = Hwaro::Models::Config.new
+          from_flag.deployment.targets << target
+
+          {
+            {Hwaro::Config::Options::DeployOptions.new(targets: ["production"]), from_config},
+            {Hwaro::Config::Options::DeployOptions.new(source_dir: "", targets: ["production"]), from_flag},
+          }.each do |options, config|
+            err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Deployer.new.run(options, config) }
+            err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+            (err.message || "").should contain("source directory is empty")
+            File.exists?(File.join(dir, "dest", "config.toml")).should be_false
+          end
+        end
+      end
+    end
+
     it "deploys to local directory" do
       Dir.mktmpdir do |dir|
         src_dir = File.join(dir, "src")
