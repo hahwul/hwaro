@@ -768,8 +768,20 @@ module Hwaro
           renderer: builder.try(&.feed_template_renderer),
           kind: "taxonomy",
           taxonomy: taxonomy.name,
-          term: term
+          term: term,
+          writer: ->(path : String, content : String) { publish(path, content, builder) },
         )
+      end
+
+      # A cold build's fresh output tree takes each new file as a plain write;
+      # anything else keeps the temp-file-and-rename (Builder#publish_output).
+      # On a site with many terms the renames were most of this pass.
+      private def self.publish(path : String, content : String, builder : Core::Build::Builder?) : Nil
+        if builder
+          builder.publish_output(path, content)
+        else
+          Hwaro::Utils::FileSafe.atomic_write(path, content)
+        end
       end
 
       private def self.page_url(base_url : String, page_number : Int32, paginate_path : String = "page") : String
@@ -848,7 +860,7 @@ module Hwaro
 
         begin
           Hwaro::Utils::FileSafe.mkdir_p(Path[output_path].dirname)
-          Hwaro::Utils::FileSafe.atomic_write(output_path, content)
+          publish(output_path, content, builder)
           builder.try(&.record_html_stats(content))
         rescue ex : File::Error
           # Term slugs are unbounded (a pasted phrase in `tags` becomes a

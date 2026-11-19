@@ -10,6 +10,57 @@ module Hwaro::Core::Build
     def test_compute_related_posts(site)
       compute_related_posts(site)
     end
+
+    def test_recompute_related_posts(site, changed)
+      recompute_related_posts_for_pages(site, changed)
+    end
+  end
+end
+
+# What `[related]` promises, by a full pairwise walk: the pages sharing a
+# term with `page` in its language and version, by shared-term count (a
+# taxonomy listed n times in `[related] taxonomies` counts n² per term),
+# ties by the first of `page`'s terms they share, then page order.
+private def related_oracle(page : Hwaro::Models::Page, pages : Array(Hwaro::Models::Page), names : Array(String), limit : Int32) : Array(String)
+  own = names.uniq.flat_map { |name| page.taxonomy_values(name).uniq.map { |term| {name, term} } }
+  scored = [] of {Int32, Int32, Int32}
+  pages.each_with_index do |other, j|
+    next if other.same?(page) || other.language != page.language || !other.version.same?(page.version)
+    score = 0
+    first = nil
+    own.each_with_index do |(name, term), pos|
+      next unless other.taxonomy_values(name).includes?(term)
+      score += names.count(name) ** 2
+      first ||= pos
+    end
+    scored << {-score, first, j} if first
+  end
+  scored.sort.first(limit).map { |_, _, j| pages[j].path }
+end
+
+# 700 posts: terms nearly every post carries, a dozen more that are either
+# rare or on a third of the posts each (more "broad" terms than the scorer
+# short-cuts), rare ones, two taxonomies, two languages and two versions, in
+# clustered and mixed order.
+private def related_corpus(seed : Int32) : Array(Hwaro::Models::Page)
+  rng = Random.new(seed)
+  v1 = Hwaro::Models::VersionConfig.new("v1")
+  mid_share = seed % 3 == 0 ? 0.4 : 0.03
+  (0...700).map do |i|
+    page = Hwaro::Models::Page.new("posts/p#{i.to_s.rjust(4, '0')}.md")
+    page.title = "P#{i}"
+    page.url = "/posts/p#{i}/"
+    tags = [] of String
+    tags << "blog" if rng.rand < 0.95
+    tags << "late" if i > 350
+    12.times { |t| tags << "mid#{t}" if rng.rand < mid_share }
+    rng.rand(3).times { tags << "rare#{rng.rand(120)}" }
+    tags << "blog" if rng.rand < 0.1
+    page.tags = tags.shuffle(rng)
+    page.taxonomies["categories"] = ["cat#{rng.rand(3)}", "all"] if rng.rand < 0.8
+    page.language = "ko" if seed.odd? ? i % 5 == 0 : i >= 560
+    page.version = v1 if rng.rand < 0.15
+    page
   end
 end
 
@@ -421,5 +472,40 @@ describe "Related posts candidates" do
     elapsed.should be < 3500.milliseconds
     # Same-residue pages share both terms and rank first, in page order.
     pages[0].related_posts.map(&.title).should eq(["P7", "P14", "P21", "P28", "P35"])
+  end
+
+  # Terms most posts carry are not walked pair by pair; the lists must be
+  # the pairwise walk's all the same.
+  [
+    {1, ["tags"], 5},
+    {2, ["tags", "categories"], 5},
+    {3, ["categories", "tags"], 1},
+    {4, ["tags", "categories", "tags"], 7},
+    {5, ["tags", "categories"], 1000},
+    {6, ["tags"], 5},
+  ].each do |(seed, names, limit)|
+    it "matches a full pairwise walk (seed #{seed}, #{names.join("+")}, limit #{limit})" do
+      config = Hwaro::Models::Config.new
+      config.related.enabled = true
+      config.related.limit = limit
+      config.related.taxonomies = names
+      site = Hwaro::Models::Site.new(config)
+      pages = related_corpus(seed)
+      site.pages = pages
+
+      builder = Hwaro::Core::Build::Builder.new
+      builder.test_compute_related_posts(site)
+      pages.each do |page|
+        page.related_posts.map(&.path).should eq(related_oracle(page, pages, names, limit))
+      end
+
+      # The serve path: retag two posts and recompute what that touches.
+      pages[3].tags = ["blog", "mid1", "rare7"]
+      pages[699].tags = ["late"]
+      builder.test_recompute_related_posts(site, [pages[3], pages[699]])
+      pages.each do |page|
+        page.related_posts.map(&.path).should eq(related_oracle(page, pages, names, limit))
+      end
+    end
   end
 end
