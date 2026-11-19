@@ -100,8 +100,8 @@ module Hwaro
           "image/x-icon"             => ".ico",
           "image/vnd.microsoft.icon" => ".ico",
         }
-        # SVG can carry script when opened directly, so it is published only
-        # for `<img>`-like references, with a warning.
+        # SVG can carry script when opened directly; publishing needs explicit
+        # trust in the final host, even for `<img>`-like references.
         SVG  = {"image/svg+xml" => ".svg"}
         FONT = {
           "font/woff2"                    => ".woff2",
@@ -206,7 +206,7 @@ module Hwaro
 
         # True for an address a build must never fetch from on a third
         # party's say-so: loopback, private (RFC 1918, ULA), link-local,
-        # CGNAT, unspecified, multicast/reserved, and IPv4-mapped forms.
+        # CGNAT, benchmarking ranges, unspecified, multicast/reserved, and IPv4-mapped forms.
         def self.internal_address?(ip : Socket::IPAddress) : Bool
           address = ip.address
           if address.starts_with?("::ffff:") && (v4 = address.lchop("::ffff:")).includes?('.')
@@ -219,10 +219,10 @@ module Hwaro
           return true if ip.loopback? || ip.private? || ip.link_local? || ip.unspecified?
           if ip.family.inet?
             a, b = address.split('.').first(2).map(&.to_i)
-            a == 0 || (a == 100 && 64 <= b <= 127) || (a == 192 && b == 0 && address.split('.')[2] == "0") || a >= 224
+            a == 0 || (a == 100 && 64 <= b <= 127) || (a == 192 && b == 0 && address.split('.')[2] == "0") || (a == 198 && 18 <= b <= 19) || a >= 224
           else
-            # Multicast ff00::/8, deprecated site-local fec0::/10.
-            address.downcase.matches?(/\A(?:ff[0-9a-f]{2}|fe[c-f][0-9a-f]):/)
+            # Multicast ff00::/8, deprecated site-local fec0::/10, benchmarking 2001:2::/48.
+            address.downcase.matches?(/\A(?:ff[0-9a-f]{2}|fe[c-f][0-9a-f]):|\A2001:2:(?:0:|:)/)
           end
         end
 
@@ -451,7 +451,11 @@ module Hwaro
             return
           end
           if ext == ".svg"
-            warn_once("svg:#{url}", "[privacy] #{RemoteFetch.sanitized_url(url)}: published an SVG, which can run script when opened directly on your site. Add its host to [privacy] exclude if you do not trust it.")
+            trusted = host_of(final_url).try { |host| @privacy.allow_svg.includes?(host) } || false
+            unless trusted
+              warn_once("svg:#{url}", "[privacy] #{RemoteFetch.sanitized_url(url)}: SVG requires its final host in [privacy] allow_svg before it can be published on your site — keeping the external URL.")
+              return
+            end
           end
           pass = Pass.new
           downloaded = body

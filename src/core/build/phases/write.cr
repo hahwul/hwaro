@@ -186,11 +186,11 @@ module Hwaro::Core::Build::Phases::Write
     return if content_copy_shadowed?(source_path, output_path, shadowed || content_copy_shadowed_outputs(output_dir))
 
     # The copy below (and File.read) follows symlinks, so a raw-file symlink
-    # whose target escapes the project would publish a file from outside
-    # the site. Skip it — mirrors the bundle-asset guard in process_assets
-    # and the static copy guard. In-repo symlinks resolve within and pass.
-    if File.symlink?(source_path) && !Hwaro::Utils::PathUtils.resolves_within?(source_path, Dir.current)
-      Logger.warn "Skipping raw file symlink pointing outside the project: #{source_path}"
+    # whose target escapes the project or names a protected project file
+    # would publish bytes that must stay private. Apply the same policy as
+    # the bundle-asset and static copy guards.
+    if File.symlink?(source_path) && !Hwaro::Utils::PathUtils.publishable_project_source?(source_path, Dir.current)
+      Logger.warn "Skipping raw file symlink with an unsafe target: #{source_path}"
       return
     end
 
@@ -280,11 +280,10 @@ module Hwaro::Core::Build::Phases::Write
       pairs.each do |source_path, dest_path|
         next unless File.exists?(source_path)
 
-        # A symlinked bundle asset whose target escapes the project would
-        # publish a file from outside the site; skip it (mirrors the static
-        # copy guard). In-repo symlinks resolve within the project and pass.
-        if File.symlink?(source_path) && !Hwaro::Utils::PathUtils.resolves_within?(source_path, Dir.current)
-          Logger.warn "Skipping bundle asset symlink pointing outside the project: #{source_path}"
+        # Bundle assets follow symlinks at copy time. Apply the same
+        # project-boundary and protected-target policy as static files.
+        if File.symlink?(source_path) && !Hwaro::Utils::PathUtils.publishable_project_source?(source_path, Dir.current)
+          Logger.warn "Skipping bundle asset symlink with an unsafe target: #{source_path}"
           next
         end
 

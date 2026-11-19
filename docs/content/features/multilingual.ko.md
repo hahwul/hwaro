@@ -293,6 +293,7 @@ hwaro init mysite --include-multilingual en,ko,ja
 ## i18n 번역 파일
 
 내비게이션 레이블, 버튼 텍스트 같은 UI 문자열은 `i18n/` 디렉터리에 언어별 TOML 파일을 두어 번역할 수 있습니다.
+빌드할 때 프로젝트 밖 번역 파일을 가리키는 심볼릭 링크는 건너뜁니다.
 
 ### 파일 구조
 

@@ -293,6 +293,7 @@ This generates the configuration and sample content files for each specified lan
 ## i18n Translation Files
 
 Hwaro supports translation files for UI strings (navigation labels, button text, etc.) using TOML files in the `i18n/` directory.
+Symlinks to translation files outside the project are skipped during the build.
 
 ### File Structure
 

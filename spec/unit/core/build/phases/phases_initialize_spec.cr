@@ -456,6 +456,19 @@ describe Hwaro::Core::Build::Phases::Initialize do
       end
     end
 
+    it "does not publish an in-project dotenv target through a static symlink" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p(["static", "public"])
+          File.write(".env", "SECRET=dummy")
+          File.symlink("../.env", "static/leak.json")
+
+          Hwaro::Core::Build::Builder.new.test_copy_static_files("public")
+          File.exists?("public/leak.json").should be_false
+        end
+      end
+    end
+
     # The static walk does not follow a linked directory; the files under it
     # used to vanish from the output without a word.
     it "warns about a symlinked directory it does not copy" do
@@ -713,6 +726,25 @@ describe Hwaro::Core::Build::Phases::Initialize do
   end
 
   describe "#load_data_files" do
+    it "does not read data symlinks outside the project" do
+      Dir.mktmpdir do |dir|
+        Dir.mktmpdir do |outside|
+          File.write(File.join(outside, "secret.json"), %({"token":"outside"}))
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("data")
+            File.symlink(File.join(outside, "secret.json"), "data/leak.json")
+
+            builder = Hwaro::Core::Build::Builder.new
+            site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+            builder.test_load_data_files(site)
+
+            site.data.has_key?("leak").should be_false
+            builder.test_compute_disk_data_hash.should eq("")
+          end
+        end
+      end
+    end
+
     it "loads YAML data files into site.data" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

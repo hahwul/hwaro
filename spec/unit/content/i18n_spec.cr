@@ -4,6 +4,21 @@ require "../../../src/content/processors/filters/i18n_filter"
 
 describe Hwaro::Content::I18n do
   describe ".load_translations" do
+    it "does not read translation symlinks outside the project" do
+      Dir.mktmpdir do |dir|
+        Dir.mktmpdir do |outside|
+          File.write(File.join(outside, "en.toml"), %(secret = "outside"))
+          Dir.cd(dir) do
+            FileUtils.mkdir_p("i18n")
+            File.symlink(File.join(outside, "en.toml"), "i18n/en.toml")
+
+            translations = Hwaro::Content::I18n.load_translations("i18n", Hwaro::Models::Config.new)
+            translations.has_key?("en").should be_false
+          end
+        end
+      end
+    end
+
     it "loads TOML translation files" do
       Dir.mktmpdir do |dir|
         i18n_dir = File.join(dir, "i18n")

@@ -68,6 +68,9 @@ module Hwaro
         # ("assets", or "assets/vendor" for a "vendor/x.css" bundle name).
         bundle_dir = Path.posix(@config.output_dir, File.dirname(bundle.name)).normalize.to_s
         source_dir_real = File.expand_path(@config.source_dir)
+        # Configured source directories outside the project are trusted, but
+        # an in-project directory symlink must not turn into an outside read.
+        source_dir_in_project = Utils::PathUtils.within?(source_dir_real, File.expand_path(Dir.current))
         # Read and concatenate source files
         contents = String.build do |io|
           wrote_any = false
@@ -89,6 +92,10 @@ module Hwaro
             # still work while still rejecting /etc-style escapes.
             unless Utils::PathUtils.resolves_within?(source, source_dir_real)
               Logger.warn "Asset pipeline: source outside source directory (symlink?): #{file}"
+              next
+            end
+            if source_dir_in_project && !Utils::PathUtils.publishable_project_source?(source, Dir.current)
+              Logger.warn "Asset pipeline: source leaves the project or has a protected target: #{file}"
               next
             end
             # Keyed off what was actually written, not the loop index: a

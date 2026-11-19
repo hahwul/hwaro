@@ -6,6 +6,7 @@ describe "[privacy] config" do
     privacy.enabled.should be_false
     privacy.include.should be_empty
     privacy.exclude.should be_empty
+    privacy.allow_svg.should be_empty
     privacy.output_dir.should eq("assets/external")
     privacy.cache_ttl.should eq(7.days)
     privacy.on_error.should eq("warn-and-keep")
@@ -17,6 +18,7 @@ describe "[privacy] config" do
       enabled = true
       include = ["Fonts.GoogleAPIs.com", "cdn.jsdelivr.net"]
       exclude = "www.youtube.com"
+      allow_svg = ["Images.Example.com"]
       output_dir = "/vendor/ext/"
       cache_ttl = "12h"
       on_error = "fail"
@@ -24,6 +26,7 @@ describe "[privacy] config" do
     privacy.enabled.should be_true
     privacy.include.should eq(["fonts.googleapis.com", "cdn.jsdelivr.net"])
     privacy.exclude.should eq(["www.youtube.com"])
+    privacy.allow_svg.should eq(["images.example.com"])
     privacy.output_dir.should eq("vendor/ext")
     privacy.cache_ttl.should eq(12.hours)
     privacy.on_error.should eq("fail")

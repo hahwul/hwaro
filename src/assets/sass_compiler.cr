@@ -48,8 +48,8 @@ module Hwaro
           # Entry paths used to skip the outside-symlink guard imports already
           # have: a `static/css/style.scss` → /etc/passwd symlink would publish
           # the target's contents as CSS. Match static-copy / importer policy.
-          unless Utils::PathUtils.resolves_within?(src_path, project_root)
-            Logger.warn "  Sass: skipping entry outside project root (symlink?): #{relative}"
+          unless Utils::PathUtils.publishable_project_source?(src_path, project_root)
+            Logger.warn "  Sass: skipping entry outside project root or at a protected target (symlink?): #{relative}"
             next
           end
 

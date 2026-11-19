@@ -340,6 +340,24 @@ module Hwaro
         within?(real_path, real_root)
       end
 
+      # Publishing follows symlinks, so check the resolved target as well as
+      # the project boundary before exposing a source file in site output.
+      def publishable_project_source?(path : String, root : String) : Bool
+        real_path = File.realpath(path)
+        real_root = File.realpath(root)
+        relative = relative_path(real_path, real_root)
+        return false unless relative
+
+        relative.split(/[\/\\]/).none? do |part|
+          name = part.downcase
+          name == ".git" || name == ".hwaro" ||
+            ((name == ".env" || name.starts_with?(".env.")) &&
+              !name.in?(".env.example", ".env.sample", ".env.template"))
+        end
+      rescue File::Error
+        false
+      end
+
       # True when `path` is `root` or lies under it. Both must already be in
       # comparable (expanded or resolved) form. A root that already ends in a
       # separator — the filesystem root "/" — is not given a second one, and

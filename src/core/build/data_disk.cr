@@ -15,6 +15,7 @@ require "../../utils/crinja_utils"
 require "../../utils/text_utils"
 require "../../utils/logger"
 require "../../utils/denied_dirs"
+require "../../utils/path_utils"
 
 module Hwaro
   module Core
@@ -50,6 +51,10 @@ module Hwaro
             next unless EXTENSIONS.includes?(File.extname(path).downcase)
             # Skips directories and FIFOs (a FIFO would block `File.read`).
             next unless Services::ContentWalk.readable_file?(path)
+            unless Utils::PathUtils.resolves_within?(path, Dir.current)
+              Logger.warn "Skipping data file outside the project: #{path}"
+              next
+            end
             rel = Path[path].relative_to("data")
             parts = rel.parts
             stem = Path[parts.last].stem

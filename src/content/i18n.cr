@@ -2,6 +2,7 @@ require "toml"
 require "../models/config"
 require "../utils/logger"
 require "../utils/text_utils"
+require "../utils/path_utils"
 
 module Hwaro
   module Content
@@ -18,11 +19,16 @@ module Hwaro
         return translations unless Dir.exists?(i18n_dir)
 
         # Load files for each configured language
+        project_root = File.dirname(File.expand_path(i18n_dir))
         codes = [config.default_language] + config.languages.keys
         codes.uniq.each do |code|
           path = File.join(i18n_dir, "#{code}.toml")
           # `File.file?`: a FIFO here would block `File.read` forever.
           next unless File.file?(path)
+          unless Utils::PathUtils.resolves_within?(path, project_root)
+            Logger.warn "Skipping i18n file outside the project: #{path}"
+            next
+          end
 
           begin
             data = TOML.parse(Utils::TextUtils.strip_bom(File.read(path)))

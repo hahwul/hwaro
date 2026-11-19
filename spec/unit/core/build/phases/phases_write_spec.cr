@@ -141,6 +141,20 @@ describe Hwaro::Core::Build::Phases::Write do
       end
     end
 
+    it "skips a raw-file symlink to an in-project dotenv file" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p(["content", "public"])
+          File.write(".env", "SECRET=dummy")
+          File.symlink("../.env", "content/leak.json")
+          raw = Hwaro::Core::Lifecycle::RawFile.new("content/leak.json", "leak.json")
+
+          Hwaro::Core::Build::Builder.new.test_process_raw_files([raw], "public", false, false).should eq(0)
+          File.exists?("public/leak.json").should be_false
+        end
+      end
+    end
+
     it "still copies an in-project raw-file symlink" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do
@@ -420,6 +434,23 @@ describe Hwaro::Core::Build::Phases::Write do
 
             File.exists?("public/blog/post/leak.txt").should be_false
           end
+        end
+      end
+    end
+
+    it "skips a bundle asset symlink to in-project git metadata" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p(["content/blog/post", ".git", "public"])
+          File.write("content/blog/post/index.md", "---\ntitle: Post\n---\n")
+          File.write(".git/config", "credential=dummy")
+          File.symlink("../../../.git/config", "content/blog/post/leak.txt")
+
+          page = Hwaro::Models::Page.new("blog/post/index.md")
+          page.url = "/blog/post/"
+          page.assets = ["blog/post/leak.txt"]
+          Hwaro::Core::Build::Builder.new.test_process_assets([page], "public", false)
+          File.exists?("public/blog/post/leak.txt").should be_false
         end
       end
     end

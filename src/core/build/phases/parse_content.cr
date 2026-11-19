@@ -537,7 +537,7 @@ module Hwaro::Core::Build::Phases::ParseContent
     lstat = File.info?(path, follow_symlinks: false)
     return false unless lstat
     return lstat.file? unless lstat.symlink?
-    return false unless Utils::PathUtils.resolves_within?(path, Dir.current)
+    return false unless Utils::PathUtils.publishable_project_source?(path, Dir.current)
     File.info?(path, follow_symlinks: true).try(&.file?) || false
   rescue File::Error
     false

@@ -163,6 +163,9 @@ module Hwaro::Core::Build::Phases::Initialize
         config_hash = "#{config_hash}-#{compute_data_hash}-#{Cache.compute_options_hash(ctx.options)}"
         # A grammar edit re-highlights every page; no grammars, no change.
         config_hash = "#{config_hash}-lexers:#{lexers_digest}" unless lexers_digest.empty?
+        # Rebuild once after the protected-source and SVG publishing defaults
+        # change, even when the source and Hwaro::VERSION have not moved.
+        config_hash = "#{config_hash}-security-policy:1"
         build_cache.set_global_checksums(@global_templates_hash, config_hash,
           invalidate_on_template_change: !@per_page_template_hash,
           output_dir: output_dir)
@@ -488,8 +491,8 @@ module Hwaro::Core::Build::Phases::Initialize
         return
       end
 
-      unless Hwaro::Utils::PathUtils.resolves_within?(src_path, Dir.current)
-        Logger.warn "Skipping static symlink pointing outside the project: #{src_path}"
+      unless Hwaro::Utils::PathUtils.publishable_project_source?(src_path, Dir.current)
+        Logger.warn "Skipping static symlink pointing outside the project or at a protected target: #{src_path}"
         return
       end
     else
@@ -1082,7 +1085,7 @@ module Hwaro::Core::Build::Phases::Initialize
       # Regular files only: a FIFO would block `File.read` below forever.
       # `readable_file?` is not used because the loaders warn about the same
       # dangling links, and this digest runs only under `--cache`.
-      paths << path if (File.info?(path).try(&.file?) rescue false)
+      paths << path if (File.info?(path).try(&.file?) rescue false) && Utils::PathUtils.resolves_within?(path, Dir.current)
     end
     return "" if paths.empty?
 

@@ -59,6 +59,7 @@ The root container. Configured in `config.toml`.
 ### Data Directory
 
 Hwaro allows you to store auxiliary data in the `data/` directory. Files ending in `.yml`, `.yaml`, `.json`, or `.toml` are automatically loaded and exposed via `site.data`.
+Symlinks to files outside the project are skipped during the build.
 
 #### File Structure
 
