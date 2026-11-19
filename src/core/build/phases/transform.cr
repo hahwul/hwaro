@@ -657,7 +657,8 @@ module Hwaro::Core::Build::Phases::Transform
     all_pages = site.pages.select { |p| related_candidate?(p) && !losers.includes?(p.path) }
 
     # Build inverted index first (needed for both candidate discovery and scoring)
-    inverted, index_of = build_related_index(all_pages, taxonomy_names)
+    index = build_related_index(all_pages, taxonomy_names)
+    inverted, index_of = index.inverted, index.index_of
 
     # Collect paths of pages that need related_posts recomputed:
     # 1. Changed pages themselves
@@ -701,10 +702,10 @@ module Hwaro::Core::Build::Phases::Transform
 
     # Recompute only for affected pages
     scores = Array(Int32).new(all_pages.size, 0)
-    touched = [] of Int32
+    touched = [] of {Int32, Int32}
     pages_to_update.each do |page_path|
       next unless i = index_of[page_path]?
-      all_pages[i].related_posts = top_related_posts(i, all_pages, inverted, taxonomy_names, limit, scores, touched)
+      all_pages[i].related_posts = top_related_posts(i, all_pages, index, limit, scores, touched)
     end
 
     pages_to_update
@@ -890,16 +891,37 @@ module Hwaro::Core::Build::Phases::Transform
     !(page.is_index && File.basename(page.path).starts_with?("_index"))
   end
 
-  # Build the taxonomy inverted index ({tax_name => {term => [page index]}})
-  # and a path->index lookup for the given candidate pages. Shared by the
-  # full and incremental related-posts computations.
-  private def build_related_index(pages : Array(Models::Page), taxonomy_names : Array(String)) : {Hash(String, Hash(String, Array(Int32))), Hash(String, Int32)}
+  # A term on more pages than this is "broad"; the broadest few are scored
+  # per group of pages instead of pair by pair (see top_related_posts).
+  RELATED_BROAD_TERM_PAGES = 256
+  RELATED_BROAD_TERMS      =   8
+
+  # What top_related_posts reads, built once per computation.
+  private record RelatedIndex,
+    # {taxonomy => {term => page indices, ascending}}
+    inverted : Hash(String, Hash(String, Array(Int32))),
+    index_of : Hash(String, Int32),
+    # `[related] taxonomies` without repeats, and what one shared term of
+    # each adds to a score.
+    names : Array(String),
+    weights : Hash(String, Int32),
+    # The broad terms' bits, each page's set of them, and the pages that
+    # carry the same set in one language and version, ascending.
+    broad : Hash({String, String}, Int32),
+    masks : Array(UInt8),
+    classes : Hash({String?, UInt64}, Hash(UInt8, Array(Int32)))
+
+  # Build the taxonomy inverted index and a path->index lookup for the given
+  # candidate pages. Shared by the full and incremental related-posts
+  # computations.
+  private def build_related_index(pages : Array(Models::Page), taxonomy_names : Array(String)) : RelatedIndex
     inverted = {} of String => Hash(String, Array(Int32))
     index_of = {} of String => Int32
+    names = taxonomy_names.uniq
 
     pages.each_with_index do |page, i|
       index_of[page.path] = i
-      taxonomy_names.each do |tax_name|
+      names.each do |tax_name|
         # uniq: a term repeated in front matter is still one shared term,
         # as on the taxonomy pages; counting it twice inflated scores.
         values = page.taxonomy_values(tax_name).uniq
@@ -911,80 +933,153 @@ module Hwaro::Core::Build::Phases::Transform
       end
     end
 
-    {inverted, index_of}
+    # A taxonomy listed n times was indexed and walked n times each: n² a term.
+    weights = names.to_h { |name| {name, taxonomy_names.count(name) ** 2} }
+
+    sized = [] of {Int32, String, String}
+    inverted.each do |tax_name, terms|
+      terms.each { |term, list| sized << {list.size, tax_name, term} if list.size > RELATED_BROAD_TERM_PAGES }
+    end
+    broad = {} of {String, String} => Int32
+    masks = Array(UInt8).new(pages.size, 0_u8)
+    sized.sort_by! { |size, _, _| -size }.first(RELATED_BROAD_TERMS).each_with_index do |(_, tax_name, term), bit|
+      broad[{tax_name, term}] = bit
+      inverted[tax_name][term].each { |j| masks[j] |= 1_u8 << bit }
+    end
+    classes = {} of {String?, UInt64} => Hash(UInt8, Array(Int32))
+    masks.each_with_index do |mask, j|
+      next if mask == 0
+      group = classes[related_group(pages[j])] ||= {} of UInt8 => Array(Int32)
+      (group[mask] ||= [] of Int32) << j
+    end
+
+    RelatedIndex.new(inverted, index_of, names, weights, broad, masks, classes)
+  end
+
+  # Related posts stay inside one language and one version — a v2 page
+  # recommending its own v1 twin is noise, not a relation.
+  private def related_group(page : Models::Page) : {String?, UInt64}
+    {page.language, page.version.object_id}
   end
 
   # The `limit` pages most related to `pages[i]`: those sharing a taxonomy
   # term with it in its own language and version, by shared-term count, ties
-  # in first-seen order (pages/taxonomy iteration order). `scores` (one zero
+  # by the first of its terms they share, then page order. `scores` (one zero
   # per page) and `touched` are scratch buffers reused across calls and left
-  # zeroed/empty. A term nearly every page carries (`tags = ["blog"]`) makes
-  # this walk O(pages²) site-wide, so the pair loop stays on array slots: a
-  # string-keyed hash insert per pair took ~8s at 4,000 posts.
+  # zeroed/empty.
+  #
+  # A term nearly every page carries (`tags = ["blog"]`) made the pair walk
+  # O(pages²) site-wide. Only the other terms are walked now. Pages that walk
+  # misses share nothing but broad terms with this one, so all those carrying
+  # the same broad terms score alike and the first `limit` of each such class
+  # are the only ones that can rank.
+  # ponytail: the broadest RELATED_BROAD_TERMS terms only; a site with more
+  # terms that size still walks the rest pair by pair, as before.
   private def top_related_posts(
     i : Int32,
     pages : Array(Models::Page),
-    inverted : Hash(String, Hash(String, Array(Int32))),
-    taxonomy_names : Array(String),
+    index : RelatedIndex,
     limit : Int32,
     scores : Array(Int32),
-    touched : Array(Int32),
+    touched : Array({Int32, Int32}),
   ) : Array(Models::Page)
     return [] of Models::Page if limit <= 0
     page = pages[i]
     page_lang = page.language
-    taxonomy_names.each do |tax_name|
-      next unless inv_tax = inverted[tax_name]?
+    # This page's broad terms: where each sits among its terms, what it scores.
+    broad_pos = StaticArray(Int32, RELATED_BROAD_TERMS).new(0)
+    broad_weight = StaticArray(Int32, RELATED_BROAD_TERMS).new(0)
+    pos = 0
+    index.names.each do |tax_name|
+      next unless inv_tax = index.inverted[tax_name]?
+      weight = index.weights[tax_name]
       page.taxonomy_values(tax_name).uniq.each do |term|
         next unless candidates = inv_tax[term]?
-        candidates.each do |j|
-          next if j == i
-          other = pages[j]
-          next unless other.language == page_lang
-          # Related posts never cross a version boundary either — a v2
-          # page recommending its own v1 twin is noise, not a relation.
-          next unless other.version.same?(page.version)
-          touched << j if scores[j] == 0
-          scores[j] += 1
+        if bit = index.broad[{tax_name, term}]?
+          broad_pos[bit] = pos
+          broad_weight[bit] = weight
+        else
+          candidates.each do |j|
+            next if j == i
+            other = pages[j]
+            next unless other.language == page_lang
+            next unless other.version.same?(page.version)
+            touched << {j, pos} if scores[j] == 0
+            scores[j] += weight
+          end
         end
+        pos += 1
       end
     end
 
-    # Bounded top-k selection — a stable descending sort's first `limit`,
-    # in O(n*k). Every touched slot is reset on the way through.
-    top = [] of {Int32, Int32}
-    touched.each do |j|
-      score = scores[j]
-      scores[j] = 0
-      next if top.size == limit && score <= top[-1][1]
-      idx = 0
-      while idx < top.size && score <= top[idx][1]
-        idx += 1
+    # Best first: {-score, first shared term, page index}.
+    top = [] of {Int32, Int32, Int32}
+    own = index.masks[i]
+    if own != 0 && (group = index.classes[related_group(page)]?)
+      group.each do |mask, members|
+        next if mask & own == 0
+        score, first = related_broad_score(mask & own, broad_pos, broad_weight, Int32::MAX)
+        taken = 0
+        members.each do |j|
+          next if j == i || scores[j] != 0
+          related_offer(top, limit, {-score, first, j})
+          break if (taken += 1) == limit
+        end
       end
-      next if idx >= limit
-      top.insert(idx, {j, score})
-      top.pop if top.size > limit
+    end
+    # Every touched slot is reset on the way through.
+    touched.each do |j, first|
+      score, first = related_broad_score(index.masks[j] & own, broad_pos, broad_weight, first)
+      related_offer(top, limit, {-(score + scores[j]), first, j})
+      scores[j] = 0
     end
     touched.clear
-    top.map { |j, _| pages[j] }
+    top.map { |_, _, j| pages[j] }
+  end
+
+  # What the broad terms in `shared` add to a score, and the earliest of
+  # them (or `first`).
+  private def related_broad_score(
+    shared : UInt8,
+    broad_pos : StaticArray(Int32, RELATED_BROAD_TERMS),
+    broad_weight : StaticArray(Int32, RELATED_BROAD_TERMS),
+    first : Int32,
+  ) : {Int32, Int32}
+    score = 0
+    RELATED_BROAD_TERMS.times do |bit|
+      next unless shared.bit(bit) == 1
+      score += broad_weight[bit]
+      first = Math.min(first, broad_pos[bit])
+    end
+    {score, first}
+  end
+
+  # Bounded top-k insertion: `top` stays sorted, at most `limit` long.
+  private def related_offer(top : Array({Int32, Int32, Int32}), limit : Int32, candidate : {Int32, Int32, Int32}) : Nil
+    return if top.size == limit && candidate > top[-1]
+    idx = top.size
+    while idx > 0 && candidate < top[idx - 1]
+      idx -= 1
+    end
+    top.insert(idx, candidate)
+    top.pop if top.size > limit
   end
 
   # Compute related posts for each page based on shared taxonomy terms.
   # Pages with more shared terms are ranked higher.
   private def compute_related_posts(site : Models::Site)
     config = site.config.related
-    taxonomy_names = config.taxonomies
     limit = config.limit
     return if limit <= 0
     losers = site_output_losers(site)
     pages = site.pages.select { |p| related_candidate?(p) && !losers.includes?(p.path) }
 
-    inverted, _ = build_related_index(pages, taxonomy_names)
+    index = build_related_index(pages, config.taxonomies)
     scores = Array(Int32).new(pages.size, 0)
-    touched = [] of Int32
+    touched = [] of {Int32, Int32}
 
     pages.each_with_index do |page, i|
-      related = top_related_posts(i, pages, inverted, taxonomy_names, limit, scores, touched)
+      related = top_related_posts(i, pages, index, limit, scores, touched)
       page.related_posts = related unless related.empty?
     end
   end
