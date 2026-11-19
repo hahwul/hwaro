@@ -94,6 +94,31 @@ describe "Render output paths: authored vs generated collisions" do
     log.should contain("collides with a pagination page of 'blog/_index.md'")
   end
 
+  it "replaces a removed page's directory with the alias stub file that now wins its path on --cache" do
+    rebuild = -> {
+      builder = Hwaro::Core::Build::Builder.new
+      Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+      builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false))
+    }
+    with_captured_log do
+      build_site(
+        "title = \"T\"\nbase_url = \"http://localhost\"\n",
+        content_files: {
+          "about.md"       => "+++\ntitle = \"About\"\naliases = [\"/legacy.html\"]\n+++\nAbout",
+          "legacy.html.md" => "+++\ntitle = \"Legacy\"\n+++\nLEGACY",
+        },
+        template_files: {"page.html" => "{{ content }}"},
+        cache: true,
+      ) do
+        File.read("public/legacy.html/index.html").should contain("LEGACY")
+        File.delete("content/legacy.html.md")
+        File.write("content/about.md", "+++\ntitle = \"About\"\naliases = [\"/legacy.html\"]\n+++\nAbout edited")
+        rebuild.call
+        File.read("public/legacy.html").should contain("Redirecting to <a href=\"/about/\"")
+      end
+    end
+  end
+
   it "fails with a classified I/O error when a page's slug shadows sitemap.xml" do
     err = expect_raises(Hwaro::HwaroError) do
       build_site(
