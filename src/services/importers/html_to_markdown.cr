@@ -237,13 +237,16 @@ module Hwaro
               # 1 changed what the reader sees. CommonMark takes the first
               # item's number as the start (at most 9 digits, never negative).
               start = attr_value(list_attrs, "start").try(&.strip.to_i?).try(&.clamp(0, 999_999_999)) || 1
-              items = list_body.scan(/<li[^>]*>(.*?)<\/li>/mi)
-              lines = items.map_with_index do |m, i|
+              # Split on the opening tags instead of pairing them with `</li>`:
+              # the end tag is optional in HTML, and a list written without it
+              # matched no item at all and vanished from the page.
+              items = list_body.split(/<li\b[^>]*>/i).skip(1).map(&.sub(/<\/li\s*>.*\z/mi, ""))
+              lines = items.map_with_index do |body, i|
                 marker = kind == "ol" ? "#{start + i}. " : "- "
                 # Inline markup first: a bare `strip_tags` here ran before
                 # the document-wide inline passes, so every link, image and
                 # emphasis inside a list item was flattened to plain text.
-                item = strip_tags(convert_inline(m[1])).gsub(MORE_PLACEHOLDER, "").strip
+                item = strip_tags(convert_inline(body)).gsub(MORE_PLACEHOLDER, "").strip
                 "#{marker}#{indent_continuation(item, marker.size)}"
               end
               "\n" + lines.join("\n") + "\n\n"

@@ -324,5 +324,9 @@ describe Hwaro::Services::Importers::HtmlToMarkdown do
       convert.call("<pre><code>```\ninner\n```</code></pre>").should eq("````\n```\ninner\n```\n````")
       convert.call("<p><code>plain</code></p>").should eq("`plain`")
     end
+
+    it "converts a list whose </li> end tags are omitted" do
+      Hwaro::Services::Importers::HtmlToMarkdown.convert("<ol><li>Preheat<li>Mix</ol>").should eq("1. Preheat\n2. Mix")
+    end
   end
 end
