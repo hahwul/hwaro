@@ -75,6 +75,33 @@ describe "Builder#run_incremental output collisions" do
       end
     end
   end
+
+  # Serve's first build is cold (no preserve_output); only its watch passes
+  # keep the tree, and the first of those still found the previous stub
+  # FILE `o.html` where the other alias now needs the directory `o.html/`.
+  it "writes an alias into a directory where the previous pass left a stub file" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", %(title = "T"\nbase_url = "http://localhost"))
+        FileUtils.mkdir_p("content")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}")
+        File.write("content/about.md", "+++\ntitle = \"About\"\naliases = [\"/o.html\"]\n+++\n")
+        File.write("content/zed.md", "+++\ntitle = \"Zed\"\naliases = [\"/o.html/sub/\"]\n+++\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        with_captured_log { builder.run(options).should be_true }
+        File.file?("public/o.html").should be_true
+
+        options.preserve_output = true
+        File.write("content/about.md", "+++\ntitle = \"About\"\n+++\n")
+        builder.run_incremental(["content/about.md"], options).should be_true
+        File.read("public/o.html/sub/index.html").should contain("Redirecting to <a href=\"/zed/\"")
+      end
+    end
+  end
 end
 
 # `site.authors` embeds each page's title and summary; only the full build's

@@ -630,8 +630,11 @@ module Hwaro
           Content::Hooks::ImageHooks.forget_op_variants
           @context.try { |ctx| publish_asset_sources(ctx) }
           forget_created_dirs
-          # The tree now holds the previous build's files, served live.
+          # The tree now holds the previous build's files, served live — and
+          # a leftover of the other kind where this pass writes (see
+          # `mkdir_output`), even when the session's first build was cold.
           @output_tree_fresh = false
+          @context.try { |ctx| @kept_output_dir = ctx.options.output_dir }
           @output_cwd = Dir.current
           mark_build_output_epoch
           @generated_claims_current = false
