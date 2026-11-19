@@ -146,6 +146,30 @@ describe Hwaro::Assets::SassCompiler do
       end
     end
 
+    it "skips an entry linked to an in-project dotenv file" do
+      Dir.mktmpdir do |dir|
+        Dir.mkdir_p(File.join(dir, "static"))
+        File.write(File.join(dir, ".env"), "a { color: red; }")
+        File.symlink("../.env", File.join(dir, "static", "leak.scss"))
+        compile_in(dir) do |compiler, output|
+          compiler.compile_all(output).should eq(0)
+          File.exists?(File.join(output, "leak.css")).should be_false
+        end
+      end
+    end
+
+    it "rejects an imported partial linked to an in-project dotenv file" do
+      Dir.mktmpdir do |dir|
+        Dir.mkdir_p(File.join(dir, "static"))
+        File.write(File.join(dir, ".env"), ".secret { color: red; }")
+        File.write(File.join(dir, "static", "main.scss"), %(@import "secret";))
+        File.symlink("../.env", File.join(dir, "static", "_secret.scss"))
+        compile_in(dir) do |compiler, output|
+          expect_raises(Hwaro::HwaroError, /protected file/) { compiler.compile_all(output) }
+        end
+      end
+    end
+
     it "keeps an in-project symlinked entry" do
       Dir.mktmpdir do |dir|
         Dir.mkdir_p(File.join(dir, "static"))

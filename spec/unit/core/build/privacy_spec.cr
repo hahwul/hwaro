@@ -126,6 +126,9 @@ private def fixture_handler(hits : Hits) : HTTP::Server::Context ->
     when "/logo.svg"
       res.content_type = "image/svg+xml"
       res.print(%(<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>))
+    when "/redirect-logo.svg"
+      res.status = HTTP::Status::FOUND
+      res.headers["Location"] = "http://localhost:#{port}/logo.svg"
     when "/img/noext"
       res.content_type = "image/webp"
       res.print("RIFFwebp")
@@ -583,7 +586,7 @@ describe Hwaro::Core::Build::Privacy do
     end
   end
 
-  it "never publishes HTML, and publishes SVG for <img> with a warning" do
+  it "never publishes HTML or an SVG without explicit trust" do
     with_cdn do |cdn, _hits, _offline|
       with_privacy(privacy_config) do |privacy, dir|
         html = %(<img src="#{cdn}/photo.html">)
@@ -591,11 +594,25 @@ describe Hwaro::Core::Build::Privacy do
         log.should contain("not a file type Hwaro publishes")
         published(dir).should be_empty
 
-        log = with_captured_log { rewrite(privacy, %(<img src="#{cdn}/logo.svg">)).should contain("-logo.svg") }
+        svg = %(<img src="#{cdn}/logo.svg">)
+        log = with_captured_log { rewrite(privacy, svg).should eq(svg) }
         log.should contain("SVG")
+        published(dir).should be_empty
         # A script reference answered with an image is not published as .svg.
         script = %(<script src="#{cdn}/logo.svg"></script>)
         rewrite(privacy, script).should eq(script)
+      end
+    end
+  end
+
+  it "publishes SVG only when its final host is explicitly trusted" do
+    with_cdn do |cdn, _hits, _offline|
+      config = privacy_config(%(allow_svg = ["127.0.0.1"]), hosts: %(["127.0.0.1", "localhost"]))
+      with_privacy(config) do |privacy, dir|
+        rewrite(privacy, %(<img src="#{cdn}/logo.svg">)).should contain("-logo.svg")
+        File.read(Dir.glob(File.join(dir, "public/assets/external/*-logo.svg")).first).should contain("<script>")
+        redirected = %(<img src="#{cdn}/redirect-logo.svg">)
+        rewrite(privacy, redirected).should eq(redirected)
       end
     end
   end

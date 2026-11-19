@@ -464,11 +464,11 @@ Hwaro separates what the project owner controls from what contributors can chang
 
 **Untrusted (cannot run code):** `content/`, `data/`, `static/`, and the names of files in them. Markdown and front matter are never evaluated as templates: `{{ env("X") }}` written in a page or passed as a shortcode argument stays literal text, shortcode arguments are plain strings, `template = "…"` can only pick a template that exists in `templates/`, and a build fetches nothing named by content (the opt-in [`[privacy]`](/features/privacy/) mode downloads external assets it finds, and refuses private and loopback addresses). File and Git metadata reach commands only as separate arguments, never through a shell. A pull request limited to those directories can change the published site, but cannot make `hwaro build` run a command or read your environment.
 
-Two things to keep in mind when you build contributed content:
+Keep these boundaries in mind when you build contributed content:
 
 - `include_code` and `include_md` let a page publish any file inside the project root, such as `config.toml` or a `data/` file. `.git/`, dotenv files (`.env`, `.env.*`), `.hwaro/`, the output directory and anything outside the project are refused. Keep credentials in the environment (`${VAR}`), not in files the site could include.
 - `hwaro tool check-links` requests every external URL found in content (private and loopback addresses are skipped). Run it on contributed content with the same care as any crawler.
-- A build writes only inside its output directory. A page URL, alias or redirect stub whose path would leave it (a `..` segment, also when percent-encoded or written with backslashes) is not published, with a warning; taxonomy terms and `[[content.generate]]` slugs are slugified and cannot hold a separator at all. Symlinks in `content/` and `static/` that resolve outside the project are skipped with a warning, and directory symlinks in `static/` are not followed.
+- A build writes only inside its output directory. A page URL, alias or redirect stub whose path would leave it (a `..` segment, also when percent-encoded or written with backslashes) is not published, with a warning; taxonomy terms and `[[content.generate]]` slugs are slugified and cannot hold a separator at all. Symlinks published from `content/` and `static/` are skipped with a warning when they resolve outside the project or to `.git/`, `.hwaro/`, or a dotenv file (`.env`, `.env.*`, except `.env.example`, `.env.sample`, and `.env.template`). Directory symlinks in `static/` are not followed.
 
 ## See Also
 

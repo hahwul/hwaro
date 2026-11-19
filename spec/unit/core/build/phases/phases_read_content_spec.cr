@@ -94,6 +94,20 @@ describe Hwaro::Core::Build::Phases::ReadContent do
   end
 
   describe "#collect_content_paths" do
+    it "does not read a content symlink to an in-project dotenv file" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          Dir.mkdir("content")
+          File.write(".env", "SECRET=dummy")
+          File.symlink("../.env", "content/leak.md")
+
+          ctx = make_ctx(Hwaro::Models::Config.new)
+          Hwaro::Core::Build::Builder.new.test_collect_content_paths(ctx)
+          ctx.pages.should be_empty
+        end
+      end
+    end
+
     it "collects markdown pages and sections" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

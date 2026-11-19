@@ -91,6 +91,12 @@ in `.github/ARCHITECTURE.md`.
 - Crinja filter args: `.to_s`, not `.as_s`.
 - Paths: `PathUtils.sanitize_path` for user-provided or content-derived paths;
   config.toml is a trusted boundary (do not guard config path escapes).
+- Published project-local symlinks (`content/`, `static/`, Sass, asset bundles): use
+  `PathUtils.publishable_project_source?` so resolved targets outside the
+  project or inside `.git/`, `.hwaro/`, or dotenv files are skipped.
+- If a security policy changes rendered output without a config edit, bump
+  the security policy suffix in Initialize's cache checksum so `--cache`
+  rebuilds existing sites once.
 - Vendored shard bugs (markd, crinja, toml, tartrazine) are patched in
   `src/ext/`, not worked around at call sites.
 

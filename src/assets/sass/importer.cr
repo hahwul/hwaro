@@ -79,8 +79,8 @@ module Hwaro
           # A symlinked source whose target escapes the project would leak
           # outside content into compiled CSS — same policy as the static
           # copy's symlink guard.
-          if File.exists?(expanded) && !Hwaro::Utils::PathUtils.resolves_within?(expanded, @root)
-            raise SyntaxError.new("import \"#{url}\" resolves outside the project directory", path, line, column)
+          if File.exists?(expanded) && !Hwaro::Utils::PathUtils.publishable_project_source?(expanded, @root)
+            raise SyntaxError.new("import \"#{url}\" resolves outside the project directory or to a protected file", path, line, column)
           end
           expanded
         end

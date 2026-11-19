@@ -61,16 +61,15 @@ module Hwaro::Core::Build::Phases::ReadContent
         # ../../secrets.env` rendered straight into public/leak/index.html.
         # This is the same policy already applied to static files
         # (phases/initialize.cr), raw files and page-bundle assets
-        # (phases/write.cr). In-project symlinks resolve back within the root
-        # and keep working; `resolves_within?` also answers false for dangling
-        # links and cycles (realpath fails), so those are skipped here instead
-        # of failing later in the parse phase's `File.read` — hence the
-        # "does not resolve inside" wording, which covers all three.
-        unless Hwaro::Utils::PathUtils.resolves_within?(file_path, Dir.current)
-          Logger.warn "Skipping content symlink that does not resolve inside the project: #{file_path}"
+        # (phases/write.cr). Safe in-project symlinks still work; the shared
+        # source policy also refuses protected targets. It answers false for
+        # dangling links and cycles (realpath fails), so those are skipped
+        # before the parse phase's `File.read`.
+        unless Hwaro::Utils::PathUtils.publishable_project_source?(file_path, Dir.current)
+          Logger.warn "Skipping content symlink that does not resolve inside the project or has a protected target: #{file_path}"
           next
         end
-        # `resolves_within?` already resolved the link (realpath succeeded),
+        # The source policy already resolved the link (realpath succeeded),
         # so this stat cannot hit the ELOOP the lstat above avoids.
         target = File.info?(file_path, follow_symlinks: true)
         next if target.nil?

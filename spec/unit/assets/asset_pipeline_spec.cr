@@ -1022,6 +1022,44 @@ describe Hwaro::Assets::Pipeline do
   # Source-path traversal guard — files must stay within source_dir
   # ===========================================================================
   describe "source path traversal guard" do
+    it "skips an in-project dotenv target when the configured source is the project root" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p(["static", "public"])
+          File.write(".env", "SECRET=dummy")
+          File.symlink("../.env", "static/leak.css")
+
+          config = make_config(source_dir: ".")
+          config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "leak.css", files: ["static/leak.css"])
+          pipeline = Hwaro::Assets::Pipeline.new(config)
+          pipeline.process("public")
+
+          pipeline.manifest.has_key?("leak.css").should be_false
+          File.exists?("public/assets/leak.css").should be_false
+        end
+      end
+    end
+
+    it "does not follow an in-project source directory symlink outside the project" do
+      Dir.mktmpdir do |outside|
+        File.write(File.join(outside, "leak.css"), "SECRET=dummy")
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            Dir.mkdir("public")
+            File.symlink(outside, "static")
+
+            config = make_config(source_dir: "static")
+            config.bundles << Hwaro::Models::AssetBundleConfig.new(name: "leak.css", files: ["leak.css"])
+            pipeline = Hwaro::Assets::Pipeline.new(config)
+            pipeline.process("public")
+
+            pipeline.manifest.has_key?("leak.css").should be_false
+            File.exists?("public/assets/leak.css").should be_false
+          end
+        end
+      end
+    end
+
     it "skips a `../`-traversal source file and warns" do
       Dir.mktmpdir do |dir|
         static_dir = File.join(dir, "static")

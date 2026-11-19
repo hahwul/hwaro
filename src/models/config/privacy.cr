@@ -18,6 +18,8 @@ module Hwaro
       property include : Array(String) = [] of String
       # Hosts never localized; wins over `include`.
       property exclude : Array(String) = [] of String
+      # Hosts whose remote SVGs may be published on the site's origin.
+      property allow_svg : Array(String) = [] of String
       # Directory under the build output that holds the downloaded files.
       property output_dir : String = "assets/external"
       # How long a downloaded file is reused without asking the network.
@@ -38,6 +40,7 @@ module Hwaro
         privacy.enabled = bool_value(s["enabled"]?, privacy.enabled)
         string_list?(s["include"]?, "[privacy] include").try { |hosts| privacy.include = hosts.map(&.strip.downcase) }
         string_list?(s["exclude"]?, "[privacy] exclude").try { |hosts| privacy.exclude = hosts.map(&.strip.downcase) }
+        string_list?(s["allow_svg"]?, "[privacy] allow_svg").try { |hosts| privacy.allow_svg = hosts.map(&.strip.downcase) }
 
         if dir = s["output_dir"]?.try(&.as_s?)
           dir = dir.strip("/")
@@ -59,7 +62,7 @@ module Hwaro
         end
 
         s.each_key do |key|
-          next if key.in?("enabled", "include", "exclude", "output_dir", "cache_ttl", "on_error")
+          next if key.in?("enabled", "include", "exclude", "allow_svg", "output_dir", "cache_ttl", "on_error")
           Logger.warn "[privacy]: unknown key '#{key}' — hwaro does not read it."
         end
       end
@@ -68,7 +71,7 @@ module Hwaro
         Hwaro::HwaroError.new(
           code: Hwaro::Errors::HWARO_E_CONFIG,
           message: message,
-          hint: "[privacy] keys: enabled, include/exclude (host lists), output_dir, cache_ttl (duration such as \"7d\"), on_error (warn-and-keep|fail).",
+          hint: "[privacy] keys: enabled, include/exclude/allow_svg (host lists), output_dir, cache_ttl (duration such as \"7d\"), on_error (warn-and-keep|fail).",
         )
       end
     end

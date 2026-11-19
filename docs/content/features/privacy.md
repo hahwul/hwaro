@@ -45,6 +45,7 @@ The local stylesheet points at local copies of the `.woff2` files it uses.
 enabled = false                 # off by default
 include = []                    # hosts to localize; empty = every external host
 exclude = []                    # hosts never localized, e.g. ["www.youtube.com"]
+allow_svg = []                  # trusted final hosts whose SVGs may be published
 output_dir = "assets/external"  # directory under the build output
 cache_ttl = "7d"                # how long a download is reused without a request
 on_error = "warn-and-keep"      # warn-and-keep | fail
@@ -55,6 +56,7 @@ on_error = "warn-and-keep"      # warn-and-keep | fail
 | `enabled` | `false` | Turn privacy mode on. When it is off the output is unchanged. |
 | `include` | `[]` | Hosts to localize, compared exactly (`fonts.googleapis.com`). Empty means every external host. A listed host is also trusted on the network (see [Network Safety](#network-safety)). |
 | `exclude` | `[]` | Hosts that stay external. `exclude` wins over `include`. |
+| `allow_svg` | `[]` | Final hosts whose remote SVGs may be published on your site. List only hosts whose SVG content you trust. |
 | `output_dir` | `"assets/external"` | Where the downloaded files are published. URLs include the `base_url` subpath. |
 | `cache_ttl` | `"7d"` | Download cache lifetime, in the `[[data.remote]]` duration syntax (`"90s"`, `"12h"`, `"7d"`). |
 | `on_error` | `"warn-and-keep"` | A download that fails with no cached copy: `warn-and-keep` warns and leaves the external URL, `fail` stops the build. |
@@ -95,10 +97,11 @@ fonts, images (not SVG) and CSS for references inside a stylesheet. Anything els
 as an `<img>` that answers with HTML, keeps its external URL with a warning.
 HTML or XML is never published.
 
-SVG is published only for `<img>`-like tags, with a warning: an SVG opened
-directly on your site can run script. Add the host to `exclude` if you do not
-trust it. An SVG referenced from a stylesheet (`background: url(icon.svg)`)
-is never published and keeps loading from its own host.
+SVG is not published by default: opening it directly on your site could run
+script. For an SVG from a host whose content you trust, list its final host in
+`allow_svg`. An SVG referenced from a stylesheet (`background: url(icon.svg)`)
+is never published and keeps loading from its own host. An SVG kept external
+still causes a visitor's browser to contact that host.
 
 ### Hwaro's own tags
 
@@ -129,7 +132,8 @@ The URLs privacy mode fetches are not all written by you: redirects and the
 party. So every request, including every redirect hop, is checked first. A
 host that resolves to a loopback, private (10/8, 172.16/12, 192.168/16,
 fc00::/7, site-local fec0::/10), link-local (169.254/16, fe80::/10), CGNAT
-(100.64/10), IETF-reserved (192.0.0.0/24), unspecified or multicast address
+(100.64/10), IETF-reserved (192.0.0.0/24), benchmarking (198.18.0.0/15,
+2001:2::/48), unspecified or multicast address
 is refused, as is a NAT64 (64:ff9b::/96) or IPv4-mapped address that wraps
 one of these. The refusal follows `on_error`. This keeps a third party from making the build read internal
 services or cloud metadata and publish the response on your site. The
