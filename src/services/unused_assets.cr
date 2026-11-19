@@ -63,7 +63,7 @@ module Hwaro
       # inside one is a fully static, literal reference — yet without the
       # extension the scan never read the file and reported its images as
       # unused, which `--delete` then removed (real data loss).
-      STATIC_SCAN_EXTENSIONS = %w[css scss sass js json webmanifest xml svg txt html htm]
+      STATIC_SCAN_EXTENSIONS = %w[css scss sass js mjs json webmanifest xml svg txt html htm]
 
       # Data and translation sources that can name an asset (`logo: /img/a.png`
       # in `data/site.yml`, an icon path in `i18n/en.toml`). `data/` is loaded
@@ -252,6 +252,11 @@ module Hwaro
           # Ignored Markdown too: a page can `include_md` an ignored partial,
           # and an asset only that partial names is still published.
           scan_files.concat(ContentWalk.find_content_files(@content_dir, ContentWalk::Ignore.none))
+          # Text files content/ publishes verbatim (raw `.json`/`.xml`,
+          # `[content.files]` html/css/js) name sibling assets as literally as
+          # a static/ file does; only Markdown was read, so `--delete` removed
+          # a bundle image only its HTML demo page used.
+          Dir.glob(File.join(Utils::PathUtils.glob_escape(@content_dir), "**", "*.{#{STATIC_SCAN_EXTENSIONS.join(",")}}")) { |f| scan_files << f }
         end
 
         if Dir.exists?(@templates_dir)
