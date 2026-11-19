@@ -410,6 +410,19 @@ describe Hwaro::Utils::HtmlMinifier do
         result.should eq("<DIV><P>hi</P></DIV>")
       end
 
+      # The byte-level passes defer to the Unicode-aware regex rules here:
+      # KELVIN SIGN downcases to `k` (so the name is `link`, a block tag) and
+      # LONG S matches `s` case-insensitively (so the tag is protected).
+      it "classifies a tag name with a non-ASCII letter by its Unicode downcase" do
+        html = "<b>x</b>\n<linK rel=\"a\">\n<b>y</b>"
+        Hwaro::Utils::HtmlMinifier.minify(html).should eq("<b>x</b><linK rel=\"a\"><b>y</b>")
+      end
+
+      it "protects a script tag spelled with LONG S" do
+        html = "<b>x</b>\n<ſcript>a  b</script>\n<b>y</b>"
+        Hwaro::Utils::HtmlMinifier.minify(html).should eq("<b>x</b> <ſcript>a  b</script> <b>y</b>")
+      end
+
       it "collapses whitespace around self-closing void elements between blocks" do
         html = "<head>\n  <meta charset=\"utf-8\"/>\n  <link rel=\"icon\" href=\"x\"/>\n</head>"
         result = Hwaro::Utils::HtmlMinifier.minify(html)

@@ -37,6 +37,46 @@ describe "Sass functions" do
     css.should contain("order: 55;")
   end
 
+  it "stops at an @return nested in loops, running nothing after it" do
+    css = compile(<<-SCSS)
+      @function fib($n) {
+        @if $n <= 2 { @return 1; }
+        @return fib($n - 1) + fib($n - 2);
+      }
+      @function first-big($list) {
+        @each $n in $list {
+          @for $i from 1 through 3 {
+            @if $n * $i > 10 { @return $n * $i; }
+          }
+        }
+        @error "unreachable";
+      }
+      @function countdown($n) {
+        @while $n > 0 {
+          @if $n == 3 { @return $n; }
+          $n: $n - 1;
+        }
+        @error "unreachable";
+      }
+      @function down() {
+        @for $i from 5 through 1 { @if $i == 4 { @return $i; } }
+        @error "unreachable";
+      }
+      @function outer() {
+        @each $x in 1 2 3 {
+          $y: fib(5);
+          @if $x == 2 { @return $y + $x; }
+        }
+        @error "unreachable";
+      }
+      .a { width: first-big(2 4 6); height: countdown(9); order: down(); z-index: outer(); }
+      SCSS
+    css.should contain("width: 12;")
+    css.should contain("height: 3;")
+    css.should contain("order: 4;")
+    css.should contain("z-index: 7;")
+  end
+
   it "supports variadic parameters via list functions" do
     css = compile(<<-SCSS)
       @function sum($nums...) {

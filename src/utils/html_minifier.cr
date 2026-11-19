@@ -112,6 +112,15 @@ module Hwaro
          )}
       end
 
+      # Every protected tag's probe in one caseless pass, one capture group
+      # per tag in PROTECTED_TAGS order. Eight separate probes each walked
+      # every `<` of the page; a tag this pass does not see cannot appear
+      # later either (extraction only replaces text with `<`-free tokens).
+      private PROTECTED_OPEN_ANY = Regex.new(
+        "<(?:#{PROTECTED_TAGS.map { |tag| "(#{tag})" }.join('|')})",
+        Regex::Options::IGNORE_CASE
+      )
+
       # Sentinel format for protected blocks. `\x00` is illegal in HTML,
       # so the placeholder cannot collide with author content. The
       # `B`/`I`/`H` suffix lets the whitespace collapser look up the
@@ -200,8 +209,14 @@ module Hwaro
         # placeholder scheme must not depend on a caller having scrubbed for
         # it. The probe is a single memchr on the common (clean) page.
         html = scrub_nul(html)
+        # PCRE2 re-validates the UTF-8 of the rest of the page on every
+        # match, so a gsub with many matches re-read the page per match.
+        # Validate once; every pass below only edits ASCII between ASCII
+        # delimiters, so what they hand on stays valid. Invalid input keeps
+        # the checked matching (and its error) it always had.
+        opts = utf8_opts(html)
         preserves = [] of String
-        result = protect_sensitive_blocks(html, preserves)
+        result = protect_sensitive_blocks(html, preserves, opts)
         result = strip_comments_and_trailing_space(result)
         result = collapse_intra_tag_whitespace(result)
         result = collapse_inter_token_whitespace(result)
@@ -215,10 +230,15 @@ module Hwaro
       # sides reference the same tag, which let prior implementations
       # pair `<pre>` openers with `</script>` closers when the document
       # mixed both. One pass per tag avoids that whole class of bug.
-      private def protect_sensitive_blocks(html : String, preserves : Array(String)) : String
+      private def protect_sensitive_blocks(html : String, preserves : Array(String), opts : Regex::MatchOptions) : String
         result = html
-        PROTECTED_PATTERNS.each do |(tag, open_literal, probe, pattern)|
-          next unless ByteScan.includes?(result, open_literal) || result.matches?(probe)
+        opened = Array.new(PROTECTED_TAGS.size, false)
+        html.scan(PROTECTED_OPEN_ANY, options: opts) do |m|
+          PROTECTED_TAGS.size.times { |i| opened[i] = true if m[i + 1]? }
+        end
+        PROTECTED_PATTERNS.each_with_index do |(tag, open_literal, probe, pattern), i|
+          next unless opened[i]
+          next unless ByteScan.includes?(result, open_literal) || result.matches?(probe, options: opts)
           prefix = if PROTECTED_INLINE.includes?(tag)
                      PRESERVE_PREFIX_INLINE
                    elsif PROTECTED_HIDDEN.includes?(tag)
@@ -226,7 +246,7 @@ module Hwaro
                    else
                      PRESERVE_PREFIX_BLOCK
                    end
-          result = result.gsub(pattern) do |match|
+          result = result.gsub(pattern, options: opts) do |match|
             idx = preserves.size
             preserves << match
             "#{prefix}#{idx}#{PRESERVE_SUFFIX}"
@@ -266,8 +286,9 @@ module Hwaro
         preserves.size.times do
           # memchr probe: once the last token is restored the loop used to
           # pay one full confirming regex pass over the document.
-          break unless html.includes?(PRESERVE_TOKEN_PROBE)
-          replaced = html.gsub(REGEX_PRESERVE_TOKEN) do
+          break unless ByteScan.includes?(html, PRESERVE_TOKEN_PROBE)
+          # Checked per pass: a caller's preserves need not be valid UTF-8.
+          replaced = html.gsub(REGEX_PRESERVE_TOKEN, options: utf8_opts(html)) do
             # to_i? (not to_i) so a counterfeit token whose digits overflow
             # Int32 (e.g. \x00HW_HTML_PB_99999999999999999999\x00 forged in
             # author input) returns nil → emit $0 unchanged instead of raising
@@ -279,6 +300,10 @@ module Hwaro
           html = replaced
         end
         html
+      end
+
+      private def utf8_opts(html : String) : Regex::MatchOptions
+        html.valid_encoding? ? Regex::MatchOptions::NO_UTF_CHECK : Regex::MatchOptions::None
       end
 
       # Drop comments and the spaces/tabs that end a line — in TEXT only.
@@ -398,6 +423,134 @@ module Hwaro
       # ponytail: decided per pair, so `<b>a</b><script/> <script/><b>c</b>`
       # still loses its one space; look past hidden runs if that shows up.
       private def collapse_inter_token_whitespace(html : String) : String
+        # A byte scan that makes REGEX_INTERTOKEN_WS's choices (same start
+        # positions, same token extents, same retry on a failed start)
+        # without a capture String per token. The regex stays the reference
+        # and handles what the scan does not model: invalid UTF-8 (the
+        # regex treats it differently) and non-ASCII where its UCP classes
+        # look (`\w` in a tag name, `\d` in a placeholder).
+        return collapse_inter_token_whitespace_regex(html) unless html.valid_encoding?
+        bytes = html.to_slice
+        n = bytes.size
+        # Past the last `>` no tag can close: a run of unclosed `<` then
+        # costs one probe each instead of a scan to the end.
+        last_gt = bytes.rindex('>'.ord.to_u8) || -1
+        values = tagged_value_spans(html)
+        String.build(n) do |io|
+          copied = 0
+          i = 0
+          while i < n
+            b = bytes[i]
+            unless b == '<'.ord || b == 0_u8
+              i += 1
+              next
+            end
+            prior_end = intertoken_end(bytes, i, n, last_gt)
+            return collapse_inter_token_whitespace_regex(html) if prior_end == -2
+            ws_end = prior_end
+            while ws_end < n && intertoken_ws?(bytes[ws_end])
+              ws_end += 1
+            end
+            if prior_end < 0 || ws_end == prior_end
+              i += 1
+              next
+            end
+            next_end = intertoken_end(bytes, ws_end, n, last_gt)
+            return collapse_inter_token_whitespace_regex(html) if next_end == -2
+            if next_end < 0
+              i += 1
+              next
+            end
+            # A match inside a quoted value is kept verbatim (see the regex
+            # version); the scan resumes after its whitespace, as gsub does.
+            if inside_span?(values, prior_end)
+              i = ws_end
+              next
+            end
+            prior_block = intertoken_block?(bytes, i, prior_end)
+            next_block = intertoken_block?(bytes, ws_end, next_end)
+            return collapse_inter_token_whitespace_regex(html) if prior_block.nil? || next_block.nil?
+            io.write(bytes[copied, prior_end - copied])
+            unless prior_block || next_block || (intertoken_hidden?(bytes, i) && intertoken_hidden?(bytes, ws_end))
+              io << ' '
+            end
+            copied = ws_end
+            i = ws_end
+          end
+          io.write(bytes[copied, n - copied])
+        end
+      end
+
+      # `[ \t\r\n\f]` — REGEX_INTERTOKEN_WS's whitespace class.
+      private def intertoken_ws?(b : UInt8) : Bool
+        b == ' '.ord || b == '\t'.ord || b == '\n'.ord || b == '\r'.ord || b == 0x0c
+      end
+
+      # End (exclusive) of a REGEX_INTERTOKEN_WS token starting at `i`, -1
+      # when none starts there, -2 when only the regex can tell.
+      #   tag:         `<` `/`? [A-Za-z] [^>]* `>`  (`[\w-]*[^>]*` matches
+      #                exactly what `[^>]*` does)
+      #   placeholder: `\0HW_HTML_P` [BIH] `_` \d+ `\0`
+      private def intertoken_end(bytes : Bytes, i : Int32, n : Int32, last_gt : Int32) : Int32
+        return -1 if i >= n
+        if bytes[i] == '<'.ord
+          j = i + 1
+          j += 1 if j < n && bytes[j] == '/'.ord
+          return -1 unless j < n && bytes[j].unsafe_chr.ascii_letter? && last_gt > j
+          close = bytes[j + 1, n - j - 1].index('>'.ord.to_u8)
+          return close ? j + 1 + close + 1 : -1
+        end
+        probe = PRESERVE_TOKEN_PROBE.bytesize
+        return -1 unless n - i > probe + 3 && prefix_at?(bytes, i, PRESERVE_TOKEN_PROBE)
+        j = i + probe
+        return -1 unless {'B'.ord, 'I'.ord, 'H'.ord}.includes?(bytes[j]) && bytes[j + 1] == '_'.ord
+        j += 2
+        start = j
+        while j < n && bytes[j].unsafe_chr.ascii_number?
+          j += 1
+        end
+        return -2 if j < n && bytes[j] >= 0x80
+        return -1 unless j > start && j < n && bytes[j] == 0_u8
+        j + 1
+      end
+
+      # `block_token?` over `bytes[start...stop]` without building the
+      # token; nil when a non-ASCII tag-name byte needs the Unicode rules
+      # (`\w`, `downcase`) of the String version.
+      private def intertoken_block?(bytes : Bytes, start : Int32, stop : Int32) : Bool?
+        if bytes[start] == 0_u8
+          return prefix_at?(bytes, start, PRESERVE_PREFIX_BLOCK)
+        end
+        j = start + 1
+        j += 1 if bytes[j] == '/'.ord
+        name_start = j
+        while j < stop
+          b = bytes[j]
+          break unless b.unsafe_chr.ascii_alphanumeric? || b == '_'.ord || b == '-'.ord
+          j += 1
+        end
+        return if j < stop && bytes[j] >= 0x80
+        return false if j - name_start > BLOCK_TAG_MAX
+        key = 0_u128
+        (name_start...j).each { |k| key = (key << 8) | bytes[k].unsafe_chr.downcase.ord }
+        BLOCK_TAG_KEYS.includes?(key)
+      end
+
+      private def intertoken_hidden?(bytes : Bytes, start : Int32) : Bool
+        prefix_at?(bytes, start, PRESERVE_PREFIX_HIDDEN)
+      end
+
+      private def prefix_at?(bytes : Bytes, start : Int32, prefix : String) : Bool
+        bytes.size - start >= prefix.bytesize && bytes[start, prefix.bytesize] == prefix.to_slice
+      end
+
+      # BLOCK_TAGS names packed one byte each into an integer (they are at
+      # most BLOCK_TAG_MAX ASCII bytes), so a token's name is looked up
+      # without building a String.
+      private BLOCK_TAG_MAX  = BLOCK_TAGS.max_of(&.bytesize)
+      private BLOCK_TAG_KEYS = BLOCK_TAGS.map { |tag| tag.each_byte.reduce(0_u128) { |key, b| (key << 8) | b } }.to_set
+
+      private def collapse_inter_token_whitespace_regex(html : String) : String
         values = tagged_value_spans(html)
         html.gsub(REGEX_INTERTOKEN_WS) do
           # Tag-shaped text inside a quoted value (`data-x='<div>  <p>'`)
@@ -551,12 +704,40 @@ module Hwaro
         !value.empty? && !value.ends_with?('"') && !value.ends_with?('\'')
       end
 
+      # True when `emit_collapsed_tag` would copy the tag unchanged, as most
+      # tags (`<li>`, `</a>`, `<a href="x">`) are: outside quotes, only
+      # single spaces (a tab/newline/CR becomes a space, a run collapses),
+      # and an ASCII last byte that is neither whitespace nor `/` (nothing
+      # for its trailing strip). Spares a String per tag.
+      private def tag_verbatim?(bytes : Bytes, start : Int32, tag_end : Int32) : Bool
+        last = bytes[tag_end - 1]
+        return false if last >= 0x80 || last == '/'.ord || last.unsafe_chr.ascii_whitespace?
+        quote = 0_u8
+        i = start + 1
+        while i < tag_end
+          b = bytes[i]
+          if quote != 0_u8
+            quote = 0_u8 if b == quote
+          elsif b == '"'.ord || b == '\''.ord
+            quote = b
+          elsif b == '\t'.ord || b == '\n'.ord || b == '\r'.ord || (b == ' '.ord && bytes[i - 1] == ' '.ord)
+            return false
+          end
+          i += 1
+        end
+        true
+      end
+
       # Write the tag at `bytes[start..tag_end]` to `io` with internal
       # whitespace collapsed. The tag-name run is copied verbatim;
       # then we collapse whitespace between attributes, preserve
       # quoted values, and strip any trailing whitespace before the
       # final `>` (or `/>` for self-closing).
       private def emit_collapsed_tag(io : IO, bytes : Bytes, start : Int32, tag_end : Int32) : Nil
+        if tag_verbatim?(bytes, start, tag_end)
+          io.write(bytes[start, tag_end - start + 1])
+          return
+        end
         # Buffer the tag body (minus the closing `>`) into a slice so
         # we can collapse and trim, then emit `>` at the end.
         # We can't easily trim trailing whitespace from an already-

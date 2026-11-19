@@ -1478,11 +1478,15 @@ module Hwaro
           stripped = text.strip
           return Raw.new(text) if stripped.empty?
           return coerce_unparsed(stripped) if unparseable?(stripped)
-          template = Ast::TextTemplate.new([stripped.as(Ast::Piece)], 1, 1)
-          node = parse(template)
+          node = parsed_storage(stripped)
           unless node
-            remember_unparseable(stripped)
-            return coerce_unparsed(stripped)
+            template = Ast::TextTemplate.new([stripped.as(Ast::Piece)], 1, 1)
+            node = parse(template)
+            unless node
+              remember_unparseable(stripped)
+              return coerce_unparsed(stripped)
+            end
+            remember_parsed(stripped, node)
           end
           # coercing: true — slash text arriving through storage is always
           # a CONSTRUCTED list (a literal lazy pair would have divided at
@@ -1492,6 +1496,25 @@ module Hwaro
         rescue SoftEvalError
           remember_unparseable(text.strip)
           coerce_unparsed(text.strip)
+        end
+
+        # Parse trees of storage text, which every variable read coerces
+        # back to a value: re-lexing the same few strings was half of a
+        # function-heavy compile. A tree depends on the text alone and is
+        # never mutated, so it is shared; same size policy as UNPARSEABLE.
+        PARSED      = {} of String => Node
+        PARSED_LOCK = Mutex.new
+
+        private def self.parsed_storage(text : String) : Node?
+          PARSED_LOCK.synchronize { PARSED[text]? }
+        end
+
+        private def self.remember_parsed(text : String, node : Node) : Nil
+          return if text.bytesize > 1024
+          PARSED_LOCK.synchronize do
+            PARSED.clear if PARSED.size >= UNPARSEABLE_LIMIT
+            PARSED[text] = node
+          end
         end
 
         # Storage text that failed to parse or evaluate. Coercion runs
