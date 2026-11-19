@@ -154,6 +154,10 @@ module Hwaro
 
               preserved = false
               if existing
+                # Regenerated text follows the file's own line endings (as
+                # `doctor --fix` does for config.toml): LF template text
+                # next to a kept CRLF section left a mixed-ending file.
+                content = content.gsub('\n', "\r\n") if existing.scan("\r\n").size * 2 > existing.count('\n')
                 if existed && !has_marker
                   # `--force` skips the prompt above, so this loss warning is
                   # the only signal the non-interactive path gets.
