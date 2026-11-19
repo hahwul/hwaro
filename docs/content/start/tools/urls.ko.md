@@ -28,7 +28,7 @@ hwaro tool urls --json
 |------|------|
 | `page` | 콘텐츠 페이지 (`[[content.generate]]` 페이지 포함) |
 | `section` | 섹션 인덱스 페이지 (`_index.md`) |
-| `alias` | `aliases`로 작성되는 리다이렉트 스텁 |
+| `alias` | `aliases`로 작성되는 리다이렉트 스텁. 실제로 쓰이는 파일의 URL로 표시됩니다(`/old/index.htm`은 `/old/`가 아니라 그대로 나옵니다) |
 | `pagination` | 섹션과 택소노미 term의 페이저 페이지 (`/posts/page/2/`) |
 | `taxonomy` | 택소노미 인덱스 페이지 (`/tags/`) |
 | `term` | 택소노미 term 페이지 (`/tags/crystal/`) |

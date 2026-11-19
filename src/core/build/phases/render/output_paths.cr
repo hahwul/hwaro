@@ -105,6 +105,12 @@ module Hwaro::Core::Build::Phases::Render
     if all_pages.any?(&.term_metadata)
       alias_owners = (writers + all_pages.select(&.term_metadata)).sort_by! { |p| {p.synthesized? ? 1 : 0, p.path} }
     end
+    # For the file-versus-directory check below, both keyed case/NFC-folded
+    # and holding {spelling, owner}: the stub FILES claimed so far, and every
+    # directory a claimed output is published into (built on the first stub
+    # file — most sites have none).
+    stub_files = {} of String => {String, String}
+    claimed_dirs : Hash(String, {String, String})? = nil
     alias_owners.each do |page|
       page.aliases.each do |a|
         norm = Utils::PathUtils.normalize_alias_url(a)
@@ -136,6 +142,44 @@ module Hwaro::Core::Build::Phases::Render
             next
           end
 
+          # A file cannot sit where another output needs a directory. A stub
+          # that is a FILE (`/legacy.html`) loses to whatever is already
+          # published under that name (`legacy.html/index.html`,
+          # `legacy.html/post/index.html`), and any stub loses to an earlier
+          # stub file on its own path (`/o.html/sub/` after `/o.html`).
+          # Unarbitrated, the second writer failed the build with an I/O
+          # error. A page's alias onto its own path is dropped by
+          # `each_alias_output`.
+          stub_file = !(file_key == "index.html" || file_key.ends_with?("/index.html"))
+          clash = nil
+          if stub_file
+            dirs = (claimed_dirs ||= output_dirs(by_file))
+            clash = dirs[Utils::PathUtils.output_fold_key(file_key)]?.try { |spelling, dir_owner| {dir_owner, spelling == file_key} }
+          end
+          unless clash || stub_files.empty?
+            dir = File.dirname(file_key)
+            until dir == "."
+              if stub = stub_files[Utils::PathUtils.output_fold_key(dir)]?
+                clash = {stub[1], stub[0] == dir}
+                break
+              end
+              dir = File.dirname(dir)
+            end
+          end
+          if clash && clash[0] != page.path
+            owner, exact = clash
+            if exact
+              Logger.warn "Duplicate alias output path '#{norm}' — alias on '#{page.path}' collides with '#{owner}' (a file where the other needs a directory) and is not written"
+            else
+              Logger.warn "Duplicate alias output path '#{norm}' — alias on '#{page.path}' differs from a directory or file of '#{owner}' only in letter case or Unicode form, which name the same path on macOS and Windows"
+              folds_case = Utils::PathUtils.case_folding_fs?(Dir.current) if folds_case.nil?
+            end
+            if exact || folds_case
+              winners[norm] = owner
+              next
+            end
+          end
+
           fold_key = Utils::PathUtils.output_fold_key(file_key)
           if (prev_path = by_fold[fold_key]?) && prev_path != page.path
             Logger.warn "Duplicate alias output path '#{norm}' — alias on '#{page.path}' differs from '#{prev_path}' only in letter case or Unicode form, which name the same file on macOS and Windows"
@@ -149,6 +193,8 @@ module Hwaro::Core::Build::Phases::Render
           end
 
           by_file[file_key] = page.path
+          stub_files[Utils::PathUtils.output_fold_key(file_key)] ||= {file_key, page.path} if stub_file
+          claimed_dirs.try { |claimed| claim_output_dirs(claimed, file_key, page.path) }
         end
 
         winners[norm] = page.path
@@ -156,6 +202,25 @@ module Hwaro::Core::Build::Phases::Render
     end
 
     winners
+  end
+
+  # Every directory the output files in `files` are published into (see the
+  # alias pass above): folded directory => {spelling, owner of a file in it}.
+  private def output_dirs(files : Hash(String, String)) : Hash(String, {String, String})
+    dirs = {} of String => {String, String}
+    files.each { |file, owner| claim_output_dirs(dirs, file, owner) }
+    dirs
+  end
+
+  private def claim_output_dirs(dirs : Hash(String, {String, String}), file : String, owner : String) : Nil
+    dir = File.dirname(file)
+    until dir == "."
+      key = Utils::PathUtils.output_fold_key(dir)
+      # Its ancestors were added with it.
+      break if dirs.has_key?(key)
+      dirs[key] = {dir, owner}
+      dir = File.dirname(dir)
+    end
   end
 
   # A `static/` directory and a page directory spelled alike but for letter
@@ -407,9 +472,13 @@ module Hwaro::Core::Build::Phases::Render
         Logger.warn "Skipping alias #{alias_path.inspect} on #{page.path}: a path segment would escape the output directory."
         next
       end
-      # Encoded paths and case-folded paths can point to the page's own file.
-      next if alias_file == own_file
-      if own_fold && Utils::PathUtils.output_fold_key(alias_file) == own_fold
+      # Encoded paths and case-folded paths can point to the page's own
+      # file — or, for a stub that is a file (`/legacy.html` on the page at
+      # `/legacy.html/` or `/legacy.html/post/`), name a directory that file
+      # lives in.
+      next if alias_file == own_file || own_file.try(&.starts_with?("#{alias_file}/"))
+      alias_fold = Utils::PathUtils.output_fold_key(alias_file)
+      if own_fold && (alias_fold == own_fold || own_fold.starts_with?("#{alias_fold}/"))
         # The output directory's filesystem; a plan (`Builder#plan_urls`)
         # runs before it exists and probes the project's instead.
         folds_case = Utils::PathUtils.case_folding_fs?(Dir.exists?(output_dir) ? output_dir : Dir.current) if folds_case.nil?
