@@ -57,15 +57,6 @@ module Hwaro
         # say so instead of hanging.
         MAX_RULE_SELECTORS = 8192
 
-        # Unwinds a @function body at @return. :nodoc:
-        class ReturnSignal < Exception
-          getter value : Value
-
-          def initialize(@value)
-            super("@return")
-          end
-        end
-
         # A `{ ... }` block passed to `@include`; evaluated at `@content`
         # with the caller's variable scope (dart-sass lexical semantics).
         # `params` are the `using ($a, $b: 1)` parameters that
@@ -136,6 +127,11 @@ module Hwaro
           @loaded_modules = {} of String => SassModule
           @load_stack = [] of String
           @in_function = false
+          # Set by `@return`; every statement loop stops while it is set and
+          # `call_user_function` takes it. A flag, not an exception: raising
+          # per call (backtrace capture + unwind) was most of the compile
+          # time of function-heavy frameworks such as Bulma.
+          @return_value = nil.as(Value?)
           @call_depth = 0
           # Bumped when text spliced into a quoted string carries that
           # string's own quote (see `resolve_template`).
@@ -177,7 +173,10 @@ module Hwaro
         end
 
         private def eval_nodes(nodes : Array(Ast::Node)) : Nil
-          nodes.each { |node| eval_node(node) }
+          nodes.each do |node|
+            eval_node(node)
+            break if @return_value
+          end
         end
 
         private def eval_node(node : Ast::Node) : Nil
@@ -231,7 +230,7 @@ module Hwaro
             eval_while(node)
           when Ast::ReturnNode
             error_at(node.line, node.column, "@return may only be used within a @function") unless @in_function
-            raise ReturnSignal.new(eval_expr!(node.value))
+            @return_value = eval_expr!(node.value)
           when Ast::MessageNode
             eval_message(node)
           when Ast::AtRootNode
@@ -1355,6 +1354,7 @@ module Hwaro
               bind_each_vars(node.vars, item)
               eval_nodes(node.body)
             end
+            break if @return_value
           end
         end
 
@@ -1395,11 +1395,11 @@ module Hwaro
 
           if from_i <= to_i
             last = node.exclusive ? to_i - 1 : to_i
-            from_i.upto(last) { |i| iterate.call(i) }
+            from_i.upto(last) { |i| iterate.call(i); break if @return_value }
           else
             # dart-sass iterates downward when from > to.
             last = node.exclusive ? to_i + 1 : to_i
-            from_i.downto(last) { |i| iterate.call(i) }
+            from_i.downto(last) { |i| iterate.call(i); break if @return_value }
           end
         end
 
@@ -1429,6 +1429,7 @@ module Hwaro
             end
             count_loop_iteration(node.line, node.column)
             scoped { eval_nodes(node.body) }
+            break if @return_value
           end
         end
 
@@ -1808,11 +1809,12 @@ module Hwaro
             @keywords_accessed = Set(String).new
             begin
               eval_nodes(closure.node.body)
-              raise SoftEvalError.new("function #{name} finished without @return")
-            rescue ex : ReturnSignal
+              value = @return_value
+              raise SoftEvalError.new("function #{name} finished without @return") unless value
+              @return_value = nil
               reject_unused_kwargs(extra, closure.node.params, "function #{name}",
                 closure.node.line, closure.node.column, soft: true)
-              ex.value
+              value
             ensure
               @env = saved_env
               @path = saved_path
