@@ -183,9 +183,12 @@ module Hwaro::Core::Build::Phases::Render
         # (`generated_outputs_read_content?`, see render_streaming's
         # `release_content`), and that is precisely the case where hydration
         # would be pointless — so gate on the same predicate instead of on
-        # the mode.
+        # the mode. A `[links] broken_anchors` check reads them too: anchor
+        # links are collected by this content pass.
+        # ponytail: keeps cached bodies under --stream when anchors are checked;
+        # release them after collection if that memory ever matters.
         if cache_enabled && pages_to_build.size < all_pages.size &&
-           (!ctx.options.streaming? || generated_outputs_read_content?(site)) &&
+           (!ctx.options.streaming? || generated_outputs_read_content?(site) || site.config.links.broken_anchors != "ignore") &&
            cached_content_needed?(ctx, site)
           skipped = all_pages - pages_to_build
           if deferred = @deferred_pages
