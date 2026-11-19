@@ -82,10 +82,10 @@ toc = true
 | url | String |
 | path | String |
 | name | String |
-| pages | Array<Page> |
+| pages | Array\<Page> |
 | pages_count | Int |
-| assets | Array<String> |
-| subsections | Array<Section> |
+| assets | Array\<String> |
+| subsections | Array\<Section> |
 
 이 객체에는 `top_level`, `date`, `draft`, `is_index`, `language`, `weight`, `transparent`, `sort_by`, `reverse`, `paginate`, `pagination_enabled`와 (지정했다면) `translation_key`도 있습니다. [데이터 모델 › 목록 속 섹션 객체](/ko/templates/data-model/#목록-속-섹션-객체)를 참고하세요.
 
@@ -139,7 +139,7 @@ toc = true
 | 속성 | 타입 |
 |----------|------|
 | name | String |
-| items | Array<Term> |
+| items | Array\<Term> |
 
 `items`의 순서는 해당 택소노미의
 [`terms_sort_by`](/ko/writing/taxonomies/#정렬)를 따릅니다. `"name"`(기본값,
@@ -154,7 +154,7 @@ toc = true
 |----------|------|
 | name | String |
 | slug | String |
-| pages | Array<Page> |
+| pages | Array\<Page> |
 | count | Int |
 
 ---

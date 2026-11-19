@@ -41,8 +41,8 @@ Site
 | site.title | String | 사이트 제목 |
 | site.description | String | 사이트 설명 |
 | site.base_url | String | 기본 URL(끝 슬래시 없음) |
-| site.pages | Array<Page> | 섹션에 속하지 않은 모든 페이지 |
-| site.sections | Array<Section> | 모든 섹션 인덱스 페이지 |
+| site.pages | Array\<Page> | 섹션에 속하지 않은 모든 페이지 |
+| site.sections | Array\<Section> | 모든 섹션 인덱스 페이지 |
 | site.taxonomies | Object | 모든 택소노미 그룹과 항목 |
 | site.data | Object | `data/` 디렉터리에서 불러온 데이터 |
 | site.authors | Object | 집계된 작성자 데이터 |
@@ -226,11 +226,11 @@ john-doe:
 |----------|------|-------------|
 | section.title | String | 섹션 제목 |
 | section.description | String? | 섹션 설명 |
-| section.pages | Array<Page> | 이 섹션의 페이지 (페이지네이션된 섹션에서는 현재 페이지에 보이는 페이지) |
+| section.pages | Array\<Page> | 이 섹션의 페이지 (페이지네이션된 섹션에서는 현재 페이지에 보이는 페이지) |
 | section.pages_count | Int | `section.pages`의 항목 수 |
 | section.list | String | 미리 렌더링된 HTML 목록(`section_list`) |
-| section.subsections | Array<Section> | 자식 섹션(`weight`, 경로 순으로 정렬) |
-| section.assets | Array<String> | 섹션의 정적 파일 |
+| section.subsections | Array\<Section> | 자식 섹션(`weight`, 경로 순으로 정렬) |
+| section.assets | Array\<String> | 섹션의 정적 파일 |
 | section.page_template | String? | 페이지 기본 템플릿 |
 | section.paginate_path | String | 페이지네이션 URL 패턴 |
 | section.redirect_to | String? | 리다이렉트 URL |
@@ -263,9 +263,9 @@ john-doe:
 | reverse | Bool | 프론트 매터의 `reverse` |
 | paginate | Int | 페이지당 항목 수(없으면 `0`) |
 | pagination_enabled | Bool? | 프론트 매터의 `pagination_enabled`(없으면 `none`) |
-| pages, pages_count | Array<Page>, Int | 섹션의 정렬 순서대로 나열된 페이지와 그 수 |
-| assets | Array<String> | 함께 둔 파일 |
-| subsections | Array<Section> | 같은 형태의 하위 섹션(루트 섹션 자신의 항목에서는 빈 배열) |
+| pages, pages_count | Array\<Page>, Int | 섹션의 정렬 순서대로 나열된 페이지와 그 수 |
+| assets | Array\<String> | 함께 둔 파일 |
+| subsections | Array\<Section> | 같은 형태의 하위 섹션(루트 섹션 자신의 항목에서는 빈 배열) |
 | version | Object? | 버전 문서 사이트에서만 |
 | translation_key | String? | 프론트 매터의 `translation_key`(없으면 정의되지 않음) |
 
@@ -333,10 +333,10 @@ john-doe:
 | page.date | String? | 발행일(YYYY-MM-DD) |
 | page.updated | String? | 마지막 수정일 |
 | page.language | String | 적용된 언어 코드 |
-| page.translations | Array<TranslationLink> | 언어별 번역본 |
+| page.translations | Array\<TranslationLink> | 언어별 번역본 |
 | page.translation_key | String | 페이지 프론트 매터의 `translation_key`. 지정하지 않은 페이지에서는 정의되지 않음(빈 값으로 출력) |
 | page.version | Object? | 문서 버전 (어느 버전에도 속하지 않는 페이지는 `nil`, `[[versions.list]]`가 없는 사이트에서는 정의되지 않음) — [page.version](#pageversion) 참고 |
-| page.version_links | Array<VersionLink> | 버전 전환기 행 (`[[versions.list]]`가 없는 사이트에서는 정의되지 않으므로 순회해도 아무것도 출력되지 않음) |
+| page.version_links | Array\<VersionLink> | 버전 전환기 행 (`[[versions.list]]`가 없는 사이트에서는 정의되지 않으므로 순회해도 아무것도 출력되지 않음) |
 
 렌더링된 HTML 콘텐츠는 최상위 `content` 변수로 제공됩니다.
 
@@ -355,8 +355,8 @@ john-doe:
 | page.draft | Bool | 초안 여부 |
 | page.weight | Int | 정렬 가중치 |
 | page.image | String? | 대표 이미지 경로 |
-| page.authors | Array<String> | 프론트 매터에 쓴 그대로의 작성자 ID([사이트 작성자](#사이트-작성자) 참고) |
-| page.tags | Array<String> | 프론트 매터의 태그 |
+| page.authors | Array\<String> | 프론트 매터에 쓴 그대로의 작성자 ID([사이트 작성자](#사이트-작성자) 참고) |
+| page.tags | Array\<String> | 프론트 매터의 태그 |
 | page.taxonomies | Object | 이 페이지의 택소노미 항목(`page.taxonomies.tags`, `page.taxonomies.<name>`) |
 | page.extra | Object | 커스텀 프론트 매터 필드 |
 
@@ -368,13 +368,13 @@ john-doe:
 | page.reading_time | Int | 읽기 시간(분, 올림): 분당 약 200단어, 중국어/일본어 글자는 분당 약 500자 |
 | page.summary | String? | 요약 HTML: `<!-- more -->` 앞부분, 없으면 `page.description`, 그것도 없으면 렌더링된 본문의 자동 발췌문(`[content] summary_length`, 이스케이프된 `<p>` 하나). 삽입할 때는 `\| safe`와 함께 사용(예: `{{ page.summary \| safe }}`). `<meta name="description">`에는 `page.description`을 직접 사용 |
 | page.summary_truncated | Bool | `page.summary`가 잘린 자동 발췌문일 때만 `true` ("더 읽기" 링크에 유용) |
-| page.assets | Array<String> | 페이지 번들의 정적 파일 |
+| page.assets | Array\<String> | 페이지 번들의 정적 파일 |
 | page.path | String | `content/` 기준 소스 경로(`blog/my-post.md`) |
 | page.series | String | 프론트 매터의 시리즈 이름(없으면 빈 문자열) |
 | page.series_index | Int | 시리즈 안에서 1부터 시작하는 순번(`[series]` 활성화 필요) |
-| page.series_pages | Array<Page> | 같은 시리즈의 모든 페이지(`series_weight` 순 정렬) |
-| page.related_posts | Array<Page> | 택소노미 항목을 공유하는 페이지(`[related]` 활성화 필요) |
-| page.backlinks | Array<Page> | 이 페이지로 링크하는 같은 언어의 게시된 페이지, 최신순(`[content] backlinks = true` 필요, [백링크](/ko/writing/obsidian/#백링크) 참고) |
+| page.series_pages | Array\<Page> | 같은 시리즈의 모든 페이지(`series_weight` 순 정렬) |
+| page.related_posts | Array\<Page> | 택소노미 항목을 공유하는 페이지(`[related]` 활성화 필요) |
+| page.backlinks | Array\<Page> | 이 페이지로 링크하는 같은 언어의 게시된 페이지, 최신순(`[content] backlinks = true` 필요, [백링크](/ko/writing/obsidian/#백링크) 참고) |
 | page.git | Object? | 소스 파일의 커밋 메타데이터(`[git]` 활성화 필요, 커밋되지 않았거나 생성된 페이지는 `nil`). 필드: `hash`, `short_hash`, `lastmod`(Time), `first_commit`(Time), `author_name`, `author_email` — [Git 메타데이터](/ko/features/git-info/) 참고 |
 
 ### 불리언 플래그
@@ -396,8 +396,8 @@ john-doe:
 |----------|------|-------------|
 | page.lower | Page? | 읽기 순서상 이전 페이지 |
 | page.higher | Page? | 읽기 순서상 다음 페이지 |
-| page.ancestors | Array<Object> | 부모 섹션 체인(각 항목은 `title`과 `url`을 가짐) |
-| page.translations | Array<TranslationLink> | 언어별 번역본 |
+| page.ancestors | Array\<Object> | 부모 섹션 체인(각 항목은 `title`과 `url`을 가짐) |
+| page.translations | Array\<TranslationLink> | 언어별 번역본 |
 
 ### 커스텀 메타데이터
 
@@ -737,7 +737,7 @@ pros = ["Fast", "Reliable"]
 | paginator.last | String | 마지막 페이지 URL |
 | paginator.previous | String? | 이전 페이지 URL(첫 페이지에서는 nil) |
 | paginator.next | String? | 다음 페이지 URL(마지막 페이지에서는 nil) |
-| paginator.pages | Array<Page> | 현재 페이저의 페이지 목록 |
+| paginator.pages | Array\<Page> | 현재 페이저의 페이지 목록 |
 | paginator.current_index | Int | 현재 페이지 번호(1부터 시작) |
 | paginator.total_pages | Int | `number_pagers`와 동일 |
 
@@ -821,7 +821,7 @@ pros = ["Fast", "Reliable"]
 | String? | 선택적 텍스트(nil 가능) |
 | Int | 정수 |
 | Bool | true/false |
-| Array<T> | T 타입의 목록 |
+| Array\<T> | T 타입의 목록 |
 | Object | 키-값 맵 |
 
 ### 템플릿에서 확인

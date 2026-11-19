@@ -229,7 +229,7 @@ Available in both `taxonomy.html` and `taxonomy_term.html`:
 |----------|------|-------------|
 | name | String | Term name |
 | slug | String | URL-safe name |
-| pages | Array<Page> | Pages with this term |
+| pages | Array\<Page> | Pages with this term |
 | count | Int | Number of pages |
 | title | String | Title from the term's `_index.md` (only when that file exists) |
 | description | String | Description from the term's `_index.md` (only when that file exists) |

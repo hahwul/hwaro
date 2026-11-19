@@ -293,3 +293,58 @@ describe "InlineMarkdown.gsub_delimited" do
     expect_raises(ArgumentError) { im.gsub_delimited(bad, Hwaro::Content::Processors::InlineMarkdown::STRIKETHROUGH) { "" } }
   end
 end
+
+describe "InlineMarkdown.render with Flags#raw_html" do
+  im = Hwaro::Content::Processors::InlineMarkdown
+  raw = Hwaro::Content::Processors::InlineMarkdown::Flags.new(raw_html: true)
+
+  it "escapes tags unless the flag is set" do
+    im.render("a<br>b <span>s</span>").should eq("a&lt;br&gt;b &lt;span&gt;s&lt;/span&gt;")
+    im.render("a<br>b <span>s</span>", flags: raw).should eq("a<br>b <span>s</span>")
+  end
+
+  it "gives a tag back byte for byte, whatever its attributes hold" do
+    tag = %(<a href="?a=1&b=2&amp;c" title='"q" > &lt; it&#39;s' data-x=y_z*w* hidden >)
+    im.render("#{tag}_t_</a >", flags: raw).should eq("#{tag}<em>t</em></a >")
+  end
+
+  it "keeps a tag out of code spans, escapes, destinations and math" do
+    im.render("`<br>` \\<br> \\\\<br>", flags: raw).should eq("<code>&lt;br&gt;</code> &lt;br&gt; \\<br>")
+    im.render("[a](<b> '<i>')", flags: raw).should eq(%(<a href="b" title="&lt;i&gt;">a</a>))
+    math = Hwaro::Content::Processors::InlineMarkdown::Flags.new(raw_html: true, math: true)
+    im.render("$a<b>c$ <b>", flags: math).should eq("$a&lt;b&gt;c$ <b>")
+  end
+
+  it "leaves a tag escaped when a token sits in its attribute" do
+    im.render(%(<i title="`c`">), flags: raw).should eq("&lt;i title=&quot;<code>c</code>&quot;&gt;")
+  end
+
+  # `MarkdownExtensions::HTML_TAG_RE` reads the same grammar off raw text and
+  # is the oracle: the two must find the same tags in any input.
+  it "finds the tags HTML_TAG_RE finds, on random text" do
+    alphabet = ["<", "<", "</", ">", ">", "/>", "a", "b", "br", " ", " ", "=", "\"", "'", "&", "&amp;", "&lt;", "&#39;",
+                "&quot;", "`", "-", ":", "_", "x", "é", "\t", "/", "!", ";", "#", "\u00a0"]
+    rng = Random.new(20261119)
+    30_000.times do
+      text = String.build { |io| rng.rand(1..24).times { io << alphabet.sample(rng) } }
+      expected = HTML.escape(text.gsub(Hwaro::Content::Processors::MarkdownExtensions::HTML_TAG_RE) { "\u0001" })
+      actual = HTML.escape(text).gsub(Hwaro::Content::Processors::InlineMarkdown::ESCAPED_HTML_TAG_RE) { "\u0001" }
+      fail "#{text.inspect}: #{actual.inspect} != #{expected.inspect}" unless actual == expected
+    end
+  end
+
+  it "reads a very long tag, closed or not, without a regex error" do
+    long = "<a #{"b=c " * 50_000}t=\"#{"x" * 200_000}\">"
+    im.render(long, flags: raw).should eq(long)
+    unclosed = %(<a b="c ) * 20_000
+    im.render(unclosed, flags: raw).should eq(HTML.escape(unclosed))
+  end
+
+  it "is switched off by TableParser when the table is trusted (safe mode)" do
+    table = "| A |\n|---|\n| a<br>b |"
+    process = ->(trusted : Bool) { Hwaro::Content::Processors::TableParser.process(table, flags: raw, trusted: trusted) }
+    process.call(false).should contain("<td>a<br>b</td>")
+    process.call(true).should contain(">a&lt;br&gt;b</td>")
+    process.call(true).should_not contain("<br")
+  end
+end

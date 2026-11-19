@@ -41,8 +41,8 @@ The root container. Configured in `config.toml`.
 | site.title | String | Site title |
 | site.description | String | Site description |
 | site.base_url | String | Base URL (no trailing slash) |
-| site.pages | Array<Page> | All non-section pages |
-| site.sections | Array<Section> | All section index pages |
+| site.pages | Array\<Page> | All non-section pages |
+| site.sections | Array\<Section> | All section index pages |
 | site.taxonomies | Object | All taxonomy groups and terms |
 | site.data | Object | Data loaded from `data/` directory |
 | site.authors | Object | Aggregated author data |
@@ -226,11 +226,11 @@ A directory with `_index.md` that groups related content.
 |----------|------|-------------|
 | section.title | String | Section title |
 | section.description | String? | Section description |
-| section.pages | Array<Page> | Pages in this section (on a paginated section, the current pager's pages) |
+| section.pages | Array\<Page> | Pages in this section (on a paginated section, the current pager's pages) |
 | section.pages_count | Int | Number of items in `section.pages` |
 | section.list | String | Pre-rendered HTML list (`section_list`) |
-| section.subsections | Array<Section> | Child sections, ordered by `weight` then path |
-| section.assets | Array<String> | Static files in section |
+| section.subsections | Array\<Section> | Child sections, ordered by `weight` then path |
+| section.assets | Array\<String> | Static files in section |
 | section.page_template | String? | Default template for pages |
 | section.paginate_path | String | Pagination URL pattern |
 | section.redirect_to | String? | Redirect URL |
@@ -263,9 +263,9 @@ The section objects in `section.subsections`, `site.sections` and `get_section()
 | reverse | Bool | `reverse` from front matter |
 | paginate | Int | Pages per pager (`0` when unset) |
 | pagination_enabled | Bool? | `pagination_enabled` from front matter (`none` when unset) |
-| pages, pages_count | Array<Page>, Int | The section's listed pages, in its sort order |
-| assets | Array<String> | Colocated files |
-| subsections | Array<Section> | Child sections, same shape (empty on the root section's own entry) |
+| pages, pages_count | Array\<Page>, Int | The section's listed pages, in its sort order |
+| assets | Array\<String> | Colocated files |
+| subsections | Array\<Section> | Child sections, same shape (empty on the root section's own entry) |
 | version | Object? | Only on versioned sites |
 | translation_key | String? | `translation_key` from front matter (undefined when unset) |
 
@@ -333,10 +333,10 @@ An individual content file (`.md`).
 | page.date | String? | Publication date (YYYY-MM-DD) |
 | page.updated | String? | Last updated date |
 | page.language | String | Effective language code |
-| page.translations | Array<TranslationLink> | Language variants |
+| page.translations | Array\<TranslationLink> | Language variants |
 | page.translation_key | String | The page's front matter `translation_key`; undefined (prints empty) on pages without one |
 | page.version | Object? | Documentation version (`nil` for a page outside every version; undefined on a site without `[[versions.list]]`) — see [page.version](#pageversion) |
-| page.version_links | Array<VersionLink> | Version switcher rows (undefined on a site without `[[versions.list]]`, so a loop over it renders nothing) |
+| page.version_links | Array\<VersionLink> | Version switcher rows (undefined on a site without `[[versions.list]]`, so a loop over it renders nothing) |
 
 Rendered HTML content is available as the top-level `content` variable.
 
@@ -355,8 +355,8 @@ Browsers encode a raw `href="{{ page.url }}"` themselves, so ordinary links need
 | page.draft | Bool | Is draft |
 | page.weight | Int | Sort weight |
 | page.image | String? | Featured image path |
-| page.authors | Array<String> | Author IDs as written in front matter (see [Site Authors](#site-authors)) |
-| page.tags | Array<String> | Tags from front matter |
+| page.authors | Array\<String> | Author IDs as written in front matter (see [Site Authors](#site-authors)) |
+| page.tags | Array\<String> | Tags from front matter |
 | page.taxonomies | Object | This page's taxonomy terms (`page.taxonomies.tags`, `page.taxonomies.<name>`) |
 | page.extra | Object | Custom front matter fields |
 
@@ -368,13 +368,13 @@ Browsers encode a raw `href="{{ page.url }}"` themselves, so ordinary links need
 | page.reading_time | Int | Reading time in minutes, rounded up: ~200 words per minute, plus ~500 Chinese/Japanese characters per minute |
 | page.summary | String? | Summary HTML: the chunk before `<!-- more -->`, else `page.description`, else an automatic excerpt of the rendered body (`[content] summary_length`, one escaped `<p>`). Use with `\| safe` to embed (e.g. `{{ page.summary \| safe }}`); for `<meta name="description">` use `page.description` directly. |
 | page.summary_truncated | Bool | `true` only when `page.summary` is an automatic excerpt that was cut short (useful for a "Read more" link). |
-| page.assets | Array<String> | Static files in page bundle |
+| page.assets | Array\<String> | Static files in page bundle |
 | page.path | String | Source path relative to `content/` (`blog/my-post.md`) |
 | page.series | String | Series name from front matter (empty if none) |
 | page.series_index | Int | 1-based position within the series (requires `[series]` enabled) |
-| page.series_pages | Array<Page> | All pages in the same series, sorted by `series_weight` |
-| page.related_posts | Array<Page> | Pages sharing taxonomy terms (requires `[related]` enabled) |
-| page.backlinks | Array<Page> | Published pages in the same language linking here, newest first (requires `[content] backlinks = true`; see [Backlinks](/writing/obsidian/#backlinks)) |
+| page.series_pages | Array\<Page> | All pages in the same series, sorted by `series_weight` |
+| page.related_posts | Array\<Page> | Pages sharing taxonomy terms (requires `[related]` enabled) |
+| page.backlinks | Array\<Page> | Published pages in the same language linking here, newest first (requires `[content] backlinks = true`; see [Backlinks](/writing/obsidian/#backlinks)) |
 | page.git | Object? | Commit metadata for the source file (requires `[git]` enabled; `nil` for uncommitted or generated pages). Fields: `hash`, `short_hash`, `lastmod` (Time), `first_commit` (Time), `author_name`, `author_email` — see [Git Metadata](/features/git-info/) |
 
 ### Boolean Flags
@@ -396,8 +396,8 @@ Browsers encode a raw `href="{{ page.url }}"` themselves, so ordinary links need
 |----------|------|-------------|
 | page.lower | Page? | Previous page in reading order |
 | page.higher | Page? | Next page in reading order |
-| page.ancestors | Array<Object> | Parent section chain (each entry has `title` and `url`) |
-| page.translations | Array<TranslationLink> | Language variants |
+| page.ancestors | Array\<Object> | Parent section chain (each entry has `title` and `url`) |
+| page.translations | Array\<TranslationLink> | Language variants |
 
 ### Custom Metadata
 
@@ -740,7 +740,7 @@ Available in section and taxonomy term templates when pagination is enabled (`pa
 | paginator.last | String | Last page URL |
 | paginator.previous | String? | Previous page URL (nil on first page) |
 | paginator.next | String? | Next page URL (nil on last page) |
-| paginator.pages | Array<Page> | Pages on the current pager |
+| paginator.pages | Array\<Page> | Pages on the current pager |
 | paginator.current_index | Int | Current page number (1-based) |
 | paginator.total_pages | Int | Same as `number_pagers` |
 
@@ -824,7 +824,7 @@ Everything else is text or a URL (titles, descriptions, names, `page.extra`, `si
 | String? | Optional text (may be nil) |
 | Int | Integer number |
 | Bool | true/false |
-| Array<T> | List of type T |
+| Array\<T> | List of type T |
 | Object | Key-value map |
 
 ### Template Checking

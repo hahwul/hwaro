@@ -56,9 +56,12 @@ module Hwaro
           # cells out of InlineMarkdown's strikethrough/emphasis passes.
           # `flags` also threads the F10 opt-in inline markup (ins/mark/sub/
           # sup) into cell rendering, alongside the existing math flag.
+          # Without `safe`, inline HTML tags in a cell are markup, as they
+          # are in a paragraph.
+          flags = markdown_config ? MarkdownExtensions.inline_flags(markdown_config) : InlineMarkdown::Flags.new
           processed = TableParser.process(
             content,
-            flags: markdown_config ? MarkdownExtensions.inline_flags(markdown_config) : InlineMarkdown::Flags.new,
+            flags: flags.copy_with(raw_html: !safe),
             hooks: hooks,
             trusted: safe)
 

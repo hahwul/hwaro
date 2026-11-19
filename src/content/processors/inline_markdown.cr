@@ -184,7 +184,12 @@ module Hwaro
         # positional keyword arg; F10 adds four more opt-in transforms that
         # default OFF, so every existing call site (`Flags.new` == all
         # false except math defaults false too) renders identically.
-        record Flags, math : Bool = false, ins : Bool = false, mark : Bool = false, sub : Bool = false, sup : Bool = false
+        #
+        # `raw_html` lets the author's inline HTML tags through as markup, as
+        # Markd does in a paragraph. Off by default: only a caller that knows
+        # safe mode is off may set it (see `ESCAPED_HTML_TAG_RE`).
+        record Flags, math : Bool = false, ins : Bool = false, mark : Bool = false, sub : Bool = false, sup : Bool = false,
+          raw_html : Bool = false
 
         # Math span patterns — canonical home for the whole pipeline
         # (MarkdownExtensions aliases these, mirroring INLINE_STRIKETHROUGH_RE).
@@ -239,6 +244,18 @@ module Hwaro
         AUTOLINK_RE = /&lt;([a-zA-Z][a-zA-Z0-9+.\-]{1,31}:(?:[^\s&]|&(?!lt;|gt;))*+)&gt;/
         # An entity or numeric character reference as `HTML.escape` left it.
         ESCAPED_ENTITY_RE = /&amp;(#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[a-zA-Z][a-zA-Z0-9]{1,31});/
+        # An inline HTML open or close tag as `HTML.escape` left it: the
+        # grammar of `MarkdownExtensions::HTML_TAG_RE` (Markd's OPEN_TAG and
+        # CLOSE_TAG) with `<`, `>`, `"`, `'` and `&` in their escaped spelling,
+        # so what is a tag in a paragraph is a tag here and `1 < 2`, `<3` or
+        # `<a b=>` stay text. Comments, processing instructions, declarations
+        # and CDATA are not matched and stay escaped: a comment is also how
+        # the engine's own markers travel.
+        # ponytail: a quoted value holding a NUL token (a code span, backslash
+        # escape, link, math or shortcode stashed inside an attribute) fails
+        # the match and the tag stays escaped text; restore those tokens to
+        # their source text here if such a tag has to work.
+        ESCAPED_HTML_TAG_RE = /&lt;[A-Za-z][A-Za-z0-9-]*+(?:\s++[a-zA-Z_:][a-zA-Z0-9:._-]*+(?:\s*+=\s*+(?:(?:[^&=`\x00-\x20]|&amp;)++|&#39;(?:[^&\x00]++|&(?!#39;))*+&#39;|&quot;(?:[^&\x00]++|&(?!quot;))*+&quot;))?+)*+\s*+\/?&gt;|&lt;\/[A-Za-z][A-Za-z0-9-]*+\s*+&gt;/
 
         # Render a small inline-markdown subset over already-HTML-escaped or
         # raw text. Code spans are extracted first so their content survives
@@ -343,6 +360,18 @@ module Hwaro
           result = result.gsub(/<(?:a|img)\b[^>]*>/i) do |tag|
             link_tags << tag
             "\x00IMTAG#{link_tags.size - 1}\x00"
+          end
+
+          # The author's inline tags, back in their raw form and opaque like
+          # the tags above. Done here because everything a tag must not be
+          # read out of is a token by now: code spans, math, backslash
+          # escapes (`\<br>`), autolinks, and the generated <a>/<img> tags
+          # with the destinations, titles and alt text they hold.
+          if flags.raw_html && result.includes?("&lt;")
+            result = result.gsub(ESCAPED_HTML_TAG_RE) do |tag|
+              link_tags << HTML.unescape(tag)
+              "\x00IMTAG#{link_tags.size - 1}\x00"
+            end
           end
 
           result = gsub_delimited(result, STRONG_EM_ASTERISK) { |m| "<em><strong>#{m[1]}</strong></em>" }

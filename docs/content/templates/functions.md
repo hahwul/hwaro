@@ -82,10 +82,10 @@ a specific language variant.
 | url | String |
 | path | String |
 | name | String |
-| pages | Array<Page> |
+| pages | Array\<Page> |
 | pages_count | Int |
-| assets | Array<String> |
-| subsections | Array<Section> |
+| assets | Array\<String> |
+| subsections | Array\<Section> |
 
 The object also carries `top_level`, `date`, `draft`, `is_index`, `language`, `weight`, `transparent`, `sort_by`, `reverse`, `paginate`, `pagination_enabled` and, when set, `translation_key`. See [Data Model › Section Objects in Lists](/templates/data-model/#section-objects-in-lists).
 
@@ -139,7 +139,7 @@ Access taxonomy terms and their pages:
 | Property | Type |
 |----------|------|
 | name | String |
-| items | Array<Term> |
+| items | Array\<Term> |
 
 `items` is ordered by the taxonomy's
 [`terms_sort_by`](/writing/taxonomies/#sorting): `"name"` (the default,
@@ -154,7 +154,7 @@ its `"count"` order can differ.
 |----------|------|
 | name | String |
 | slug | String |
-| pages | Array<Page> |
+| pages | Array\<Page> |
 | count | Int |
 
 ---
