@@ -246,6 +246,23 @@ describe Hwaro::Utils::FileSafe do
         File.read(File.join(root, "missing.md")).should eq("made")
       end
     end
+
+    # Regression: the rename landed a fresh umask-mode file, so
+    # `tool agents-md --write --force` turned a private 0600 AGENTS.md into
+    # 0644 (and `tool platform --force` reset its config the same way).
+    it "keeps the permissions of the file it replaces, through a link too" do
+      posix_only!("chmod")
+      Dir.mktmpdir do |root|
+        real = File.join(root, "real.md")
+        link = File.join(root, "link.md")
+        File.write(real, "old")
+        File.chmod(real, 0o600)
+        File.symlink("real.md", link)
+        Hwaro::Utils::FileSafe.atomic_write_through_links(link, "new")
+        File.read(real).should eq("new")
+        File.info(real).permissions.value.should eq(0o600)
+      end
+    end
   end
 
   describe ".write_new" do
