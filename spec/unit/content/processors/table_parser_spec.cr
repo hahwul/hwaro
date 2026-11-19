@@ -868,6 +868,13 @@ describe Hwaro::Content::Processors::TableParser do
       out.should contain("> </table>\n>\n> after **bold**")
     end
 
+    it "ends a table's HTML block so a block right after it is still markdown" do
+      md = "| a | b |\n|---|---|\n| 1 | 2 |\n## Next\n\n| a |\n|---|\n| 1 |\n> quote\n"
+      html, _ = Hwaro::Processor::Markdown.render(md, markdown_config: Hwaro::Models::MarkdownConfig.new)
+      html.should contain(%(</table>\n<h2 id="next">Next</h2>))
+      html.should contain("</table>\n<blockquote>\n<p>quote</p>\n</blockquote>")
+    end
+
     it "leaves a nested `> >` quote's pipes to the paragraph path" do
       md = "> > | a | b |\n> > |---|---|\n> > | 1 | 2 |"
       out = Hwaro::Content::Processors::TableParser.process(md)
