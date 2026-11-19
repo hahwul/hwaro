@@ -425,10 +425,12 @@ module Hwaro
                 io << line
                 next
               end
-              newline = line.ends_with?('\n')
-              spans << (newline ? line.byte_slice(0, line.bytesize - 1) : line)
+              # The line ending (CRLF too) stays outside the mask, where
+              # `body.strip` can still trim it.
+              text = line.chomp
+              spans << text
               io << "\x00HWARO-INLINE-CODE-" << spans.size - 1 << "\x00"
-              io << '\n' if newline
+              io << line.byte_slice(text.bytesize)
             end
           end
         end

@@ -81,7 +81,7 @@ module Hwaro::Core::Build::Phases::Initialize
       @output_tree_fresh = fresh && !ctx.options.serve_mode && !File.symlink?(output_dir.rstrip(File::SEPARATOR))
       @output_cwd = Dir.current
       copy_static_files(output_dir, verbose, keep_output,
-        write_ahead: keep_output && !ctx.options.serve_mode ? build_cache : nil)
+        write_ahead: keep_output ? build_cache : nil)
 
       if ctx.options.serve_mode
         # Serve output is never deployable (dev base_url baked into every

@@ -277,7 +277,7 @@ module Hwaro
           oo = float_value(ai["overlay_opacity"]?, config.og.auto_image.overlay_opacity)
           config.og.auto_image.overlay_opacity = oo.finite? ? oo : config.og.auto_image.overlay_opacity
           config.og.auto_image.format = ai["format"]?.try(&.as_s?) || config.og.auto_image.format
-          config.og.auto_image.font_path = ai["font_path"]?.try(&.as_s?)
+          config.og.auto_image.font_path = ai["font_path"]?.try(&.as_s?).presence
           if lp = ai["logo_position"]?.try(&.as_s?)
             if {"bottom-left", "bottom-right", "top-left", "top-right"}.includes?(lp)
               config.og.auto_image.logo_position = lp

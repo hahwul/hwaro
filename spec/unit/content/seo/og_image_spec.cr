@@ -137,6 +137,18 @@ describe Hwaro::Models::AutoImageConfig do
       config.og.auto_image.font_path.should eq("fonts/Pretendard-Bold.ttf")
     end
 
+    # Like `logo` and `background_image`: a blank value (an empty
+    # `${OG_FONT:-}`) would otherwise expand to the project directory.
+    it "reads a blank font_path as unset" do
+      config = make_og_config(<<-TOML)
+        [og.auto_image]
+        enabled = true
+        font_path = ""
+        TOML
+
+      config.og.auto_image.font_path.should be_nil
+    end
+
     it "loads secondary_color from TOML" do
       config = make_og_config(<<-TOML)
         [og.auto_image]

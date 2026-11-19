@@ -781,6 +781,8 @@ module Hwaro::Core::Build::Phases::Transform
 
           pairs.each do |k, v|
             if k == "name"
+              # A blank name keeps the ID, like an entry with no name at all.
+              next if v.raw.nil? || v.to_s.blank?
               current = temp_authors[id]
               temp_authors[id] = {name: v.to_s, pages: current[:pages], extra: current[:extra]}
             else
@@ -1096,12 +1098,14 @@ module Hwaro::Core::Build::Phases::Transform
       return Content::Processors::InternalLinkResolver.page_for(pages_by_path, path.lchop("@/"))
     end
     return if Content::Processors::InternalLinkResolver.has_own_origin?(path)
-    unless path.starts_with?('/')
+    if path.starts_with?('/')
+      path = path.lchop(base_path) if !base_path.empty? && path.starts_with?("#{base_path}/")
+    else
+      # Joined to the source's URL, which never carries the base path.
       base = source.url.ends_with?('/') ? source.url : "#{source.url}/"
       path = Path.posix(base, path).normalize.to_s
       path += "/" if url.partition('#')[0].partition('?')[0].ends_with?('/') && !path.ends_with?('/')
     end
-    path = path.lchop(base_path) if !base_path.empty? && path.starts_with?("#{base_path}/")
     by_url[path]? || by_url["#{path}/"]?
   end
 end

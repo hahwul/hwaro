@@ -199,6 +199,9 @@ module Hwaro
           # their new terms from being re-added).
           update_taxonomies_incremental(site, changed_pages + excluded_pages, old_taxonomies_snapshot, excluded_paths)
 
+          # From here this pass rewrites the output (Cache#invalidate_on_disk):
+          # the `cache.save` below vouches for the tree again.
+          @cache.try(&.invalidate_on_disk)
           drop_excluded_and_orphaned_outputs(site, changed_pages, excluded_pages, old_output_paths, output_dir)
           relinked_counterparts = relink_counterparts(site)
 
@@ -1308,6 +1311,9 @@ module Hwaro
             Logger.info "Template change detected. Re-rendering all pages..." if options.verbose
           end
 
+          # From here this pass rewrites the output (Cache#invalidate_on_disk).
+          @cache.try(&.invalidate_on_disk)
+
           # Term bodies (headless) the listing fan-out selected — rendered by
           # render_term_bodies below, never by the page pass.
           fanout_term_bodies = [] of Models::Page
@@ -1604,6 +1610,8 @@ module Hwaro
           highlight = options.highlight && site.config.highlight.enabled
           verbose = options.verbose
           cache = @cache || Cache.new(enabled: false)
+          # This pass writes most of the site (Cache#invalidate_on_disk).
+          cache.invalidate_on_disk
 
           # Re-run the BeforeRender hooks against the full page set. The
           # ctx carries no priority_pages this time, so OG image

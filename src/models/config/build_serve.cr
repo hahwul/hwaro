@@ -166,7 +166,10 @@ module Hwaro
             (!pattern.includes?('/') && Utils::PathUtils.glob_match?(pattern, basename))
         else
           # Literal: an exact file, or a directory subtree rooted at it.
-          pattern = Utils::PathUtils.nfc(pattern)
+          # `/drafts` and `./drafts` are the same anchored literal; `drafts/`
+          # is the folder form, which matches only the subtree.
+          pattern = Utils::PathUtils.nfc(pattern).lchop("./").lchop('/')
+          return normalized.starts_with?(pattern) if pattern.ends_with?('/')
           normalized == pattern || normalized.starts_with?("#{pattern}/")
         end
       end

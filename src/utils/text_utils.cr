@@ -1115,7 +1115,7 @@ module Hwaro
         return {text, false} if text.empty? || length <= 0
 
         cut = if cjk_dominant?(text)
-                truncate_excerpt_chars(text, length * 2)
+                truncate_excerpt_chars(text, length > Int32::MAX // 2 ? Int32::MAX : length * 2)
               else
                 truncate_excerpt_words(text, length)
               end

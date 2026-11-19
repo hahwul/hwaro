@@ -238,6 +238,29 @@ describe "Broken anchors" do
     end
   end
 
+  # Anchor links are collected by a page's content pass; a warm `--stream`
+  # build skipped that pass for cached pages unless search or feeds read the
+  # content back, so a link on one went unchecked.
+  it "checks a cached page's links on a warm --stream --cache build" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", ANCHOR_LINKS_CONFIG)
+        Dir.mkdir_p("content")
+        Dir.mkdir_p("templates")
+        File.write("templates/page.html", "{{ content }}")
+        File.write("content/a.md", "---\ntitle: A\n---\n[x](@/b.md#real)")
+        File.write("content/b.md", "---\ntitle: B\n---\n## Real\n")
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", cache: true, stream: true)
+        Hwaro::Core::Build::Builder.new.run(options)
+
+        sleep 1.1.seconds
+        File.write("content/b.md", "---\ntitle: B\n---\n## Renamed\n")
+        ex = expect_raises(Hwaro::HwaroError) { Hwaro::Core::Build::Builder.new.run(options) }
+        ex.message.not_nil!.should contain(%(a.md → @/b.md#real → missing id "real"))
+      end
+    end
+  end
+
   it "ignores data-href attributes" do
     build_site(
       ANCHOR_LINKS_CONFIG,
