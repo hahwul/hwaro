@@ -162,6 +162,39 @@ describe "cache: page-set fingerprint covers what listings read" do
     end
   end
 
+  # A field named through a filter argument is a read too: the documented
+  # `selectattr("extra.featured")`, and `selectattr("word_count", ">", 4)`.
+  it "re-renders listings that name a field through a positional filter argument" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        listing_project("")
+        File.write("templates/index.html",
+          %({% for p in site.pages | selectattr("extra.featured") %}[{{ p.title }}]{% endfor %}) +
+          %({% for p in site.pages | selectattr("word_count", ">", 4) %}<{{ p.title }}>{% endfor %}))
+        File.write("content/posts/a.md", "+++\ntitle = \"Alpha\"\n\n[extra]\nfeatured = true\n+++\n\none two\n")
+        File.write("content/posts/b.md", "+++\ntitle = \"Beta\"\n+++\n\none two\n")
+        File.write("content/posts/c.md", "+++\ntitle = \"Gamma\"\n+++\n\none two\n")
+
+        cached_build
+        File.read("public/index.html").should eq("[Alpha]")
+
+        sleep 1.1.seconds
+        File.write("content/posts/b.md", "+++\ntitle = \"Beta\"\n\n[extra]\nfeatured = true\n+++\n\none two\n")
+        cached_build
+        File.read("public/index.html").should eq("[Alpha][Beta]")
+
+        sleep 1.1.seconds
+        File.write("content/posts/c.md", "+++\ntitle = \"Gamma\"\n+++\n\none two three four five\n")
+        cached_build
+        warm = File.read("public/index.html")
+
+        clean_build
+        warm.should eq(File.read("public/index.html"))
+        warm.should eq("[Alpha][Beta]<Gamma>")
+      end
+    end
+  end
+
   # A page's `translations` are derived from its counterparts: one turning
   # into a `redirect_to` stub leaves every switcher it was in, so listings
   # printing them must re-render.

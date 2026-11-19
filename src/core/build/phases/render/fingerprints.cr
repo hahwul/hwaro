@@ -354,10 +354,15 @@ module Hwaro::Core::Build::Phases::Render
   # keeps prose and markup out of the match.
   CONTENT_DERIVED_ATTR_RE  = /(?<![\w.])(\w+)\.(?:summary(?:_truncated)?|word_count|reading_time)\b/
   CONTENT_DERIVED_INDEX_RE = /(?<![\w.])(\w+)\[\s*["'](?:summary(?:_truncated)?|word_count|reading_time)["']\s*\]/
-  CONTENT_DERIVED_ARG_RE   = /attribute\s*=\s*["'](?:summary(?:_truncated)?|word_count|reading_time)\b/
-  EXTRA_ATTR_RE            = /(?<![\w.])(\w+)\.extra\b/
-  EXTRA_INDEX_RE           = /(?<![\w.])(\w+)\[\s*["']extra["']\s*\]/
-  EXTRA_ARG_RE             = /attribute\s*=\s*["']extra\b/
+  # A field named as a filter argument: `attribute="…"`, the positional
+  # name of `selectattr("extra.featured")` / `groupby("word_count")` /
+  # `join(", ", "word_count")`, and any key of a comma list
+  # (`sort(attribute="section,extra.order")`).
+  ATTR_NAME_ARG_PREFIX   = /(?:attribute\s*=\s*|\b(?:selectattr|rejectattr|groupby|group_by|sort_by|where|sum|attr)\s*\(\s*|\bjoin\s*\([^()]*,\s*)["'](?:[\w.]+\s*,\s*)*/
+  CONTENT_DERIVED_ARG_RE = /#{ATTR_NAME_ARG_PREFIX}(?:summary(?:_truncated)?|word_count|reading_time)\b/
+  EXTRA_ATTR_RE          = /(?<![\w.])(\w+)\.extra\b/
+  EXTRA_INDEX_RE         = /(?<![\w.])(\w+)\[\s*["']extra["']\s*\]/
+  EXTRA_ARG_RE           = /#{ATTR_NAME_ARG_PREFIX}extra\b/
 
   # Anything that rebinds `page`/`section` to a DIFFERENT page, in which case
   # a `page.`-qualified read is a read off another page after all. Covers the
