@@ -67,10 +67,11 @@ module Hwaro
 
       # Data and translation sources that can name an asset (`logo: /img/a.png`
       # in `data/site.yml`, an icon path in `i18n/en.toml`). `data/` is loaded
-      # by `Phases::Initialize#load_data_files` with exactly this extension
-      # set, and i18n locale files are TOML; templates render whatever those
-      # hold, so a path that only ever appears there is still in use.
-      DATA_SCAN_EXTENSIONS = %w[yml yaml json toml]
+      # by `Phases::Initialize#load_data_files` with the first four, and
+      # `load_data()` also reads `.csv` (`DATA_DIGEST_EXTENSIONS`); i18n locale
+      # files are TOML. Templates render whatever those hold, so a path that
+      # only ever appears there is still in use.
+      DATA_SCAN_EXTENSIONS = %w[yml yaml json toml csv]
 
       @content_dir : String
       @static_dir : String
