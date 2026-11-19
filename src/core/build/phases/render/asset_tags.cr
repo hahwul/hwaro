@@ -106,7 +106,7 @@ module Hwaro::Core::Build::Phases::Render
       withheld = withheld_bundle_dirs
       ctx.raw_files.each do |raw|
         next if !withheld.empty? && withheld_content_file?(raw.relative_path, withheld)
-        dest = File.expand_path(File.join(output_dir, raw.relative_path))
+        dest = File.expand_path(File.join(output_dir, Utils::PathUtils.nfc(raw.relative_path)))
         if ctx.options.minify && File.extname(raw.source_path).downcase.in?(".json", ".xml", ".html", ".htm")
           transformed << dest
         else

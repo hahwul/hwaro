@@ -72,3 +72,14 @@ describe "Crinja test argument followed by an operator" do
     render_test_arg(%({{ 3 is divisibleby 1 + 2 }}|{{ "/x" is startswith "/blog" ~ "/" }})).should eq("true2|false/")
   end
 end
+
+# A template saved with CRLF line endings: Jinja drops ONE trailing line
+# ending, "\r\n" (or a lone "\r") included, not just the "\n" of it.
+describe "Crinja trailing newline" do
+  it "drops a trailing CRLF or CR whole, as it drops a trailing LF" do
+    render_crinja("a\n").should eq("a")
+    render_crinja("a\r\n").should eq("a")
+    render_crinja("a\r").should eq("a")
+    render_crinja("a\r\n\r\n").should eq("a\r\n")
+  end
+end

@@ -164,6 +164,28 @@ describe Hwaro::Content::Seo::OgPngRenderer do
   end
 
   describe ".render_png" do
+    # The same title typed composed (NFC) or decomposed (NFD) must give the
+    # same card: stb draws one codepoint per glyph, so an NFD title printed
+    # its accents as separate spacing marks (and NFD Hangul as nothing).
+    it "draws a decomposed (NFD) title and description like the composed (NFC) one" do
+      ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts
+      next if ctx.nil?
+      Dir.mktmpdir do |dir|
+        config = Hwaro::Models::Config.new
+        config.title = "Café Site"
+        config.og.auto_image.enabled = true
+        bytes = [Unicode::NormalizationForm::NFC, Unicode::NormalizationForm::NFD].map do |form|
+          page = Hwaro::Models::Page.new("#{form}.md")
+          page.title = "Café résumé naïve".unicode_normalize(form)
+          page.description = "Crème brûlée à la carte".unicode_normalize(form)
+          path = File.join(dir, "#{form}.png")
+          Hwaro::Content::Seo::OgPngRenderer.render_png(page, config, path, font_ctx: ctx).should be_true
+          File.read(path).to_slice
+        end
+        bytes[0].should eq(bytes[1])
+      end
+    end
+
     it "renders a PNG file when fonts are available" do
       Dir.mktmpdir do |dir|
         page = Hwaro::Models::Page.new("test.md")

@@ -176,7 +176,9 @@ module Hwaro::Core::Build::Phases::Write
   # file gets the bytes a full build would write. `shadowed` defaults to a
   # fresh `content_copy_shadowed_outputs`.
   def publish_raw_file(source_path : String, relative_path : String, output_dir : String, minify : Bool, shadowed : Set(String)? = nil) : String?
-    output_path = File.join(output_dir, relative_path)
+    # NFC, like the page and bundle-asset outputs beside it, whatever form
+    # the source name is stored in (Utils::PermalinkResolver).
+    output_path = File.join(output_dir, Utils::PathUtils.nfc(relative_path))
 
     # Validate output path stays within output directory
     unless Utils::OutputGuard.within_output_dir?(output_path, output_dir)

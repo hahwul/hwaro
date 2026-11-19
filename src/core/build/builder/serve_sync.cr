@@ -330,7 +330,8 @@ module Hwaro
                   end
                 end
               else
-                dest = File.join(output_dir, path.lchop("content/"))
+                # NFC, as `publish_raw_file` wrote it.
+                dest = File.join(output_dir, Utils::PathUtils.nfc(path.lchop("content/")))
                 outputs << dest if Utils::OutputGuard.within_output_dir?(dest, output_dir)
               end
             end
@@ -603,7 +604,7 @@ module Hwaro
           return [] of String unless ctx = @context
           withheld = withheld_bundle_dirs
           return [] of String if withheld.empty?
-          ctx.raw_files.compact_map { |raw| File.join(output_dir, raw.relative_path) if withheld_content_file?(raw.relative_path, withheld) }
+          ctx.raw_files.compact_map { |raw| File.join(output_dir, Utils::PathUtils.nfc(raw.relative_path)) if withheld_content_file?(raw.relative_path, withheld) }
         end
 
         # One page's share of `bundle_asset_outputs`. Not gated on `render`:

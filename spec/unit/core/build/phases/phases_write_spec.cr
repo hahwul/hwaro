@@ -610,6 +610,24 @@ describe "Phases::Write withheld bundle files" do
       File.exists?("public/public.json").should be_true
     end
   end
+
+  # Content paths publish under their NFC spelling whatever form the file
+  # system stored (templates/data-model.md); the [content.files] lane kept
+  # the decomposed name, so a link to the NFC name 404s on a Linux host.
+  it "publishes an NFD-named content file under its NFC name" do
+    nfd = ->(s : String) { s.unicode_normalize(:nfd) }
+    build_site(
+      "title = \"T\"\nbase_url = \"http://localhost\"\n\n[content.files]\nallow_extensions = [\"svg\", \"pdf\"]\n",
+      content_files: {
+        "#{nfd.call("café")}/index.md"                   => "+++\ntitle = \"B\"\n+++\nb\n",
+        "#{nfd.call("café")}/#{nfd.call("photo-é.svg")}" => "<svg/>",
+        "files/#{nfd.call("résumé.pdf")}"                => "%PDF",
+      },
+    ) do
+      Dir.children("public/café").should contain("photo-é.svg")
+      Dir.children("public/files").should eq(["résumé.pdf"])
+    end
+  end
 end
 
 describe "Phases::Write content copies vs pages and generated outputs" do

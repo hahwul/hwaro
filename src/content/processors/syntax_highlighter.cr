@@ -975,8 +975,9 @@ module Hwaro
 
         # Matches the first paragraph of a rendered admonition blockquote
         # (`> [!NOTE]` ...). Built from the same type list the postprocess
-        # regex uses, so the two can't drift apart.
-        ADMONITION_START_RE = /\A\s*<p>\[!(#{MarkdownExtensions::ADMONITION_TYPES.join('|')})\]/
+        # regex uses, and case-insensitive like it, so the two can't drift
+        # apart.
+        ADMONITION_START_RE = /\A\s*<p>\[!(#{MarkdownExtensions::ADMONITION_TYPES.join('|')})\]/i
 
         def block_quote(node : Markd::Node, entering : Bool)
           return super unless @hooks.blockquote?

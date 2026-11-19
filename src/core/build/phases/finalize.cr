@@ -297,7 +297,7 @@ module Hwaro::Core::Build::Phases::Finalize
     return unless csp_config(ctx) && (config = @config)
     output_dir = ctx.options.output_dir
     # `[content.files]` HTML is published verbatim, like `static/`.
-    raw = ctx.raw_files.map { |file| File.expand_path(File.join(output_dir, file.relative_path)) }.to_set
+    raw = ctx.raw_files.map { |file| File.expand_path(File.join(output_dir, Utils::PathUtils.nfc(file.relative_path))) }.to_set
     # So are a page bundle's assets, copied from `content/<bundle>/`.
     ctx.all_pages.each do |page|
       next if page.assets.empty?
