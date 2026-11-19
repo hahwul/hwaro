@@ -392,8 +392,9 @@ module Hwaro::Core::Build::Phases::Write
   # its writes go straight to the target (see `@output_tree_fresh`) — unless
   # something already stands there (a static file copied this build, possibly
   # read-only, or a symlink): replacing it stays a rename, so the result and
-  # its permissions are exactly what `atomic_write` produces.
-  private def publish_output(path : String, content : String) : Nil
+  # its permissions are exactly what `atomic_write` produces. Public: the
+  # taxonomy generator writes through it too.
+  def publish_output(path : String, content : String) : Nil
     if @output_tree_fresh && File.info?(path, follow_symlinks: false).nil?
       Hwaro::Utils::FileSafe.write_new(path, content)
     else

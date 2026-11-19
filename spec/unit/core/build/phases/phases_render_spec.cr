@@ -86,7 +86,7 @@ end
 # Every page write fails the way a full disk does: an `IO::Error` raised on
 # the open output file, whose message names that file.
 private class FullDiskBuilder < Hwaro::Core::Build::Builder
-  private def publish_output(path : String, content : String) : Nil
+  def publish_output(path : String, content : String) : Nil
     File.open(path, "w") do |file|
       raise IO::Error.from_os_error("write", Errno::ENOSPC, target: file)
     end

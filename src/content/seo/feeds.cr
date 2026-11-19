@@ -303,6 +303,7 @@ module Hwaro
           taxonomy : String? = nil,
           term : String? = nil,
           home_path : String? = nil,
+          writer : Proc(String, String, Nil)? = nil,
         ) : String
           # Determine feed type and filename
           feed_type = config.feeds.type.downcase
@@ -355,7 +356,13 @@ module Hwaro
           # (`published_outputs`, `Builder#plan_urls`) touches no disk.
           Hwaro::Utils::FileSafe.mkdir_p(output_dir)
           feed_path = File.join(output_dir, filename)
-          Hwaro::Utils::FileSafe.atomic_write(feed_path, feed_content)
+          # `writer`: the caller's way to put the file down (the taxonomy
+          # generator's skips the rename on a fresh tree).
+          if writer
+            writer.call(feed_path, feed_content)
+          else
+            Hwaro::Utils::FileSafe.atomic_write(feed_path, feed_content)
+          end
           Logger.action :create, feed_path if verbose
           feed_path
         end
