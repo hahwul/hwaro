@@ -247,23 +247,26 @@ module Hwaro
       # `fm_string_array` / `extract_taxonomies` do: `"  crystal  "` is the
       # build's `crystal` term, and a blank term never gets a page. Counting
       # them raw split one tag into two rows and charted tags no build
-      # publishes.
+      # publishes. Integer terms (`tags = [2024]`) count as their digits and
+      # a repeat counts once, as in the build's `fm_terms`.
       private def toml_string_array(value : TOML::Any?) : Array(String)
-        raw = value.try(&.raw)
-        return [] of String unless raw.is_a?(Array)
-        normalize_terms(raw.compact_map { |item| item.as(TOML::Any).raw.as?(String) })
+        normalize_terms(value.try(&.as_a?).try(&.compact_map { |item| term_of(item) }) || [] of String)
       end
 
       private def yaml_string_array(value : YAML::Any?) : Array(String)
-        normalize_terms(value.try(&.as_a?).try(&.compact_map(&.as_s?)) || [] of String)
+        normalize_terms(value.try(&.as_a?).try(&.compact_map { |item| term_of(item) }) || [] of String)
       end
 
       private def json_string_array(value : JSON::Any?) : Array(String)
-        normalize_terms(value.try(&.as_a?).try(&.compact_map(&.as_s?)) || [] of String)
+        normalize_terms(value.try(&.as_a?).try(&.compact_map { |item| term_of(item) }) || [] of String)
+      end
+
+      private def term_of(item : TOML::Any | YAML::Any | JSON::Any) : String?
+        item.as_s? || item.as_i64?.try(&.to_s)
       end
 
       private def normalize_terms(terms : Array(String)) : Array(String)
-        terms.map { |term| Utils::TextUtils.normalize_term(term) }.reject(&.empty?)
+        terms.map { |term| Utils::TextUtils.normalize_term(term) }.reject(&.empty?).uniq!
       end
 
       private def warn_unparsed_frontmatter(path : String, dialect : String, ex : Exception, content : String) : Nil
