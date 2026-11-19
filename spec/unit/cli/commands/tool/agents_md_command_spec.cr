@@ -123,6 +123,20 @@ describe Hwaro::CLI::Commands::Tool::AgentsMdCommand do
       end
     end
 
+    # Regression: the regenerated part was written with LF while the kept
+    # Site-Specific section stayed CRLF, leaving a mixed-ending file.
+    it "keeps a CRLF AGENTS.md CRLF throughout" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          File.write("AGENTS.md", "# Old\r\n\r\n## Site-Specific Instructions\r\n\r\nmy rule\r\n")
+          with_captured_log { Hwaro::CLI::Commands::Tool::AgentsMdCommand.new.run(["--write", "--force"]) }
+          text = File.read("AGENTS.md")
+          text.should end_with("## Site-Specific Instructions\r\n\r\nmy rule\r\n")
+          text.count('\n').should eq(text.scan("\r\n").size)
+        end
+      end
+    end
+
     # The marker/fence regexes raise ArgumentError on invalid UTF-8, which
     # surfaced as an unclassified `Error: Regex match error` (exit 1).
     it "refuses with a classified HWARO_E_IO error when the existing AGENTS.md is not valid UTF-8" do

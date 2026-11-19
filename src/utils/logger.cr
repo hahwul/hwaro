@@ -428,7 +428,14 @@ module Hwaro
       bar_width = 30
       filled = (current.to_f / total * bar_width).to_i
       bar = "█" * filled + "░" * (bar_width - filled)
-      @@io.print "\r#{prefix}[#{bar}] #{percent}% (#{current}/#{total})"
+      # The `\r` redraw is the logger's own (like Status#write): through
+      # GuardedIO#write it was escaped into the visible text `\x0d`.
+      if (io = @@io).is_a?(GuardedIO)
+        io.write_raw("\r".to_slice)
+      else
+        io.print '\r'
+      end
+      @@io.print "#{prefix}[#{bar}] #{percent}% (#{current}/#{total})"
       @@io.puts if current >= total
     end
 

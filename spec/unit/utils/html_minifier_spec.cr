@@ -539,6 +539,27 @@ describe Hwaro::Utils::HtmlMinifier do
         result = Hwaro::Utils::HtmlMinifier.minify(html)
         result.should eq("<p>A</p><p>B</p>")
       end
+
+      # Regression: the blank-line collapse was a regex over the whole
+      # document, so a quoted value lost its empty lines — a copy button's
+      # `data-copy` payload, a multi-paragraph `content="…"`.
+      it "keeps blank lines inside quoted attribute values" do
+        html = "<button data-copy=\"one\n\nthree\">c</button>\n<p title='a\n\n\nb'>x\n\n\ny</p>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should eq("<button data-copy=\"one\n\nthree\">c</button><p title='a\n\n\nb'>x\ny</p>")
+      end
+
+      # Regression: the between-tags collapse matched tag-shaped text INSIDE
+      # a quoted value, so an HTML snippet held in an attribute (a copy
+      # button's payload, a popover's content) lost its whitespace.
+      it "leaves tag-shaped text inside quoted attribute values alone" do
+        html = "<button data-snippet='<div>\n  <p>hi</p>\n</div>'>c</button>\n<p data-x=\"<b>a</b>\n<i>b</i>\">x</p>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should eq(html.sub("</button>\n<p", "</button><p"))
+        # A quote opens a value only after `=`: an apostrophe in an unquoted
+        # value is no value, and the markup after it still collapses.
+        Hwaro::Utils::HtmlMinifier.minify("<img alt=Bob's src=x.png>\n<p>a</p>\n<p>it's</p>").should eq("<img alt=Bob's src=x.png><p>a</p><p>it's</p>")
+      end
     end
 
     describe "forged protected-block placeholders" do

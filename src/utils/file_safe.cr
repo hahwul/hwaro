@@ -147,11 +147,15 @@ module Hwaro
       #
       # The temp name is unique per process AND fiber so parallel render
       # workers writing sibling outputs can't collide on it.
-      def self.atomic_write(path : String | Path, content : String) : Nil
+      #
+      # `permissions`, when given, is applied to the temp file before the
+      # rename: the replacement is a new file, born with the umask mode.
+      def self.atomic_write(path : String | Path, content : String, permissions : File::Permissions? = nil) : Nil
         target = path.to_s
         tmp = temp_path(target)
         begin
           write_unbuffered(tmp, content)
+          File.chmod(tmp, permissions) if permissions
           File.rename(tmp, target)
         rescue ex
           # Never leave the temp file behind — a failed write must look
@@ -166,6 +170,9 @@ module Hwaro
       # set up on purpose (`AGENTS.md -> docs/agents.md`): the rename must land
       # on what the link points at, or it would replace the link itself with a
       # regular file. A dangling link resolves to its (not yet existing) target.
+      # A file being replaced keeps its permissions (a private 0600 file
+      # must not come back world-readable), as `tool convert` and
+      # `doctor --fix` already do for the files they rewrite.
       def self.atomic_write_through_links(path : String | Path, content : String) : Nil
         target = path.to_s
         40.times do
@@ -173,7 +180,7 @@ module Hwaro
           link = File.readlink(target)
           target = Path[link].absolute? ? link : File.join(File.dirname(target), link)
         end
-        atomic_write(target, content)
+        atomic_write(target, content, File.info?(target).try(&.permissions))
       end
 
       # `atomic_write` for a target that does not exist yet and that no
