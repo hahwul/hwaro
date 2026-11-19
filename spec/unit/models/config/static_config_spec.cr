@@ -28,6 +28,18 @@ describe Hwaro::Models::StaticConfig do
       end
     end
 
+    # `drafts/` was compared against "drafts//" and matched nothing, so the
+    # folder shipped; `/private` and `./tmp` never matched either.
+    it "reads the folder, root-anchored and ./ forms of a literal" do
+      config = Hwaro::Models::StaticConfig.new
+      config.exclude = ["drafts/", "/private", "./tmp"]
+      config.excluded?("drafts/notes.txt").should be_true
+      config.excluded?("private/key.txt").should be_true
+      config.excluded?("tmp/x.txt").should be_true
+      config.excluded?("drafts").should be_false
+      config.excluded?("keep/drafts/a.txt").should be_false
+    end
+
     it "does not exclude ordinary files" do
       config = Hwaro::Models::StaticConfig.new
       config.excluded?("robots.txt").should be_false
