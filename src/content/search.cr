@@ -184,8 +184,9 @@ module Hwaro
         cut = text[0, max]
         # A cut that already ends on a word boundary (the next character is
         # whitespace) keeps its last word; otherwise back up to the last
-        # whitespace inside the cut.
-        unless text[max].whitespace?
+        # whitespace inside the cut. A first cluster kept whole can reach the
+        # end of the text.
+        unless (next_char = text[max]?).nil? || next_char.whitespace?
           if idx = cut.rindex(/\s/)
             cut = cut[0, idx] if idx > 0
           end

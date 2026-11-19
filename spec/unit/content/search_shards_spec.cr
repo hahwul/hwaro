@@ -403,6 +403,12 @@ describe "Hwaro::Content::Search shards" do
     it "counts characters, not bytes" do
       Hwaro::Content::Search.truncate_words("한국어 검색 인덱스", 6).should eq("한국어 검색")
     end
+
+    it "keeps a text that is one grapheme cluster longer than the limit" do
+      zalgo = "e" + "́" * 5
+      Hwaro::Content::Search.truncate_words(zalgo, 3).should eq(zalgo)
+      Hwaro::Content::Search.truncate_words("#{zalgo} tail", 3).should eq(zalgo)
+    end
   end
 
   describe "config loading" do
