@@ -398,7 +398,11 @@ module Hwaro
       # ponytail: decided per pair, so `<b>a</b><script/> <script/><b>c</b>`
       # still loses its one space; look past hidden runs if that shows up.
       private def collapse_inter_token_whitespace(html : String) : String
+        values = tagged_value_spans(html)
         html.gsub(REGEX_INTERTOKEN_WS) do
+          # Tag-shaped text inside a quoted value (`data-x='<div>  <p>'`)
+          # is the value's own bytes, not markup.
+          next $0 if inside_span?(values, $~.byte_begin(2))
           prior = $1
           # $2 = whitespace run (discarded except when we re-emit one space)
           nxt = $3
@@ -420,6 +424,44 @@ module Hwaro
         else
           false
         end
+      end
+
+      # Byte spans of the quoted attribute values that contain a `<` — the
+      # only ones REGEX_INTERTOKEN_WS can match inside. As in HTML, a quote
+      # opens a value only right after `=` (an apostrophe in `alt=Bob's` is
+      # no value). Sorted and disjoint.
+      private def tagged_value_spans(html : String) : Array({Int32, Int32})
+        spans = [] of {Int32, Int32}
+        bytes = html.to_slice
+        n = bytes.size
+        i = 0
+        while lt = bytes.index('<'.ord.to_u8, i)
+          i = lt + 1
+          next unless i < n && tag_start_byte?(bytes[i])
+          after_eq = false
+          while i < n && bytes[i] != '>'.ord
+            b = bytes[i]
+            if after_eq && (b == '"'.ord || b == '\''.ord)
+              close = bytes.index(b, i + 1)
+              break unless close
+              spans << {i + 1, close} if bytes[i + 1, close - i - 1].includes?('<'.ord.to_u8)
+              i = close
+              after_eq = false
+            elsif b == '='.ord
+              after_eq = true
+            elsif !(b == ' '.ord || b == '\t'.ord || b == '\n'.ord || b == '\r'.ord || b == '\f'.ord)
+              after_eq = false
+            end
+            i += 1
+          end
+        end
+        spans
+      end
+
+      private def inside_span?(spans : Array({Int32, Int32}), pos : Int32) : Bool
+        return false if spans.empty?
+        idx = spans.bsearch_index { |(_, stop)| stop > pos }
+        !idx.nil? && spans[idx][0] <= pos
       end
 
       private def hidden_token?(token : String) : Bool
