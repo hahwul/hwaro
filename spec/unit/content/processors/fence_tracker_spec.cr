@@ -301,5 +301,20 @@ describe Hwaro::Content::Processors::FenceTracker do
       feed(["> - a", ">     ```", ">     x", ">     ```", "after"])
         .should eq [false, true, true, true, false]
     end
+
+    it "sees a fence opened on the item's marker line" do
+      feed(["- ```", "  x", "  ```", "after"]).should eq [true, true, true, false]
+      feed(["1. ~~~sh", "   x", "   ~~~", "after"]).should eq [true, true, true, false]
+      feed(["- - ```", "    x", "    ```", "after"]).should eq [true, true, true, false]
+      feed(["> - ```", ">   x", ">   ```", "after"]).should eq [true, true, true, false]
+    end
+
+    it "opens no fence after a marker followed by indented code" do
+      feed(["-     ```", "text"]).should eq [false, false]
+    end
+
+    it "opens no fence in an item that cannot interrupt a paragraph" do
+      feed(["text", "2. ```", "x"]).should eq [false, false, false]
+    end
   end
 end

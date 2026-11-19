@@ -119,6 +119,9 @@ module Hwaro
         @list_items = [] of {Int32, Int32}
         @prev_blank = true
         @prev_atx_heading = false
+        # Byte offset of the innermost item's text on the last marker line
+        # (nil when the item is empty or starts with indented code).
+        @item_text : Int32? = nil
         # Deepest blockquote that may still hold an open paragraph: raised by
         # any line at a deeper quote, lowered only by a blank line (which
         # closes the paragraph and every quote deeper than its markers).
@@ -290,16 +293,23 @@ module Hwaro
           @html_block_line = in_html_block || opened_html
           stripped = content.lstrip
           heading = !blank && ATX_HEADING_RE.matches?(content)
-          fence_run = column - container_column >= 4 ? nil : opener_run(stripped)
-          if heading || fence_run
+          # On a marker line the fence opens in the item's text (`- ```sh`),
+          # if Markd starts the item (`2. ```` cannot interrupt a paragraph).
+          fence_text = if marker_item
+                         @item_text.try { |start| content.byte_slice(start) } if @list_item_line
+                       else
+                         stripped
+                       end
+          fence_run = fence_text.nil? || column - container_column >= 4 ? nil : opener_run(fence_text)
+          if heading || (fence_run && !marker_item)
             # Headings and fences are never lazy continuations: one left of
             # an item's content closes it, like a line after a blank.
             @list_items.reject! { |item| item[0] > depth || (item[0] == depth && item[1] > column) }
           end
 
-          if run = fence_run
+          if (run = fence_run) && fence_text
             @in_fence = true
-            @fence_char = stripped[0]
+            @fence_char = fence_text[0]
             @fence_len = run
             @fence_bq_depth = depth
             @fence_base = container_column
@@ -541,10 +551,14 @@ module Hwaro
           offset = text_start
           first = true
           pushed = nil
+          @item_text = nil
           loop do
             rest = content.byte_slice(offset, content.bytesize - offset)
             marker = LIST_MARKER_RE.match(rest)
-            break unless marker
+            unless marker
+              @item_text = offset if pushed
+              break
+            end
 
             marker_size = marker[0].bytesize
             virtual_column += marker_size
