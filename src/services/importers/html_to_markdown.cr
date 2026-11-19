@@ -246,7 +246,7 @@ module Hwaro
                 # Inline markup first: a bare `strip_tags` here ran before
                 # the document-wide inline passes, so every link, image and
                 # emphasis inside a list item was flattened to plain text.
-                item = strip_tags(convert_inline(body)).gsub(MORE_PLACEHOLDER, "").strip
+                item = strip_tags(convert_inline(line_breaks(body, "  \n", "\n\n"))).gsub(MORE_PLACEHOLDER, "").strip
                 "#{marker}#{indent_continuation(item, marker.size)}"
               end
               "\n" + lines.join("\n") + "\n\n"
@@ -264,7 +264,7 @@ module Hwaro
             rows = inner.scan(/<tr[^>]*>(.*?)<\/tr>/mi).map do |m|
               m[1].scan(/<(?:th|td)[^>]*>(.*?)<\/(?:th|td)>/mi).map do |cell|
                 # Same as list items: convert inline markup before stripping.
-                text = strip_tags(convert_inline(cell[1])).gsub(MORE_PLACEHOLDER, "").strip.gsub(/\s+/, " ").gsub("|", "\\|")
+                text = strip_tags(convert_inline(line_breaks(cell[1], " ", " "))).gsub(MORE_PLACEHOLDER, "").strip.gsub(/\s+/, " ").gsub("|", "\\|")
                 # A stashed code span sits in the cell as a placeholder, so
                 # its pipes have to be escaped in the stash itself. Only a
                 # span's: in a fenced block `\|` is literal text.
@@ -506,6 +506,13 @@ module Hwaro
 
         private def self.longest_backtick_run(text : String) : Int32
           text.scan(/`+/).max_of?(&.[0].size) || 0
+        end
+
+        # `<br>` and paragraph boundaries inside a list item or table cell:
+        # `strip_tags` deleted them before the document-wide `<br>`/`<p>`
+        # passes ran, gluing the words on either side together.
+        private def self.line_breaks(html : String, br : String, paragraph : String) : String
+          html.gsub(/<br\b[^>]*>/i, br).gsub(/<\/p\s*>\s*<p\b[^>]*>/i, paragraph)
         end
 
         private def self.attr_value(attrs : String, name : String) : String?

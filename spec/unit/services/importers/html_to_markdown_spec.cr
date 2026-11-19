@@ -328,5 +328,13 @@ describe Hwaro::Services::Importers::HtmlToMarkdown do
     it "converts a list whose </li> end tags are omitted" do
       Hwaro::Services::Importers::HtmlToMarkdown.convert("<ol><li>Preheat<li>Mix</ol>").should eq("1. Preheat\n2. Mix")
     end
+
+    it "keeps <br> and paragraph breaks inside list items and table cells" do
+      convert = ->(html : String) { Hwaro::Services::Importers::HtmlToMarkdown.convert(html) }
+      convert.call("<ul><li>line one<br>line two</li><li><p>para one</p><p>para two</p></li></ul>")
+        .should eq("- line one  \n  line two\n- para one\n\n  para two")
+      convert.call("<table><tr><th>H</th></tr><tr><td>c1<br/>c2</td></tr><tr><td><p>d1</p><p>d2</p></td></tr></table>")
+        .should eq("| H |\n| --- |\n| c1 c2 |\n| d1 d2 |")
+    end
   end
 end
