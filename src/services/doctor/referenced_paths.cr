@@ -138,8 +138,21 @@ module Hwaro
         end
 
         config.og.default_image.try { |v| emit_published.call("[og] default_image", v, false) }
-        config.og.auto_image.logo.try { |v| emit_file.call("[og.auto_image] logo", v) }
-        config.og.auto_image.background_image.try { |v| emit_file.call("[og.auto_image] background_image", v) }
+        # The PNG renderer opens these as project-relative files, with no
+        # `static/` or URL-path fallback (`OgImage.generate`): `logo =
+        # "logo.png"` beside a `static/logo.png` resolved here and was
+        # silently left out of every image. Only the SVG renderer falls back
+        # to a URL, so only there does the lenient lookup apply.
+        emit_og_file = ->(label : String, value : String) do
+          if config.og.auto_image.format == "png"
+            emit_missing(issues, "#{label} (a file path from the project root, e.g. static/logo.png)", value,
+              resolver: ->(s : String) { File.file?(File.expand_path(s, File.dirname(@config_path))) }, id: "config-path-missing", kind: "file")
+          else
+            emit_file.call(label, value)
+          end
+        end
+        config.og.auto_image.logo.try { |v| emit_og_file.call("[og.auto_image] logo", v) }
+        config.og.auto_image.background_image.try { |v| emit_og_file.call("[og.auto_image] background_image", v) }
         config.pwa.offline_page.try { |v| emit_route.call("[pwa] offline_page", v) }
         config.pwa.precache_urls.each_with_index do |url, idx|
           # External URLs aren't ours to validate; `emit_missing` drops any

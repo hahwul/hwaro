@@ -1215,6 +1215,29 @@ describe Hwaro::Services::Doctor do
         end
       end
 
+      # The PNG renderer opens the logo as a project-relative file; a
+      # static-relative `logo.png` was accepted here and silently dropped
+      # from every generated image.
+      it "warns for an [og.auto_image] logo the PNG renderer cannot open" do
+        Dir.mktmpdir do |dir|
+          static_dir = File.join(dir, "static")
+          FileUtils.mkdir_p(static_dir)
+          File.write(File.join(static_dir, "logo.png"), "fake png")
+          config_path = File.join(dir, "config.toml")
+          doctor = ->(logo : String) do
+            File.write(config_path, %(title = "T"\nbase_url = "http://x"\n[og.auto_image]\nenabled = true\nformat = "png"\nlogo = "#{logo}"\n))
+            Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path,
+              templates_dir: File.join(dir, "templates"), static_dir: static_dir).run
+              .any? { |i| i.id == "config-path-missing" && i.message.includes?("logo") }
+          end
+          Dir.cd(dir) do
+            doctor.call("logo.png").should be_true
+            doctor.call("/logo.png").should be_true
+            doctor.call("static/logo.png").should be_false
+          end
+        end
+      end
+
       it "does not warn when [og] default_image points to a real file" do
         Dir.mktmpdir do |dir|
           static_dir = File.join(dir, "static")
