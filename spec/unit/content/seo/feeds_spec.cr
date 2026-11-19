@@ -121,6 +121,39 @@ describe Hwaro::Content::Seo::Feeds do
       end
     end
 
+    it "regenerates on a warm build when only a language feed is missing" do
+      # The warm-build skip probed the main feed alone, so a deleted
+      # ko/rss.xml was never written again by `build --cache`.
+      config = Hwaro::Models::Config.new
+      config.feeds.enabled = true
+      config.base_url = "https://example.com"
+      config.default_language = "en"
+      config.languages["ko"] = Hwaro::Models::LanguageConfig.new("ko")
+
+      en_page = Hwaro::Models::Page.new("posts/hello.md")
+      en_page.title = "Hello World"
+      en_page.url = "/posts/hello/"
+      en_page.render = true
+      ko_page = Hwaro::Models::Page.new("posts/hello.ko.md")
+      ko_page.title = "안녕하세요"
+      ko_page.url = "/ko/posts/hello/"
+      ko_page.language = "ko"
+      ko_page.render = true
+
+      Dir.mktmpdir do |output_dir|
+        File.write(File.join(output_dir, "rss.xml"), "sentinel-main")
+
+        Hwaro::Content::Seo::Feeds.generate([en_page, ko_page], config, output_dir, skip_if_unchanged: true)
+
+        File.read(File.join(output_dir, "ko", "rss.xml")).should contain("안녕하세요")
+
+        # With every feed present the skip still holds.
+        File.write(File.join(output_dir, "rss.xml"), "sentinel-main")
+        Hwaro::Content::Seo::Feeds.generate([en_page, ko_page], config, output_dir, skip_if_unchanged: true)
+        File.read(File.join(output_dir, "rss.xml")).should eq("sentinel-main")
+      end
+    end
+
     it "generates atom feed per language when feed type is atom" do
       config = Hwaro::Models::Config.new
       config.feeds.enabled = true

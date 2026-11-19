@@ -71,10 +71,13 @@ module Hwaro
             # Basename only: process_feed refuses nested filename components
             # (path-traversal defense), so the skip probe must match the
             # path that is actually written.
+            # Every feed the build publishes, not just the main one: a
+            # deleted language or section feed was never written again.
             feed_file = safe_feed_filename(config.feeds.filename, config.feeds.type)
-            if File.exists?(File.join(output_dir, feed_file))
+            if File.exists?(File.join(output_dir, feed_file)) &&
+               (published = published_outputs(pages, config, output_dir)).all? { |path| File.exists?(path) }
               Logger.debug "  Feeds unchanged (cache hit), skipping."
-              return published_outputs(pages, config, output_dir)
+              return published
             end
           end
 
