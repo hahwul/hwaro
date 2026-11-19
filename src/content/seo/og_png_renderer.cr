@@ -279,7 +279,8 @@ module Hwaro
 
         # Read a font file and initialize it. Returns {info, data} or nil.
         private def self.load_font_file(path : String) : {LibStb::HwaroFontInfo, Bytes}?
-          return unless File.exists?(path)
+          # A directory exists too, and reading it raises.
+          return unless File.file?(path)
           data = File.open(path, "rb", &.getb_to_end)
           init_font(data)
         end

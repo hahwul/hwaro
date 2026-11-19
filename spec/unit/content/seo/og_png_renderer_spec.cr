@@ -110,6 +110,13 @@ describe Hwaro::Content::Seo::OgPngRenderer do
       ctx.should_not be_nil
     end
 
+    # Reading a directory raises, which aborted the whole build (exit 6).
+    it "falls back when custom font path is a directory" do
+      Dir.mktmpdir do |dir|
+        with_captured_log { Hwaro::Content::Seo::OgPngRenderer.load_fonts(dir).should_not be_nil }
+      end
+    end
+
     it "returns a FontContext when prefer_cjk is set" do
       ctx = Hwaro::Content::Seo::OgPngRenderer.load_fonts(nil, prefer_cjk: true)
       ctx.should_not be_nil
