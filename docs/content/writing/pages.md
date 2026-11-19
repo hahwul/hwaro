@@ -355,7 +355,7 @@ console.log("Hello");
 
 Table cells support inline Markdown: **bold**, *italic*, `code spans`, `[links](url)`, `![images](url)`, and ~~strikethrough~~. Links and images take the same destinations as in a paragraph: balanced parentheses (`[W](https://en.wikipedia.org/wiki/Foo_(bar))`), an optional title (`[T](/x/ "the title")`) and `<angle>` destinations; a backslash escapes punctuation (`\*not emphasis\*`). The same applies to definition list and footnote bodies.
 
-Raw HTML is not rendered there: a tag written in a cell (`<em>`, `<br>`) is escaped and shows as literal text, whatever `[markdown] safe` is set to. The same holds in definition lists and footnote bodies.
+An inline HTML tag written in a cell (`<br>`, `<kbd>`, `<span class="x">`) is rendered as it is in a paragraph, so `one<br>two` puts two lines in a cell. Text that only looks like a tag is read as one too: write `Array\<Page>` or use a code span to show `Array<Page>`. With `[markdown] safe = true` the tag is escaped and shows as literal text. An HTML comment in a cell is always escaped. Definition lists and footnote bodies do not render raw HTML: a tag written there is escaped whatever `safe` is set to.
 
 ```markdown
 | Feature        | Example                          |

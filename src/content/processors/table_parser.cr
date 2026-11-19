@@ -8,7 +8,8 @@
 # - Basic pipe-delimited tables
 # - Column alignment (left, center, right)
 # - Inline formatting within cells (rendered via InlineMarkdown, which
-#   HTML-escapes cell text — markd does not reparse the generated HTML)
+#   HTML-escapes cell text — markd does not reparse the generated HTML —
+#   and, with `Flags#raw_html`, lets inline HTML tags through)
 #
 # Table syntax:
 #   | Header 1 | Header 2 | Header 3 |
@@ -132,6 +133,9 @@ module Hwaro
           return content unless has_table?(content)
 
           effective = flags || InlineMarkdown::Flags.new(math: math)
+          # `trust` below marks every tag in a table as hwaro's own, so in
+          # safe mode a cell must not carry the author's.
+          effective = effective.copy_with(raw_html: false) if trusted
           lines = content.split("\n")
           result = [] of String
           i = 0

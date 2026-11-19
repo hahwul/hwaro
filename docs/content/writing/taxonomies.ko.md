@@ -216,7 +216,7 @@ Crystal은 Ruby와 닮은 문법의 컴파일 언어입니다.
 |----------|------|-------------|
 | name | String | 항목 이름 |
 | slug | String | URL에 안전한 이름 |
-| pages | Array<Page> | 이 항목이 붙은 페이지 |
+| pages | Array\<Page> | 이 항목이 붙은 페이지 |
 | count | Int | 페이지 수 |
 | title | String | 항목 `_index.md`의 제목(파일이 있을 때만) |
 | description | String | 항목 `_index.md`의 설명(파일이 있을 때만) |

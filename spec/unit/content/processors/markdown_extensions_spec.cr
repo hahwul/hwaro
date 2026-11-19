@@ -2427,7 +2427,7 @@ describe "safe mode extension markup" do
     html.should_not contain("</div></main>")
     html.should_not contain("onclick=")
     html.should contain("<!-- raw HTML omitted -->")
-    # Cell, term and footnote text is escaped, as with safe = false.
+    # Cell, term and footnote text is escaped.
     html.should contain("<th>&lt;b&gt;cell&lt;/b&gt;</th>")
     html.should contain("<dt>Term &lt;i&gt;t&lt;/i&gt;</dt>")
     html.should contain("&lt;img src=x onerror=alert(8)&gt; body")

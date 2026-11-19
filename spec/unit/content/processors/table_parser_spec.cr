@@ -952,3 +952,66 @@ describe "GFM delimiter-row lengths" do
     result.should_not contain("<table>")
   end
 end
+
+# A cell rendered every `<` as `&lt;`, so `a<br>b` showed the tag as text even
+# with `safe = false`, where the same tag in a paragraph is markup. Cells now
+# take inline HTML tags as a paragraph does; safe mode still escapes them.
+describe "raw inline HTML in table cells" do
+  cell = ->(text : String, safe : Bool) do
+    html, _ = Hwaro::Processor::Markdown.render("| A |\n|---|\n| #{text} |", safe: safe)
+    html[/<td>(.*)<\/td>/, 1]
+  end
+
+  it "passes <br> in each spelling through with safe off" do
+    cell.call("- a<br>- b", false).should eq("- a<br>- b")
+    cell.call("x<br/>y", false).should eq("x<br/>y")
+    cell.call("x<br />y", false).should eq("x<br />y")
+  end
+
+  it "passes other inline tags and their attributes through as written" do
+    cell.call("<span>span</span> <em>em</em>", false).should eq("<span>span</span> <em>em</em>")
+    cell.call(%(<span class="a_b" title='x > "y" & *z*'>**t**</span>), false)
+      .should eq(%(<span class="a_b" title='x > "y" & *z*'><strong>t</strong></span>))
+    cell.call("[<b>x</b>](/u/)", false).should eq(%(<a href="/u/"><b>x</b></a>))
+  end
+
+  it "renders a cell as the same text renders in a paragraph" do
+    ["a<br>b", "<kbd>k</kbd> *e*", "1 < 2 and 3 > 2", "<3", "a <b", "\\<br>", "\\\\<br>", "`<br>` <br>"].each do |text|
+      paragraph, _ = Hwaro::Processor::Markdown.render(text)
+      "<p>#{cell.call(text, false)}</p>\n".should eq(paragraph), text
+    end
+  end
+
+  it "keeps a code span literal" do
+    cell.call("`<br>`", false).should eq("<code>&lt;br&gt;</code>")
+    cell.call("``<span title=\"x\">``", false).should eq("<code>&lt;span title=&quot;x&quot;&gt;</code>")
+  end
+
+  it "keeps escaping tags with safe on" do
+    ["a<br>b", "x<br />y", "<span>s</span>", %(<img src=x onerror="alert(1)">), "<script>alert(1)</script>"].each do |text|
+      cell.call(text, true).should eq(HTML.escape(text)), text
+    end
+  end
+
+  it "keeps link destinations, URL sanitising and autolinks as they were" do
+    cell.call("[a](<b>)", false).should eq(%(<a href="b">a</a>))
+    cell.call("[a](<my file> \"<i>t</i>\")", false).should eq(%(<a href="my%20file" title="&lt;i&gt;t&lt;/i&gt;">a</a>))
+    cell.call("![<b>](/i.png)", false).should eq(%(<img src="/i.png" alt="&lt;b&gt;">))
+    cell.call("[x](javascript:alert(1))", false).should eq("[x](javascript:alert(1))")
+    cell.call("<https://example.com/a_b_c>", false).should eq(%(<a href="https://example.com/a_b_c">https://example.com/a_b_c</a>))
+    cell.call("<javascript:alert(1)>", false).should eq("&lt;javascript:alert(1)&gt;")
+  end
+
+  it "keeps a shortcode placeholder and math in a cell untouched" do
+    placeholder = "<!--HWARO-SHORTCODE-PLACEHOLDER-0-->"
+    cell.call("#{placeholder}<br>`#{placeholder}`", false).should eq("#{placeholder}<br><code>#{HTML.escape(placeholder)}</code>")
+    config = Hwaro::Models::MarkdownConfig.new
+    config.math = true
+    html, _ = Hwaro::Processor::Markdown.render("| A |\n|---|\n| $a<b>c$ <br> |", markdown_config: config)
+    html.should contain(%(<td><span class="math math-inline">\\(a&lt;b&gt;c\\)</span> <br></td>))
+  end
+
+  it "leaves what is not a tag escaped" do
+    cell.call("<!-- c --> <?x?> <a b=>", false).should eq("&lt;!-- c --&gt; &lt;?x?&gt; &lt;a b=&gt;")
+  end
+end
