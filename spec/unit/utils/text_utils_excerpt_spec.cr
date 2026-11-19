@@ -93,6 +93,14 @@ describe Hwaro::Utils::TextUtils do
       cut.should be_true
     end
 
+    # CJK text is measured in characters at twice the setting, and doubling
+    # a "no limit" `summary_length` overflowed Int32.
+    it "takes a huge length for CJK text without overflowing" do
+      text, cut = Hwaro::Utils::TextUtils.truncate_excerpt("이것은 한국어 본문입니다", Int32::MAX, ELLIPSIS)
+      text.should eq("이것은 한국어 본문입니다")
+      cut.should be_false
+    end
+
     it "uses the configured ellipsis verbatim" do
       text, _ = Hwaro::Utils::TextUtils.truncate_excerpt("a b c d", 2, " [more]")
       text.should eq("a b [more]")
