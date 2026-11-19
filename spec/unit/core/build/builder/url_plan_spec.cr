@@ -63,7 +63,7 @@ end
 
 private DENSE_SITE = {
   "index.md"          => page(%(title = "Home")),
-  "about.md"          => page(%(title = "About"\naliases = ["/me/", "old-about", "/legacy.html", "https://x.test/y", "/../up/", "/posts/"])),
+  "about.md"          => page(%(title = "About"\naliases = ["/me/", "old-about", "/legacy.html", "https://x.test/y", "/../up/", "/posts/", "/About/"])),
   "posts/_index.md"   => page(%(title = "Posts"\npaginate = 2\ngenerate_feeds = true)),
   "posts/a.md"        => page(%(title = "A"\ndate = "2024-01-01"\ntags = ["x", "C++", "C#"]\ncategories = ["one"])),
   "posts/b.md"        => page(%(title = "B"\ndate = "2024-01-02"\ntags = ["x"]\naliases = ["/posts/page/2/"])),
@@ -216,6 +216,42 @@ describe "Hwaro::Core::Build::Builder#plan_urls" do
       planned.find! { |entry| entry.url == "/products/blue-widget/" }.source.should be_nil
       Dir.exists?("public").should be_false
       urls.sort!.should eq(built_urls)
+    end
+  end
+
+  it "makes no network request: a generate rule over a remote key is skipped" do
+    config = <<-TOML
+      title = "Plan"
+      base_url = "http://localhost"
+
+      [[data.remote]]
+      key = "team"
+      url = "http://127.0.0.1:1/unreachable.json"
+
+      [[content.generate]]
+      source = "team"
+      section = "people"
+      slug = "id"
+      title = "name"
+      TOML
+    in_site(config, {"index.md" => page(%(title = "Home"))}) do
+      urls = [] of String
+      warnings = with_captured_log { urls = plan.map(&.url) }
+      urls.should eq(["/"])
+      warnings.should contain(%([[content.generate]] "team": remote source))
+      Dir.exists?(".hwaro").should be_false
+    end
+  end
+
+  it "spells an alias the way page URLs are spelled" do
+    files = {
+      "a b.md" => page(%(title = "Spaced"\naliases = ["/old%20name/", "/plain"])),
+    }
+    in_site(URL_PLAN_CONFIG, files) do
+      by_url = plan.index_by(&.url)
+      by_url["/old%20name/"]?.try(&.kind).should eq("alias")
+      by_url["/plain/"]?.try(&.kind).should eq("alias")
+      by_url.keys.any?(&.includes?("old name")).should be_false
     end
   end
 

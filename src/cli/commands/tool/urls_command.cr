@@ -45,7 +45,9 @@ module Hwaro
           end
 
           def run(args : Array(String))
-            options = Config::Options::BuildOptions.new
+            # HWARO_ENV selects the config overlay exactly as it does for
+            # `hwaro build`; `--env` overrides it.
+            options = Config::Options::BuildOptions.new(env: ENV["HWARO_ENV"]?.presence)
             input_dir : String? = nil
             json_output = false
 
@@ -97,7 +99,8 @@ module Hwaro
                 "urls"  => urls.map { |entry| {"url" => entry.url, "kind" => entry.kind, "source" => entry.source} },
               }.to_json)
             else
-              urls.each { |entry| Logger.result entry.url }
+              # One URL per line, whatever a file name or alias holds.
+              urls.each { |entry| Logger.result entry.url.gsub('\n', "%0A").gsub('\r', "%0D") }
             end
           end
         end

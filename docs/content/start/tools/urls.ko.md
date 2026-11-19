@@ -34,16 +34,16 @@ hwaro tool urls --json
 | `term` | 택소노미 term 페이지 (`/tags/crystal/`) |
 | `feed` | 사이트, 섹션, 언어, 택소노미 피드 (`/rss.xml`) |
 
-URL은 사이트 루트 기준 경로(`/posts/hello/`)입니다. `base_url`과 그 하위 경로는 포함되지 않으므로, 같은 콘텐츠를 쓰는 환경이라면 목록이 동일합니다.
+URL은 사이트 루트 기준 경로(`/posts/hello/`)이며 빌드가 링크하는 표기 그대로입니다(파일 이름의 공백은 `%20`). `base_url`과 그 하위 경로는 포함되지 않으므로, 같은 콘텐츠를 쓰는 환경이라면 목록이 동일합니다.
 
-그 자체로 라우트가 아닌 파일은 제외됩니다. 정적 파일과 페이지 번들 파일, `sitemap.xml`, `robots.txt`, `llms.txt`, 검색 인덱스, `404.html`, `[outputs]` 형식, AMP 미러가 해당합니다. `[build] hooks`는 실행되지 않으므로, `hooks.pre` 명령이 생성하는 콘텐츠는 디스크에 존재할 때만 나열됩니다.
+그 자체로 라우트가 아닌 파일은 제외됩니다. 정적 파일과 페이지 번들 파일, `sitemap.xml`, `robots.txt`, `llms.txt`, 검색 인덱스, `404.html`, `[outputs]` 형식, AMP 미러가 해당합니다. `[build] hooks`는 실행되지 않으므로, `hooks.pre` 명령이 생성하는 콘텐츠는 디스크에 존재할 때만 나열됩니다. 다른 `hwaro tool` 명령과 마찬가지로 네트워크 요청을 하지 않습니다. `[[content.generate]]` 규칙이 [원격 데이터 소스](/ko/features/remote-data/)로 만드는 페이지는 나열되지 않으며, 해당 규칙을 알리는 경고가 출력됩니다.
 
 ## 옵션
 
 | 플래그 | 설명 |
 |------|-------------|
 | -i, --input DIR | 프로젝트 디렉터리 (기본값: 현재 디렉터리) |
-| -e, --env ENV | 환경 이름 (`config.<env>.toml` 로드) |
+| -e, --env ENV | 환경 이름 (`config.<env>.toml` 로드), 기본값은 `HWARO_ENV` |
 | -d, --drafts | 초안 콘텐츠 포함 |
 | --include-expired | 만료된 콘텐츠 포함 |
 | --include-future | 미래 날짜 콘텐츠 포함 |

@@ -377,8 +377,9 @@ module Hwaro::Core::Build::Phases::Render
     target
   end
 
-  # The redirect stubs `page`'s aliases publish: yields each one's output
-  # file, relative to the output directory and joined onto it. ONE decision
+  # The redirect stubs `page`'s aliases publish: yields each one's URL
+  # (`normalize_alias_url`, the spelling collisions are keyed by) and the
+  # file it is written to. ONE decision
   # feeds the writer (`generate_aliases`) and `Builder#plan_urls`, so the
   # URL preview cannot list a stub the build refuses.
   private def each_alias_output(page : Models::Page, output_dir : String, except : Set(String)? = nil, & : String, String ->) : Nil
@@ -409,7 +410,9 @@ module Hwaro::Core::Build::Phases::Render
       # Encoded paths and case-folded paths can point to the page's own file.
       next if alias_file == own_file
       if own_fold && Utils::PathUtils.output_fold_key(alias_file) == own_fold
-        folds_case = Utils::PathUtils.case_folding_fs?(output_dir) if folds_case.nil?
+        # The output directory's filesystem; a plan (`Builder#plan_urls`)
+        # runs before it exists and probes the project's instead.
+        folds_case = Utils::PathUtils.case_folding_fs?(Dir.exists?(output_dir) ? output_dir : Dir.current) if folds_case.nil?
         next if folds_case
       end
       dest_path = File.join(output_dir, alias_file)
@@ -421,7 +424,7 @@ module Hwaro::Core::Build::Phases::Render
         next
       end
 
-      yield alias_file, dest_path
+      yield norm, dest_path
     end
   end
 

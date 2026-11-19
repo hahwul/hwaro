@@ -43,6 +43,28 @@ describe Hwaro::CLI::Commands::Tool::UrlsCommand do
       end
     end
 
+    it "reads the config overlay named by HWARO_ENV, as the build does" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "config.toml"), "title = \"T\"\nbase_url = \"http://localhost\"\n")
+        File.write(File.join(dir, "config.preview.toml"), "[build]\ndrafts = true\n")
+        FileUtils.mkdir_p(File.join(dir, "content"))
+        File.write(File.join(dir, "content", "wip.md"), "+++\ntitle = \"W\"\ndraft = true\n+++\n")
+
+        original = Dir.current
+        previous = ENV["HWARO_ENV"]?
+        begin
+          ENV["HWARO_ENV"] = "preview"
+          output = with_captured_log do
+            Hwaro::CLI::Commands::Tool::UrlsCommand.new.run(["-i", dir])
+          end
+          output.should eq("/wip/\n")
+        ensure
+          ENV["HWARO_ENV"] = previous
+          Dir.cd(original)
+        end
+      end
+    end
+
     it "rejects positional arguments" do
       expect_raises(Hwaro::HwaroError, /unexpected extra argument/) do
         Hwaro::CLI::Commands::Tool::UrlsCommand.new.run(["extra"])

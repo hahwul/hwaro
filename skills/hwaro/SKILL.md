@@ -224,7 +224,7 @@ hwaro tool list drafts --json        # all | drafts | published; --sort date|tit
 hwaro tool stats --json              # word counts, page totals, top tags
 hwaro tool convert to-yaml           # to-yaml | to-toml | to-json (front matter, in place)
 hwaro tool unused-assets --json      # unreferenced files under static/ (--delete -f removes them)
-hwaro tool urls --json               # every URL a build would publish (pages, aliases, pagination, taxonomies, feeds); writes nothing
+hwaro tool urls --json               # every URL a build would publish (pages, aliases, pagination, taxonomies, feeds); writes nothing, no network
 hwaro tool agents-md --write         # (re)generate AGENTS.md (--remote = links-only; -f skips the prompt, keeps the site-specific section)
 hwaro tool import hugo /path/to/hugo-site     # also: jekyll, wordpress, notion, obsidian, hexo, astro, eleventy
 hwaro tool export jekyll                       # also: hugo (writes to export/ by default)

@@ -14,7 +14,7 @@ module Hwaro
         record PlannedUrl, url : String, kind : String, source : String?
 
         # The URLs `run(options)` would publish, in write order, with no
-        # template rendered and nothing written.
+        # template rendered, nothing written and no network request.
         #
         # Runs the build's own ReadContent, ParseContent and Transform phases
         # (publish filters, cascade, permalinks, languages, versions,
@@ -25,7 +25,9 @@ module Hwaro
         # copy of any of those rules would be a preview that drifts from the
         # site.
         #
-        # Not run: `[build] hooks`, the lifecycle hooks (none touches the
+        # Not run: `[build] hooks`, `[[data.remote]]` fetches (a tool never
+        # touches the network; a `[[content.generate]]` rule over a remote
+        # key is skipped with a warning, as `tool list` skips it), the lifecycle hooks (none touches the
         # page set before Render) and everything from Render on. Not listed:
         # files that are not routes of their own — static and bundle files,
         # sitemap/robots/llms/search index, `[outputs]` formats, AMP mirrors.
@@ -46,9 +48,17 @@ module Hwaro
           @output_cwd = Dir.current
           site = Models::Site.new(config)
           @site = site
-          # `[[content.generate]]` plans pages from the data tree, and
-          # `[git] use_date` dates feed `[permalinks]` tokens.
-          load_data_files(site, config)
+          # `[[content.generate]]` plans pages from the data tree (the
+          # disk half of `load_data_files`), and `[git] use_date` dates feed
+          # `[permalinks]` tokens.
+          DataDisk.load_tree.children.each { |key, child| site.data[key] = DataDisk.tree_to_crinja(child) }
+          remote_keys = config.data_remote.map(&.key.downcase)
+          config.content_generate.reject! do |rule|
+            root_key = rule.source.split('.').first
+            next false unless remote_keys.includes?(root_key.downcase)
+            Logger.warn "[[content.generate]] \"#{rule.source}\": remote source — its pages are not listed (a build fetches site.data.#{root_key}; `tool urls` does not)."
+            true
+          end
           collect_git_info(config)
           ctx.site = site
           ctx.config = config
@@ -78,7 +88,7 @@ module Hwaro
           output_writers(all_pages).each do |page|
             source = page.synthesized? ? nil : File.join("content", page.path)
             plan_page(page, site, templates, output_dir, source, planned)
-            each_alias_output(page, output_dir) { |file, _| planned << PlannedUrl.new(output_file_url(file), "alias", source) }
+            each_alias_output(page, output_dir) { |url, _| planned << PlannedUrl.new(url, "alias", source) }
           end
 
           taxonomy = Content::Taxonomies.planned_urls(site, output_dir)
@@ -126,8 +136,8 @@ module Hwaro
           taxonomy_urls = taxonomy.select(&.kind.in?("taxonomy", "term")).map(&.url).to_set
           term_meta.each do |url, meta|
             next unless term_urls.includes?(url)
-            each_alias_output(meta, output_dir, term_alias_refusals(meta, taxonomy_urls)) do |file, _|
-              planned << PlannedUrl.new(output_file_url(file), "alias", File.join("content", meta.path))
+            each_alias_output(meta, output_dir, term_alias_refusals(meta, taxonomy_urls)) do |alias_url, _|
+              planned << PlannedUrl.new(alias_url, "alias", File.join("content", meta.path))
             end
           end
         end

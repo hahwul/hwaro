@@ -34,16 +34,16 @@ hwaro tool urls --json
 | `term` | Taxonomy term pages (`/tags/crystal/`) |
 | `feed` | Site, section, language and taxonomy feeds (`/rss.xml`) |
 
-URLs are site-root paths (`/posts/hello/`): the `base_url` and its subpath are not part of them, so the list is the same for every environment that shares the content.
+URLs are site-root paths (`/posts/hello/`), spelled as the build links to them (a space in a file name is `%20`): the `base_url` and its subpath are not part of them, so the list is the same for every environment that shares the content.
 
-Files that are not routes of their own are left out: static and page-bundle files, `sitemap.xml`, `robots.txt`, `llms.txt`, the search index, `404.html`, `[outputs]` formats and AMP mirrors. `[build] hooks` do not run, so content a `hooks.pre` command generates is only listed once it exists on disk.
+Files that are not routes of their own are left out: static and page-bundle files, `sitemap.xml`, `robots.txt`, `llms.txt`, the search index, `404.html`, `[outputs]` formats and AMP mirrors. `[build] hooks` do not run, so content a `hooks.pre` command generates is only listed once it exists on disk. Like every `hwaro tool` command it makes no network request: pages a `[[content.generate]]` rule builds from a [remote data source](/features/remote-data/) are not listed, with a warning naming the rule.
 
 ## Options
 
 | Flag | Description |
 |------|-------------|
 | -i, --input DIR | Project directory (default: current directory) |
-| -e, --env ENV | Environment name (loads `config.<env>.toml`) |
+| -e, --env ENV | Environment name (loads `config.<env>.toml`); defaults to `HWARO_ENV` |
 | -d, --drafts | Include draft content |
 | --include-expired | Include expired content |
 | --include-future | Include future-dated content |
