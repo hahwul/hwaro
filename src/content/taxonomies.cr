@@ -19,21 +19,32 @@ require "../content/pagination/renderer"
 module Hwaro
   module Content
     class Taxonomies
-      def self.generate(site : Models::Site, output_dir : String, templates : Hash(String, String), verbose : Bool = false, builder : Core::Build::Builder? = nil) : Array(Models::Section)
-        # A caller-supplied builder may have run an earlier pass into this
-        # same output directory (the serve session's builder); it removes
-        # what that pass wrote and this one no longer does. See
-        # `Builder#track_taxonomy_outputs`. Every build renders these pages
-        # again, so their reads key nothing (TemplateEngine.without_render_reads).
+      # `reuse_unchanged` (Builder#taxonomy_outputs_unchanged?): keep every
+      # output file still on disk instead of rendering it again; everything
+      # else — claims, warnings, the returned sections — is as on a full pass.
+      # `record_reads`: the caller keys its next `--cache` build on what these
+      # templates read (Builder#record_taxonomy_render_reads); otherwise every
+      # build renders these pages again, so their reads key nothing
+      # (TemplateEngine.without_render_reads).
+      def self.generate(site : Models::Site, output_dir : String, templates : Hash(String, String), verbose : Bool = false, builder : Core::Build::Builder? = nil, reuse_unchanged : Bool = false, record_reads : Bool = false) : Array(Models::Section)
+        return generate_tracked(site, output_dir, templates, verbose, builder, reuse_unchanged) if record_reads
         Processors::TemplateEngine.without_render_reads do
-          next generate_untracked(site, output_dir, templates, verbose, builder) unless builder
-          builder.track_taxonomy_outputs(output_dir) do
-            generate_untracked(site, output_dir, templates, verbose, builder)
-          end
+          generate_tracked(site, output_dir, templates, verbose, builder, reuse_unchanged)
         end
       end
 
-      private def self.generate_untracked(site : Models::Site, output_dir : String, templates : Hash(String, String), verbose : Bool, builder : Core::Build::Builder?) : Array(Models::Section)
+      # A caller-supplied builder may have run an earlier pass into this
+      # same output directory (the serve session's builder); it removes
+      # what that pass wrote and this one no longer does. See
+      # `Builder#track_taxonomy_outputs`.
+      private def self.generate_tracked(site : Models::Site, output_dir : String, templates : Hash(String, String), verbose : Bool, builder : Core::Build::Builder?, reuse : Bool) : Array(Models::Section)
+        return generate_untracked(site, output_dir, templates, verbose, builder, reuse) unless builder
+        builder.track_taxonomy_outputs(output_dir) do
+          generate_untracked(site, output_dir, templates, verbose, builder, reuse)
+        end
+      end
+
+      private def self.generate_untracked(site : Models::Site, output_dir : String, templates : Hash(String, String), verbose : Bool, builder : Core::Build::Builder?, reuse : Bool) : Array(Models::Section)
         config = site.config
         return [] of Models::Section if config.taxonomies.empty?
 
@@ -77,7 +88,7 @@ module Hwaro
           end
         end
         spaces.each do |space|
-          generate_term_space(space, site, output_dir, templates, builder, verbose, global_vars, collected, term_meta, taxonomy_urls)
+          generate_term_space(space, site, output_dir, templates, builder, verbose, global_vars, collected, term_meta, taxonomy_urls, reuse)
         end
 
         collected
@@ -222,6 +233,7 @@ module Hwaro
         collected : Array(Models::Section),
         term_meta : Hash(String, Models::Section),
         taxonomy_urls : Set(String),
+        reuse : Bool,
       )
         taxonomy, language, lang_prefix = space.taxonomy, space.language, space.lang_prefix
         terms_map, index_terms, slug_map = space.terms_map, space.index_terms, space.slug_map
@@ -243,12 +255,12 @@ module Hwaro
           Logger.warn "Taxonomy term #{term.inspect} is too long for a path segment — its URL was shortened to /#{taxonomy.name}/#{slug_map[term]? || Utils::TextUtils.safe_slugify(term)}/. Shorten the term in the front matter of the pages that use it."
         end
 
-        render_taxonomy_index(index_page, sort_terms(taxonomy, index_terms, terms_map, language, site.config.default_language), templates, site, output_dir, builder, verbose, global_vars, slug_map)
+        render_taxonomy_index(index_page, sort_terms(taxonomy, index_terms, terms_map, language, site.config.default_language), templates, site, output_dir, builder, verbose, global_vars, slug_map, reuse)
         collected << index_page
 
         each_term(space, site.config.default_language) do |term, slug, filtered_pages|
           meta = term_meta.empty? ? nil : term_meta["#{lang_prefix}/#{taxonomy.name}/#{slug}/"]?
-          collected << render_taxonomy_term(taxonomy, term, filtered_pages, templates, site, output_dir, builder, verbose, global_vars, slug, lang_prefix: lang_prefix, language: language, meta: meta, taxonomy_urls: taxonomy_urls)
+          collected << render_taxonomy_term(taxonomy, term, filtered_pages, templates, site, output_dir, builder, verbose, global_vars, slug, lang_prefix: lang_prefix, language: language, meta: meta, taxonomy_urls: taxonomy_urls, reuse: reuse)
         end
       end
 
@@ -496,13 +508,15 @@ module Hwaro
         verbose : Bool,
         global_vars : Hash(String, Crinja::Value),
         slug_map : Hash(String, String),
+        reuse : Bool,
       )
         template_name = ["taxonomy", "page"].find { |n| templates.has_key?(n) }
         template_content = template_name.try { |n| templates[n] }
-        html_content = build_term_list(terms, page.url, site.config.base_url, slug_map)
 
-        final_html = apply_template(template_content, html_content, page, site, templates, builder: builder, global_vars: global_vars, template_name: template_name)
-        write_output(page, output_dir, final_html, verbose, builder)
+        write_output(page, output_dir, verbose, builder, reuse) do
+          html_content = build_term_list(terms, page.url, site.config.base_url, slug_map)
+          apply_template(template_content, html_content, page, site, templates, builder: builder, global_vars: global_vars, template_name: template_name)
+        end
       end
 
       private def self.render_taxonomy_term(
@@ -520,6 +534,7 @@ module Hwaro
         language : String? = nil,
         meta : Models::Section? = nil,
         taxonomy_urls : Set(String) = Set(String).new,
+        reuse : Bool = false,
       ) : Models::Section
         index_page = build_term_page(taxonomy, term, slug, lang_prefix, language)
         base_url = index_page.url
@@ -543,22 +558,24 @@ module Hwaro
         template_content = template_name.try { |n| templates[n] }
 
         paginated_pages.each do |paginated_page|
-          list_html = build_page_list(paginated_page.pages, site.config.base_url, site.config.title)
-          renderer = Content::Pagination::Renderer.new(site.config)
-          pagination_html = renderer.render_pagination_nav(paginated_page)
-          seo_links = renderer.render_seo_links(paginated_page)
-          html_content = list_html + pagination_html
+          render = -> do
+            list_html = build_page_list(paginated_page.pages, site.config.base_url, site.config.title)
+            renderer = Content::Pagination::Renderer.new(site.config)
+            pagination_html = renderer.render_pagination_nav(paginated_page)
+            seo_links = renderer.render_seo_links(paginated_page)
+            html_content = list_html + pagination_html
 
-          final_html = apply_template(template_content, html_content, index_page, site, templates, paginated_page, builder: builder, global_vars: global_vars, template_name: template_name, pagination: pagination_html, pagination_seo_links: seo_links)
+            apply_template(template_content, html_content, index_page, site, templates, paginated_page, builder: builder, global_vars: global_vars, template_name: template_name, pagination: pagination_html, pagination_seo_links: seo_links)
+          end
 
           if paginated_page.page_number == 1
-            write_output(index_page, output_dir, final_html, verbose, builder)
+            write_output(index_page, output_dir, verbose, builder, reuse) { render.call }
           else
-            write_paginated_output(index_page, paginated_page.page_number, output_dir, final_html, verbose, index_page.paginate_path, builder)
+            write_paginated_output(index_page, paginated_page.page_number, output_dir, verbose, index_page.paginate_path, builder, reuse) { render.call }
           end
         end
 
-        generate_taxonomy_feed(taxonomy, term, index_page.title, pages, site, output_dir, base_url, verbose, templates, builder, language) if taxonomy.feed
+        generate_taxonomy_feed(taxonomy, term, index_page.title, pages, site, output_dir, base_url, verbose, templates, builder, language, reuse) if taxonomy.feed
 
         index_page
       end
@@ -712,6 +729,7 @@ module Hwaro
         templates : Hash(String, String)? = nil,
         builder : Core::Build::Builder? = nil,
         language : String? = nil,
+        reuse : Bool = false,
       )
         # No base_url guard on emission: like the main and section feeds,
         # taxonomy feeds emit with relative URLs when base_url is empty.
@@ -726,9 +744,9 @@ module Hwaro
         # Like section and language feeds, a term feed always takes the
         # default name for `[feeds] type` — `[feeds] filename` names only the
         # main feed — so this is the "" that `process_feed` gets below.
-        builder.try(&.claim_generated_output(
-          File.join(feed_output_dir, Content::Seo::Feeds.safe_feed_filename("", site.config.feeds.type))
-        ))
+        feed_path = File.join(feed_output_dir, Content::Seo::Feeds.safe_feed_filename("", site.config.feeds.type))
+        builder.try(&.claim_generated_output(feed_path))
+        return if reusable_output?(feed_path, reuse, builder)
 
         # No caller-side sort/limit: process_feed itself sorts date-desc
         # (SortUtils.compare_by_date) and applies feeds.limit. Dedupe by URL
@@ -798,7 +816,10 @@ module Hwaro
 
       # Guard against escaping the output dir, then mkdir + write + log a
       # taxonomy output file. Shared by the single-page and paginated writers.
-      private def self.write_to(output_path : String, output_dir : String, content : String, verbose : Bool, builder : Core::Build::Builder? = nil)
+      # The content is rendered (the block) only when the file is written.
+      private def self.write_to(output_path : String, output_dir : String, verbose : Bool, builder : Core::Build::Builder? = nil, reuse : Bool = false, & : -> String)
+        reused = reusable_output?(output_path, reuse, builder)
+        content = reused ? "" : yield
         unless Utils::OutputGuard.within_output_dir?(output_path, output_dir)
           Logger.warn "Skipping taxonomy output outside output directory: #{output_path}"
           return
@@ -819,6 +840,7 @@ module Hwaro
         # its last post was deleted (the output directory survives a warm
         # build, and this generator only ever writes the terms that exist).
         builder.try(&.claim_generated_output(output_path))
+        return if reused
 
         if builder && output_path.ends_with?(".html")
           content = builder.privacy_rewrite(content)
@@ -855,9 +877,19 @@ module Hwaro
       # page onto the shortened path instead of skipping it. Reachable only if
       # a term ever escapes `safe_slugify`, but every writer family must answer
       # this question the same way.
-      private def self.write_output(page : Models::Section, output_dir : String, content : String, verbose : Bool = false, builder : Core::Build::Builder? = nil)
+      private def self.write_output(page : Models::Section, output_dir : String, verbose : Bool, builder : Core::Build::Builder?, reuse : Bool, & : -> String)
         return unless output_path = output_path_for(page.url, output_dir)
-        write_to(output_path, output_dir, content, verbose, builder)
+        write_to(output_path, output_dir, verbose, builder, reuse) { yield }
+      end
+
+      # Under `reuse` (Builder#taxonomy_outputs_unchanged?: nothing this file
+      # renders from changed since the build that wrote it), a file still on
+      # disk holds exactly the bytes a render would produce — unless this
+      # build's copy of `static/` just replaced it, which a full pass writes
+      # over.
+      private def self.reusable_output?(path : String, reuse : Bool, builder : Core::Build::Builder?) : Bool
+        return false unless reuse && builder
+        File.file?(path) && !builder.static_copied_output?(path, Dir.current)
       end
 
       # The `index.html` a taxonomy page at `url` is written to, or nil
@@ -871,11 +903,11 @@ module Hwaro
         File.join(output_dir, segments.join("/"), "index.html")
       end
 
-      private def self.write_paginated_output(page : Models::Section, page_number : Int32, output_dir : String, content : String, verbose : Bool = false, paginate_path : String = "page", builder : Core::Build::Builder? = nil)
+      private def self.write_paginated_output(page : Models::Section, page_number : Int32, output_dir : String, verbose : Bool, paginate_path : String, builder : Core::Build::Builder?, reuse : Bool, & : -> String)
         segments, refused = Utils::PathUtils.split_safe_segments(page.url.lchop("/"))
         return if refused
         output_path = File.join(output_dir, segments.join("/"), paginate_path, page_number.to_s, "index.html")
-        write_to(output_path, output_dir, content, verbose, builder)
+        write_to(output_path, output_dir, verbose, builder, reuse) { yield }
       end
     end
   end

@@ -27,7 +27,15 @@ module Hwaro
           site = ctx.site
           return unless site
 
-          sections = Content::Taxonomies.generate(site, ctx.output_dir, ctx.templates, ctx.options.verbose, builder: ctx.builder)
+          builder = ctx.builder
+          # A CLI `--cache` build keys the next one on what these templates
+          # read, and keeps last build's files when nothing they render from
+          # moved (Builder#taxonomy_outputs_unchanged?).
+          record_reads = builder.try(&.taxonomy_render_reads_recorded?) || false
+          reuse = builder.try(&.taxonomy_outputs_unchanged?(ctx)) || false
+          sections = Content::Taxonomies.generate(site, ctx.output_dir, ctx.templates, ctx.options.verbose,
+            builder: builder, reuse_unchanged: reuse, record_reads: record_reads)
+          builder.try(&.record_taxonomy_render_reads) if record_reads
           return if sections.empty?
 
           # Register the generated taxonomy pages so the SEO generators include
