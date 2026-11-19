@@ -781,6 +781,8 @@ module Hwaro::Core::Build::Phases::Transform
 
           pairs.each do |k, v|
             if k == "name"
+              # A blank name keeps the ID, like an entry with no name at all.
+              next if v.raw.nil? || v.to_s.blank?
               current = temp_authors[id]
               temp_authors[id] = {name: v.to_s, pages: current[:pages], extra: current[:extra]}
             else

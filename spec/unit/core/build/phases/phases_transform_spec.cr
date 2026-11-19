@@ -779,6 +779,27 @@ describe Hwaro::Core::Build::Phases::Transform do
       author[Crinja::Value.new("bio")].to_s.should eq("Creator")
     end
 
+    # "The author name (from data, else the ID as first written)": a blank
+    # `name:` beside other fields printed an empty byline.
+    it "keeps the id as the name when the data entry's name is blank" do
+      [Crinja::Value.new(""), Crinja::Value.new(nil)].each do |blank|
+        site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
+        page = make_page("a.md")
+        page.authors = ["Ann"]
+        site.pages = [page]
+        site.data["authors"] = Crinja::Value.new({
+          "ann" => Crinja::Value.new({"name" => blank, "bio" => Crinja::Value.new("writer")}),
+        })
+
+        builder = Hwaro::Core::Build::Builder.new
+        builder.test_aggregate_site_authors(site)
+
+        author = site.authors["ann"].raw.as(Hash(Crinja::Value, Crinja::Value))
+        author[Crinja::Value.new("name")].to_s.should eq("Ann")
+        author[Crinja::Value.new("bio")].to_s.should eq("writer")
+      end
+    end
+
     it "excludes headless pages, which are never written" do
       site = Hwaro::Models::Site.new(Hwaro::Models::Config.new)
       shown = make_page("shown.md")
