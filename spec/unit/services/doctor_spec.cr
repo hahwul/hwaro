@@ -1889,6 +1889,20 @@ describe "sass diagnostics" do
     end
   end
 
+  # features/sass "Bundles": `[[assets.bundles]]` may name `.scss` files, and
+  # the build compiles them from `[assets] source_dir` — sass/ included.
+  it "does not warn when an asset bundle compiles its SCSS from sass/" do
+    Dir.mktmpdir do |dir|
+      config_path = File.join(dir, "config.toml")
+      File.write(config_path, %(title = "My Site"\nbase_url = "https://example.com"\n[sass]\nenabled = true\n[assets]\nenabled = true\nsource_dir = "sass"\n[[assets.bundles]]\nname = "main.css"\nfiles = ["main.scss"]\n))
+      FileUtils.mkdir_p(File.join(dir, "sass"))
+      File.write(File.join(dir, "sass", "main.scss"), ".a { color: red; }")
+
+      issues = Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: config_path).run
+      issues.any? { |i| i.id == "sass-dir-not-scanned" }.should be_false
+    end
+  end
+
   it "does not warn for an empty or SCSS-less sass/ directory" do
     Dir.mktmpdir do |dir|
       config_path = File.join(dir, "config.toml")

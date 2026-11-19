@@ -213,6 +213,21 @@ module Hwaro
         end
       end
 
+      # True when an `[[assets.bundles]]` entry names a `.scss` file under
+      # `dir`: the asset pipeline compiles those from `[assets] source_dir`
+      # (features/sass, "Bundles"), so `dir` IS read and the sources are fine.
+      private def bundles_read_scss_from?(config : Models::Config, dir : String) : Bool
+        return false unless config.assets.enabled
+        root = File.expand_path(dir)
+        base = File.dirname(@config_path)
+        config.assets.bundles.any? do |bundle|
+          bundle.files.any? do |file|
+            file.ends_with?(".scss") &&
+              Utils::PathUtils.within?(File.expand_path(File.join(base, config.assets.source_dir, file)), root)
+          end
+        end
+      end
+
       # [sass] pitfalls that build and serve stay silent about: SCSS sources
       # in a directory the compiler never scans, or sources in the right
       # place with compilation left off. Both ship a site whose stylesheet
@@ -227,7 +242,7 @@ module Hwaro
         # config.toml rather than the CWD so a doctor run pointed at
         # another project (-i / spec temp dirs) inspects that project.
         sass_dir = File.join(File.dirname(@config_path), "sass")
-        if Dir.exists?(sass_dir) && Dir.glob(File.join(Utils::PathUtils.glob_escape(sass_dir), "**", "*.scss"), match: glob).any? { |p| File.file?(p) }
+        if Dir.exists?(sass_dir) && !bundles_read_scss_from?(config, sass_dir) && Dir.glob(File.join(Utils::PathUtils.glob_escape(sass_dir), "**", "*.scss"), match: glob).any? { |p| File.file?(p) }
           issues << Issue.new(
             id: "sass-dir-not-scanned",
             level: :warning,
