@@ -313,6 +313,16 @@ describe Hwaro::Content::Processors::FenceTracker do
       feed(["-     ```", "text"]).should eq [false, false]
     end
 
+    it "ends an item's fence at a line left of the item's content" do
+      # Fenced code has no lazy continuation: the line closes the item, and
+      # the fence with it, and is read again as ordinary markdown.
+      feed(["- a", "", "  ```", "  x", "y", "z"]).should eq [false, false, true, true, false, false]
+      feed(["-  ```", "   aaa", "  aaa", "  ```", "tail"]).should eq [true, true, false, true, true]
+      feed(["> - ```", ">   x", "> y", "after"]).should eq [true, true, false, false]
+      # Blank lines stay fence content.
+      feed(["- ```", "", "  x", "  ```", "y"]).should eq [true, true, true, true, false]
+    end
+
     it "opens no fence in an item that cannot interrupt a paragraph" do
       feed(["text", "2. ```", "x"]).should eq [false, false, false]
     end

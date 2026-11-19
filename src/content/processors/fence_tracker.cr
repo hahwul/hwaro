@@ -186,11 +186,15 @@ module Hwaro
 
           if @in_fence
             content, depth = strip_blockquote_markers(line, @fence_bq_depth)
-            if depth == @fence_bq_depth
+            # A non-blank line left of the list item's content ends the item
+            # and the fence with it, as a missing quote marker does below.
+            column = @fence_base.zero? || content.blank? ? nil : item_column(line, content, depth)
+            if depth == @fence_bq_depth && !(column && column < @fence_base)
               @in_fence = false if !indented_beyond?(line, content, depth, @fence_base) && closes_fence?(content.lstrip)
               @prev_blank = false
               return true
             end
+            @list_items.reject! { |item| item[0] == depth && item[1] > column } if column
             # The fence's blockquote marker is gone: the quote ends here
             # and takes the fence with it (no lazy continuation for fenced
             # code). Fall through so this same line can open a new fence.
@@ -335,8 +339,14 @@ module Hwaro
         # of the enclosing list item (0 outside one: plain 4+ indentation).
         private def indented_beyond?(line : String, content : String, depth : Int32, base : Int32) : Bool
           return indented?(content) if base.zero?
+          item_column(line, content, depth) - base >= 4
+        end
+
+        # Column of `content`'s first non-whitespace character, measured
+        # like a list item's content column.
+        private def item_column(line : String, content : String, depth : Int32) : Int32
           prefix, tab_consumed = depth.zero? ? {0, false} : blockquote_prefix_column(line, depth)
-          leading_columns(content, prefix, tab_consumed)[0] - base >= 4
+          leading_columns(content, prefix, tab_consumed)[0]
         end
 
         # Consumes up to `max_depth` leading blockquote markers (each up to
