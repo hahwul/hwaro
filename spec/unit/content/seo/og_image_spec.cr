@@ -801,6 +801,10 @@ describe Hwaro::Content::Seo::OgImage do
       Hwaro::Content::Seo::OgImage.contains_cjk?("Mixed 中文 text").should be_true
     end
 
+    it "detects decomposed (NFD) Hangul, which macOS file names and pastes produce" do
+      Hwaro::Content::Seo::OgImage.contains_cjk?("한글 제목".unicode_normalize(:nfd)).should be_true
+    end
+
     it "caps band title lines to what fits the fixed-height band" do
       # BAND_HEIGHT is 200: a 52px line (+8 gap) fits 3 lines, a 60px line fits 2.
       Hwaro::Content::Seo::OgImage.band_line_capacity(52).should eq(3)

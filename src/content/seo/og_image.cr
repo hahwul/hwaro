@@ -107,7 +107,8 @@ module Hwaro
         # rev 5: 2026-10 untitled pages headline the site title; the masthead
         # and editorial kickers are XML-escaped; JPEG backgrounds and logos
         # honour their EXIF orientation.
-        RENDER_REVISION = 5
+        # rev 6: 2026-11 PNG text is composed (NFC) before drawing.
+        RENDER_REVISION = 6
 
         # `default` ("masthead"): eyebrow on top, title anchored high.
         MASTHEAD_EYEBROW_Y    =  96 # eyebrow baseline
@@ -1502,8 +1503,11 @@ module Hwaro
         # True if the text contains CJK ideographs, kana, hangul, or fullwidth
         # forms — glyphs the bundled/system Latin fonts cannot render, so PNG
         # OG images would show blank "tofu" boxes unless a CJK-capable
-        # `font_path` is configured.
+        # `font_path` is configured. The text is composed (NFC) first, as the
+        # PNG renderer draws it: decomposed Hangul is conjoining jamo, outside
+        # the syllable block.
         def self.contains_cjk?(text : String) : Bool
+          text = text.unicode_normalize unless text.ascii_only?
           text.each_char.any? { |c| cjk_char?(c) }
         end
 
