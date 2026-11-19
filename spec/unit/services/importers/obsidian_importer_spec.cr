@@ -223,6 +223,22 @@ describe Hwaro::Services::Importers::ObsidianImporter do
       end
     end
 
+    # Obsidian names pasted images `Pasted image <timestamp>.png`; a space
+    # ends a bare Markdown destination, so the embed rendered as text.
+    it "wraps an image embed target holding a space or paren in <…>" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "embeds.md"), "---\ntitle: \"Embeds\"\n---\n![[Pasted image 2024.png]] and ![[shot (1).png]] and ![[photo.png]]\n")
+        output_dir = File.join(dir, "output")
+        options = Hwaro::Config::Options::ImportOptions.new(source_type: "obsidian", path: dir, output_dir: output_dir)
+        Hwaro::Services::Importers::ObsidianImporter.new.run(options)
+
+        content = File.read(File.join(output_dir, "posts", "embeds.md"))
+        content.should contain("![Pasted image 2024.png](<Pasted image 2024.png>)")
+        content.should contain("![shot (1).png](<shot (1).png>)")
+        content.should contain("![photo.png](photo.png)")
+      end
+    end
+
     it "skips hidden directories like .obsidian" do
       Dir.mktmpdir do |dir|
         obsidian_dir = File.join(dir, ".obsidian")

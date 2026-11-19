@@ -138,8 +138,21 @@ module Hwaro
         end
 
         config.og.default_image.try { |v| emit_published.call("[og] default_image", v, false) }
-        config.og.auto_image.logo.try { |v| emit_file.call("[og.auto_image] logo", v) }
-        config.og.auto_image.background_image.try { |v| emit_file.call("[og.auto_image] background_image", v) }
+        # The PNG renderer opens these as project-relative files, with no
+        # `static/` or URL-path fallback (`OgImage.generate`): `logo =
+        # "logo.png"` beside a `static/logo.png` resolved here and was
+        # silently left out of every image. Only the SVG renderer falls back
+        # to a URL, so only there does the lenient lookup apply.
+        emit_og_file = ->(label : String, value : String) do
+          if config.og.auto_image.format == "png"
+            emit_missing(issues, "#{label} (a file path from the project root, e.g. static/logo.png)", value,
+              resolver: ->(s : String) { File.file?(File.expand_path(s, File.dirname(@config_path))) }, id: "config-path-missing", kind: "file")
+          else
+            emit_file.call(label, value)
+          end
+        end
+        config.og.auto_image.logo.try { |v| emit_og_file.call("[og.auto_image] logo", v) }
+        config.og.auto_image.background_image.try { |v| emit_og_file.call("[og.auto_image] background_image", v) }
         config.pwa.offline_page.try { |v| emit_route.call("[pwa] offline_page", v) }
         config.pwa.precache_urls.each_with_index do |url, idx|
           # External URLs aren't ours to validate; `emit_missing` drops any
@@ -213,6 +226,21 @@ module Hwaro
         end
       end
 
+      # True when an `[[assets.bundles]]` entry names a `.scss` file under
+      # `dir`: the asset pipeline compiles those from `[assets] source_dir`
+      # (features/sass, "Bundles"), so `dir` IS read and the sources are fine.
+      private def bundles_read_scss_from?(config : Models::Config, dir : String) : Bool
+        return false unless config.assets.enabled
+        root = File.expand_path(dir)
+        base = File.dirname(@config_path)
+        config.assets.bundles.any? do |bundle|
+          bundle.files.any? do |file|
+            file.ends_with?(".scss") &&
+              Utils::PathUtils.within?(File.expand_path(File.join(base, config.assets.source_dir, file)), root)
+          end
+        end
+      end
+
       # [sass] pitfalls that build and serve stay silent about: SCSS sources
       # in a directory the compiler never scans, or sources in the right
       # place with compilation left off. Both ship a site whose stylesheet
@@ -227,7 +255,7 @@ module Hwaro
         # config.toml rather than the CWD so a doctor run pointed at
         # another project (-i / spec temp dirs) inspects that project.
         sass_dir = File.join(File.dirname(@config_path), "sass")
-        if Dir.exists?(sass_dir) && Dir.glob(File.join(Utils::PathUtils.glob_escape(sass_dir), "**", "*.scss"), match: glob).any? { |p| File.file?(p) }
+        if Dir.exists?(sass_dir) && !bundles_read_scss_from?(config, sass_dir) && Dir.glob(File.join(Utils::PathUtils.glob_escape(sass_dir), "**", "*.scss"), match: glob).any? { |p| File.file?(p) }
           issues << Issue.new(
             id: "sass-dir-not-scanned",
             level: :warning,

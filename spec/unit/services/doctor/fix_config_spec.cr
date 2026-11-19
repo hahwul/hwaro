@@ -54,3 +54,16 @@ describe "Doctor#fix_config and the removed [plugins] section" do
     end
   end
 end
+
+describe "Doctor#fix_config sitemap priority with digit separators" do
+  it "clamps the whole value and leaves parseable TOML" do
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "config.toml")
+      File.write(path, "title = \"S\"\nbase_url = \"https://example.com\"\n[sitemap]\npriority = 15_0.0 # x\n")
+      Hwaro::Services::Doctor.new(content_dir: File.join(dir, "content"), config_path: path).fix_config
+      text = File.read(path)
+      text.should contain("priority = 1.0 # x\n")
+      TOML.parse(text)["sitemap"].as_h["priority"].as_f.should eq(1.0)
+    end
+  end
+end

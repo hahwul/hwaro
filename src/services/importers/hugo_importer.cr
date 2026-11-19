@@ -389,12 +389,11 @@ module Hwaro
             if match = TOML_FM_REGEX.match(raw)
               toml_str = match[1].strip
               body = match[2].lstrip('\n')
-              begin
-                data = TOML.parse(toml_str)
-                return {data, body}
-              rescue TOML::ParseException
-                return {nil, raw}
-              end
+              # Raised, not swallowed: `+++` can only open front matter, so a
+              # parse failure is a broken page. Returning the raw text
+              # imported it with an empty front matter and the TOML printed
+              # in its body, and the run reported success.
+              return {TOML.parse(toml_str), body}
             end
           elsif raw.starts_with?("{")
             # Hugo also reads JSON front matter: a JSON object at the top of

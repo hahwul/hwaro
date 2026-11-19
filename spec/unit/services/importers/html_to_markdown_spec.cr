@@ -317,5 +317,32 @@ describe Hwaro::Services::Importers::HtmlToMarkdown do
       code = Hwaro::Services::Importers::HtmlToMarkdown.convert("<p><code>&#038;amp;</code></p>")
       code.should eq("`&amp;`")
     end
+
+    it "delimits code that itself contains backticks with a longer run" do
+      convert = ->(html : String) { Hwaro::Services::Importers::HtmlToMarkdown.convert(html) }
+      convert.call("<p>Run <code>echo `date`</code> now.</p>").should eq("Run `` echo `date` `` now.")
+      convert.call("<pre><code>```\ninner\n```</code></pre>").should eq("````\n```\ninner\n```\n````")
+      convert.call("<p><code>plain</code></p>").should eq("`plain`")
+    end
+
+    it "converts a list whose </li> end tags are omitted" do
+      Hwaro::Services::Importers::HtmlToMarkdown.convert("<ol><li>Preheat<li>Mix</ol>").should eq("1. Preheat\n2. Mix")
+    end
+
+    it "keeps <br> and paragraph breaks inside list items and table cells" do
+      convert = ->(html : String) { Hwaro::Services::Importers::HtmlToMarkdown.convert(html) }
+      convert.call("<ul><li>line one<br>line two</li><li><p>para one</p><p>para two</p></li></ul>")
+        .should eq("- line one  \n  line two\n- para one\n\n  para two")
+      convert.call("<table><tr><th>H</th></tr><tr><td>c1<br/>c2</td></tr><tr><td><p>d1</p><p>d2</p></td></tr></table>")
+        .should eq("| H |\n| --- |\n| c1 c2 |\n| d1 d2 |")
+    end
+
+    it "keeps an image alt holding the other quote character" do
+      convert = ->(html : String) { Hwaro::Services::Importers::HtmlToMarkdown.convert(html) }
+      convert.call(%(<img src="/dog.png" alt="Bob's dog">)).should eq("![Bob's dog](/dog.png)")
+      convert.call(%(<img alt="It's me" src="/me.png" />)).should eq("![It's me](/me.png)")
+      convert.call(%(<img src='/q.png' alt='say "hi"'>)).should eq(%(![say "hi"](/q.png)))
+      convert.call(%(<img data-src="/lazy.png" alt="lazy">)).should eq("![lazy](/lazy.png)")
+    end
   end
 end

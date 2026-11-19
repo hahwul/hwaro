@@ -83,3 +83,15 @@ describe Hwaro::Services::UnusedAssets do
     end
   end
 end
+
+describe "UnusedAssets: load_data() CSV sources" do
+  it "keeps an image named only in a data/*.csv file load_data() reads" do
+    Dir.mktmpdir do |dir|
+      build_input_project(dir, "")
+      FileUtils.mkdir_p(File.join(dir, "data"))
+      File.write(File.join(dir, "data", "team.csv"), "name,avatar\nAlice,alice.png\n")
+      write_static(dir, "img/alice.png")
+      build_input_unused(dir).should be_empty
+    end
+  end
+end

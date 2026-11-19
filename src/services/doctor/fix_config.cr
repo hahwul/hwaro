@@ -269,7 +269,7 @@ module Hwaro
         # `inf`/`nan` are TOML floats too; doctor reports them (the loader
         # silently swaps in the default), so `--fix` must be able to clear
         # them as well.
-        number = /[+-]?(?:\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|inf|nan)/
+        number = /[+-]?(?:\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d[\d_]*)?|inf|nan)/
         lines.each_with_index do |line, idx|
           # Lines inside a TOML multi-line string are string CONTENT: a
           # priority-looking line there must never be clamped, and a
@@ -292,8 +292,10 @@ module Hwaro
                   next
                 end
 
-          next unless m = line.match(/^([ \t]*)(#{key})([ \t]*=[ \t]*)(#{number})(.*)$/)
-          val = m[4].to_f?
+          # The whole value, up to a comment, with TOML's `_` digit
+          # separators: matching only a prefix rewrote `15_0.0` as `1.0_0.0`.
+          next unless m = line.match(/^([ \t]*)(#{key})([ \t]*=[ \t]*)(#{number})(\s*(?:#.*)?)$/)
+          val = m[4].delete('_').to_f?
           next unless val
           next if 0.0 <= val <= 1.0
           # A non-finite value is not clamped: the loader replaces it with

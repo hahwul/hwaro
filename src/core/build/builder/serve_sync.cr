@@ -545,7 +545,7 @@ module Hwaro
           # at `/posts/foo/`) sits in a directory the write landed in: rename
           # it to the URL's case, as a cold build would spell it. The dev
           # server 404s case-mismatched paths, so the new URL answered 404.
-          respell_folded_output_dirs(respell, output_dir) unless respell.empty?
+          respell_folded_output_dirs(respell, output_dir, leaves: true) unless respell.empty?
         end
 
         # Add `path` to the keep-set of `prune_unclaimed_outputs`: exact

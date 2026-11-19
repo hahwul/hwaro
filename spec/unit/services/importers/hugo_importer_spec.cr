@@ -147,6 +147,23 @@ SUMMARY_POST = <<-MD
 
 describe Hwaro::Services::Importers::HugoImporter do
   describe "#run" do
+    # `+++` only ever opens front matter; a parse failure used to import the
+    # page with an empty front matter and the raw TOML as its body.
+    it "reports a page whose TOML front matter does not parse instead of importing it" do
+      Dir.mktmpdir do |tmpdir|
+        hugo_dir = setup_hugo_site(tmpdir)
+        write_hugo_content(hugo_dir, "posts/bad.md", "+++\ntitle = \"unterminated\ndate = 2024-01-01\n+++\nBody\n")
+        write_hugo_content(hugo_dir, "posts/good.md", "+++\ntitle = \"Good\"\n+++\nFine\n")
+        output_dir = File.join(tmpdir, "output")
+
+        result = Hwaro::Services::Importers::HugoImporter.new.run(make_hugo_options(hugo_dir, output_dir))
+
+        result.imported_count.should eq(1)
+        result.error_count.should eq(1)
+        File.exists?(File.join(output_dir, "posts", "bad.md")).should be_false
+      end
+    end
+
     it "imports a TOML frontmatter post" do
       Dir.mktmpdir do |tmpdir|
         hugo_dir = setup_hugo_site(tmpdir)
