@@ -132,6 +132,8 @@ module Hwaro
           # per call (backtrace capture + unwind) was most of the compile
           # time of function-heavy frameworks such as Bulma.
           @return_value = nil.as(Value?)
+          # Expression trees of this compile's templates (see `parse_expr`).
+          @parsed_exprs = {} of Ast::TextTemplate => Expr::Node
           @call_depth = 0
           # Bumped when text spliced into a quoted string carries that
           # string's own quote (see `resolve_template`).
@@ -1447,7 +1449,7 @@ module Hwaro
         end
 
         private def message_text(template : Ast::TextTemplate) : String
-          value = Expr::Evaluator.new(self, strict: true, force_div: true).eval(Expr.parse!(template))
+          value = Expr::Evaluator.new(self, strict: true, force_div: true).eval(parse_expr!(template))
           value.is_a?(Str) ? value.text : Builtins.inspect_value(value)
         rescue SoftEvalError
           resolve_value(template)
@@ -1772,10 +1774,29 @@ module Hwaro
         # Functions
         # ---------------------------------------------------------------
 
+        # `Expr.parse`, memoized per template: a function body, mixin or
+        # loop re-evaluates the same templates on every call, and the tree
+        # depends on the template alone (it is never mutated). Identity
+        # keys hold the template, so its address cannot be reused. Only
+        # successes are kept — a failed parse (and its nesting warning)
+        # happens again as before.
+        private def parse_expr(template : Ast::TextTemplate) : Expr::Node?
+          if node = @parsed_exprs[template]?
+            return node
+          end
+          node = Expr.parse(template)
+          @parsed_exprs[template] = node if node
+          node
+        end
+
+        private def parse_expr!(template : Ast::TextTemplate) : Expr::Node
+          @parsed_exprs[template]? || (@parsed_exprs[template] = Expr.parse!(template))
+        end
+
         # Strict expression evaluation for control-flow contexts: every
         # failure is a located error.
         private def eval_expr!(template : Ast::TextTemplate) : Value
-          node = Expr.parse!(template)
+          node = parse_expr!(template)
           Expr::Evaluator.new(self, strict: true, force_div: true).eval(node)
         rescue ex : SoftEvalError
           error_at(template.line, template.column, ex.message || "invalid expression")
@@ -2265,7 +2286,7 @@ module Hwaro
           if template.pieces.size == 1 && (ref = template.pieces[0].as?(Ast::VarRef))
             return lookup_var_ref(ref)
           end
-          if node = Expr.parse(template)
+          if node = parse_expr(template)
             if Expr.computes?(node, self, force_div: true, amp: true)
               begin
                 return value_storage(Expr::Evaluator.new(self, force_div: true).eval(node))
@@ -2284,7 +2305,7 @@ module Hwaro
           # `'#{"Don't"}'`: only the typed path can re-quote the string.
           # `1px, $null, 2px`: only the typed path drops the null element —
           # the text path leaves an empty `1px, , 2px` member behind.
-          if (@quote_conflicts != conflicts || (@null_elisions != nulls && comma_hole?(text))) && (node = Expr.parse(template))
+          if (@quote_conflicts != conflicts || (@null_elisions != nulls && comma_hole?(text))) && (node = parse_expr(template))
             begin
               return value_storage(Expr::Evaluator.new(self, force_div: true).eval(node))
             rescue SoftEvalError
@@ -2301,7 +2322,7 @@ module Hwaro
         # while a null-valued variable must omit the declaration.
         private def resolve_decl_value(template : Ast::TextTemplate,
                                        fold_calc : Bool = true) : ResolvedValue
-          if node = Expr.parse(template)
+          if node = parse_expr(template)
             if Expr.computes?(node, self, fold_calc: fold_calc, amp: true)
               begin
                 value = Expr::Evaluator.new(self, fold_calc: fold_calc).eval(node)
@@ -2320,7 +2341,7 @@ module Hwaro
           conflicts = @quote_conflicts
           nulls = @null_elisions
           text = collapse_ws(resolve_template(template, allow_vars: true))
-          if (@quote_conflicts != conflicts || (@null_elisions != nulls && comma_hole?(text))) && (node = Expr.parse(template))
+          if (@quote_conflicts != conflicts || (@null_elisions != nulls && comma_hole?(text))) && (node = parse_expr(template))
             begin
               return ResolvedValue.new(Expr::Evaluator.new(self, fold_calc: fold_calc).eval(node).to_css, false)
             rescue SoftEvalError
@@ -2338,7 +2359,7 @@ module Hwaro
         # `#{&}` is the parent selector list; in a selector it stays the
         # verbatim `&` that `substitute_parent` rewrites per parent.
         private def resolve_interp(template : Ast::TextTemplate, amp : Bool = false) : String
-          if node = Expr.parse(template)
+          if node = parse_expr(template)
             if Expr.computes?(node, self, force_div: true, amp: amp)
               begin
                 # `interp_css`, not `to_css`: inside `#{...}` dart-sass
