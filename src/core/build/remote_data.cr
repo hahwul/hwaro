@@ -294,7 +294,8 @@ module Hwaro
           fetched_at = json["fetched_at"]?.try(&.as_i64?)
           return unless url_digest && fetched_at
           {url_digest: url_digest, fetched_at: Time.unix(fetched_at), format: json["format"]?.try(&.as_s?)}
-        rescue JSON::ParseException | IO::Error | ArgumentError
+        rescue JSON::ParseException | IO::Error | ArgumentError | OverflowError
+          # `Time.unix` overflows near Int64::MAX: a corrupt stamp is a stale entry.
           nil
         end
 
