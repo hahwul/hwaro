@@ -220,6 +220,7 @@ module Hwaro::Core::Build::Phases::Render
     # site's reads; otherwise the cached pages still depend on the last
     # build's, so keep those too. Deferred under fast-start, like the set
     # fingerprints: render_deferred records both once its pages are written.
+    @render_reads_state = nil
     if cache_enabled
       @deferred_cache_keys = nil
       if ctx.options.fast_start && has_deferred_pages?
@@ -227,6 +228,7 @@ module Hwaro::Core::Build::Phases::Render
       else
         build_cache.record_set_fingerprints(page_set_fp, section_set_fp) if ctx.options.fast_start
         record_render_reads(build_cache, render_globals, render_input_values, rendered_every_page)
+        @render_reads_state = {render_globals, render_input_values} unless ctx.options.serve_mode
       end
     end
     profiler.end_phase

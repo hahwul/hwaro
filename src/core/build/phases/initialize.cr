@@ -163,6 +163,10 @@ module Hwaro::Core::Build::Phases::Initialize
         config_hash = "#{config_hash}-#{compute_data_hash}-#{Cache.compute_options_hash(ctx.options)}"
         # A grammar edit re-highlights every page; no grammars, no change.
         config_hash = "#{config_hash}-lexers:#{lexers_digest}" unless lexers_digest.empty?
+        # Rebuild once so the recorded render inputs include the taxonomy
+        # templates' reads (Builder#record_taxonomy_render_reads) before a
+        # warm build may keep the term pages they render.
+        config_hash = "#{config_hash}-taxonomy-reads:1"
         # Rebuild once after the protected-source and SVG publishing defaults
         # change, even when the source and Hwaro::VERSION have not moved.
         config_hash = "#{config_hash}-security-policy:1"

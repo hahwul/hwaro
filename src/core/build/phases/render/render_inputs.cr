@@ -99,6 +99,28 @@ module Hwaro::Core::Build::Phases::Render
     digest.hexfinal
   end
 
+  # The taxonomy generator renders in the Generate phase, after
+  # `record_render_reads` stored this build's keys, so a read only a term or
+  # taxonomy template makes (an `env()`, a `load_data()` outside data/) is
+  # folded in here. `taxonomy_outputs_unchanged?` keeps last build's term
+  # pages only because a change to one of these reads invalidates the build
+  # like any other recorded read. Nothing to do without `--cache` or in serve.
+  def record_taxonomy_render_reads : Nil
+    state = @render_reads_state
+    build_cache = @cache
+    return unless state && build_cache
+    reads = Content::Processors::TemplateEngine.take_render_reads
+    return if reads.empty?
+    render_globals, values = state
+    keys = (reads.to_a + build_cache.render_input_keys).uniq.sort!
+    build_cache.record_render_inputs(render_inputs_digest(render_globals, keys, values), stamped_render_input_keys(keys, values))
+  end
+
+  # Does this build record the taxonomy templates' reads? (see above)
+  def taxonomy_render_reads_recorded? : Bool
+    !@render_reads_state.nil?
+  end
+
   # The keys to persist: the real read keys plus a fresh stamp for every
   # file among them that exists (computed by `render_inputs_digest`).
   private def stamped_render_input_keys(keys : Array(String), values : Hash(String, String)) : Array(String)

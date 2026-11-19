@@ -54,6 +54,34 @@ module Hwaro::Core::Build::Phases::Generate
       !@cache.try(&.globals_invalidated?) && !static_copy_over_skippable_output?(ctx)
   end
 
+  # True when a warm `--cache` build may keep the taxonomy index, term, pager
+  # and term-feed files the previous build wrote instead of rendering them
+  # again (each still on disk and not just replaced by the static copy, see
+  # `Taxonomies.reusable_output?`). Every input they render from is unchanged:
+  #
+  #   * every page was a cache hit, the page/section set did not move and no
+  #     global input changed (`generate_outputs_unchanged?`) — so the term
+  #     lists, the pages they print and the site-wide template variables are
+  #     what they were;
+  #   * no template changed and no feed template exists
+  #     (`feeds_need_regeneration?`) — no page's dependency closure covers
+  #     the taxonomy templates, so a cache hit says nothing about them;
+  #   * what those templates read outside the tracked files is part of the
+  #     recorded render inputs (`record_taxonomy_render_reads`), so a change
+  #     there already invalidated the build;
+  #   * no term `_index.md` — its body and aliases reach the term page
+  #     outside the page fingerprints;
+  #   * no `[build] write_stats` — its file lists every page written.
+  #
+  # Never in serve, which keeps its own record of taxonomy outputs.
+  def taxonomy_outputs_unchanged?(ctx : Lifecycle::BuildContext) : Bool
+    site = @site
+    return false unless site && taxonomy_render_reads_recorded? && @html_stats.nil?
+    hits = ctx.stats.cache_hits
+    return false unless hits > 0 && hits == ctx.all_pages.size
+    generate_outputs_unchanged?(ctx) && !feeds_need_regeneration? && site.sections.none?(&.term_metadata)
+  end
+
   # Did this build's static copy land on a file one of the skippable
   # generators (sitemap, feeds, llms, search) publishes?
   private def static_copy_over_skippable_output?(ctx : Lifecycle::BuildContext) : Bool

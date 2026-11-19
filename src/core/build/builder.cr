@@ -388,6 +388,11 @@ module Hwaro
         # every auto-include asset — O(site) work for one page — and silently
         # used cache_busting defaults instead of the build's options.
         @render_global_vars : Hash(String, Crinja::Value)? = nil
+        # The render-inputs digest state (globals digest, memoized read values)
+        # of a CLI `--cache` build, kept from the Render phase so the taxonomy
+        # generator's template reads can join the recorded keys
+        # (`record_taxonomy_render_reads`). Nil without `--cache` and in serve.
+        @render_reads_state : {String, Hash(String, String)}? = nil
         # `[build] write_stats`: tags/classes/ids of every HTML page this
         # Builder wrote, flushed to `hwaro_stats.json`. Nil when the feature
         # is off. Replaced per full build; serve's incremental passes keep
