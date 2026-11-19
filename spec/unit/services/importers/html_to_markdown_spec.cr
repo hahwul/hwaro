@@ -336,5 +336,13 @@ describe Hwaro::Services::Importers::HtmlToMarkdown do
       convert.call("<table><tr><th>H</th></tr><tr><td>c1<br/>c2</td></tr><tr><td><p>d1</p><p>d2</p></td></tr></table>")
         .should eq("| H |\n| --- |\n| c1 c2 |\n| d1 d2 |")
     end
+
+    it "keeps an image alt holding the other quote character" do
+      convert = ->(html : String) { Hwaro::Services::Importers::HtmlToMarkdown.convert(html) }
+      convert.call(%(<img src="/dog.png" alt="Bob's dog">)).should eq("![Bob's dog](/dog.png)")
+      convert.call(%(<img alt="It's me" src="/me.png" />)).should eq("![It's me](/me.png)")
+      convert.call(%(<img src='/q.png' alt='say "hi"'>)).should eq(%(![say "hi"](/q.png)))
+      convert.call(%(<img data-src="/lazy.png" alt="lazy">)).should eq("![lazy](/lazy.png)")
+    end
   end
 end

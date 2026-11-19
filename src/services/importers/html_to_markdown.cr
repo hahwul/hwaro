@@ -335,9 +335,14 @@ module Hwaro
           # untrusted export can't smuggle a live `javascript:`/`data:` src
           # into content — the importer stays safe regardless of the markdown
           # renderer's `safe` flag.
-          result = result.gsub(/<img[^>]*\bsrc=["']([^"']+)["'][^>]*\balt=["']([^"']*)["'][^>]*\/?>/i) { safe_media($1, $2, image: true) }
-          result = result.gsub(/<img[^>]*\balt=["']([^"']*)["'][^>]*\bsrc=["']([^"']+)["'][^>]*\/?>/i) { safe_media($2, $1, image: true) }
-          result = result.gsub(/<img[^>]*\bsrc=["']([^"']+)["'][^>]*\/?>/i) { safe_media($1, "", image: true) }
+          # Attributes are read by `attr_value`, which closes a value on its
+          # own opening quote: `["']…["']` cut `alt="Bob's dog"` at the
+          # apostrophe. A lazy-load `data-src` (which the old `\bsrc=` also
+          # matched) stands in for a missing `src`.
+          result = result.gsub(/<img\b[^>]*>/i) do |tag|
+            src = attr_value(tag, "src").presence || attr_value(tag, "data-src")
+            src.nil? || src.empty? ? tag : safe_media(src, attr_value(tag, "alt") || "", image: true)
+          end
 
           # Links — likewise drop a dangerous href but keep the link text.
           #
