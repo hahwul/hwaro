@@ -28,7 +28,7 @@ hwaro tool urls --json
 |------|------|
 | `page` | Content pages, including `[[content.generate]]` pages |
 | `section` | Section index pages (`_index.md`) |
-| `alias` | Redirect stubs written for `aliases` |
+| `alias` | Redirect stubs written for `aliases`, under the URL of the file written (`/old/index.htm` is listed as itself, not as `/old/`) |
 | `pagination` | Pager pages of sections and taxonomy terms (`/posts/page/2/`) |
 | `taxonomy` | Taxonomy index pages (`/tags/`) |
 | `term` | Taxonomy term pages (`/tags/crystal/`) |

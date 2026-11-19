@@ -214,7 +214,9 @@ An alias is used exactly as written, Unicode form included, so it can keep an ol
 URL that an older hwaro published under a decomposed (NFD) file name answering.
 When an alias resolves to the same output file as a page, the page takes
 precedence. This also applies to percent-encoded spellings of the file name
-and to case differences on case-insensitive filesystems.
+and to case differences on case-insensitive filesystems. An alias that names
+a file (`/legacy.html`) where a page publishes a directory (`/legacy.html/`)
+yields to the page the same way.
 
 ### Custom Metadata
 

@@ -626,7 +626,7 @@ module Hwaro
                end
       end
 
-      private URL_DELIMITER_ESCAPES = {'#' => "%23", '?' => "%3F", '"' => "%22", '<' => "%3C", '>' => "%3E"}
+      URL_DELIMITER_ESCAPES = {'#' => "%23", '?' => "%3F", '"' => "%22", '<' => "%3C", '>' => "%3E"}
 
       # Generate permalink (absolute URL)
       def generate_permalink(base_url : String) : String

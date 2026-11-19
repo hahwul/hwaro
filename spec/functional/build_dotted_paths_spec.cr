@@ -339,6 +339,68 @@ describe "build: alias targets that name the same file" do
     end
   end
 
+  # A stub that is a FILE (`/legacy.html` is `legacy.html`) and a directory
+  # something else publishes into (`legacy.html.md` is
+  # `legacy.html/index.html`) cannot both exist. Keyed apart, neither claim
+  # saw the other and the second writer failed the build with HWARO_E_IO.
+  describe "an alias file where another output needs a directory" do
+    it "yields to the page that publishes that directory" do
+      log = with_captured_log do
+        build_site(
+          DOTS_CONFIG,
+          content_files: {
+            "legacy.html.md" => "+++\n+++\n\nLegacy body\n",
+            "zz.md"          => "+++\naliases = [\"/legacy.html\", \"/kept.html\"]\n+++\n\nOther body\n",
+          },
+          template_files: {"page.html" => "{{ content }}"},
+        ) do
+          File.read("public/legacy.html/index.html").should contain("Legacy body")
+          File.read("public/kept.html").should contain("http-equiv")
+        end
+      end
+      log.should contain("alias on 'zz.md' collides with 'legacy.html.md' (a file where the other needs a directory) and is not written")
+    end
+
+    it "yields to a page nested deeper in that directory" do
+      log = with_captured_log do
+        build_site(
+          DOTS_CONFIG,
+          content_files: {
+            "legacy.html/post.md" => "+++\naliases = [\"/legacy.html\"]\n+++\n\nNested body\n",
+            "zz.md"               => "+++\naliases = [\"/legacy.html\"]\n+++\n\nOther body\n",
+          },
+          template_files: {"page.html" => "{{ content }}"},
+        ) do
+          File.read("public/legacy.html/post/index.html").should contain("Nested body")
+        end
+      end
+      # The nested page's own alias is dropped without a warning.
+      log.scan("Duplicate alias output path").size.should eq(1)
+      log.should contain("alias on 'zz.md' collides with 'legacy.html/post.md'")
+    end
+
+    it "lets the first of two aliases keep the path, whichever is the file" do
+      {
+        {"/o.html", "/o.html/sub/", "public/o.html"},
+        {"/o.html/index.html", "/o.html", "public/o.html/index.html"},
+      }.each do |first, second, written|
+        log = with_captured_log do
+          build_site(
+            DOTS_CONFIG,
+            content_files: {
+              "a.md" => "+++\naliases = [#{first.inspect}]\n+++\n\nA\n",
+              "b.md" => "+++\naliases = [#{second.inspect}]\n+++\n\nB\n",
+            },
+            template_files: {"page.html" => "{{ content }}"},
+          ) do
+            File.read(written).should contain("http-equiv")
+          end
+        end
+        log.should contain("alias on 'b.md' collides with 'a.md' (a file where the other needs a directory) and is not written")
+      end
+    end
+  end
+
   it "still writes a non-colliding .html alias" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do

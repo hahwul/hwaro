@@ -88,7 +88,7 @@ module Hwaro
           output_writers(all_pages).each do |page|
             source = page.synthesized? ? nil : File.join("content", page.path)
             plan_page(page, site, templates, output_dir, source, planned)
-            each_alias_output(page, output_dir) { |url, _| planned << PlannedUrl.new(url, "alias", source) }
+            each_alias_output(page, output_dir) { |url, dest| planned << PlannedUrl.new(alias_stub_url(url, dest, output_dir), "alias", source) }
           end
 
           taxonomy = Content::Taxonomies.planned_urls(site, output_dir)
@@ -136,17 +136,28 @@ module Hwaro
           taxonomy_urls = taxonomy.select(&.kind.in?("taxonomy", "term")).map(&.url).to_set
           term_meta.each do |url, meta|
             next unless term_urls.includes?(url)
-            each_alias_output(meta, output_dir, term_alias_refusals(meta, taxonomy_urls)) do |alias_url, _|
-              planned << PlannedUrl.new(alias_url, "alias", File.join("content", meta.path))
+            each_alias_output(meta, output_dir, term_alias_refusals(meta, taxonomy_urls)) do |alias_url, dest|
+              planned << PlannedUrl.new(alias_stub_url(alias_url, dest, output_dir), "alias", File.join("content", meta.path))
             end
           end
         end
 
+        # The URL a redirect stub answers at. `url` (`normalize_alias_url`)
+        # is the alias as a collision key, which spells `/x/index.htm` and
+        # `/o.html/` as directories; the stubs written for them are the files
+        # `x/index.htm` and `o.html`, and a host serves those names.
+        private def alias_stub_url(url : String, dest : String, output_dir : String) : String
+          return url unless url.ends_with?('/') && (file = Utils::PathUtils.relative_path(dest, output_dir))
+          natural = Utils::PathUtils.output_file_key(url).try { |dir| Path.posix(dir, "index.html").to_s }
+          file == natural ? url : output_file_url(file)
+        end
+
         # The URL that serves an output file given relative to the output
         # directory: `posts/a/index.html` is `/posts/a/`, `old.html` and
-        # `rss.xml` are themselves.
+        # `rss.xml` are themselves. The characters of a file name that a URL
+        # cannot hold raw are escaped as `Page#url=` escapes them.
         private def output_file_url(file : String) : String
-          url = "/#{file.gsub('\\', '/')}"
+          url = "/#{file.gsub('\\', '/').gsub('%', "%25").gsub(Models::Page::URL_DELIMITER_ESCAPES)}"
           url.ends_with?("/index.html") ? url.rchop("index.html") : url
         end
       end

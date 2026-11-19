@@ -255,6 +255,26 @@ describe "Hwaro::Core::Build::Builder#plan_urls" do
     end
   end
 
+  # `normalize_alias_url` keys `/x/index.htm` and `/o.html/` as directories,
+  # but their stubs are the files `x/index.htm` and `o.html`.
+  it "lists an alias under the URL of the file its stub is written to" do
+    files = {
+      "about.md"       => page(%(title = "About"\naliases = ["/x/index.htm", "/o.html/", "/old/index.html", "/legacy.html", "/h%23h/index.htm"])),
+      "100%/_index.md" => page(%(title = "Percent"\ngenerate_feeds = true)),
+      "100%/p.md"      => page(%(title = "P"\ndate = "2026-01-01")),
+    }
+    in_site(URL_PLAN_CONFIG, files) do
+      planned = plan
+      planned.select { |entry| entry.kind == "alias" }.map(&.url).sort!.should eq(["/h%23h/index.htm", "/legacy.html", "/o.html", "/old/", "/x/index.htm"])
+      # A file name's `%` and `#` are spelled as page URLs spell them.
+      planned.map(&.url).should contain("/100%25/rss.xml")
+      built_urls
+      %w[h#h/index.htm legacy.html o.html old/index.html x/index.htm 100%/rss.xml].each do |file|
+        File.file?(File.join("public", file)).should be_true
+      end
+    end
+  end
+
   it "raises the build's own classified error for a broken site" do
     in_site(URL_PLAN_CONFIG, {"bad.md" => "+++\ntitle = \"open\n+++\n"}) do
       expect_raises(Hwaro::HwaroError, /Invalid TOML frontmatter/) { plan }
