@@ -71,8 +71,8 @@ contract over scraping human text.**
 
 - **`-j` / `--json`** — available on every top-level command (`init`, `new`,
   `build`, `serve`, `doctor`, `deploy`) and on the tool subcommands `list`,
-  `stats`, `validate`, `unused-assets`, `check-links`, `convert`, `import`,
-  `export`. It implies `--quiet`, and errors become the JSON error
+  `stats`, `validate`, `unused-assets`, `urls`, `check-links`, `convert`,
+  `import`, `export`. It implies `--quiet`, and errors become the JSON error
   payload below. Discovery flags pair with it: `init --list-scaffolds`,
   `new --list-archetypes`, `deploy --list-targets`. Parse the JSON; do not
   regex the pretty output.
@@ -224,6 +224,7 @@ hwaro tool list drafts --json        # all | drafts | published; --sort date|tit
 hwaro tool stats --json              # word counts, page totals, top tags
 hwaro tool convert to-yaml           # to-yaml | to-toml | to-json (front matter, in place)
 hwaro tool unused-assets --json      # unreferenced files under static/ (--delete -f removes them)
+hwaro tool urls --json               # every URL a build would publish (pages, aliases, pagination, taxonomies, feeds); writes nothing
 hwaro tool agents-md --write         # (re)generate AGENTS.md (--remote = links-only; -f skips the prompt, keeps the site-specific section)
 hwaro tool import hugo /path/to/hugo-site     # also: jekyll, wordpress, notion, obsidian, hexo, astro, eleventy
 hwaro tool export jekyll                       # also: hugo (writes to export/ by default)

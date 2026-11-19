@@ -20,6 +20,7 @@ Hwaro는 콘텐츠 관리를 돕는 유틸리티 도구와, CLI를 더 편하게
 | [stats](/ko/start/tools/stats/) | 콘텐츠 통계 표시 |
 | [validate](/ko/start/tools/validate/) | 콘텐츠 프론트 매터와 마크업 검증 |
 | [unused-assets](/ko/start/tools/unused-assets/) | 참조되지 않는 정적 파일 찾기 |
+| [urls](/ko/start/tools/urls/) | 빌드가 게시할 URL 미리보기 |
 | [platform](/ko/start/tools/platform/) | 호스팅 플랫폼 설정 파일 생성 |
 | [import](/ko/start/tools/import/) | 다양한 플랫폼에서 콘텐츠 가져오기 |
 | [export](/ko/start/tools/export/) | 다른 플랫폼으로 콘텐츠 내보내기 |

@@ -15,7 +15,7 @@ and AI agents that want clean output.
 
 | Flag / Env var | Description |
 |----------------|-------------|
-| `-q`, `--quiet` | Suppress informational output and the startup banner. Warnings and errors still appear on stderr. The result a command exists to print (`--help`, listings such as `tool list` / `tool stats` / `tool unused-assets` / `--list-*`, the version, completion scripts) is still printed on stdout. |
+| `-q`, `--quiet` | Suppress informational output and the startup banner. Warnings and errors still appear on stderr. The result a command exists to print (`--help`, listings such as `tool list` / `tool stats` / `tool unused-assets` / `tool urls` / `--list-*`, the version, completion scripts) is still printed on stdout. |
 | `NO_COLOR` (env) | When set to any non-empty value, suppresses ANSI color codes from every command's output. Follows the [no-color.org](https://no-color.org) cross-tool convention. |
 | `GC_MARKERS` (env) | GC marker-thread count. For `hwaro build` only, Hwaro defaults this to `1` (measured 3-5x faster on allocation-heavy sites); export it to override. Other commands keep the garbage collector's stock behavior. |
 | `GC_INITIAL_HEAP_SIZE` (env) | Initial GC heap size. For `hwaro build` only, Hwaro defaults this to `256M` to avoid repeated grow-collect cycles; export it to override. Skipped automatically when `--memory-limit` / `HWARO_MEMORYLIMIT` is set. |
@@ -567,6 +567,7 @@ hwaro tool check-links          # Check for dead external links
 hwaro tool stats                # Show content statistics
 hwaro tool validate             # Validate content frontmatter and markup
 hwaro tool unused-assets        # Find unreferenced static files
+hwaro tool urls                 # Preview the URLs a build would publish
 
 # Site tools
 hwaro tool platform netlify       # Generate Netlify config
@@ -587,6 +588,7 @@ hwaro tool convert to-yaml --json
 hwaro tool stats --json
 hwaro tool validate --json
 hwaro tool unused-assets --json
+hwaro tool urls --json
 hwaro tool check-links --json
 hwaro tool import jekyll /path --json
 hwaro tool export hugo --json
@@ -598,7 +600,7 @@ hwaro tool export hugo --dry-run
 ```
 
 The `list` and `convert` commands accept only the positional arguments shown in
-their usage. `check-links`, `stats`, `validate`, and `unused-assets` accept no
+their usage. `check-links`, `stats`, `validate`, `unused-assets`, and `urls` accept no
 positional arguments. Extra positional arguments, including arguments after
 `--`, are rejected with a usage error; use the documented flags for additional
 paths and options.
@@ -616,6 +618,7 @@ report and do not accept `--json`; every other `tool` subcommand does.
 | Content | [stats](/start/tools/stats/) | Show content statistics |
 | Content | [validate](/start/tools/validate/) | Validate content frontmatter and markup |
 | Content | [unused-assets](/start/tools/unused-assets/) | Find unreferenced static files |
+| Content | [urls](/start/tools/urls/) | Preview the URLs a build would publish |
 | Site | [platform](/start/tools/platform/) | Generate platform config and CI/CD workflow files |
 | Site | [import](/start/tools/import/) | Import content from WordPress, Jekyll, Hugo, Notion, Obsidian, Hexo, Astro, or Eleventy |
 | Site | [export](/start/tools/export/) | Export content to Hugo or Jekyll |
