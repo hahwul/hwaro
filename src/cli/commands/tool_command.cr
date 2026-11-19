@@ -9,6 +9,7 @@
 #   list          - List content files by status
 #   check-links   - Check for dead links
 #   stats         - Show content statistics
+#   urls          - Preview the URLs a build would publish
 #   validate      - Validate content frontmatter and markup
 #   unused-assets - Find unreferenced static files
 #   platform      - Generate hosting platform config files
@@ -28,6 +29,7 @@ require "./tool/stats_command"
 require "./tool/validate_command"
 require "./tool/unused_assets_command"
 require "./tool/agents_md_command"
+require "./tool/urls_command"
 require "../../utils/errors"
 require "../../utils/logger"
 require "../../utils/command_suggester"
@@ -67,6 +69,7 @@ module Hwaro
         register_sub(Tool::ValidateCommand.metadata) { |args| Tool::ValidateCommand.new.run(args) }
         register_sub(Tool::UnusedAssetsCommand.metadata) { |args| Tool::UnusedAssetsCommand.new.run(args) }
         register_sub(Tool::AgentsMdCommand.metadata) { |args| Tool::AgentsMdCommand.new.run(args) }
+        register_sub(Tool::UrlsCommand.metadata) { |args| Tool::UrlsCommand.new.run(args) }
 
         def self.subcommands : Array(CommandInfo)
           @@sub_metadata
@@ -132,7 +135,7 @@ module Hwaro
 
         # Category display order and membership for help output
         CATEGORIES = {
-          "Content" => ["list", "convert", "check-links", "stats", "validate", "unused-assets"],
+          "Content" => ["list", "convert", "check-links", "stats", "validate", "unused-assets", "urls"],
           "Site"    => ["platform", "import", "export", "agents-md"],
         }
 

@@ -1048,6 +1048,54 @@ describe "hwaro tool review-fix regressions (2026-08 batch)" do
   end
 end
 
+describe "hwaro tool urls" do
+  it "prints the URLs a build would publish without creating the output directory" do
+    with_initialized_project do |project_dir|
+      status, output, _ = run_hwaro(["tool", "urls"], chdir: project_dir)
+      status.success?.should be_true
+      lines = output.lines
+      lines.should eq(lines.sort)
+      lines.should contain("/")
+      lines.should contain("/about/")
+      lines.should contain("/tags/")
+      Dir.exists?(File.join(project_dir, "public")).should be_false
+
+      # The same list from outside the project, and under --quiet.
+      _, from_outside, _ = run_hwaro(["tool", "urls", "-i", project_dir, "-q"], chdir: File.dirname(project_dir))
+      from_outside.should eq(output)
+    end
+  end
+
+  it "emits one JSON document with kind and source per URL" do
+    with_initialized_project do |project_dir|
+      status, output, _ = run_hwaro(["tool", "urls", "--json"], chdir: project_dir)
+      status.success?.should be_true
+      payload = JSON.parse(output)
+      urls = payload["urls"].as_a
+      payload["count"].as_i.should eq(urls.size)
+      home = urls.find! { |entry| entry["url"] == "/" }
+      home["kind"].as_s.should eq("page")
+      home["source"].as_s.should eq("content/index.md")
+      tags = urls.find! { |entry| entry["url"] == "/tags/" }
+      tags["kind"].as_s.should eq("taxonomy")
+      tags["source"].raw.should be_nil
+    end
+  end
+
+  it "reports a missing config.toml as a classified error, as JSON under --json" do
+    Dir.mktmpdir do |dir|
+      status, output, error = run_hwaro(["tool", "urls"], chdir: dir)
+      status.exit_code.should eq(Hwaro::Errors::EXIT_CONFIG)
+      output.should be_empty
+      error.should contain("HWARO_E_CONFIG")
+
+      status, output, _ = run_hwaro(["tool", "urls", "--json"], chdir: dir)
+      status.exit_code.should eq(Hwaro::Errors::EXIT_CONFIG)
+      JSON.parse(output)["error"]["code"].as_s.should eq("HWARO_E_CONFIG")
+    end
+  end
+end
+
 # Regression: `doctor -q` printed its `[warning] …` lines on stdout, while
 # `--quiet` keeps warnings and errors on stderr for every other command
 # (`tool validate -q` included), as the CLI docs promise.

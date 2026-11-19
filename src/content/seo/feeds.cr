@@ -351,6 +351,9 @@ module Hwaro
                          end
 
           # Write feed file (filename is already basename-normalized above)
+          # The directory is created here, by the writer: planning a feed
+          # (`published_outputs`, `Builder#plan_urls`) touches no disk.
+          Hwaro::Utils::FileSafe.mkdir_p(output_dir)
           feed_path = File.join(output_dir, filename)
           Hwaro::Utils::FileSafe.atomic_write(feed_path, feed_content)
           Logger.action :create, feed_path if verbose
@@ -414,7 +417,6 @@ module Hwaro
             Logger.warn "Skipping feed output outside output directory: #{url}"
             return
           end
-          Hwaro::Utils::FileSafe.mkdir_p(candidate)
           candidate
         end
 

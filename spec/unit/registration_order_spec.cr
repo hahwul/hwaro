@@ -71,7 +71,7 @@ describe "registration order" do
     )
     Hwaro::CLI::Commands::ToolCommand.subcommands.map(&.name).should eq([
       "convert", "list", "check-links", "platform",
-      "import", "export", "stats", "validate", "unused-assets", "agents-md",
+      "import", "export", "stats", "validate", "unused-assets", "agents-md", "urls",
     ])
   end
 

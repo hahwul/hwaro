@@ -77,7 +77,9 @@ Initialize → ReadContent → ParseContent → Transform → Render (+ OutputFo
   serve-mode strategies (`run_incremental`, `run_incremental_then_rerender`,
   `run_rerender`, deferred fast-start pages), `builder/serve_sync.cr` the
   static/content-file sync, `builder/seo_surfaces.cr` the sitemap/feed/search
-  regeneration after a partial rebuild.
+  regeneration after a partial rebuild, `builder/url_plan.cr` the render-less
+  URL plan behind `hwaro tool urls` (`plan_urls`: Read → Parse → Transform,
+  then the writers' own planners).
 - `src/core/build/phases/<phase>.cr` is a flat `module Hwaro::Core::Build::Phases::<Phase>`
   included into Builder, so phase code reads and writes Builder ivars directly.
 - `phases/render.cr` keeps the tuning constants and the ordered require list

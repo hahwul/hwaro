@@ -20,6 +20,7 @@ The `hwaro tool` command provides utility subcommands for working with content f
 | [stats](/start/tools/stats/) | Show content statistics |
 | [validate](/start/tools/validate/) | Validate content frontmatter and markup |
 | [unused-assets](/start/tools/unused-assets/) | Find unreferenced static files |
+| [urls](/start/tools/urls/) | Preview the URLs a build would publish |
 | [platform](/start/tools/platform/) | Generate hosting platform config files |
 | [import](/start/tools/import/) | Import content from various platforms |
 | [export](/start/tools/export/) | Export content to other platforms |

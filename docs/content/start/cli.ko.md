@@ -15,7 +15,7 @@ Hwaro는 사이트를 만들고, 빌드하고, 서빙하는 명령을 제공합�
 
 | 플래그 / 환경 변수 | 설명 |
 |----------------|-------------|
-| `-q`, `--quiet` | 정보성 출력과 시작 배너를 숨김. 경고와 오류는 stderr에 계속 표시. 명령이 출력하려는 결과(`--help`, `tool list` / `tool stats` / `tool unused-assets` / `--list-*` 같은 목록, 버전, 자동 완성 스크립트)는 `--quiet`에서도 stdout에 출력됨 |
+| `-q`, `--quiet` | 정보성 출력과 시작 배너를 숨김. 경고와 오류는 stderr에 계속 표시. 명령이 출력하려는 결과(`--help`, `tool list` / `tool stats` / `tool unused-assets` / `tool urls` / `--list-*` 같은 목록, 버전, 자동 완성 스크립트)는 `--quiet`에서도 stdout에 출력됨 |
 | `NO_COLOR` (env) | 비어 있지 않은 값이면 모든 명령 출력에서 ANSI 색상 코드를 제거. [no-color.org](https://no-color.org)의 도구 공통 규약을 따름 |
 | `GC_MARKERS` (env) | GC 마커 스레드 수. `hwaro build`에 한해 Hwaro가 `1`을 기본값으로 지정합니다(할당이 많은 사이트에서 3~5배 빠르게 측정됨). 직접 export 하면 덮어쓸 수 있습니다. 다른 명령은 가비지 컬렉터의 기본 동작을 그대로 씁니다 |
 | `GC_INITIAL_HEAP_SIZE` (env) | GC 초기 힙 크기. `hwaro build`에 한해 Hwaro가 `256M`을 기본값으로 지정해 힙 확장-수집 사이클 반복을 피합니다. 직접 export 하면 덮어쓸 수 있습니다. `--memory-limit` / `HWARO_MEMORYLIMIT`가 설정되어 있으면 자동으로 건너뜁니다 |
@@ -570,6 +570,7 @@ hwaro tool check-links          # 죽은 외부 링크 검사
 hwaro tool stats                # 콘텐츠 통계 표시
 hwaro tool validate             # 콘텐츠 프론트 매터와 마크업 검증
 hwaro tool unused-assets        # 참조되지 않는 정적 파일 찾기
+hwaro tool urls                 # 빌드가 게시할 URL 미리보기
 
 # 사이트 도구
 hwaro tool platform netlify       # Netlify 설정 생성
@@ -590,6 +591,7 @@ hwaro tool convert to-yaml --json
 hwaro tool stats --json
 hwaro tool validate --json
 hwaro tool unused-assets --json
+hwaro tool urls --json
 hwaro tool check-links --json
 hwaro tool import jekyll /path --json
 hwaro tool export hugo --json
@@ -601,7 +603,7 @@ hwaro tool export hugo --dry-run
 ```
 
 `list`와 `convert` 명령은 사용법에 표시된 위치 인자만 받습니다.
-`check-links`, `stats`, `validate`, `unused-assets`는 위치 인자를 받지 않습니다.
+`check-links`, `stats`, `validate`, `unused-assets`, `urls`는 위치 인자를 받지 않습니다.
 `--` 뒤의 인자를 포함한 추가 위치 인자는 사용법 오류로 거부되므로, 경로나
 다른 옵션에는 문서에 나온 플래그를 사용하세요.
 
@@ -618,6 +620,7 @@ hwaro tool export hugo --dry-run
 | 콘텐츠 | [stats](/ko/start/tools/stats/) | 콘텐츠 통계 표시 |
 | 콘텐츠 | [validate](/ko/start/tools/validate/) | 콘텐츠 프론트 매터와 마크업 검증 |
 | 콘텐츠 | [unused-assets](/ko/start/tools/unused-assets/) | 참조되지 않는 정적 파일 찾기 |
+| 콘텐츠 | [urls](/ko/start/tools/urls/) | 빌드가 게시할 URL 미리보기 |
 | 사이트 | [platform](/ko/start/tools/platform/) | 플랫폼 설정과 CI/CD 워크플로 파일 생성 |
 | 사이트 | [import](/ko/start/tools/import/) | WordPress, Jekyll, Hugo, Notion, Obsidian, Hexo, Astro, Eleventy에서 콘텐츠 가져오기 |
 | 사이트 | [export](/ko/start/tools/export/) | 콘텐츠를 Hugo 또는 Jekyll로 내보내기 |

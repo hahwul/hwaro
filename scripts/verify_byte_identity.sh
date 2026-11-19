@@ -548,7 +548,7 @@ run_both_here "help:version" "$WORK" -- version
 for cmd in init build serve new deploy doctor tool completion; do
   run_both_here "help:$cmd" "$WORK" -- "$cmd" --help
 done
-for sub in convert list check-links platform import export stats validate unused-assets agents-md; do
+for sub in convert list check-links platform import export stats validate unused-assets agents-md urls; do
   run_both_here "help:tool-$sub" "$WORK" -- tool "$sub" --help
 done
 for shell in bash zsh fish; do
@@ -570,6 +570,8 @@ for s in $SCAFFOLDS; do
   run_both_here "validate:$s" "$d" -- tool validate
   run_both_here "validate-json:$s" "$d" -- tool validate --json
   run_both_here "unused-assets:$s" "$d" -- tool unused-assets
+  run_both_here "urls:$s" "$d" -- tool urls
+  run_both_here "urls-json:$s" "$d" -- tool urls --json
   run_both_here "check-links:$s (no build output)" "$d" -- tool check-links --internal-only
   built="$WORK/build/checklinks-$s"
   copy_tree "$d" "$built"

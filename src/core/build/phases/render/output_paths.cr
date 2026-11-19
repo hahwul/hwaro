@@ -291,11 +291,7 @@ module Hwaro::Core::Build::Phases::Render
       next unless url.starts_with?(base) && (match = url[base.size..].match(/\A([1-9]\d*)\/\z/))
       number = match[1].to_i? || next
       next unless number >= 2 && paginated_section?(section, determine_template(section, templates, site))
-      # The page list render_section_with_pagination paginates.
-      section_name = Path[section.path].dirname
-      section_name = "" if section_name == "."
-      pages = site.pages_for_section(section_name, section.language).reject(&.output_suppressed)
-      return section.path if number <= Content::Pagination::Paginator.new(site.config).paginate(section, pages).paginated_pages.size
+      return section.path if number <= section_pagination(section, site).paginated_pages.size
     end
   end
 
@@ -381,7 +377,12 @@ module Hwaro::Core::Build::Phases::Render
     target
   end
 
-  private def generate_aliases(page : Models::Page, site : Models::Site, output_dir : String, verbose : Bool, except : Set(String)? = nil)
+  # The redirect stubs `page`'s aliases publish: yields each one's URL
+  # (`normalize_alias_url`, the spelling collisions are keyed by) and the
+  # file it is written to. ONE decision
+  # feeds the writer (`generate_aliases`) and `Builder#plan_urls`, so the
+  # URL preview cannot list a stub the build refuses.
+  private def each_alias_output(page : Models::Page, output_dir : String, except : Set(String)? = nil, & : String, String ->) : Nil
     return if page.aliases.empty?
     own_url = Utils::PathUtils.normalize_alias_url(page.url)
     own_path = Utils::PathUtils.output_file_key(page.url)
@@ -409,7 +410,9 @@ module Hwaro::Core::Build::Phases::Render
       # Encoded paths and case-folded paths can point to the page's own file.
       next if alias_file == own_file
       if own_fold && Utils::PathUtils.output_fold_key(alias_file) == own_fold
-        folds_case = Utils::PathUtils.case_folding_fs?(output_dir) if folds_case.nil?
+        # The output directory's filesystem; a plan (`Builder#plan_urls`)
+        # runs before it exists and probes the project's instead.
+        folds_case = Utils::PathUtils.case_folding_fs?(Dir.exists?(output_dir) ? output_dir : Dir.current) if folds_case.nil?
         next if folds_case
       end
       dest_path = File.join(output_dir, alias_file)
@@ -421,6 +424,12 @@ module Hwaro::Core::Build::Phases::Render
         next
       end
 
+      yield norm, dest_path
+    end
+  end
+
+  private def generate_aliases(page : Models::Page, site : Models::Site, output_dir : String, verbose : Bool, except : Set(String)? = nil)
+    each_alias_output(page, output_dir, except) do |_, dest_path|
       ensure_dir(File.dirname(dest_path))
 
       # Prefix the page's root-relative URL with `base_url`'s path component so
