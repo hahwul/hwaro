@@ -119,6 +119,42 @@ describe "Render output paths: authored vs generated collisions" do
     end
   end
 
+  it "writes an alias stub on --cache once the page or pager page holding its path is gone" do
+    rebuild = -> {
+      builder = Hwaro::Core::Build::Builder.new
+      Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+      builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false))
+    }
+    with_captured_log do
+      build_site(
+        "title = \"T\"\nbase_url = \"http://localhost\"\n\n[pagination]\nenabled = true\nper_page = 1\n",
+        content_files: {
+          "about.md"       => "+++\ntitle = \"About\"\naliases = [\"/target/\", \"/blog/page/2/\", \"/legacy.html\"]\n+++\nAbout",
+          "target.md"      => "+++\ntitle = \"Target\"\n+++\nTARGET",
+          "legacy.html.md" => "+++\ntitle = \"Legacy\"\n+++\nLEGACY",
+          "blog/_index.md" => "+++\ntitle = \"Blog\"\n+++\n",
+          "blog/p1.md"     => "+++\ntitle = \"P1\"\n+++\nP1",
+          "blog/p2.md"     => "+++\ntitle = \"P2\"\n+++\nP2",
+        },
+        template_files: {
+          "page.html"    => "{{ content }}",
+          "section.html" => "PAGER={{ paginator.current_index }}",
+        },
+        cache: true,
+      ) do
+        File.read("public/target/index.html").should contain("TARGET")
+        # The aliasing page itself is untouched: only what held its paths goes.
+        File.delete("content/target.md")
+        File.delete("content/legacy.html.md")
+        File.delete("content/blog/p2.md")
+        rebuild.call
+        File.read("public/target/index.html").should contain("Redirecting to <a href=\"/about/\"")
+        File.read("public/legacy.html").should contain("Redirecting to <a href=\"/about/\"")
+        File.read("public/blog/page/2/index.html").should contain("Redirecting to <a href=\"/about/\"")
+      end
+    end
+  end
+
   it "fails with a classified I/O error when a page's slug shadows sitemap.xml" do
     err = expect_raises(Hwaro::HwaroError) do
       build_site(
