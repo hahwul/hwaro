@@ -560,6 +560,17 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
       out.should_not contain("{% endnote %}")
     end
 
+    # In a CRLF file the masked fence line kept its `\r`, which `body.strip`
+    # could not see: the body ended in "```\r" and Markdown read the closing
+    # fence as one more line of code.
+    it "strips the carriage return after a body's closing fence in a CRLF file" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/box" => "[{{ body }}]"}
+      out = builder.test_sc_process("{% box() %}\r\nRun:\r\n\r\n```sh\r\necho hi\r\n```\r\n{% end %}\r\n", templates)
+      out.should contain("```]")
+      out.should_not contain("```\r]")
+    end
+
     it "keeps a fenced block closer inside a block body from closing the block" do
       builder = Hwaro::Core::Build::Builder.new
       templates = {"shortcodes/note" => %(<div class="note">{{ body }}</div>)}
