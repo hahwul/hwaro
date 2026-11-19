@@ -539,6 +539,15 @@ describe Hwaro::Utils::HtmlMinifier do
         result = Hwaro::Utils::HtmlMinifier.minify(html)
         result.should eq("<p>A</p><p>B</p>")
       end
+
+      # Regression: the blank-line collapse was a regex over the whole
+      # document, so a quoted value lost its empty lines — a copy button's
+      # `data-copy` payload, a multi-paragraph `content="…"`.
+      it "keeps blank lines inside quoted attribute values" do
+        html = "<button data-copy=\"one\n\nthree\">c</button>\n<p title='a\n\n\nb'>x\n\n\ny</p>"
+        result = Hwaro::Utils::HtmlMinifier.minify(html)
+        result.should eq("<button data-copy=\"one\n\nthree\">c</button><p title='a\n\n\nb'>x\ny</p>")
+      end
     end
 
     describe "forged protected-block placeholders" do

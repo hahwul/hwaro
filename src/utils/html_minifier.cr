@@ -152,7 +152,6 @@ module Hwaro
       # (block neighbours), silently changing the rendered page.
       private REGEX_INTERTOKEN_WS  = /(<\/?[A-Za-z][\w-]*[^>]*>|\x00HW_HTML_P[BIH]_\d+\x00)([ \t\r\n\f]+)(?=(<\/?[A-Za-z][\w-]*[^>]*>|\x00HW_HTML_P[BIH]_\d+\x00))/
       private REGEX_TAG_NAME       = /^<\/?([A-Za-z][\w-]*)/
-      private REGEX_BLANK_LINES    = /\n{2,}/
       private REGEX_PRESERVE_TOKEN = /\x00HW_HTML_P[BIH]_(\d{1,9})\x00/
 
       # Minify the given HTML.
@@ -206,7 +205,6 @@ module Hwaro
         result = strip_comments_and_trailing_space(result)
         result = collapse_intra_tag_whitespace(result)
         result = collapse_inter_token_whitespace(result)
-        result = result.gsub(REGEX_BLANK_LINES, "\n")
         result = restore_sensitive_blocks(result, preserves)
         result.strip
       end
@@ -435,12 +433,17 @@ module Hwaro
       # (`<!...>`) and processing instructions (`<?...?>`) are
       # ignored. Protected-block placeholders are also ignored
       # (their bodies are already opaque).
+      #
+      # Runs of blank lines in TEXT collapse to one newline here too. A
+      # quoted value keeps its own: a whole-document `\n{2,}` pass rewrote
+      # `data-copy="a\n\nb"` and multi-paragraph `content="…"` values.
       private def collapse_intra_tag_whitespace(html : String) : String
         return html if html.empty?
         bytes = html.to_slice
         n = bytes.size
         String.build(n) do |io|
           i = 0
+          prev_newline = false
           while i < n
             b = bytes[i]
             if b == '<'.ord
@@ -449,11 +452,14 @@ module Hwaro
                 if tag_end >= 0
                   emit_collapsed_tag(io, bytes, i, tag_end)
                   i = tag_end + 1
+                  prev_newline = false
                   next
                 end
               end
             end
-            io.write_byte(b)
+            newline = b == '\n'.ord
+            io.write_byte(b) unless newline && prev_newline
+            prev_newline = newline
             i += 1
           end
         end
