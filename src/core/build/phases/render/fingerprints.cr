@@ -9,7 +9,7 @@ module Hwaro::Core::Build::Phases::Render
   # changes (not only when its own source changes). Version URLs
   # (`page.version`, `page.version_links`, `versions`) name the version root
   # sections the set actually holds (Versions.root_url).
-  PAGE_SET_MARKERS    = ["site.pages", "__all_pages__", ".pages", "paginate", "site.taxonomies", "__taxonomies__", "get_taxonomy", "site.menus", "get_menu", "__menus__", "version_links", "versions"]
+  PAGE_SET_MARKERS    = ["site.pages", "__all_pages__", ".pages", "paginate", "site.taxonomies", "__taxonomies__", "get_taxonomy", "site.menus", "get_menu", "__menus__", "version_links", "versions", "site.authors"]
   SECTION_SET_MARKERS = ["site.sections", "__all_sections__", "get_section", "site.menus", "get_menu", "__menus__", "page.version", "versions"]
 
   # The same markers split into the PROJECTIONS of the page set they actually

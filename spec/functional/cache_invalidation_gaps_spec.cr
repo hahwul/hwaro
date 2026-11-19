@@ -188,6 +188,30 @@ describe "cache: page-set fingerprint covers what listings read" do
     end
   end
 
+  # `site.authors` is aggregated from every page's `authors`.
+  it "re-renders a page listing site.authors when a page's authors change" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        listing_project("")
+        File.write("templates/index.html", "{% for id, a in site.authors %}[{{ a.name }}]{% endfor %}")
+        File.write("content/posts/a.md", "+++\ntitle = \"Alpha\"\nauthors = [\"ann\"]\n+++\n\nbody\n")
+        File.write("content/posts/b.md", "+++\ntitle = \"Beta\"\nauthors = [\"ann\"]\n+++\n\nbody\n")
+
+        cached_build
+        File.read("public/index.html").should eq("[ann]")
+
+        sleep 1.1.seconds
+        File.write("content/posts/b.md", "+++\ntitle = \"Beta\"\nauthors = [\"bob\"]\n+++\n\nbody\n")
+        cached_build
+        warm = File.read("public/index.html")
+
+        clean_build
+        warm.should eq(File.read("public/index.html"))
+        warm.should contain("[bob]")
+      end
+    end
+  end
+
   it "leaves listings cached when no listing template reads those fields" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do
