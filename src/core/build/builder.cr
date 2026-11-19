@@ -87,6 +87,7 @@ require "../../utils/redirect_html"
 require "./builder/incremental"
 require "./builder/serve_sync"
 require "./builder/seo_surfaces"
+require "./builder/url_plan"
 
 module Hwaro
   module Core

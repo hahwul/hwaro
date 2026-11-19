@@ -20,9 +20,9 @@ describe Hwaro::CLI::Commands::ToolCommand do
   end
 
   describe ".subcommands" do
-    it "returns 10 subcommands" do
+    it "returns 11 subcommands" do
       subs = Hwaro::CLI::Commands::ToolCommand.subcommands
-      subs.size.should eq(10)
+      subs.size.should eq(11)
     end
 
     it "includes convert subcommand" do
