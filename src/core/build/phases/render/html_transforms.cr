@@ -95,8 +95,10 @@ module Hwaro::Core::Build::Phases::Render
         # rewritten a root-relative src with the subpath, but the resize map is
         # keyed by bare root-relative paths — strip the base_path back off so the
         # lookup hits (then with_base_path re-adds it to the emitted candidates).
+        # Only a root-relative src: a page-relative one was joined to the page
+        # URL above, which never carries the base path.
         bp = config.base_path
-        key = key[bp.size..] if !bp.empty? && key.starts_with?("#{bp}/")
+        key = key[bp.size..] if src.starts_with?('/') && !bp.empty? && key.starts_with?("#{bp}/")
 
         additions = ""
         widths = resize_map[key]?

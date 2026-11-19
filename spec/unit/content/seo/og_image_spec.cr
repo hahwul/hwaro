@@ -137,6 +137,18 @@ describe Hwaro::Models::AutoImageConfig do
       config.og.auto_image.font_path.should eq("fonts/Pretendard-Bold.ttf")
     end
 
+    # Like `logo` and `background_image`: a blank value (an empty
+    # `${OG_FONT:-}`) would otherwise expand to the project directory.
+    it "reads a blank font_path as unset" do
+      config = make_og_config(<<-TOML)
+        [og.auto_image]
+        enabled = true
+        font_path = ""
+        TOML
+
+      config.og.auto_image.font_path.should be_nil
+    end
+
     it "loads secondary_color from TOML" do
       config = make_og_config(<<-TOML)
         [og.auto_image]
@@ -799,6 +811,10 @@ describe Hwaro::Content::Seo::OgImage do
       Hwaro::Content::Seo::OgImage.contains_cjk?("한글 제목").should be_true
       Hwaro::Content::Seo::OgImage.contains_cjk?("日本語のタイトル").should be_true
       Hwaro::Content::Seo::OgImage.contains_cjk?("Mixed 中文 text").should be_true
+    end
+
+    it "detects decomposed (NFD) Hangul, which macOS file names and pastes produce" do
+      Hwaro::Content::Seo::OgImage.contains_cjk?("한글 제목".unicode_normalize(:nfd)).should be_true
     end
 
     it "caps band title lines to what fits the fixed-height band" do

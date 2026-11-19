@@ -355,6 +355,17 @@ describe "HookedRenderer (via SyntaxHighlighter.render with in-memory contexts)"
       html.should contain(%(class="admonition admonition-note"))
     end
 
+    # The admonition marker is case-insensitive (`> [!note]` is an
+    # admonition without a hook); the bypass must agree or the hook steals it.
+    it "bypasses the hook for a lowercase admonition marker too" do
+      hooks = make_hooks(blockquote: "BQ[{{ text }}]", admonition_bypass: true)
+      cfg = Hwaro::Models::MarkdownConfig.new
+      cfg.admonitions = true
+      html, _ = Hwaro::Content::Processors::Markdown.new.render("> [!note]\n> Watch out.", markdown_config: cfg, hooks: hooks)
+      html.should_not contain("BQ[")
+      html.should contain(%(class="admonition admonition-note"))
+    end
+
     it "runs the hook on an admonition-shaped blockquote when admonitions are disabled" do
       hooks = make_hooks(blockquote: "BQ[{{ text }}]", admonition_bypass: false)
       cfg = Hwaro::Models::MarkdownConfig.new

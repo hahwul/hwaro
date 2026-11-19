@@ -50,6 +50,12 @@ describe Hwaro::Content::Processors::InlineMarkdown do
       # Any other block stays text.
       render.call("![a](/p.png){.big}").should eq(%(<img src="/p.png" alt="a">{.big}))
     end
+
+    it "nests a triple-delimited run as em around strong, as in a paragraph" do
+      render = ->(text : String) { Hwaro::Content::Processors::InlineMarkdown.render(text) }
+      render.call("***a*** and ___b___").should eq("<em><strong>a</strong></em> and <em><strong>b</strong></em>")
+      render.call("**a** *b*").should eq("<strong>a</strong> <em>b</em>")
+    end
   end
 
   # Code spans in this renderer used to be single-backtick-only, so a

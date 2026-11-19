@@ -153,7 +153,7 @@ module Hwaro
             pre_attrs, code_attrs, body = $1, $2, $3
             lang = code_language(code_attrs) || code_language(pre_attrs)
             code = decode_html_entities(body)
-            code_stash << "```#{lang}\n#{code.strip}\n```\n\n"
+            code_stash << fence_block(lang, code.strip)
             code_placeholder(code_stash.size - 1)
           end
           result = result.gsub(/<pre([^>]*)>(.*?)<\/pre>/mi) do
@@ -165,7 +165,7 @@ module Hwaro
             body = inner.sub(/\A\s*<code[^>]*>/mi, "").sub(/<\/code>\s*\z/mi, "")
             lang = code_attrs.try { |a| code_language(a) } || code_language(pre_attrs)
             code = decode_html_entities(body)
-            code_stash << "```#{lang}\n#{code.strip}\n```\n\n"
+            code_stash << fence_block(lang, code.strip)
             code_placeholder(code_stash.size - 1)
           end
 
@@ -174,7 +174,7 @@ module Hwaro
           # be touched by the prose escaping in `decode_prose_entities`
           # (Markdown shows `&lt;` inside a code span verbatim).
           result = result.gsub(/<code\b[^>]*>(.*?)<\/code>/mi) do
-            code_stash << "`#{decode_html_entities(strip_tags($1))}`"
+            code_stash << code_span(decode_html_entities(strip_tags($1)))
             inline_code << code_stash.size - 1
             code_placeholder(code_stash.size - 1)
           end
@@ -237,13 +237,16 @@ module Hwaro
               # 1 changed what the reader sees. CommonMark takes the first
               # item's number as the start (at most 9 digits, never negative).
               start = attr_value(list_attrs, "start").try(&.strip.to_i?).try(&.clamp(0, 999_999_999)) || 1
-              items = list_body.scan(/<li[^>]*>(.*?)<\/li>/mi)
-              lines = items.map_with_index do |m, i|
+              # Split on the opening tags instead of pairing them with `</li>`:
+              # the end tag is optional in HTML, and a list written without it
+              # matched no item at all and vanished from the page.
+              items = list_body.split(/<li\b[^>]*>/i).skip(1).map(&.sub(/<\/li\s*>.*\z/mi, ""))
+              lines = items.map_with_index do |body, i|
                 marker = kind == "ol" ? "#{start + i}. " : "- "
                 # Inline markup first: a bare `strip_tags` here ran before
                 # the document-wide inline passes, so every link, image and
                 # emphasis inside a list item was flattened to plain text.
-                item = strip_tags(convert_inline(m[1])).gsub(MORE_PLACEHOLDER, "").strip
+                item = strip_tags(convert_inline(line_breaks(body, "  \n", "\n\n"))).gsub(MORE_PLACEHOLDER, "").strip
                 "#{marker}#{indent_continuation(item, marker.size)}"
               end
               "\n" + lines.join("\n") + "\n\n"
@@ -261,7 +264,7 @@ module Hwaro
             rows = inner.scan(/<tr[^>]*>(.*?)<\/tr>/mi).map do |m|
               m[1].scan(/<(?:th|td)[^>]*>(.*?)<\/(?:th|td)>/mi).map do |cell|
                 # Same as list items: convert inline markup before stripping.
-                text = strip_tags(convert_inline(cell[1])).gsub(MORE_PLACEHOLDER, "").strip.gsub(/\s+/, " ").gsub("|", "\\|")
+                text = strip_tags(convert_inline(line_breaks(cell[1], " ", " "))).gsub(MORE_PLACEHOLDER, "").strip.gsub(/\s+/, " ").gsub("|", "\\|")
                 # A stashed code span sits in the cell as a placeholder, so
                 # its pipes have to be escaped in the stash itself. Only a
                 # span's: in a fenced block `\|` is literal text.
@@ -332,9 +335,14 @@ module Hwaro
           # untrusted export can't smuggle a live `javascript:`/`data:` src
           # into content — the importer stays safe regardless of the markdown
           # renderer's `safe` flag.
-          result = result.gsub(/<img[^>]*\bsrc=["']([^"']+)["'][^>]*\balt=["']([^"']*)["'][^>]*\/?>/i) { safe_media($1, $2, image: true) }
-          result = result.gsub(/<img[^>]*\balt=["']([^"']*)["'][^>]*\bsrc=["']([^"']+)["'][^>]*\/?>/i) { safe_media($2, $1, image: true) }
-          result = result.gsub(/<img[^>]*\bsrc=["']([^"']+)["'][^>]*\/?>/i) { safe_media($1, "", image: true) }
+          # Attributes are read by `attr_value`, which closes a value on its
+          # own opening quote: `["']…["']` cut `alt="Bob's dog"` at the
+          # apostrophe. A lazy-load `data-src` (which the old `\bsrc=` also
+          # matched) stands in for a missing `src`.
+          result = result.gsub(/<img\b[^>]*>/i) do |tag|
+            src = attr_value(tag, "src").presence || attr_value(tag, "data-src")
+            src.nil? || src.empty? ? tag : safe_media(src, attr_value(tag, "alt") || "", image: true)
+          end
 
           # Links — likewise drop a dangerous href but keep the link text.
           #
@@ -484,6 +492,32 @@ module Hwaro
         # every imported sample unhighlighted.
         private def self.code_language(attrs : String) : String?
           attr_value(attrs, "class").try(&.[/(?<![\w-])lang(?:uage)?-([\w+#.-]+)/i, 1]?)
+        end
+
+        # A fence one backtick longer than any run inside the code (at least
+        # three): a sample showing a ``` line closed a plain ``` fence early.
+        private def self.fence_block(lang : String?, code : String) : String
+          fence = "`" * Math.max(3, longest_backtick_run(code) + 1)
+          "#{fence}#{lang}\n#{code}\n#{fence}\n\n"
+        end
+
+        # Delimited by more backticks than the code holds, padded when it
+        # starts or ends with one (CommonMark strips one space each side).
+        private def self.code_span(code : String) : String
+          ticks = "`" * (longest_backtick_run(code) + 1)
+          pad = code.starts_with?('`') || code.ends_with?('`') ? " " : ""
+          "#{ticks}#{pad}#{code}#{pad}#{ticks}"
+        end
+
+        private def self.longest_backtick_run(text : String) : Int32
+          text.scan(/`+/).max_of?(&.[0].size) || 0
+        end
+
+        # `<br>` and paragraph boundaries inside a list item or table cell:
+        # `strip_tags` deleted them before the document-wide `<br>`/`<p>`
+        # passes ran, gluing the words on either side together.
+        private def self.line_breaks(html : String, br : String, paragraph : String) : String
+          html.gsub(/<br\b[^>]*>/i, br).gsub(/<\/p\s*>\s*<p\b[^>]*>/i, paragraph)
         end
 
         private def self.attr_value(attrs : String, name : String) : String?

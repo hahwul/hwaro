@@ -377,4 +377,33 @@ describe "serve orphaned outputs" do
       end
     end
   end
+
+  # With `--cache` the Finalize prune read only the cache file, and a rebuild
+  # that fails saves none: the page it had already written at a new URL stayed
+  # published after the edit was undone.
+  it "removes the output of a page move a failed rebuild made (--cache)" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_tagged_site
+        File.write("config.toml", File.read("config.toml") + "\n[links]\nbroken_internal = \"error\"\n")
+        server = Hwaro::Services::Server.new
+        options = orphan_options
+        options.cache = true
+        server.orphan_builder.run(options).should be_true
+
+        # The strict link check raises after the fan-out wrote the page.
+        File.write("content/posts/keep.md", "---\ntitle: Keep\nslug: moved\ntags: [shared]\n---\n[x](@/missing.md)")
+        expect_raises(Hwaro::HwaroError) do
+          with_captured_log { server.orphan_builder.run_incremental(["content/posts/keep.md"], options) }
+        end
+        File.exists?("public/posts/moved/index.html").should be_true
+
+        File.write("content/posts/keep.md", "---\ntitle: Keep\ntags: [shared]\n---\nkeep")
+        server.orphan_builder.run(options).should be_true
+
+        Dir.exists?("public/posts/moved").should be_false
+        File.exists?("public/posts/keep/index.html").should be_true
+      end
+    end
+  end
 end

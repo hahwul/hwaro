@@ -204,7 +204,9 @@ end
 
 class Crinja::Template
   def initialize(@source : String, @env : Crinja = Crinja.new, @name : String = "", @filename : String? = nil, run_parser = true)
-    @source = @source.rchop '\n' unless env.config.keep_trailing_newline
+    # `chomp`, not upstream's `rchop '\n'`: Jinja drops one trailing line
+    # ending of any kind, so a CRLF template left a stray "\r" behind.
+    @source = @source.chomp unless env.config.keep_trailing_newline
 
     @nodes = AST::NodeList.new([] of AST::TemplateNode, false)
 

@@ -100,8 +100,14 @@ module Hwaro
         # "Title" instead of "☐ Title". Whitespace always passes; leftover
         # double spaces from removed runs are collapsed. Returns the
         # original string untouched when everything is drawable.
+        #
+        # Text is composed (NFC) first: stb draws one glyph per codepoint with
+        # no shaping, so a decomposed title (macOS file names and some paste
+        # sources produce NFD) printed its accents as separate spacing marks
+        # and its Hangul as conjoining jamo the fonts lack, i.e. not at all.
         def self.drop_missing_glyphs(info : LibStb::HwaroFontInfo, text : String) : String
           return text if text.empty?
+          text = text.unicode_normalize unless text.ascii_only?
           filtered = text.chars.select { |c| c.whitespace? || font_has_glyph?(info, c.ord) }.join
           return text if filtered.size == text.size
           filtered.gsub(/\s{2,}/, " ").strip
@@ -111,6 +117,7 @@ module Hwaro
         # covers it.
         def self.drop_missing_glyphs(chain : Array(FontEntry), text : String) : String
           return text if text.empty?
+          text = text.unicode_normalize unless text.ascii_only?
           filtered = text.chars.select { |c| c.whitespace? || chain_font_index(chain, c.ord) }.join
           return text if filtered.size == text.size
           filtered.gsub(/\s{2,}/, " ").strip
@@ -279,7 +286,8 @@ module Hwaro
 
         # Read a font file and initialize it. Returns {info, data} or nil.
         private def self.load_font_file(path : String) : {LibStb::HwaroFontInfo, Bytes}?
-          return unless File.exists?(path)
+          # A directory exists too, and reading it raises.
+          return unless File.file?(path)
           data = File.open(path, "rb", &.getb_to_end)
           init_font(data)
         end

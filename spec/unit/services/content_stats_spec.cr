@@ -62,6 +62,19 @@ describe Hwaro::Services::ContentStats do
       end
     end
 
+    # The build publishes `/tags/2024/` for an integer term and lists a page
+    # once under a repeated one (`fm_terms`).
+    it "counts integer and repeated tags the way the build resolves them" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "a.md"), "+++\ntitle = \"a\"\ntags = [2024, \"dup\", \"dup\"]\n+++\nx\n")
+        File.write(File.join(content_dir, "b.md"), "---\ntitle: b\ntags: [2024, dup]\n---\nx\n")
+
+        Hwaro::Services::ContentStats.new(content_dir).run.tags.should eq({"2024" => 2, "dup" => 2})
+      end
+    end
+
     # Regression for gh#528 (C): word counts, tags, and monthly buckets
     # used to include drafts even though `hwaro build` skips them. Stats
     # now reflect what would actually publish.

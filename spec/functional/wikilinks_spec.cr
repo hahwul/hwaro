@@ -489,6 +489,22 @@ describe "page.backlinks sources" do
       wiki_main(dir, "t1").should_not contain("Lk;")
     end
   end
+
+  # A document-relative link is resolved against the source page's URL, which
+  # never carries the base path: deployed under `/docs` with a `docs/`
+  # section, `/docs/b/` was stripped to `/b/` and matched no page.
+  it "counts a relative link when the section is named like the deploy subpath" do
+    build_site(
+      WIKI_CONFIG.sub("http://localhost", "http://localhost/docs"),
+      content_files: {
+        "docs/a.md" => "---\ntitle: A\n---\n[to b](../b/)\n",
+        "docs/b.md" => "---\ntitle: B\n---\nbody\n",
+      },
+      template_files: WIKI_TEMPLATES,
+    ) do |dir|
+      wiki_main(dir, "docs/b").should contain("|BL:A;")
+    end
+  end
 end
 
 # The linker is no neighbour of the edited page and the templates read no

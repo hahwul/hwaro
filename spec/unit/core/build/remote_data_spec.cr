@@ -518,6 +518,32 @@ describe "RemoteData.load" do
     end
   end
 
+  # `Time.unix` raises OverflowError, not ArgumentError, at the top of the
+  # Int64 range: a corrupt stamp failed every build until the file was deleted.
+  it "refetches when the cache meta's fetched_at is out of range" do
+    hits = Atomic(Int32).new(0)
+    handler = ->(ctx : HTTP::Server::Context) do
+      hits.add(1)
+      ctx.response.content_type = "application/json"
+      ctx.response.print %({"n": #{hits.get}})
+    end
+
+    with_test_server(handler) do |base|
+      Dir.mktmpdir do |dir|
+        cache_dir = File.join(dir, "cache")
+        entry = remote_entry("#{base}/team", cache_ttl: 1.hour)
+        RemoteData.load(entry, cache_dir: cache_dir)
+        hits.get.should eq(1)
+
+        meta = Dir.glob(File.join(cache_dir, "**", "*")).find! { |path| File.file?(path) && File.read(path).includes?(%("fetched_at")) }
+        File.write(meta, File.read(meta).sub(/"fetched_at":\s*\d+/, %("fetched_at":#{Int64::MAX})))
+
+        RemoteData.load(entry, cache_dir: cache_dir)
+        hits.get.should eq(2)
+      end
+    end
+  end
+
   it "does not serve a fresh cache entry fetched with different headers" do
     handler = ->(ctx : HTTP::Server::Context) do
       ctx.response.content_type = "application/json"

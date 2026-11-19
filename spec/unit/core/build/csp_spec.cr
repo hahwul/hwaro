@@ -303,6 +303,19 @@ describe Hwaro::Core::Build::Csp do
       end
     end
 
+    # The raw lane publishes under the NFC name; the verbatim set must name
+    # the same file or CSP rewrites it like a generated page.
+    it "leaves an NFD-named [content.files] HTML file alone" do
+      demo = "<!doctype html><html><head><title>demo</title><script>var x=1</script></head><body>demo</body></html>"
+      build_site(
+        %(title = "T"\nbase_url = "https://example.com"\n[csp]\nenabled = true\nmode = "meta"\n[content.files]\nallow_extensions = ["html"]\n),
+        content_files: {"files/#{"démo.html".unicode_normalize(:nfd)}" => demo},
+        template_files: {"page.html" => CSP_TEMPLATE},
+      ) do
+        File.read("public/files/démo.html").should eq(demo)
+      end
+    end
+
     it "skips a static HTML file that is not UTF-8" do
       Dir.mktmpdir do |dir|
         Dir.cd(dir) do

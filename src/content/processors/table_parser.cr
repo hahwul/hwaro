@@ -203,6 +203,11 @@ module Hwaro
                 end
                 result << html
                 i += consumed
+                # As in the quoted branch: a blank line ends the `<table>`
+                # HTML block, or the next line (a heading, a quote, text) is
+                # swallowed into it verbatim. Inside a list item the blank
+                # would make a tight list loose, so it is left out there.
+                result << "" if indent.nil? && i < lines.size && !lines[i].blank?
                 next
               end
             end

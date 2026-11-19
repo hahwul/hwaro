@@ -351,6 +351,19 @@ describe "Content image dimensions" do
     end
   end
 
+  # A relative src is resolved against the page URL, which never carries the
+  # base path: a site deployed under `/posts` with a `posts/` section had
+  # `/posts/foo/photo.png` stripped to `/foo/photo.png`, and lost its srcset.
+  it "keeps a page-relative src whose page URL starts like the base path" do
+    config = enabled_config
+    config.base_url = "https://example.com/posts"
+    with_resize_map(SAMPLE_MAP) do
+      out = Hwaro::Core::Build::Builder.new.test_apply_responsive_images(
+        %(<img src="photo.png">), bundle_page, config)
+      out.should contain(%(srcset="/posts/posts/foo/photo_400w.png 400w, /posts/posts/foo/photo_800w.png 800w"))
+    end
+  end
+
   it "uses the original's size alongside generated srcset variants" do
     with_image_project do
       config = dimensions_config

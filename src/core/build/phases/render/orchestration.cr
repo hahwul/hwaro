@@ -18,8 +18,9 @@ module Hwaro::Core::Build::Phases::Render
     all_pages = ctx.all_pages
 
     # From here this build rewrites the output; see Cache#invalidate_on_disk.
-    # (Serve keeps its own cache and its incremental passes re-save it.)
-    build_cache.invalidate_on_disk if cache_enabled && !ctx.options.serve_mode
+    # Under serve too: its cache file describes its own tree, and a failed
+    # rebuild is followed by one that reads the file back.
+    build_cache.invalidate_on_disk if cache_enabled
 
     # Filter pages for caching. Listing pages (homepage, section indexes,
     # archives, taxonomy widgets) render content derived from the global
@@ -182,9 +183,12 @@ module Hwaro::Core::Build::Phases::Render
         # (`generated_outputs_read_content?`, see render_streaming's
         # `release_content`), and that is precisely the case where hydration
         # would be pointless — so gate on the same predicate instead of on
-        # the mode.
+        # the mode. A `[links] broken_anchors` check reads them too: anchor
+        # links are collected by this content pass.
+        # ponytail: keeps cached bodies under --stream when anchors are checked;
+        # release them after collection if that memory ever matters.
         if cache_enabled && pages_to_build.size < all_pages.size &&
-           (!ctx.options.streaming? || generated_outputs_read_content?(site)) &&
+           (!ctx.options.streaming? || generated_outputs_read_content?(site) || site.config.links.broken_anchors != "ignore") &&
            cached_content_needed?(ctx, site)
           skipped = all_pages - pages_to_build
           if deferred = @deferred_pages

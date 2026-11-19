@@ -204,6 +204,31 @@ describe "serve prune keep-set" do
     end
   end
 
+  # A static copy is skipped (unchanged) or rewritten in place, never replaced
+  # by a rename, so the file kept the old spelling — and the dev server 404s a
+  # case-mismatched path, so the new URL answered 404 for the whole session.
+  it "respells a static file renamed by case only (case-folding filesystems)" do
+    pending!("case-sensitive filesystem") unless case_insensitive_fs?
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_keep_site
+        FileUtils.mkdir_p("static")
+        File.write("static/Logo.txt", "LOGO")
+        builder = keep_builder
+        options = keep_options
+        builder.run(options).should be_true
+        stale = builder.stale_outputs_for_removed(["static/Logo.txt"], "public")
+
+        File.rename("static/Logo.txt", "static/logo.txt")
+        builder.run(options).should be_true
+        builder.prune_unclaimed_outputs(stale, "public") unless stale.empty?
+
+        Dir.children("public").should contain("logo.txt")
+        Dir.children("public").should_not contain("Logo.txt")
+      end
+    end
+  end
+
   # A bundle asset publishes under its page's URL. Its source still being on
   # disk kept the copy at the OLD URL alive after the page moved.
   it "removes a moved bundle page's assets from the old URL" do

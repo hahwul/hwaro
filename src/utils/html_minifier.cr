@@ -152,7 +152,6 @@ module Hwaro
       # (block neighbours), silently changing the rendered page.
       private REGEX_INTERTOKEN_WS  = /(<\/?[A-Za-z][\w-]*[^>]*>|\x00HW_HTML_P[BIH]_\d+\x00)([ \t\r\n\f]+)(?=(<\/?[A-Za-z][\w-]*[^>]*>|\x00HW_HTML_P[BIH]_\d+\x00))/
       private REGEX_TAG_NAME       = /^<\/?([A-Za-z][\w-]*)/
-      private REGEX_BLANK_LINES    = /\n{2,}/
       private REGEX_PRESERVE_TOKEN = /\x00HW_HTML_P[BIH]_(\d{1,9})\x00/
 
       # Minify the given HTML.
@@ -206,7 +205,6 @@ module Hwaro
         result = strip_comments_and_trailing_space(result)
         result = collapse_intra_tag_whitespace(result)
         result = collapse_inter_token_whitespace(result)
-        result = result.gsub(REGEX_BLANK_LINES, "\n")
         result = restore_sensitive_blocks(result, preserves)
         result.strip
       end
@@ -400,7 +398,11 @@ module Hwaro
       # ponytail: decided per pair, so `<b>a</b><script/> <script/><b>c</b>`
       # still loses its one space; look past hidden runs if that shows up.
       private def collapse_inter_token_whitespace(html : String) : String
+        values = tagged_value_spans(html)
         html.gsub(REGEX_INTERTOKEN_WS) do
+          # Tag-shaped text inside a quoted value (`data-x='<div>  <p>'`)
+          # is the value's own bytes, not markup.
+          next $0 if inside_span?(values, $~.byte_begin(2))
           prior = $1
           # $2 = whitespace run (discarded except when we re-emit one space)
           nxt = $3
@@ -424,6 +426,44 @@ module Hwaro
         end
       end
 
+      # Byte spans of the quoted attribute values that contain a `<` — the
+      # only ones REGEX_INTERTOKEN_WS can match inside. As in HTML, a quote
+      # opens a value only right after `=` (an apostrophe in `alt=Bob's` is
+      # no value). Sorted and disjoint.
+      private def tagged_value_spans(html : String) : Array({Int32, Int32})
+        spans = [] of {Int32, Int32}
+        bytes = html.to_slice
+        n = bytes.size
+        i = 0
+        while lt = bytes.index('<'.ord.to_u8, i)
+          i = lt + 1
+          next unless i < n && tag_start_byte?(bytes[i])
+          after_eq = false
+          while i < n && bytes[i] != '>'.ord
+            b = bytes[i]
+            if after_eq && (b == '"'.ord || b == '\''.ord)
+              close = bytes.index(b, i + 1)
+              break unless close
+              spans << {i + 1, close} if bytes[i + 1, close - i - 1].includes?('<'.ord.to_u8)
+              i = close
+              after_eq = false
+            elsif b == '='.ord
+              after_eq = true
+            elsif !(b == ' '.ord || b == '\t'.ord || b == '\n'.ord || b == '\r'.ord || b == '\f'.ord)
+              after_eq = false
+            end
+            i += 1
+          end
+        end
+        spans
+      end
+
+      private def inside_span?(spans : Array({Int32, Int32}), pos : Int32) : Bool
+        return false if spans.empty?
+        idx = spans.bsearch_index { |(_, stop)| stop > pos }
+        !idx.nil? && spans[idx][0] <= pos
+      end
+
       private def hidden_token?(token : String) : Bool
         token.starts_with?(PRESERVE_PREFIX_HIDDEN)
       end
@@ -435,12 +475,17 @@ module Hwaro
       # (`<!...>`) and processing instructions (`<?...?>`) are
       # ignored. Protected-block placeholders are also ignored
       # (their bodies are already opaque).
+      #
+      # Runs of blank lines in TEXT collapse to one newline here too. A
+      # quoted value keeps its own: a whole-document `\n{2,}` pass rewrote
+      # `data-copy="a\n\nb"` and multi-paragraph `content="…"` values.
       private def collapse_intra_tag_whitespace(html : String) : String
         return html if html.empty?
         bytes = html.to_slice
         n = bytes.size
         String.build(n) do |io|
           i = 0
+          prev_newline = false
           while i < n
             b = bytes[i]
             if b == '<'.ord
@@ -449,11 +494,14 @@ module Hwaro
                 if tag_end >= 0
                   emit_collapsed_tag(io, bytes, i, tag_end)
                   i = tag_end + 1
+                  prev_newline = false
                   next
                 end
               end
             end
-            io.write_byte(b)
+            newline = b == '\n'.ord
+            io.write_byte(b) unless newline && prev_newline
+            prev_newline = newline
             i += 1
           end
         end

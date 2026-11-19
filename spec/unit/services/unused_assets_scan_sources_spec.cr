@@ -180,3 +180,25 @@ describe Hwaro::Services::UnusedAssets do
     end
   end
 end
+
+describe "UnusedAssets: published text files" do
+  it "sees assets referenced from a static ES module (.mjs)" do
+    Dir.mktmpdir do |dir|
+      scaffold_project(dir)
+      FileUtils.mkdir_p(File.join(dir, "static", "js"))
+      File.write(File.join(dir, "static", "js", "app.mjs"), %(const s = "/img/sprite.png";))
+      File.write(File.join(dir, "static", "sprite.png"), "png")
+      unused_basenames(dir).should be_empty
+    end
+  end
+
+  it "sees assets referenced from an HTML file content/ publishes verbatim" do
+    Dir.mktmpdir do |dir|
+      scaffold_project(dir)
+      FileUtils.mkdir_p(File.join(dir, "content", "demo"))
+      File.write(File.join(dir, "content", "demo", "page.html"), %(<img src="shot.png">))
+      File.write(File.join(dir, "content", "demo", "shot.png"), "png")
+      unused_basenames(dir).should be_empty
+    end
+  end
+end

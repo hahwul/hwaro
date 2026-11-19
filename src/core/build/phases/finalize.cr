@@ -24,9 +24,11 @@ module Hwaro::Core::Build::Phases::Finalize
       if ctx.options.cache
         prune_orphaned_cached_outputs(ctx, build_cache)
         build_cache.save
-      else
-        prune_unclaimed_generated_outputs(ctx)
       end
+      # With `--cache` too: the cache file knows nothing of what a serve
+      # rebuild wrote before it failed (it saved none), the builder does.
+      # A no-op on a process's first build.
+      prune_unclaimed_generated_outputs(ctx)
       @prune_baselines_pending = false
       # Files a failed serve pass relocated away from (a no-op otherwise).
       settle_page_outputs(ctx.options.output_dir)
@@ -165,7 +167,7 @@ module Hwaro::Core::Build::Phases::Finalize
     (owned | still_written | generated_output_claims).each { |path| keep_output(path, cwd, exact, folded) }
     respell = Set(String).new
     stale.reject! { |path| kept_output?(path, cwd, exact, folded, respell) }
-    respell_folded_output_dirs(respell, output_dir) unless respell.empty?
+    respell_folded_output_dirs(respell, output_dir, leaves: true) unless respell.empty?
     return if stale.empty?
 
     delete_orphaned_outputs(stale, output_dir)
@@ -179,16 +181,20 @@ module Hwaro::Core::Build::Phases::Finalize
   # each directory on the way to a file this build owns to the spelling the
   # page URL asks for. Runs after the render, so no worker is writing into the
   # directory; only directories are touched, since a file replaced by rename
-  # already takes the new name. A no-op everywhere the probe says the
+  # already takes the new name. `leaves` respells the files themselves too:
+  # a static or bundle-asset copy is skipped when unchanged or rewritten in
+  # place, never renamed, so a case-renamed source (`Logo.png` -> `logo.png`)
+  # kept the old spelling. Callers pass it only for the case-folded keeps,
+  # never for every page output. A no-op everywhere the probe says the
   # filesystem is case-sensitive.
-  private def respell_folded_output_dirs(owned : Set(String), output_dir : String) : Nil
+  private def respell_folded_output_dirs(owned : Set(String), output_dir : String, leaves : Bool = false) : Nil
     # expand_path keeps the trailing separator of `-o public/`.
     root = Utils::PathUtils.chomp_separator(File.expand_path(output_dir))
     return unless Dir.exists?(root) && Utils::PathUtils.case_folding_fs?(root)
 
     dirs = Set(String).new
     owned.each do |file|
-      dir = File.dirname(file)
+      dir = leaves ? file : File.dirname(file)
       while dir.starts_with?("#{root}/")
         break unless dirs.add?(dir)
         dir = File.dirname(dir)
@@ -293,7 +299,7 @@ module Hwaro::Core::Build::Phases::Finalize
     return unless csp_config(ctx) && (config = @config)
     output_dir = ctx.options.output_dir
     # `[content.files]` HTML is published verbatim, like `static/`.
-    raw = ctx.raw_files.map { |file| File.expand_path(File.join(output_dir, file.relative_path)) }.to_set
+    raw = ctx.raw_files.map { |file| File.expand_path(File.join(output_dir, Utils::PathUtils.nfc(file.relative_path))) }.to_set
     # So are a page bundle's assets, copied from `content/<bundle>/`.
     ctx.all_pages.each do |page|
       next if page.assets.empty?

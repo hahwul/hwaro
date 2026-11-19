@@ -1049,4 +1049,30 @@ describe "cache: case-only section rename" do
       end
     end
   end
+
+  # A static copy is skipped (unchanged) or rewritten in place, never
+  # replaced by a rename, so the file kept the old spelling and a
+  # case-sensitive host 404'd the new one after deploy.
+  it "respells a static file renamed by case only" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("probe", "")
+        pending!("needs a case-insensitive filesystem") unless Hwaro::Utils::PathUtils.case_folding_fs?(File.join(dir, "probe"))
+        File.write("config.toml", "title = \"T\"\nbase_url = \"http://localhost\"\n")
+        FileUtils.mkdir_p("static/Img")
+        File.write("static/Logo.txt", "LOGO")
+        File.write("static/Img/a.txt", "A")
+        cached_build
+
+        File.rename("static/Logo.txt", "static/logo.txt")
+        File.rename("static/Img", "static/img")
+        cached_build
+
+        Dir.children("public").should contain("logo.txt")
+        Dir.children("public").should_not contain("Logo.txt")
+        Dir.children("public").should contain("img")
+        File.read("public/logo.txt").should eq("LOGO")
+      end
+    end
+  end
 end

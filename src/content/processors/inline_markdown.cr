@@ -118,6 +118,12 @@ module Hwaro
         INS               = Delimited.new(INLINE_INS_RE, "++", /(?<=\S)\+\+/)
         MARK              = Delimited.new(INLINE_MARK_RE, "==", /(?<=[^\s=])==(?!=)/)
 
+        # `***x***` / `___x___`: em around strong, as CommonMark nests it. Run
+        # before bold, which would pair two of the three delimiters and leave
+        # italic to close across `</strong>` (`<strong><em>x</strong></em>`).
+        STRONG_EM_ASTERISK   = Delimited.new(/\*\*\*(?=\S)(.+?)(?<=\S)\*\*\*/, "***", /(?<=\S)\*\*\*/)
+        STRONG_EM_UNDERSCORE = Delimited.new(/___(?=\S)(.+?)(?<=\S)___/, "___", /(?<=\S)___/)
+
         # `text.gsub(d.re) { |_, m| yield m }`, byte for byte, in linear time.
         #
         # The lazy body `(.+?)` of an opener that never closes reads to the
@@ -368,6 +374,8 @@ module Hwaro
             end
           end
 
+          result = gsub_delimited(result, STRONG_EM_ASTERISK) { |m| "<em><strong>#{m[1]}</strong></em>" }
+          result = gsub_delimited(result, STRONG_EM_UNDERSCORE) { |m| "<em><strong>#{m[1]}</strong></em>" }
           result = gsub_delimited(result, BOLD_ASTERISK) { |m| "<strong>#{m[1]}</strong>" }
           result = gsub_delimited(result, BOLD_UNDERSCORE) { |m| "<strong>#{m[1]}</strong>" }
           result = gsub_delimited(result, ITALIC_ASTERISK) { |m| "<em>#{m[1]}</em>" }

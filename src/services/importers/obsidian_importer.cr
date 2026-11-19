@@ -496,7 +496,11 @@ module Hwaro
                       # sized image a meaningless numeric alt attribute.
                       sized = alt_or_width.matches?(/\A\d+(x\d+)?\z/)
                       alt = (alt_or_width.empty? || sized) ? target : alt_or_width
-                      "![#{alt}](#{target})"
+                      # A space (Obsidian's default `Pasted image …` names) or
+                      # a paren ends a bare link destination, so the embed
+                      # rendered as literal text; `<…>` keeps it whole.
+                      dest = target.matches?(/[\s()]/) ? "<#{target}>" : target
+                      "![#{alt}](#{dest})"
                     else
                       display = alt_or_width.empty? ? target : alt_or_width
                       resolved_url = resolve_wikilink(target, link_map, note_dir)
