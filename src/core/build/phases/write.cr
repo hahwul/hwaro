@@ -399,7 +399,12 @@ module Hwaro::Core::Build::Phases::Write
     if @output_tree_fresh && File.info?(path, follow_symlinks: false).nil?
       Hwaro::Utils::FileSafe.write_new(path, content)
     else
-      Hwaro::Utils::FileSafe.atomic_write(path, content)
+      begin
+        Hwaro::Utils::FileSafe.atomic_write(path, content)
+      rescue ex : Hwaro::HwaroError
+        raise ex unless remove_stale_dir_in_the_way(path)
+        Hwaro::Utils::FileSafe.atomic_write(path, content)
+      end
     end
   end
 
@@ -461,6 +466,29 @@ module Hwaro::Core::Build::Phases::Write
     rescue File::AlreadyExistsError
     end
     raise ex unless Dir.exists?(dir)
+  end
+
+  # Delete the directory standing where the FILE `path` goes, when all it
+  # holds is a previous build's output: the counterpart of
+  # `remove_stale_file_in_the_way` for an output that turned from a directory
+  # into a file (the page `legacy.html/` is gone and the alias stub
+  # `legacy.html` now wins its path). Finalize prunes the old files only
+  # after the render, so the write failed until the tree was wiped by hand.
+  # True when it was removed.
+  private def remove_stale_dir_in_the_way(path : String) : Bool
+    return false unless kept = @kept_output_dir
+    return false unless File.info?(path, follow_symlinks: false).try(&.directory?)
+    return false unless Utils::OutputGuard.safe_to_delete_directory?(path, kept)
+    claims = generated_output_claims.map { |claim| File.expand_path(claim) }.to_set
+    match = File::MatchOptions.glob_default | File::MatchOptions::DotFiles
+    Dir.glob(File.join(Utils::PathUtils.glob_escape(path), "**", "*"), match: match) do |entry|
+      info = File.info?(entry, follow_symlinks: false)
+      next if info.try(&.directory?)
+      return false unless info.try(&.file?)
+      return false if written_this_build?(entry) || claims.includes?(File.expand_path(entry))
+    end
+    FileUtils.rm_rf(path)
+    true
   end
 
   # Delete the regular file standing at `dir` or one of its ancestors, when

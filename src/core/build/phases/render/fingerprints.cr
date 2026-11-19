@@ -310,6 +310,10 @@ module Hwaro::Core::Build::Phases::Render
         next true if cache.derived_paths_for(source_path).any? { |path| static_copied_output?(path, cwd) }
       end
       next true if cache.changed?(source_path, output_path || "", page.cascade_fingerprint, page_template_hash(page, templates, site), extra_outputs: fmt_paths, assets_hash: page_assets_hash(page), git_hash: page_git_hash(page), relations_hash: relations_hash)
+      # An alias that lost its path last build wins it now (the page, alias
+      # or `/page/N/` page holding it went away): only a render writes the
+      # stub, so a page whose source is unchanged has to render again.
+      next true if alias_output_unrecorded?(page, output_dir, cache, source_path)
       # Page's own source is unchanged: only re-render it if a set it depends on
       # changed. Skip the (cheap) marker scan entirely when nothing moved.
       next false unless page_set_changed || section_set_changed
@@ -324,6 +328,18 @@ module Hwaro::Core::Build::Phases::Render
       section_dep = sdep || page.is_a?(Models::Section)
       (page_dep && page_set_changed) || (section_dep && section_set_changed)
     end
+  end
+
+  # True when `page` would now write an alias stub its last render did not
+  # (see `filter_changed_pages`). Muted: the render repeats any warning.
+  private def alias_output_unrecorded?(page : Models::Page, output_dir : String, cache : Cache, source_path : String) : Bool
+    return false if page.aliases.empty?
+    recorded = cache.derived_paths_for(source_path).map { |path| File.expand_path(path) }.to_set
+    missing = false
+    Logger.muted do
+      each_alias_output(page, output_dir) { |_, dest| missing ||= !recorded.includes?(File.expand_path(dest)) }
+    end
+    missing
   end
 
   # Scan a page's resolved template-closure SOURCE for global-iteration markers.
