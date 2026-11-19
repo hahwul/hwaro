@@ -262,6 +262,22 @@ describe Hwaro::Logger do
       Hwaro::Logger.io = IO::Memory.new
     end
 
+    # Regression: the terminal guard (GuardedIO, what Logger.io is on a real
+    # terminal) escapes a lone CR, so the bar's own `\r` redraw printed as
+    # the text `\x0d` and every step piled onto one line.
+    it "redraws with a real carriage return through the terminal guard" do
+      tty = TtyMemory.new
+      Hwaro::Logger.io = Hwaro::Logger::GuardedIO.new(tty)
+      Hwaro::Logger.progress(1, 2, "Copying ")
+      Hwaro::Logger.progress(2, 2, "Copying ")
+      output = tty.to_s
+      output.should start_with("\rCopying [")
+      output.should contain("\rCopying [#{"█" * 30}] 100.0% (2/2)\n")
+      output.should_not contain("\\x0d")
+      # Restore
+      Hwaro::Logger.io = IO::Memory.new
+    end
+
     it "shows partial progress" do
       io = TtyMemory.new
       Hwaro::Logger.io = io
