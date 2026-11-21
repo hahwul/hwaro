@@ -55,6 +55,8 @@ Each cached entry tracks:
 
 When mtime and size haven't changed, the file is considered unchanged without reading its content. When either differs, Hwaro computes and compares the content hash to confirm the change is real. A page whose output file (or one of its alias stubs or pagination pages) is missing from the output directory is re-rendered as well.
 
+When another page takes over an alias URL, a cached build removes the old redirect file if it is no longer published.
+
 ### Dependency invalidation
 
 Beyond per-file checksums, Hwaro tracks what each page actually depends on:
