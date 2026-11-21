@@ -666,7 +666,7 @@ hwaro completion fish    # Fish 자동 완성 스크립트
 # Bash (~/.bashrc에 추가)
 eval "$(hwaro completion bash)"
 
-# Zsh (~/.zshrc에 추가)
+# Zsh (~/.zshrc에서 compinit 실행 후 추가)
 eval "$(hwaro completion zsh)"
 
 # Fish (~/.config/fish/config.fish에 추가)

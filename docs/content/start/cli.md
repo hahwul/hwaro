@@ -665,7 +665,7 @@ hwaro completion fish    # Fish completion script
 # Bash (add to ~/.bashrc)
 eval "$(hwaro completion bash)"
 
-# Zsh (add to ~/.zshrc)
+# Zsh (add to ~/.zshrc after compinit)
 eval "$(hwaro completion zsh)"
 
 # Fish (add to ~/.config/fish/config.fish)
