@@ -283,11 +283,11 @@ module Hwaro
 
           # Parse and format date — prefer the precise `<wp:post_date>`
           # (local time, no TZ noise) and fall back to RFC 822 `<pubDate>`.
-          date_str : String? = nil
+          published : Time? = nil
           if !post_date.empty? && (parsed = Utils::DateUtils.parse_import(post_date))
-            date_str = format_date(parsed)
+            published = parsed
           elsif !pub_date.empty? && (parsed = Utils::DateUtils.parse_import(pub_date))
-            date_str = format_date(parsed)
+            published = parsed
           end
 
           # Build frontmatter fields
@@ -298,11 +298,11 @@ module Hwaro
           # plain text, so decode them, or every template — and the
           # autoescape default — shows a literal `&amp;`.
           fields["title"] = HTML.unescape(title) unless title.empty?
-          fields["date"] = date_str
+          fields["date"] = published.try { |date| format_date(date) }
           # A modification time earlier than (or equal to) the post date is
           # WordPress's default for an unedited post; only a real edit is
           # `updated`.
-          if !modified.empty? && !modified.starts_with?("0000") && (changed = Utils::DateUtils.parse_import(modified)) && (published = Utils::DateUtils.parse_import(post_date.empty? ? pub_date : post_date)) && changed > published
+          if published && !modified.empty? && !modified.starts_with?("0000") && (changed = Utils::DateUtils.parse_import(modified)) && changed > published
             fields["updated"] = format_date(changed)
           end
           if (featured = @attachments[thumbnail_id]?) && !thumbnail_id.empty?

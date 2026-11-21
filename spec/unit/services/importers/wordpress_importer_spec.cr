@@ -245,6 +245,24 @@ describe Hwaro::Services::Importers::WordPressImporter do
       end
     end
 
+    it "keeps the edit time when an invalid post date falls back to pubDate" do
+      Dir.mktmpdir do |tmpdir|
+        wxr = PUBDATE_ONLY_WXR.sub(
+          "<wp:post_name>pubdate-only</wp:post_name>",
+          "<wp:post_date>invalid</wp:post_date>\n<wp:post_modified>2024-02-01 00:00:00</wp:post_modified>\n<wp:post_name>pubdate-only</wp:post_name>"
+        )
+        wxr_path = write_wxr(tmpdir, wxr)
+        output_dir = File.join(tmpdir, "content")
+
+        result = Hwaro::Services::Importers::WordPressImporter.new.run(make_options(wxr_path, output_dir))
+        result.imported_count.should eq(1)
+
+        content = File.read(File.join(output_dir, "posts", "pubdate-only.md"))
+        content.should contain(%(date = "2024-01-01"))
+        content.should contain(%(updated = "2024-02-01"))
+      end
+    end
+
     it "converts <table> in content to a Markdown pipe-table" do
       Dir.mktmpdir do |tmpdir|
         wxr_path = write_wxr(tmpdir, TABLE_WXR)
