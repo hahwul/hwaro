@@ -307,9 +307,9 @@ module Hwaro
           unless fields.has_key?("date")
             # Try to extract date from filename (YYYY-MM-DD-slug.md)
             filename = File.basename(file_path)
-            if match = /^(\d{4}-\d{2}-\d{2})/.match(filename)
-              parsed = Utils::DateUtils.parse_import(match[1])
-              fields["date"] = format_date(parsed) if parsed
+            filename_date = /^(\d{4}-\d{2}-\d{2})/.match(filename).try { |match| Utils::DateUtils.parse_import(match[1]) }
+            if filename_date
+              fields["date"] = format_date(filename_date)
             elsif info = File.info?(file_path)
               fields["date"] = format_date(info.modification_time)
             end
