@@ -221,37 +221,40 @@ describe "serve incremental staleness" do
 
   # L3: the watcher scanned five fixed roots. A project that keeps bundle
   # sources outside static/ got no event for them at all.
-  it "watches a configured [assets] source_dir outside static/ (L3)" do
-    Dir.mktmpdir do |dir|
-      Dir.cd(dir) do
-        write_listing_site
-        FileUtils.mkdir_p("assets/js")
-        File.write("assets/js/app.js", "console.log(1)")
-        File.write("config.toml", <<-TOML
-          title = "Listing Site"
-          base_url = "https://example.com"
+  {"relative", "absolute"}.each do |kind|
+    it "watches #{kind} project paths for [assets] source_dir (L3)" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          write_listing_site
+          FileUtils.mkdir_p("assets/js")
+          File.write("assets/js/app.js", "console.log(1)")
+          source_dir = kind == "absolute" ? File.expand_path("assets") : "assets"
+          File.write("config.toml", <<-TOML
+            title = "Listing Site"
+            base_url = "https://example.com"
 
-          [assets]
-          enabled = true
-          source_dir = "assets"
+            [assets]
+            enabled = true
+            source_dir = #{source_dir.inspect}
 
-          [[assets.bundles]]
-          name = "app.js"
-          files = ["js/app.js"]
-          TOML
-        )
+            [[assets.bundles]]
+            name = "app.js"
+            files = ["js/app.js"]
+            TOML
+          )
 
-        server = Hwaro::Services::Server.new
-        server.staleness_resolve_extra_roots.should eq(["assets"])
+          server = Hwaro::Services::Server.new
+          server.staleness_resolve_extra_roots.should eq(["assets"])
 
-        before = server.staleness_scan_mtimes
-        before.has_key?("assets/js/app.js").should be_true
+          before = server.staleness_scan_mtimes
+          before.has_key?("assets/js/app.js").should be_true
 
-        File.write("assets/js/app.js", "console.log(2)")
-        File.touch("assets/js/app.js", Time.local + 2.seconds)
-        changeset = server.staleness_detect_changes(before, server.staleness_scan_mtimes)
-        changeset.modified_static.should eq(["assets/js/app.js"])
-        changeset.rebuild_strategy.should eq(:static)
+          File.write("assets/js/app.js", "console.log(2)")
+          File.touch("assets/js/app.js", Time.local + 2.seconds)
+          changeset = server.staleness_detect_changes(before, server.staleness_scan_mtimes)
+          changeset.modified_static.should eq(["assets/js/app.js"])
+          changeset.rebuild_strategy.should eq(:static)
+        end
       end
     end
   end
@@ -284,18 +287,19 @@ describe "serve incremental staleness" do
   # the build output and `.git` every 500ms, and an absolute root — `"/"`, or
   # any typo that normalizes to one — would put a full-filesystem glob on the
   # poll loop.
-  it "refuses a project-root, absolute or escaping [assets] source_dir (L3)" do
+  it "refuses project-root and external [assets] source_dir paths (L3)" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do
         write_listing_site
-        {".", "", "../elsewhere", "/", "/srv/assets"}.each do |source_dir|
+        outside_sibling = File.expand_path("../#{File.basename(Dir.current)}-elsewhere")
+        {".", "", "../elsewhere", "/", Dir.current, outside_sibling}.each do |source_dir|
           File.write("config.toml", <<-TOML
             title = "Listing Site"
             base_url = "https://example.com"
 
             [assets]
             enabled = true
-            source_dir = "#{source_dir}"
+            source_dir = #{source_dir.inspect}
             TOML
           )
           Hwaro::Services::Server.new.staleness_resolve_extra_roots.should be_empty
@@ -310,17 +314,57 @@ describe "serve incremental staleness" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do
         write_listing_site
-        {"public", "public/js", "."}.each do |source_dir|
-          File.write("config.toml", <<-TOML
-            title = "Listing Site"
-            base_url = "https://example.com"
+        FileUtils.mkdir_p("target/public/js")
+        output_dir = File.expand_path("target/public")
+        {"target", "target/public", "target/public/js"}.each do |overlap|
+          {overlap, File.expand_path(overlap)}.each do |source_dir|
+            File.write("config.toml", <<-TOML
+              title = "Listing Site"
+              base_url = "https://example.com"
 
-            [assets]
-            enabled = true
-            source_dir = "#{source_dir}"
-            TOML
-          )
-          Hwaro::Services::Server.new.staleness_resolve_extra_roots(output_dir: "public").should be_empty
+              [assets]
+              enabled = true
+              source_dir = #{source_dir.inspect}
+              TOML
+            )
+            server = Hwaro::Services::Server.new
+            server.staleness_resolve_extra_roots(output_dir: "target/public").should be_empty
+            server.staleness_resolve_extra_roots(output_dir: output_dir).should be_empty
+          end
+        end
+      end
+    end
+  end
+
+  it "resolves directory symlinks before accepting an absolute asset watch root" do
+    posix_only!("directory symlinks need privileges on Windows")
+    Dir.mktmpdir do |outside|
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("build/output/vendor")
+          FileUtils.mkdir_p("bundle-sources")
+          File.symlink(outside, "outside-alias")
+          File.symlink("build/output/vendor", "output-subdir-alias")
+          File.symlink(".", "project-alias")
+          File.symlink("bundle-sources", "sources-alias")
+
+          {"outside-alias", "output-subdir-alias", "project-alias", "sources-alias"}.each do |source|
+            File.write("config.toml", <<-TOML
+              title = "Listing Site"
+              base_url = "https://example.com"
+
+              [assets]
+              enabled = true
+              source_dir = #{File.expand_path(source).inspect}
+              TOML
+            )
+            server = Hwaro::Services::Server.new
+            roots = server.staleness_resolve_extra_roots(output_dir: "build/output")
+            roots.should eq(source == "sources-alias" ? [source] : [] of String)
+          end
+
+          # Also reject an output whose parent is a symlink into the source.
+          Hwaro::Services::Server.new.staleness_resolve_extra_roots(output_dir: "sources-alias/missing").should be_empty
         end
       end
     end

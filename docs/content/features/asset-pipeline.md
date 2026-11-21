@@ -40,9 +40,11 @@ Bundle `files` may also name `.scss` sources. While `[sass]` is enabled they com
 | `enabled` | bool | `false` | Enable the asset pipeline |
 | `minify` | bool | `true` | Minify CSS/JS output |
 | `fingerprint` | bool | `true` | Add content hash to filenames |
-| `source_dir` | string | `"static"` | Directory containing source files (watched by `hwaro serve` wherever it points, as long as it stays inside the project) |
+| `source_dir` | string | `"static"` | Directory containing source files. `hwaro serve` watches project subdirectories given as relative or absolute paths that are separate from the build output. |
 | `output_dir` | string | `"assets"` | Output subdirectory in the build output |
 | `sri` | bool | `false` | Add `integrity` attributes to the local CSS/JS tags Hwaro emits (see [Subresource Integrity](#subresource-integrity)). Works with `enabled = false` |
+
+An absolute source directory must exist when `hwaro serve` starts or a full rebuild reloads the configuration. Hwaro resolves directory symlinks before checking that the source is inside the project and separate from the build output.
 
 ### Bundle definition
 

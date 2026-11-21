@@ -387,8 +387,8 @@ module Hwaro
       # worse:
       # - the project root (`.`, ""): scanning it would sweep the build
       #   output, `.git` and every dependency directory every 500ms;
-      # - an absolute path: `source_dir = "/"` (or any typo that normalizes
-      #   to one) would put a full-filesystem glob on the poll loop;
+      # - an absolute path outside the project: `source_dir = "/"` would
+      #   put a full-filesystem glob on the poll loop;
       # - a path escaping the project, for the same reason;
       # - the build output directory, in either direction: the watcher would
       #   re-stat the whole generated tree every poll and re-classify the
@@ -403,9 +403,34 @@ module Hwaro
         roots = [] of String
         return roots unless config
         output = Path[output_dir].normalize.to_s
-        add_watch_root(roots, config.assets.source_dir, output) if config.assets.enabled
+        if config.assets.enabled
+          project_dir = Dir.current
+          absolute_output = File.expand_path(output, project_dir)
+          source_dir = config.assets.source_dir
+          if Path[source_dir].absolute?
+            source_dir = absolute_asset_watch_root(source_dir, project_dir, absolute_output)
+          end
+          asset_output = Utils::PathUtils.relative_path(absolute_output, project_dir) || output
+          add_watch_root(roots, source_dir, asset_output) if source_dir && !asset_output.empty?
+        end
         config.highlight.lexers_dir.try { |dir| add_watch_root(roots, dir, output) }
         roots
+      end
+
+      private def absolute_asset_watch_root(source : String, project : String, output : String) : String?
+        absolute_source = File.expand_path(source, project)
+        return unless relative = Utils::PathUtils.relative_path(absolute_source, project).try(&.presence)
+
+        # Validate the directories reached through any symlinks, then keep
+        # the configured spelling so the watcher can match the bundle inputs.
+        real_source = File.realpath(absolute_source)
+        real_project = File.realpath(project)
+        return unless Utils::PathUtils.relative_path(real_source, real_project).try(&.presence)
+        real_output = Utils::PathUtils.resolved_real_path(output)
+        return if Utils::PathUtils.within?(real_source, real_output) || Utils::PathUtils.within?(real_output, real_source)
+        relative
+      rescue File::Error | IO::Error
+        nil
       end
 
       private def add_watch_root(roots : Array(String), dir : String, output : String) : Nil
