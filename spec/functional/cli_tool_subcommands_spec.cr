@@ -402,7 +402,7 @@ describe "hwaro tool export" do
         payload["success"]?.try(&.as_bool?).should be_false
         payload["exported_count"].as_i.should eq(1)
         payload["error_count"].as_i.should eq(2)
-        payload["files"].as_a.map { |file| file["path"].as_s }.should eq([
+        payload["files"].as_a.map(&.["path"].as_s).should eq([
           File.join(bundle, "index.md"), File.join(bundle, "later.png"),
         ])
         error.should contain("blocked.png")
