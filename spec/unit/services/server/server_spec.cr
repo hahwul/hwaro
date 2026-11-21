@@ -723,6 +723,13 @@ describe Hwaro::Services::CharsetHandler do
 
   it "is idempotent when a charset already exists (no double-append)" do
     run_charset("text/html; charset=iso-8859-1").headers["Content-Type"].should eq("text/html; charset=iso-8859-1")
+    run_charset("text/html; Charset=ISO-8859-1").headers["Content-Type"].should eq("text/html; Charset=ISO-8859-1")
+    run_charset("text/html; CHARSET = UTF-8").headers["Content-Type"].should eq("text/html; CHARSET = UTF-8")
+    run_charset("text/html; x-charset=legacy").headers["Content-Type"].should eq("text/html; x-charset=legacy; charset=utf-8")
+  end
+
+  it "ignores charset text inside another parameter's quoted value" do
+    run_charset(%(text/html; note="a;Charset=latin1")).headers["Content-Type"].should eq(%(text/html; note="a;Charset=latin1"; charset=utf-8))
   end
 
   it "is a no-op when downstream sets no Content-Type" do
