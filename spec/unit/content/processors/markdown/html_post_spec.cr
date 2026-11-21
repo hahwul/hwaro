@@ -132,6 +132,26 @@ describe Hwaro::Content::Processors::Markdown do
   end
 
   describe "emoji conversion" do
+    it "does not convert emoji names inside quoted HTML attributes" do
+      html, _ = Hwaro::Processor::Markdown.render(%(<span title="a > :fire:">text</span> :smile:), emoji: true)
+      html.should contain(%(title="a > :fire:"))
+      html.should contain("😄")
+    end
+
+    it "keeps a quoted HTML comment separate from following emoji" do
+      html, _ = Hwaro::Processor::Markdown.render(%(<!-- unmatched " :fire: --> :smile:), emoji: true)
+      html.should contain(%(<!-- unmatched " :fire: -->))
+      html.should contain("😄")
+    end
+
+    it "keeps visible emoji after a stray quote in an unquoted attribute" do
+      {"x", "a=b"}.each do |value|
+        html, _ = Hwaro::Processor::Markdown.render(%(<div data-x=#{value}"> :smile: "hi<span>later</span></div>), emoji: true)
+        html.should contain("😄")
+        html.should contain("<span>later</span>")
+      end
+    end
+
     it "leaves raw-text elements, math and mermaid untouched" do
       md_config = Hwaro::Models::MarkdownConfig.new
       md_config.math = true

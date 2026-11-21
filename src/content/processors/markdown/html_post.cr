@@ -298,7 +298,15 @@ module Hwaro
 
             if bytes[pos] == lt
               # Inside a tag, don't transform
-              tag_end = html.byte_index('>', pos)
+              # A `>` inside a quoted attribute is not the tag's end. Keep
+              # the old first-`>` behavior for comments/declarations and
+              # stray `<` text; only ordinary tags have HTML attributes.
+              tag_end = if pos + 1 < len && (bytes[pos + 1].unsafe_chr.ascii_letter? ||
+                           (bytes[pos + 1] == '/'.ord.to_u8 && pos + 2 < len && bytes[pos + 2].unsafe_chr.ascii_letter?))
+                          emoji_tag_end(bytes, pos, len) || html.byte_index('>', pos)
+                        else
+                          html.byte_index('>', pos)
+                        end
               if tag_end
                 result.write(bytes[pos, tag_end - pos + 1])
                 pos = tag_end + 1
@@ -317,6 +325,40 @@ module Hwaro
           end
 
           result.to_s
+        end
+
+        private def emoji_tag_end(bytes : Bytes, start : Int32, len : Int32) : Int32?
+          i = start + 1
+          quote = 0_u8
+          awaiting_value = false
+          unquoted_value = false
+          while i < len
+            byte = bytes[i]
+            if quote != 0_u8
+              quote = 0_u8 if byte == quote
+            elsif unquoted_value
+              return i if byte == '>'.ord
+              unquoted_value = false if byte.unsafe_chr.ascii_whitespace?
+            elsif awaiting_value
+              if byte == '>'.ord
+                return i
+              elsif byte.unsafe_chr.ascii_whitespace?
+                # Whitespace between `=` and a quoted value is allowed.
+              elsif byte == '"'.ord || byte == '\''.ord
+                quote = byte
+                awaiting_value = false
+              else
+                unquoted_value = true
+                awaiting_value = false
+              end
+            elsif byte == '>'.ord
+              return i
+            elsif byte == '='.ord
+              awaiting_value = true
+            end
+            i += 1
+          end
+          nil
         end
       end
     end
