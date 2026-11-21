@@ -348,12 +348,43 @@ module Hwaro
 
         existing = context.response.headers["Content-Type"]?
         return unless existing
-        return if existing.includes?("charset=")
+        return if charset_parameter?(existing)
 
         base = existing.split(';', 2).first.strip.downcase
         return unless text_like?(base)
 
         context.response.headers["Content-Type"] = "#{existing}; charset=utf-8"
+      end
+
+      CHARSET_PARAM = /\A[ \t]*charset[ \t]*=/i
+
+      # Parameter names are case-insensitive. Only semicolons outside quoted
+      # values divide parameters; `note="a;Charset=x"` is not a charset.
+      private def charset_parameter?(content_type : String) : Bool
+        bytes = content_type.to_slice
+        segment_start : Int32? = nil
+        quoted = false
+        i = 0
+        while i < bytes.size
+          case bytes[i]
+          when 34_u8 # quote
+            quoted = !quoted
+          when 92_u8 # escaped character inside a quoted value
+            i += 1 if quoted && i + 1 < bytes.size
+          when 59_u8 # semicolon
+            unless quoted
+              if start = segment_start
+                return true if content_type.byte_slice(start, i - start).matches?(CHARSET_PARAM)
+              end
+              segment_start = i + 1
+            end
+          end
+          i += 1
+        end
+        if start = segment_start
+          return content_type.byte_slice(start, bytes.size - start).matches?(CHARSET_PARAM)
+        end
+        false
       end
 
       private def text_like?(base : String) : Bool
