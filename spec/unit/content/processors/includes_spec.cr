@@ -22,6 +22,11 @@ describe Hwaro::Content::Processors::Includes do
       Includes.region(CODE, "server", markdown: false).should eq("  def run\n    puts \"hi\"\n  end\n")
     end
 
+    it "keeps content after a nested region with the same name" do
+      text = "#region outer\nA\n#region outer\nB\n#endregion outer\nC\n#endregion outer\n"
+      Includes.region(text, "outer", markdown: false).should eq("A\nB\nC\n")
+    end
+
     it "reads markers after every comment leader" do
       %w[// # -- ; /*].each do |leader|
         text = "a\n#{leader} #region r\nb\n#{leader} #endregion r\nc\n"
