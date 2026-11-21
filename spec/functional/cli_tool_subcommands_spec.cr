@@ -380,6 +380,38 @@ describe "hwaro tool import" do
 end
 
 describe "hwaro tool export" do
+  {"hugo", "jekyll"}.each do |target|
+    it "keeps the #{target} manifest and copies later assets after a copy fails" do
+      Dir.mktmpdir do |project_dir|
+        source = File.join(project_dir, "content", "notes")
+        FileUtils.mkdir_p(File.join(source, "blocked-folder"))
+        File.write(File.join(source, "index.md"), "Notes.\n")
+        File.write(File.join(source, "blocked.png"), "first asset")
+        File.write(File.join(source, "blocked-folder", "nested.png"), "second asset")
+        File.write(File.join(source, "later.png"), "third asset")
+
+        target_root = target == "hugo" ? File.join("export", "content") : "export"
+        bundle = File.join(target_root, "notes")
+        FileUtils.mkdir_p(File.join(project_dir, bundle, "blocked.png"))
+        File.write(File.join(project_dir, bundle, "blocked-folder"), "already a file")
+
+        status, output, error = run_hwaro(["tool", "export", target, "--json"], chdir: project_dir)
+
+        status.exit_code.should eq(Hwaro::Errors::EXIT_IO)
+        payload = JSON.parse(output)
+        payload["success"]?.try(&.as_bool?).should be_false
+        payload["exported_count"].as_i.should eq(1)
+        payload["error_count"].as_i.should eq(2)
+        payload["files"].as_a.map(&.["path"].as_s).should eq([
+          File.join(bundle, "index.md"), File.join(bundle, "later.png"),
+        ])
+        error.should contain("blocked.png")
+        error.should contain("nested.png")
+        File.read(File.join(project_dir, bundle, "later.png")).should eq("third asset")
+      end
+    end
+  end
+
   it "exits with HWARO_E_USAGE when target-type is missing" do
     with_initialized_project do |project_dir|
       status, _, err = run_hwaro(["tool", "export"], chdir: project_dir)

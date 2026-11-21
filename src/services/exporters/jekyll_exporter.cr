@@ -55,7 +55,7 @@ module Hwaro
             Logger.warn "Error exporting #{file_path}: #{front_matter_error_message(ex, file_path)}"
           end
 
-          export_assets(content_dir, files, output_dir, verbose)
+          errors += export_assets(content_dir, files, output_dir, verbose)
 
           # Any per-file error fails the run: `exported > 0` used to mask
           # errors, so a partial export reported success and exited 0.
@@ -272,15 +272,16 @@ module Hwaro
         # relative path, where Jekyll publishes it at the same URL. A
         # flattened bundle's files stay behind and are named in a warning:
         # the export used to report a clean run for a post whose every image
-        # link was dead. Counts cover content documents only, as Hugo's do.
-        private def export_assets(content_dir : String, files : Array(String), output_dir : String, verbose : Bool) : Nil
+        # link was dead. Return the number of copy failures.
+        private def export_assets(content_dir : String, files : Array(String), output_dir : String, verbose : Bool) : Int32
           left_behind = {} of String => Array(String)
+          errors = 0
           begin
             each_published_asset(content_dir, files) do |src, relative, owner|
               if owner && (index = @flattened_bundles[owner]?)
                 (left_behind[index] ||= [] of String) << Path[File.expand_path(src)].relative_to(owner).to_s
               else
-                copy_asset(src, File.join(output_dir, relative), output_dir, verbose)
+                errors += copy_asset(src, File.join(output_dir, relative), output_dir, verbose)
               end
             end
           rescue ex : File::Error
@@ -291,6 +292,7 @@ module Hwaro
             Logger.warn "#{assets.size} bundle asset(s) not exported for #{index}: #{assets.join(", ")}. " \
                         "Copy them into the Jekyll site and update the links."
           end
+          errors
         end
 
         # String form of a scalar front-matter value: strings pass through

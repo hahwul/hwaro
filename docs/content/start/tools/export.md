@@ -80,8 +80,10 @@ instead. When individual files fail, the manifest above is printed with
 `"success": false` and an `error_count` above zero. Both exit non-zero, with
 the same code as the human output.
 
-`files` lists every destination written, content assets included,
-while the counts cover content documents only.
+`files` lists every destination written, including content assets.
+`exported_count` and `skipped_count` cover content documents. If an asset
+copy fails, the export continues with the remaining files, includes the
+failure in `error_count`, and exits with the I/O error code.
 
 ## Content Assets
 
