@@ -41,6 +41,11 @@ describe Hwaro::Content::Processors::Includes do
       Includes.region(md, "brew", markdown: true).should eq("```sh\n# #region x\nbrew\n```\n")
     end
 
+    it "keeps region markers inside Markdown code fences literal" do
+      md = "```md\n<!-- #region brew -->\n```\n<!-- #region brew -->\n```md\n<!-- #endregion brew -->\n```\nafter\n<!-- #endregion brew -->\n"
+      Includes.region(md, "brew", markdown: true).should eq("```md\n<!-- #endregion brew -->\n```\nafter\n")
+    end
+
     it "raises for a missing or unclosed region" do
       expect_raises(Includes::Error, "region 'nope' not found") { Includes.region(CODE, "nope", markdown: false) }
       expect_raises(Includes::Error, "region 'r' is never closed") { Includes.region("# #region r\nx\n", "r", markdown: false) }
