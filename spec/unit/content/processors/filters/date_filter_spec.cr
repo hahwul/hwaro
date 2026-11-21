@@ -221,6 +221,24 @@ describe "DateFilters locale" do
     render_crinja(%({% autoescape true %}{{ ("<b>" | safe) | date }}{% endautoescape %})).should eq("&lt;b&gt;")
   end
 
+  it "keeps fractional seconds with an optional zone and either separator" do
+    {
+      "2024-06-15T14:30:45.123"        => "45.123000000 +0000",
+      "2024-06-15 14:30:45.123456789"  => "45.123456789 +0000",
+      "2024-06-15 14:30:45.123-03:30"  => "45.123000000 -0330",
+      "2024-06-15 14:30:45.123 -03:30" => "45.123000000 -0330",
+      "2024-06-15t14:30:45.1z"         => "45.100000000 +0000",
+    }.each do |input, expected|
+      render_crinja("{{ d | date('%S.%N %z') }}", {"d" => Crinja::Value.new(input)}).should eq(expected)
+    end
+  end
+
+  it "leaves strings with trailing text unchanged" do
+    {"2024-6-15x", "2024-06-15T14:30:45oops", "2024-06-15T14:30:45Z 오후"}.each do |input|
+      render_crinja("{{ d | date(locale='ko') }}", {"d" => Crinja::Value.new(input)}).should eq(input)
+    end
+  end
+
   it "passes the locale through now(format=...)" do
     now_day = render_crinja("{{ now(format='%a', locale='ko') }}")
     %w[월 화 수 목 금 토 일].should contain(now_day)

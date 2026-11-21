@@ -201,7 +201,7 @@ Pass `locale` to translate the names. A template shared by several languages pas
 
 `page.date` reaches templates as a date-only string (`2024-03-05`), so `%p`/`%P` on it always print the morning form. Use a value with a time of day (a datetime from front matter `extra` or data, or `now()`) when you need AM/PM.
 
-A string (safe strings included) is read as `YYYY-MM-DD` or an ISO 8601 / RFC 3339 datetime, with a `T` (or `t`) or a space before the time and an optional zone (`Z`, `z`, `+09:00`). A string that does not parse is printed unchanged.
+A string (safe strings included) is read as `YYYY-MM-DD` or an ISO 8601 / RFC 3339 datetime, with a `T` (or `t`) or a space before the time and an optional zone (`Z`, `z`, `+09:00`). Fractional seconds are kept with or without a zone. The filter prints the original string if the entire value cannot be parsed as a date or datetime.
 
 Built-in locales: `ko`, `ja`, `zh` (Simplified), `zh_TW` (Traditional; also used for `zh_Hant`, `zh_HK`, `zh_MO`), `de`, `fr`, `es`, `it`, `pt` (Brazilian, so `pt_BR` uses it), `ru`, `nl`, `pl`, `tr`, `vi`, `id`, and English. `ko`, `ko_KR`, `ko-KR` and `KO-kr` are the same locale, and a region without its own table falls back to its language (`fr_CA` uses `fr`). A POSIX codeset or modifier is ignored, so `ko.UTF-8`, `ko_KR.UTF-8` and `ko@euro` use `ko`.
 
