@@ -386,6 +386,8 @@ content_max_length = 500    # optional: cap each entry's content
 
 Nested sections fold into their top-level section: `blog/news/post.md` lands in the `blog` shard. Every eligibility rule of the classic index applies unchanged (`fields`, `exclude`, `in_search_index = false`, drafts, `render = false`, per-language `build_search_index`, `tokenize_cjk`).
 
+If a section named `_root` shares an index with root-level pages, the root-level pages keep the `_root` shard and Hwaro adds underscores to the section's shard ID. In `section-language` mode this is decided separately for each language. The manifest's `section` field still contains `_root` for that section and an empty string for root-level pages.
+
 ### Generated Files
 
 ```

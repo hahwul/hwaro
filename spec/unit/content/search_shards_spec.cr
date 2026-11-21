@@ -175,6 +175,30 @@ describe "Hwaro::Content::Search shards" do
   end
 
   describe "shards = \"section\"" do
+    it "keeps root pages separate from a section named _root" do
+      config = shard_config("section")
+      pages = [
+        shard_page("_root/a.md", "Section", "/_root/a/", "_root"),
+        shard_page("about.md", "About", "/about/", ""),
+        shard_page("__root/a.md", "Other", "/__root/a/", "__root"),
+      ]
+      Dir.mktmpdir do |odir|
+        Hwaro::Content::Search.generate(pages, config, odir)
+        shards = read_manifest(odir)["shards"].as_a.to_h { |shard| {shard["section"].as_s, shard} }
+        shards.keys.sort!.should eq(["", "__root", "_root"])
+        shards[""]["url"].as_s.should eq("/search/_root.json")
+        shards["__root"]["url"].as_s.should eq("/search/__root.json")
+        section_url = shards["_root"]["url"].as_s
+        section_url.should eq("/search/___root.json")
+        JSON.parse(File.read(File.join(odir, section_url.lchop('/')))).as_a.map(&.["title"].as_s).should eq(["Section"])
+        JSON.parse(File.read(File.join(odir, "search", "_root.json"))).as_a.map(&.["title"].as_s).should eq(["About"])
+
+        Hwaro::Content::Search.generate([pages.first], config, odir)
+        read_manifest(odir)["shards"].as_a.first["url"].as_s.should eq("/search/_root.json")
+        Dir.children(File.join(odir, "search")).sort.should eq(["_root.json", "index.json"])
+      end
+    end
+
     it "writes one shard per top-level section, root pages to _root, plus a manifest" do
       config = shard_config("section")
       Dir.mktmpdir do |odir|
@@ -393,6 +417,22 @@ describe "Hwaro::Content::Search shards" do
   end
 
   describe "shards = \"section-language\"" do
+    it "resolves a _root section collision only in the language with root pages" do
+      config = multilingual_config("section-language")
+      pages = [
+        shard_page("about.md", "About", "/about/", ""),
+        shard_page("_root/a.md", "Section", "/_root/a/", "_root"),
+        shard_page("_root/a.ko.md", "섹션", "/ko/_root/a/", "_root", language: "ko"),
+      ]
+      Dir.mktmpdir do |odir|
+        Hwaro::Content::Search.generate(pages, config, odir)
+        shards = read_manifest(odir)["shards"].as_a
+        shards.map(&.["id"].as_s).should eq(["en/__root", "en/_root", "ko/_root"])
+        shards.map(&.["section"].as_s).should eq(["_root", "", "_root"])
+        shards.map(&.["count"].as_i).should eq([1, 1, 1])
+      end
+    end
+
     it "nests section shards under the language code" do
       config = multilingual_config("section-language")
       Dir.mktmpdir do |odir|

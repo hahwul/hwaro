@@ -28,6 +28,7 @@ module Hwaro
       KNOWN_FIELDS = %w[title content tags url section description]
 
       alias Entry = Hash(String, String | Array(String))
+      private alias ShardKey = {id: String, language: String?, section: String?}
 
       # An h2/h3 element of the rendered page, and the `id` attribute in its
       # attribute list (quote-aware: `title="a > b"` does not end the tag).
@@ -199,7 +200,7 @@ module Hwaro
       # `section` is the page's TOP-LEVEL section (`blog` for `blog/news`)
       # because that is the granularity a client can lazy-load by; nested
       # sections would explode the shard count without helping.
-      private def self.shard_key(page : Models::Page, config : Models::Config) : {id: String, language: String?, section: String?}
+      private def self.shard_key(page : Models::Page, config : Models::Config) : ShardKey
         lang = page.language || config.default_language
         lang = "_default" if lang.empty?
         # NFC like the page URLs: the shard is an output name.
@@ -214,6 +215,24 @@ module Hwaro
         end
       end
 
+      private def self.shard_keys_by_id(keys : Array(ShardKey)) : Hash(String, ShardKey)
+        # The ordinary `_root` section shares the root pages' preferred id.
+        # Reserve everyone else's ids first, then move that section only if
+        # its own language already has a root-pages shard.
+        preferred, root_sections = keys.partition { |key| key[:section] != ROOT_SHARD_ID }
+        by_id = preferred.to_h { |key| {key[:id], key} }
+        root_sections.each do |key|
+          id = key[:id]
+          dir, separator, stem = id.rpartition('/')
+          while by_id.has_key?(id)
+            stem = "_#{stem}"
+            id = "#{dir}#{separator}#{stem}"
+          end
+          by_id[id] = key
+        end
+        by_id
+      end
+
       # Emit `search/<id>.json` per shard plus the `search/index.json`
       # manifest. Shards are always plain JSON arrays whatever `format`
       # says: the `*_javascript` wrapper only serves `<script src>` loading,
@@ -225,15 +244,16 @@ module Hwaro
         manifest_file = manifest_path(output_dir)
         previous_files = previous_shard_files(manifest_file)
 
-        groups = {} of String => {language: String?, section: String?, entries: Array(Entry)}
+        groups = {} of ShardKey => Array(Entry)
         pages.each_with_index do |page, i|
           key = shard_key(page, config)
-          group = groups[key[:id]] ||= {language: key[:language], section: key[:section], entries: [] of Entry}
-          group[:entries].concat(entries[i])
+          (groups[key] ||= [] of Entry).concat(entries[i])
         end
 
-        ids = groups.keys.sort!
-        files = shard_file_names(ids)
+        by_id = shard_keys_by_id(groups.keys)
+        ids = by_id.keys.sort!
+        root_ids, other_ids = ids.partition { |id| by_id[id][:section] == "" }
+        files = shard_file_names(root_ids.concat(other_ids))
         base_path = config.base_path
         Hwaro::Utils::FileSafe.mkdir_p(shards_dir)
         manifest = JSON.build do |json|
@@ -243,8 +263,9 @@ module Hwaro
             json.field "shards" do
               json.array do
                 ids.each do |id|
-                  group = groups[id]
-                  content = group[:entries].to_json
+                  key = by_id[id]
+                  group = groups[key]
+                  content = group.to_json
                   name = files[id]
                   shard_file = File.join(shards_dir, name)
                   Hwaro::Utils::FileSafe.mkdir_p(File.dirname(shard_file))
@@ -255,9 +276,9 @@ module Hwaro
                     # Percent-encode: a section directory may carry spaces
                     # or non-ASCII the filesystem accepts but a URL must escape.
                     json.field "url", "#{base_path}/#{SHARDS_DIR}/#{URI.encode_path(name)}"
-                    json.field "language", group[:language]
-                    json.field "section", group[:section]
-                    json.field "count", group[:entries].size
+                    json.field "language", key[:language]
+                    json.field "section", key[:section]
+                    json.field "count", group.size
                     json.field "bytes", content.bytesize
                   end
                 end
