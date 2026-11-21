@@ -324,11 +324,13 @@ module Hwaro
           end
         end
 
-        # Copy one content asset to `dest` through `write_file`'s guards.
-        protected def copy_asset(src : String, dest : String, output_dir : String, verbose : Bool) : Nil
+        # Copy one content asset through the output guards and return its error count.
+        protected def copy_asset(src : String, dest : String, output_dir : String, verbose : Bool) : Int32
           write_file(dest, File.read(src), output_dir, verbose)
-        rescue ex : File::Error
+          0
+        rescue ex : IO::Error | Hwaro::HwaroError
           Logger.warn "Could not export asset #{src}: #{ex.message}"
+          1
         end
 
         # The project's `[content.files]` rules: `config.toml` beside the

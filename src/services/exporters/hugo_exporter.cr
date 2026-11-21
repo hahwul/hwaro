@@ -51,10 +51,11 @@ module Hwaro
           # Every non-Markdown file the build publishes keeps its place under
           # `content/`: beside an exported index Hugo reads it as a (leaf or
           # branch) bundle resource, so `![](cover.png)` keeps resolving.
-          # Assets are listed in the manifest but not counted.
+          # Successful copies appear in the manifest, while copy failures
+          # count as export errors alongside content document failures.
           begin
             each_published_asset(content_dir, files) do |src, relative, _owner|
-              copy_asset(src, File.join(output_dir, "content", relative), output_dir, verbose)
+              errors += copy_asset(src, File.join(output_dir, "content", relative), output_dir, verbose)
             end
           rescue ex : File::Error
             # The tree changed under the walk after the pages were written —
