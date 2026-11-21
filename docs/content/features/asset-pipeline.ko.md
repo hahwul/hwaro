@@ -40,9 +40,11 @@ files = ["js/util.js", "js/app.js"]
 | `enabled` | bool | `false` | 에셋 파이프라인 활성화 |
 | `minify` | bool | `true` | CSS/JS 출력 압축 |
 | `fingerprint` | bool | `true` | 파일명에 콘텐츠 해시 추가 |
-| `source_dir` | string | `"static"` | 소스 파일이 있는 디렉터리 (프로젝트 안에 있는 한 어디를 가리켜도 `hwaro serve`가 감시합니다) |
+| `source_dir` | string | `"static"` | 소스 파일이 있는 디렉터리. `hwaro serve`는 상대 경로나 절대 경로로 지정한 프로젝트 하위 디렉터리 중 빌드 출력과 겹치지 않는 곳을 감시합니다. |
 | `output_dir` | string | `"assets"` | 빌드 출력 내 출력 하위 디렉터리 |
 | `sri` | bool | `false` | Hwaro가 출력하는 로컬 CSS/JS 태그에 `integrity` 속성 추가([하위 리소스 무결성](#sri) 참고). `enabled = false`여도 동작 |
+
+절대 경로로 지정한 소스 디렉터리는 `hwaro serve`가 시작되거나 전체 재빌드에서 설정을 다시 읽을 때 존재해야 합니다. Hwaro는 디렉터리 심볼릭 링크를 해석한 뒤 실제 소스 경로가 프로젝트 안에 있고 빌드 출력 경로와 겹치지 않는지 확인합니다.
 
 ### 번들 정의
 
