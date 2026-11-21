@@ -1382,8 +1382,16 @@ module Hwaro
             error_at(node.line, node.column,
               "@for range has incompatible units: #{from_n.to_css} and #{to_n.to_css}")
           end
-          unit = from_n.result_unit(to_n)
+          unit = from_n.unit
           from_i = int_bound(from_n, node)
+          unless unit.empty? || to_n.unit.empty? || unit == to_n.unit
+            # Unit conversion can leave a whole bound just below or above
+            # its integer value, as when converting 7.62cm to inches.
+            converted = from_n.coerce_value(to_n)
+            nearest = converted.round
+            converted = nearest if Number.fuzzy_eq?(converted, nearest)
+            to_n = Number.new(converted, unit)
+          end
           to_i = int_bound(to_n, node)
           name = Sass.normalize_ident(node.var)
 
