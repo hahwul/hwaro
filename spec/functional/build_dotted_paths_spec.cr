@@ -366,17 +366,34 @@ describe "build: alias targets that name the same file" do
         build_site(
           DOTS_CONFIG,
           content_files: {
-            "legacy.html/post.md" => "+++\naliases = [\"/legacy.html\"]\n+++\n\nNested body\n",
+            "legacy.html/post.md" => "+++\naliases = [\"/legacy.html\", \"/legacy.html/sibling/\"]\n+++\n\nNested body\n",
             "zz.md"               => "+++\naliases = [\"/legacy.html\"]\n+++\n\nOther body\n",
           },
           template_files: {"page.html" => "{{ content }}"},
         ) do
           File.read("public/legacy.html/post/index.html").should contain("Nested body")
+          File.read("public/legacy.html/sibling/index.html").should contain("http-equiv")
         end
       end
       # The nested page's own alias is dropped without a warning.
       log.scan("Duplicate alias output path").size.should eq(1)
       log.should contain("alias on 'zz.md' collides with 'legacy.html/post.md'")
+    end
+
+    it "keeps a sibling alias when another directory differs only by case" do
+      build_site(
+        DOTS_CONFIG,
+        content_files: {
+          "a.md" => %(+++\npath = "Legacy/shape.html/other"\n+++\nOther body),
+          "b.md" => %(+++\npath = "legacy/shape.html/post"\naliases = ["/legacy/shape.html", "/legacy/shape.html/sibling/"]\n+++\nPost body),
+        },
+        template_files: {"page.html" => "{{ content }}"},
+      ) do
+        File.read("public/legacy/shape.html/post/index.html").should contain("Post body")
+        File.read("public/legacy/shape.html/sibling/index.html").should contain("http-equiv")
+        planned = Hwaro::Core::Build::Builder.new.plan_urls(Hwaro::Config::Options::BuildOptions.new)
+        planned.map(&.url).should contain("/legacy/shape.html/sibling/")
+      end
     end
 
     it "lets the first of two aliases keep the path, whichever is the file" do
@@ -397,6 +414,27 @@ describe "build: alias targets that name the same file" do
           end
         end
         log.should contain("alias on 'b.md' collides with 'a.md' (a file where the other needs a directory) and is not written")
+      end
+    end
+
+    it "keeps the first conflicting alias on the same page" do
+      {
+        {"/o.html", "/o.html/sub/", "public/o.html"},
+        {"/o.html/index.html", "/o.html", "public/o.html/index.html"},
+      }.each do |first, second, written|
+        log = with_captured_log do
+          build_site(
+            DOTS_CONFIG,
+            content_files: {"a.md" => "+++\naliases = [#{first.inspect}, #{second.inspect}, \"/kept.html\"]\n+++\n\nA\n"},
+            template_files: {"page.html" => "{{ content }}"},
+          ) do
+            File.read(written).should contain("http-equiv")
+            File.read("public/kept.html").should contain("http-equiv")
+            planned = Hwaro::Core::Build::Builder.new.plan_urls(Hwaro::Config::Options::BuildOptions.new)
+            planned.map(&.url).should_not contain(second)
+          end
+        end
+        log.should contain("a file where the other needs a directory")
       end
     end
   end
