@@ -44,6 +44,7 @@ module Hwaro
       abstract class Base
         TOML_FRONTMATTER_RE = Utils::FrontmatterScanner::TOML_FRONTMATTER_RE
         YAML_FRONTMATTER_RE = Utils::FrontmatterScanner::YAML_FRONTMATTER_RE
+        MARKDOWN_EXT_RE     = /\.(?:md|markdown)\z/i
 
         # Project directories that hold SOURCES, never export output. The
         # exporters write each file with a plain `File.write`, so a destination
@@ -167,6 +168,9 @@ module Hwaro
         # exactly which pre-existing files a run replaced.
         getter file_actions = [] of FileAction
 
+        # Destinations reserved in this run, separate from pre-existing output.
+        @written_paths = Set(String).new
+
         # Expanded paths a default build treats as drafts, including pages
         # under a section's `[cascade] draft = true` (ContentLister is the
         # publish-state source of truth). Filled by `load_draft_paths`.
@@ -225,21 +229,24 @@ module Hwaro
           return files unless Dir.exists?(content_dir)
           project_root = Utils::PathUtils.find_project_root(content_dir)
           rules = ContentWalk.ignore_rules(content_dir)
-          Dir.glob(File.join(Utils::PathUtils.glob_escape(content_dir), "**", "*.md")) do |file|
+          Dir.glob(File.join(Utils::PathUtils.glob_escape(content_dir), "**", "*")) do |file|
+            next unless ContentWalk.markdown?(file)
             next if File.symlink?(file) && !Utils::PathUtils.resolves_within?(file, project_root)
             next if rules.ignored?(file)
             # Directories named `x.md` and FIFOs (whose `File.read` blocks
             # forever) are skipped, as the build and the other tools do.
             files << file if ContentWalk.readable_file?(file)
           end
-          Dir.glob(File.join(Utils::PathUtils.glob_escape(content_dir), "**", "*.markdown")) do |file|
-            next if File.symlink?(file) && !Utils::PathUtils.resolves_within?(file, project_root)
-            next if rules.ignored?(file)
-            # Directories named `x.md` and FIFOs (whose `File.read` blocks
-            # forever) are skipped, as the build and the other tools do.
-            files << file if ContentWalk.readable_file?(file)
+          # Let existing lowercase sources keep their destinations when
+          # two extension spellings normalize to the same name.
+          files.sort_by! do |file|
+            extension = File.extname(file)
+            {extension == extension.downcase ? 0 : 1, file}
           end
-          files.sort
+        end
+
+        protected def normalize_markdown_extension(path : String) : String
+          path.sub(MARKDOWN_EXT_RE, &.downcase)
         end
 
         # Read a content file for export, stripping a UTF-8 BOM. A leading
@@ -255,7 +262,7 @@ module Hwaro
 
         # `index.md`, `_index.md` and their translations: the pages whose
         # directory is a bundle (or section) with files of its own.
-        INDEX_PAGE_RE = /\A_?index(?:\.[^.\/]+)?\.(?:md|markdown)\z/
+        INDEX_PAGE_RE = /\A_?index(?:\.[^.\/]+)?\.(?i:md|markdown)\z/
 
         # Expanded directories of the index pages this run exported. A build
         # publishes a bundle's or section's files beside a page it renders,
@@ -356,7 +363,7 @@ module Hwaro
         # "ko") when the project declares that language, else nil.
         private def link_language(target : String) : String?
           return unless language_prefixed_links? && (dir = @content_dir) && (config = site_config(dir)) && config.multilingual?
-          stem = target.sub(/\.(?:md|markdown)\z/, "")
+          stem = target.sub(MARKDOWN_EXT_RE, "")
           Utils::PathUtils.language_suffix(File.basename(stem)) do |code|
             config.languages.has_key?(code) || code == config.default_language
           end
@@ -536,6 +543,21 @@ module Hwaro
           true
         end
 
+        # Keep distinct pages that resolve to the same destination in one run.
+        protected def disambiguate_path(path : String) : String
+          return path if @written_paths.add?(path)
+
+          ext = File.extname(path)
+          stem = path.chomp(ext)
+          n = 1
+          until @written_paths.add?("#{stem}-#{n}#{ext}")
+            n += 1
+          end
+          unique = "#{stem}-#{n}#{ext}"
+          Logger.warn "Export destination collision: #{path} already written this run; writing #{File.basename(unique)} instead."
+          unique
+        end
+
         # Normalize a front-matter field that may be authored as either a list
         # (`tags: [a, b]`) or a single scalar (`tags: crystal`, `tags: 2024`)
         # into an array of strings, so shorthand isn't silently dropped on
@@ -709,7 +731,7 @@ module Hwaro
           # A section `_index` and a page-bundle `index` both publish at
           # their directory's URL (`@/posts/my-post/index.md` →
           # `/posts/my-post/`), as the build resolves them.
-          path = target.sub(/\.(?:md|markdown)$/, "")
+          path = target.sub(MARKDOWN_EXT_RE, "")
           path = path.rchop(".#{lang}") if lang
           path = path.sub(/(\A|\/)_?index$/, "\\1")
           # Jekyll exports a translated `_index.ko.md` as `index.ko.md`.

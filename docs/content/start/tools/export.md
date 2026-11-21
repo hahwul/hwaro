@@ -52,6 +52,11 @@ summary warns with the count, and the JSON manifest marks those rows
 `overwritten` (fresh destinations are `exported`). Use `--dry-run` to see the
 full manifest before writing.
 
+Markdown extensions are matched without regard to case and written as `.md`
+or `.markdown`. When two source files resolve to the same destination after
+normalization, the lowercase source extension keeps the original destination
+and the other file receives a numeric suffix.
+
 ## JSON Output
 
 ```json

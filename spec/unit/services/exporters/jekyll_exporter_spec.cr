@@ -336,6 +336,23 @@ describe Hwaro::Services::Exporters::JekyllExporter do
       end
     end
 
+    it "uses the usual Jekyll paths for pages with mixed-case Markdown extensions" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(File.join(content_dir, "posts", "trip"))
+        File.write(File.join(content_dir, "About.Markdown"), "[Trip](@/posts/trip/index.MD)\n")
+        File.write(File.join(content_dir, "posts", "trip", "index.MD"), "+++\ndate = 2024-04-01\n+++\nTrip.\n")
+
+        options = Hwaro::Config::Options::ExportOptions.new(target_type: "jekyll", content_dir: content_dir, output_dir: output_dir)
+        result = Hwaro::Services::Exporters::JekyllExporter.new.run(options)
+
+        result.exported_count.should eq(2)
+        File.read(File.join(output_dir, "About.markdown")).should contain("[Trip](/posts/trip/)")
+        File.read(File.join(output_dir, "_posts", "2024-04-01-trip.md")).should contain("permalink: \"/posts/trip/\"")
+      end
+    end
+
     it "uses the bundle directory as the slug for leaf-bundle posts" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")

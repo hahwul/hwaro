@@ -17,10 +17,11 @@ module Hwaro
           include_drafts = options.drafts
           verbose = options.verbose
 
+          @written_paths.clear
           files = scan_content_files(content_dir)
           load_draft_paths(content_dir)
           @exported_index_dirs.clear
-          @relative_files = files.map(&.sub(content_dir, "").lstrip('/')).to_set
+          @relative_files = files.map { |file| normalize_markdown_extension(file.sub(content_dir, "").lstrip('/')) }.to_set
 
           if files.empty?
             return ExportResult.new(
@@ -201,8 +202,8 @@ module Hwaro
           end
 
           # Preserve directory structure
-          relative = file_path.sub(content_dir, "").lstrip('/')
-          out_path = File.join(output_dir, "content", hugo_relative_path(relative))
+          relative = normalize_markdown_extension(file_path.sub(content_dir, "").lstrip('/'))
+          out_path = disambiguate_path(File.join(output_dir, "content", hugo_relative_path(relative)))
 
           # A refused destination (outside `output_dir`) is reported as
           # skipped, and its bundle assets are not copied either — there is no

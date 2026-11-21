@@ -420,6 +420,44 @@ end
 # blog/docs/book scaffolds use `content/index.md` as the homepage, so the
 # verbatim export made `hugo` publish the homepage and nothing else.
 describe "Hugo export: index.md with pages below it" do
+  it "exports mixed-case extensions with bundle assets and localized links" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(File.join(content_dir, "guide"))
+      File.write(File.join(dir, "config.toml"), %(title = "T"\ndefault_language = "en"\n[languages.en]\nlanguage_name = "English"\n[languages.ko]\nlanguage_name = "Korean"\n))
+      File.write(File.join(content_dir, "index.MD"), "[Guide](@/guide/index.ko.Markdown)\n")
+      File.write(File.join(content_dir, "guide", "index.ko.Markdown"), "![Cover](cover.png)\n")
+      File.write(File.join(content_dir, "guide", "cover.png"), "PNG")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "hugo", content_dir: content_dir, output_dir: output_dir)
+      result = Hwaro::Services::Exporters::HugoExporter.new.run(options)
+
+      result.exported_count.should eq(2)
+      File.read(File.join(output_dir, "content", "_index.md")).should contain("[Guide](/ko/guide/)")
+      File.exists?(File.join(output_dir, "content", "guide", "index.ko.markdown")).should be_true
+      File.read(File.join(output_dir, "content", "guide", "cover.png")).should eq("PNG")
+    end
+  end
+
+  it "keeps lowercase destination names when normalizing other extensions" do
+    Dir.mktmpdir do |dir|
+      content_dir = File.join(dir, "content")
+      output_dir = File.join(dir, "export")
+      FileUtils.mkdir_p(content_dir)
+      File.write(File.join(content_dir, "note.md"), "Original body.\n")
+      pending!("case-folding filesystem") if File.exists?(File.join(content_dir, "note.MD"))
+      File.write(File.join(content_dir, "note.MD"), "Alternate body.\n")
+
+      options = Hwaro::Config::Options::ExportOptions.new(target_type: "hugo", content_dir: content_dir, output_dir: output_dir)
+      result = Hwaro::Services::Exporters::HugoExporter.new.run(options)
+
+      result.exported_count.should eq(2)
+      File.read(File.join(output_dir, "content", "note.md")).should contain("Original body.")
+      File.read(File.join(output_dir, "content", "note-1.md")).should contain("Alternate body.")
+    end
+  end
+
   it "exports the site root index.md as Hugo's _index.md" do
     Dir.mktmpdir do |dir|
       content_dir = File.join(dir, "content")
