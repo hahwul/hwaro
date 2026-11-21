@@ -119,7 +119,7 @@ module Hwaro::Core::Build::Phases::Generate
       # (see Phases::Finalize), so disabling or renaming an output removes
       # the file an earlier build wrote.
       -> {
-        Content::Seo::Sitemap.generate(all_pages, site, output_dir, verbose, skip_if_unchanged: skip_unchanged)
+        Content::Seo::Sitemap.generate(all_pages, site, output_dir, verbose, skip_if_unchanged: skip_unchanged, builder: self)
         Content::Seo::Sitemap.published_outputs(site.config, output_dir).each { |path| claim_generated_output(path) }
         nil
       },
@@ -154,7 +154,7 @@ module Hwaro::Core::Build::Phases::Generate
   def generate_search_index(ctx : Lifecycle::BuildContext) : Nil
     site = @site || raise "Site not initialized"
     Content::Search.generate(ctx.all_pages, site.config, ctx.options.output_dir, ctx.options.verbose,
-      skip_if_unchanged: generate_outputs_unchanged?(ctx))
+      skip_if_unchanged: generate_outputs_unchanged?(ctx), builder: self)
     # Claimed whether written or skipped: the claim list is "what this build
     # publishes" (see Phases::Finalize).
     Content::Search.published_outputs(site.config, ctx.options.output_dir).each { |path| claim_generated_output(path) }
