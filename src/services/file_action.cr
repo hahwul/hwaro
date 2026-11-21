@@ -34,8 +34,8 @@ module Hwaro
         dirs = [{source_dir, dest_dir}]
         while pair = dirs.shift?
           from, to = pair
-          # A subdirectory's destination may not exist yet; its parent passed
-          # this check, so only an existing one (a symlink?) is resolved.
+          # A subdirectory's destination may not exist yet, but an existing
+          # ancestor can already point outside the output directory.
           next unless Dir.exists?(from) && dest_dir_ok?(to, output_dir, dry_run || to != dest_dir)
           Dir.children(from).sort!.each do |entry|
             src = File.join(from, entry)
@@ -66,10 +66,9 @@ module Hwaro
         # `within_output_dir?` is lexical. If the destination directory —
         # or any ancestor — is a symlink out of the tree, `Dir.exists?`
         # follows it and `File.copy` would write straight through it.
-        # A dry run never created `dest_dir`, so it can only apply the
-        # resolved check to a directory that already exists — the same
-        # pre-existing-symlink case the real run refuses.
-        return !Dir.exists?(dest_dir) || Utils::PathUtils.resolves_within?(dest_dir, output_dir) if may_be_missing
+        # Resolve the deepest existing ancestor even in a dry run, when the
+        # destination itself has not been created yet.
+        return Utils::PathUtils.destination_within?(dest_dir, output_dir) if may_be_missing
         Utils::PathUtils.resolves_within?(dest_dir, output_dir)
       end
 
