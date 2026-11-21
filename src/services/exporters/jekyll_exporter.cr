@@ -24,6 +24,7 @@ module Hwaro
         @flattened_bundles = {} of String => String
 
         def run(options : Config::Options::ExportOptions) : ExportResult
+          @file_actions.clear
           content_dir = options.content_dir
           output_dir = options.output_dir
           include_drafts = options.drafts

@@ -1,5 +1,39 @@
 require "../../../spec_helper"
 
+describe "exporter manifests" do
+  {
+    "hugo"   => Hwaro::Services::Exporters::HugoExporter,
+    "jekyll" => Hwaro::Services::Exporters::JekyllExporter,
+  }.each do |target, exporter_type|
+    it "reports only the current #{target} export when reused" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        FileUtils.mkdir_p(content_dir)
+        File.write(File.join(content_dir, "page.md"), "Page body.\n")
+        exporter = exporter_type.new
+
+        first = File.join(dir, "first")
+        exporter.run(Hwaro::Config::Options::ExportOptions.new(
+          target_type: target, content_dir: content_dir, output_dir: first,
+        )).success.should be_true
+        exporter.file_actions.size.should eq(1)
+
+        second = File.join(dir, "second")
+        exporter.run(Hwaro::Config::Options::ExportOptions.new(
+          target_type: target, content_dir: content_dir, output_dir: second,
+        )).success.should be_true
+        target_dir = target == "hugo" ? File.join(second, "content") : second
+        exporter.file_actions.map(&.path).should eq([File.join(target_dir, "page.md")])
+
+        exporter.run(Hwaro::Config::Options::ExportOptions.new(
+          target_type: target, content_dir: File.join(dir, "missing"), output_dir: second,
+        )).success.should be_false
+        exporter.file_actions.should be_empty
+      end
+    end
+  end
+end
+
 # Exposes the asset copy failure path deterministically: a content tree that
 # becomes unlistable mid-run (permissions, NFS hiccup) makes the asset walk
 # raise after the posts themselves were already written.
