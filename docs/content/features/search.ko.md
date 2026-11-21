@@ -384,6 +384,8 @@ content_max_length = 500    # 선택: 각 항목의 content 길이 제한
 | `"language"` | 언어마다 하나(다국어 사이트); 기본 언어는 자신의 코드 사용 | `en`, `ko` |
 | `"section-language"` | 언어, 그다음 섹션 | `en/blog`, `ko/blog`, `ko/_root` |
 
+`_root`라는 섹션과 루트 수준 페이지가 같은 인덱스에 있으면 루트 수준 페이지는 `_root` 샤드를 유지하고, Hwaro는 섹션의 샤드 ID 앞에 밑줄을 추가합니다. `section-language` 모드에서는 언어별로 이 규칙을 적용합니다. 매니페스트의 `section` 필드는 해당 섹션에 `_root`, 루트 수준 페이지에 빈 문자열을 사용합니다.
+
 중첩 섹션은 최상위 섹션으로 합쳐집니다. `blog/news/post.md`는 `blog` 샤드에 들어갑니다. 기존 인덱스의 포함 규칙(`fields`, `exclude`, `in_search_index = false`, 초안, `render = false`, 언어별 `build_search_index`, `tokenize_cjk`)은 그대로 적용됩니다.
 
 ### 생성 파일
