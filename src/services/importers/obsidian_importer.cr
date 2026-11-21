@@ -410,27 +410,16 @@ module Hwaro
         private def extract_inline_tags(body : String) : Array(String)
           tags = [] of String
           # Skip code blocks (and `$$` display math) when extracting tags
-          in_code_block = false
+          tracker = Content::Processors::FenceTracker.new
           in_math_block = false
-          fence_close_re : Regex? = nil
           body.each_line do |line|
             if in_math_block
               in_math_block = false if line.strip == "$$"
               next
-            elsif !in_code_block && line.strip == "$$"
+            elsif tracker.fence_line?(line)
+              next
+            elsif line.strip == "$$"
               in_math_block = true
-              next
-            end
-            if in_code_block
-              if fence_close_re.try(&.match(line))
-                in_code_block = false
-                fence_close_re = nil
-              end
-              next
-            end
-            if match = line.match(/^(\s*(`{3,}|~{3,}))/)
-              in_code_block = true
-              fence_close_re = Regex.new("^\\s*#{Regex.escape(match[2])}\\s*$")
               next
             end
             # Skip headings (all markdown heading levels)
@@ -451,25 +440,16 @@ module Hwaro
         end
 
         private def convert_obsidian_syntax(body : String, link_map : Hash(String, String) = {} of String => String, note_dir : String = "") : String
-          in_code_block = false
+          tracker = Content::Processors::FenceTracker.new
           in_math_block = false
-          fence_close_re : Regex? = nil
           lines = body.split("\n").map do |line|
             if in_math_block
               in_math_block = false if line.strip == "$$"
               line
-            elsif !in_code_block && line.strip == "$$"
+            elsif tracker.fence_line?(line)
+              line
+            elsif line.strip == "$$"
               in_math_block = true
-              line
-            elsif in_code_block
-              if fence_close_re.try(&.match(line))
-                in_code_block = false
-                fence_close_re = nil
-              end
-              line
-            elsif fence_match = line.match(/^(\s*(`{3,}|~{3,}))/)
-              in_code_block = true
-              fence_close_re = Regex.new("^\\s*#{Regex.escape(fence_match[2])}\\s*$")
               line
             elsif line.matches?(/^\s*\#{1,6}\s/)
               # Preserve markdown headings
