@@ -505,6 +505,30 @@ describe Hwaro::Services::Importers::ObsidianImporter do
       end
     end
 
+    it "resumes Obsidian conversion after a longer closing code fence" do
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "target.md"), "Target body.\n")
+        File.write(File.join(dir, "example.md"), <<-OBSIDIAN)
+          ~~~
+          Keep [[target]] with #literal.
+          ~~~~~
+
+          Visit [[target]] with #example.
+          OBSIDIAN
+
+        output_dir = File.join(dir, "output")
+        Hwaro::Services::Importers::ObsidianImporter.new.run(Hwaro::Config::Options::ImportOptions.new(
+          source_type: "obsidian", path: dir, output_dir: output_dir,
+        ))
+
+        content = File.read(File.join(output_dir, "posts", "example.md"))
+        content.should contain("Keep [[target]] with #literal.")
+        content.should contain("[target](/posts/target/)")
+        content.should contain(%(tags = ["example"]))
+        content.should_not contain("#example")
+      end
+    end
+
     it "excludes drafts from the link map when drafts: false" do
       Dir.mktmpdir do |dir|
         File.write(File.join(dir, "linker.md"), <<-OBSIDIAN)
