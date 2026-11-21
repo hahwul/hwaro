@@ -348,6 +348,80 @@ describe "serve incremental staleness" do
   end
 end
 
+describe "serve watch parity: colocated bundle inputs" do
+  [{"templates/theme", false}, {"content/theme", false}, {"content/ignored", false}, {"content/ignored", true}].each do |source_dir, absolute|
+    description = absolute ? "absolute #{source_dir}" : source_dir
+    it "refreshes the bundle and its page URL after #{description} changes" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          write_listing_site
+          File.write("content/posts/note.md", "+++\ntitle = \"Notes\"\n+++\nNotes\n")
+          File.write("templates/page.html", %(<html><body>{{ content }}<script src="{{ asset(name='app.js') }}"></script></body></html>))
+          configured_source_dir = absolute ? File.expand_path(source_dir) : source_dir
+          File.write("config.toml", <<-TOML
+            title = "Listing Site"
+            base_url = "https://example.com"
+
+            [assets]
+            enabled = true
+            source_dir = #{configured_source_dir.inspect}
+
+            [[assets.bundles]]
+            name = "app.js"
+            files = ["app.js"]
+
+            [content]
+            ignore = ["ignored/**"]
+
+            [content.files]
+            allow_extensions = ["js"]
+            TOML
+          )
+          FileUtils.mkdir_p(source_dir)
+          source = File.join(source_dir, "app.js")
+          File.write(source, "window.message = 'before';")
+
+          server = Hwaro::Services::Server.new
+          options = staleness_options
+          options.preserve_output = true
+          server.staleness_builder.run(options).should be_true
+          original_bundle = Dir.glob("public/assets/app.*.js").first
+
+          before = server.staleness_scan_mtimes
+          File.write(source, "window.message = 'after change';")
+          File.touch(source, Time.local + 2.seconds)
+          changes = server.staleness_detect_changes(before, server.staleness_scan_mtimes)
+          changes.empty?.should be_false
+          server.staleness_apply_changeset(changes, options)
+
+          clean = options.dup
+          clean.output_dir = "clean"
+          clean.serve_mode = false
+          clean.preserve_output = false
+          Hwaro::Services::Server.new.staleness_builder.run(clean).should be_true
+          clean_bundle = Dir.glob("clean/assets/app.*.js").first
+          served_bundle = File.join("public/assets", File.basename(clean_bundle))
+
+          File.exists?(original_bundle).should be_false
+          File.read(served_bundle).should eq(File.read(clean_bundle))
+          File.read("public/posts/note/index.html").should eq(File.read("clean/posts/note/index.html"))
+          if source_dir == "content/theme"
+            File.read("public/theme/app.js").should eq(File.read("clean/theme/app.js"))
+          elsif source_dir == "content/ignored"
+            File.exists?("public/ignored/app.js").should be_false
+          end
+
+          # A pre-build hook can rewrite the bundle input without changing
+          # its bytes. Do not send that rewrite through another full build.
+          before = server.staleness_scan_mtimes
+          File.touch(source, Time.local + 4.seconds)
+          server.staleness_detect_changes(before, server.staleness_scan_mtimes).empty?.should be_true
+        end
+      end
+    end
+  end
+end
+
 # The fan-out is only usable on a dev server if it stays proportional. A
 # nav partial in the shared base layout puts `get_menu` in EVERY page's
 # template closure, and tag pills put `get_taxonomy_url` in every post's —

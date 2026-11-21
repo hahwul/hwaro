@@ -139,10 +139,13 @@ module Hwaro
           config = @config
           return false unless config && config.assets.enabled
 
-          normalized = Path[path].normalize.to_s
+          source_dir = Path[config.assets.source_dir]
+          source = Path[path]
+          # An absolute source dir can still sit under a watched root.
+          normalized = source_dir.absolute? ? source.expand : source.normalize
           config.assets.bundles.any? do |bundle|
             bundle.files.any? do |file|
-              Path[config.assets.source_dir, file].normalize.to_s == normalized
+              source_dir.join(file).normalize == normalized
             end
           end
         end

@@ -117,7 +117,7 @@ module Hwaro
         # path shows up (see content_ignored?).
         read_sources = [] of Set(String)
         hidden = ->(path : String) do
-          if content_ignored?(path)
+          if content_ignored?(path) && !colocated_bundle_source?(path)
             sources = read_sources.first? || explicit_read_sources.tap { |found| read_sources << found }
             !sources.includes?(path)
           else
@@ -144,7 +144,7 @@ module Hwaro
               config_changed = true
               config_files << path
             elsif identical_rewrite?(path, old_stamp, new_stamp)
-              # A data/i18n stamp that moved without a byte changing — the
+              # A stamp that moved without a byte changing — the
               # #755 hook loop: reporting it would force a full rebuild,
               # which re-runs build.hooks.pre, which rewrites the file
               # again. Dropping it lets the changeset settle to empty.
@@ -186,13 +186,11 @@ module Hwaro
 
       # A `content/` path the last build's `[content] ignore` hides. The build
       # never discovers it, so editing, adding or removing it is no change —
-      # unless a page reads it by name (`include_md`, `include_code`, a
-      # literal `load_data()`; a transclusion never can, since it resolves
-      # pages and an ignored file is none): a partials folder is a fine
-      # thing to ignore, and its edits must still re-render the pages that
-      # include it. The snapshots keep stamping every path, so editing the
-      # patterns (a config change: full rebuild) never reads as a burst of
-      # adds or removals.
+      # unless a page or asset bundle reads it by name. This covers
+      # `include_md`, `include_code` and a literal `load_data()`; transclusion
+      # resolves discovered pages, so it cannot read an ignored file. The
+      # snapshots keep stamping every path, so editing the patterns (a config
+      # change: full rebuild) never reads as a burst of adds or removals.
       private def content_ignored?(path : String) : Bool
         return false unless path.starts_with?("content/")
         !!@builder.config.try(&.content_files.ignored?(path.lchop("content/")))
@@ -203,6 +201,10 @@ module Hwaro
         sources = @builder.load_data_sources
         @builder.include_sources.each { |path| sources << Path.posix(path).normalize.to_s }
         sources
+      end
+
+      private def colocated_bundle_source?(path : String) : Bool
+        (path.starts_with?("content/") || path.starts_with?("templates/")) && @builder.asset_bundle_source?(path)
       end
 
       # Put a modified path into the right bucket.
@@ -235,9 +237,8 @@ module Hwaro
         if lexers_path?(path)
           data << path
         elsif content_ignored?(path)
-          # Only a file a page reads by name gets here (see content_ignored?).
-          # It is no page, so like an include source outside the roots it
-          # takes the data bucket's full rebuild.
+          # An ignored file gets here only when the build reads it by name.
+          # Like an include source outside the roots, it takes a full rebuild.
           data << path
         elsif path.starts_with?("content/")
           if markdown_source?(path)
@@ -297,8 +298,16 @@ module Hwaro
         # A file an include call or a transclusion read, wherever it lives:
         # the cheap strategies re-render only the saved page itself, never
         # the pages that include it.
-        if @builder.include_source_changed?(changeset.all_changed_files)
+        changed_files = changeset.all_changed_files
+        if @builder.include_source_changed?(changed_files)
           Logger.info "  An included file changed — running a full rebuild to re-render the pages that include it."
+          return :full
+        end
+
+        # A source under content/ or templates/ may also publish verbatim
+        # or feed a render. Build both that output and the bundle together.
+        if changed_files.any? { |path| colocated_bundle_source?(path) }
+          Logger.info "  A bundle input under content/ or templates/ changed — running a full rebuild."
           return :full
         end
 
@@ -442,7 +451,7 @@ module Hwaro
         false
       end
 
-      # `prev` is the previous snapshot, used only to carry data/i18n digests
+      # `prev` is the previous snapshot, used only to carry file digests
       # forward without re-reading files whose stamps are unchanged (see
       # watch_digest). Passing nil — the baseline scan, or a caller without a
       # previous snapshot — computes them fresh.
@@ -600,31 +609,21 @@ module Hwaro
         built[0] == new_stamp[0] && built[1] == new_stamp[1]
       end
 
-      # data/** and i18n/** are the only buckets whose FileStamp carries a
-      # content digest. They are the buckets #755 reported: a full rebuild is
-      # the only thing that re-runs build.hooks.pre, and a hook rewriting
-      # data/ byte-identically then looped forever on its own stamp.
-      #
-      # content/, templates/ and static/ stay stamp-only because hashing them
-      # would tax every save of every page for a rarer case: each has its own
-      # hook-free rebuild path (:incremental, :templates, :static copy), and a
-      # static file's only full rebuild is the one-time added-file case.
-      #
-      # That is a cost trade, not a proof of no-loop — it is only the reason
-      # THESE buckets are hashed. The two routes that used to bypass it (#760)
-      # are closed without hashing anything else: `rebuild_strategy` no longer
-      # sends a mixed templates+static changeset to :full (so no hook re-runs
-      # for it), and a config.toml that only our own hooks rewrote is dropped
-      # by built_config_rewrite?.
+      # Keep digests for inputs that force a full rebuild when edited. That
+      # rebuild re-runs build.hooks.pre, so a hook rewriting the same bytes
+      # must not trigger another rebuild (#755). Ordinary content, templates
+      # and static files usually have hook-free rebuild paths and stay
+      # stamp-only outside their timestamp tick.
       private def digest_watched?(path : String) : Bool
         path.starts_with?("data/") || path.starts_with?("i18n/") ||
+          colocated_bundle_source?(path) ||
           # An include source outside the roots: it rides the data bucket's
           # full rebuild, so it needs the same byte-identical-rewrite guard.
           !(watched_root_path?(path) || watched_config_file?(path))
       end
 
-      # The digest slot for a scanned file: nil for stamp-only buckets. For
-      # data/i18n, the previous scan's digest is carried forward when
+      # The digest slot for a scanned file: nil for stamp-only buckets. The
+      # previous scan's digest is carried forward when
       # mtime+size are unchanged — the bytes can't differ without moving one
       # of them, the same assumption the stamp comparison itself makes — so
       # steady-state polls never re-read content. A read happens only on the
@@ -662,7 +661,7 @@ module Hwaro
         nil
       end
 
-      # True only when a data/i18n stamp difference is PROVABLY
+      # True only when a digest-watched stamp difference is provably
       # byte-identical: equal sizes (a size change is always a real change —
       # no digest consulted) and equal non-nil digests. A nil digest — a
       # hash-read failure — never matches, so the event is reported and the
