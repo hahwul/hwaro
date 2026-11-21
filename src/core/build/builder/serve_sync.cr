@@ -192,8 +192,9 @@ module Hwaro
           written = Set(String).new
           withheld = withheld_bundle_dirs
           sources = changed_files.select { |src_path| File.exists?(src_path) && !File.directory?(src_path) }
-          # Once per batch, not per file: the set is O(pages).
+          # Once per batch, not per file: these plans walk the site's pages.
           shadowed : Set(String)? = nil
+          bundle_dirs : {Set(String), Bool}? = nil
           sources.each do |src_path|
             relative = path_relative_to(src_path, "content")
 
@@ -203,7 +204,8 @@ module Hwaro
             next if withheld_content_file?(relative, withheld)
 
             shadowed ||= content_copy_shadowed_outputs(output_dir)
-            next unless dest_path = publish_raw_file(src_path, relative, output_dir, minify, shadowed)
+            bundle_dirs ||= bundle_output_directories(output_dir)
+            next unless dest_path = publish_raw_file(src_path, relative, output_dir, minify, shadowed, bundle_dirs: bundle_dirs)
             written << File.expand_path(dest_path)
             Logger.action :copy, dest_path, Logger::Role::Dim if verbose
             copied << src_path

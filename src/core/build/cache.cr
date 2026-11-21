@@ -900,10 +900,10 @@ module Hwaro
           @entries.clear
         end
 
-        # Every output file the entries that SURVIVED this build record. The
-        # Finalize phase subtracts it from the stale list: a path harvested
-        # from a discarded entry and then written again is not stale at all.
-        def current_output_files : Set(String)
+        # Output files recorded by the remaining entries. Before Finalize,
+        # include_replaced also counts files from entries already replaced
+        # during this build, so a writer can recognize them as build output.
+        def current_output_files(*, include_replaced : Bool = false) : Set(String)
           files = Set(String).new
           @mutex.synchronize do
             @entries.each_value do |entry|
@@ -911,6 +911,7 @@ module Hwaro
               entry.output_paths.each { |path| files << path }
               entry.derived_paths.each { |path| files << path }
             end
+            files.concat(@orphaned_outputs) if include_replaced
           end
           files
         end
