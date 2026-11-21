@@ -222,6 +222,8 @@ Render a Markdown file in place, as if its text were written at that spot.
 | `path` | (required) | File path, relative to the project root (also accepted as the first positional argument) |
 | `region` | (none) | Only the lines between `<!-- #region <name> -->` and `<!-- #endregion <name> -->` |
 
+Region markers inside fenced code blocks remain literal content.
+
 Shortcodes inside the included file expand, and its headings take part in the page's table of contents and heading ids. Its front matter is dropped. An included file can include others, up to 8 levels deep. A cycle is an error that shows the chain.
 
 #### Paths and errors

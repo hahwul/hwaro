@@ -153,10 +153,18 @@ module Hwaro
         # region.
         def region(text : String, name : String, markdown : Bool) : String
           re = markdown ? MD_REGION_RE : CODE_REGION_RE
+          tracker = FenceTracker.new(raw_html_code: false) if markdown
           inside = false
           open = [] of String
           String.build do |io|
             text.each_line(chomp: false) do |line|
+              # An example of a region marker inside a Markdown code fence
+              # is literal content, whether it appears before or inside the
+              # selected region.
+              if tracker.try(&.fence_line?(line))
+                io << line if inside
+                next
+              end
               if m = re.match(line)
                 marker = m[2]? || ""
                 if !inside
