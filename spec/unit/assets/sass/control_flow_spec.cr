@@ -178,6 +178,34 @@ describe "Sass control flow" do
     css.should contain(".c-3 {")
   end
 
+  it "matches convertible bounds that round to the same integer" do
+    css = compile("@for $i from 3in through 7.62cm { .equal { width: $i; } }")
+    css.scan(/width: ([^;]+);/).map(&.[1]).should eq(["3in"])
+  end
+
+  it "chooses the direction after converting the exclusive end bound" do
+    css = compile("@for $i from 2in to 96px { .descending { width: $i; } }")
+    css.scan(/width: ([^;]+);/).map(&.[1]).should eq(["2in"])
+  end
+
+  it "keeps the start bound unit even when one bound is unitless" do
+    css = compile(<<-SCSS)
+      @for $i from 1 through 2px { .unitless { order: $i; } }
+      @for $i from 1px through 2 { .pixels { width: $i; } }
+      SCSS
+    css.scan(/order: ([^;]+);/).map(&.[1]).should eq(["1", "2"])
+    css.scan(/width: ([^;]+);/).map(&.[1]).should eq(["1px", "2px"])
+  end
+
+  it "validates bound integrality after conversion" do
+    css = compile("@for $i from 143px through 1.5in { .converted { width: $i; } }")
+    css.scan(/width: ([^;]+);/).map(&.[1]).should eq(["143px", "144px"])
+
+    expect_raises(Hwaro::Assets::Sass::SyntaxError, /must be an integer/) do
+      compile("@for $i from 1in through 97px { .fractional { width: $i; } }")
+    end
+  end
+
   it "errors on non-integer bounds" do
     expect_raises(Hwaro::Assets::Sass::SyntaxError, /must be an integer/) do
       compile("@for $i from 1 through 2.5 { .a { order: $i; } }")

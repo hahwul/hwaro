@@ -89,6 +89,8 @@ Hwaro implements a practical SCSS subset, the features hand-written site stylesh
 | `@keyframes`, `@font-face`, custom properties | ✅ pass through correctly |
 | Plain CSS | ✅ any valid `.css` compiles to itself (whitespace-normalized) |
 
+The `@for` loop variable uses the start bound's unit. Sass converts a compatible end bound to that unit before checking that the bound is an integer and deciding the iteration direction.
+
 Unknown functions (`var()`, `clamp()`, `color-mix()`, …) pass through untouched. Arguments still evaluate (`translate($x * 2, -50%)` works), a static `calc()` folds to its number (see deviations), and a whole-token `url($v)` / `url(ns.$img)` substitutes the variable (`$` is not valid in a raw URL). A `$` embedded in a larger url token (`url(plain$x.png)`) is valid plain CSS and passes through byte-identical. dart-sass hard-errors there, and evaluates expression contents like `url($a + $b)` that Hwaro keeps verbatim.
 
 ```scss
