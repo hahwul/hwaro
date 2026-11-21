@@ -480,7 +480,7 @@ module Hwaro
       # forward without re-reading files whose stamps are unchanged (see
       # watch_digest). Passing nil — the baseline scan, or a caller without a
       # previous snapshot — computes them fresh.
-      MISSING_STAMP = {Time::UNIX_EPOCH, -1_i64, nil}
+      MISSING_STAMP = {Time::UNIX_EPOCH, -1_i64, nil, nil}
 
       private def scan_mtimes(prev : Hash(String, FileStamp)? = nil) : Hash(String, FileStamp)
         mtimes = {} of String => FileStamp
@@ -513,16 +513,18 @@ module Hwaro
               # lstat first, the same shape collect_static_files uses on the
               # build side so both agree on what a file is: it never follows,
               # so a cycle is just a symlink here, and only real symlinks pay
-              # the extra target stat. Only regular files get stamped —
-              # directories, dangling links and non-regular entries (FIFO,
-              # socket, device node) carry nothing the build can read, and the
-              # build skips them too. Failures stay at debug: this loop runs
+              # the extra target stat and path resolution. Only regular files
+              # get stamped. The build skips directories, dangling links and
+              # non-regular entries (FIFO, socket, device node). Failures stay
+              # at debug because this loop runs
               # every POLL_INTERVAL, so a warn would repeat forever.
               info = File.info?(file, follow_symlinks: false)
               next if info.nil?
-              info = File.info?(file, follow_symlinks: true) if info.symlink?
+              symlink = info.symlink?
+              info = File.info?(file, follow_symlinks: true) if symlink
               next if info.nil? || !info.type.file?
-              mtimes[file] = {info.modification_time, info.size.to_i64, watch_digest(file, info, prev, now_ms, racy)}
+              target = symlink ? File.realpath(file) : nil
+              mtimes[file] = {info.modification_time, info.size.to_i64, watch_digest(file, info, prev, now_ms, racy, target), target}
             rescue ex
               Logger.debug "Failed to read file info for #{file}: #{ex.message}"
             end
@@ -539,7 +541,7 @@ module Hwaro
           next if Utils::PathUtils.absolute?(path) || Utils::PathUtils.escapes_parent?(path)
           begin
             info = File.info?(path)
-            mtimes[path] = info && info.file? ? {info.modification_time, info.size.to_i64, watch_digest(path, info, prev, now_ms, racy)} : MISSING_STAMP
+            mtimes[path] = info && info.file? ? {info.modification_time, info.size.to_i64, watch_digest(path, info, prev, now_ms, racy), nil} : MISSING_STAMP
           rescue ex
             Logger.debug "Failed to read file info for #{path}: #{ex.message}"
           end
@@ -552,7 +554,7 @@ module Hwaro
           next unless File.exists?(cfg)
           begin
             info = File.info(cfg)
-            mtimes[cfg] = {info.modification_time, info.size.to_i64, nil}
+            mtimes[cfg] = {info.modification_time, info.size.to_i64, nil, nil}
           rescue ex
             Logger.debug "Failed to read #{cfg} info: #{ex.message}"
           end
@@ -584,7 +586,7 @@ module Hwaro
         watched_config_files.each do |cfg|
           info = File.info?(cfg)
           next if info.nil? || !info.type.file?
-          stamps[cfg] = {info.modification_time, info.size.to_i64, file_digest(cfg)}
+          stamps[cfg] = {info.modification_time, info.size.to_i64, file_digest(cfg), nil}
         rescue ex
           Logger.debug "Failed to stamp #{cfg}: #{ex.message}"
         end
@@ -648,11 +650,10 @@ module Hwaro
       end
 
       # The digest slot for a scanned file: nil for stamp-only buckets. The
-      # previous scan's digest is carried forward when
-      # mtime+size are unchanged — the bytes can't differ without moving one
-      # of them, the same assumption the stamp comparison itself makes — so
-      # steady-state polls never re-read content. A read happens only on the
-      # poll that first sees a path or sees its stamp move; that includes
+      # previous scan's digest is carried forward when mtime, size, and
+      # symlink target are unchanged, so steady-state polls never re-read
+      # content. A read happens only on the poll that first sees a path or
+      # sees its stamp move. That includes
       # size-only changes (the change decision doesn't need the digest then,
       # but the next byte-identical hook rewrite does need a fresh baseline
       # to compare against, and the read is amortized against the full
@@ -664,11 +665,11 @@ module Hwaro
       # more on the first scan after it settles (`@racy_watch_paths`), so the
       # second save shows up as a digest change. Afterwards the digest is
       # carried like any other, so a settled file is never read again.
-      private def watch_digest(file : String, info : File::Info, prev : Hash(String, FileStamp)?, now_ms : Int64, racy : Set(String)) : String?
+      private def watch_digest(file : String, info : File::Info, prev : Hash(String, FileStamp)?, now_ms : Int64, racy : Set(String), target : String? = nil) : String?
         mtime_ms = info.modification_time.to_unix_ms
         racy_now = !Core::Build::Cache.stable_mtime?(mtime_ms, now_ms)
         racy << file if racy_now
-        same = prev && (old = prev[file]?) && old[0] == info.modification_time && old[1] == info.size.to_i64
+        same = prev && (old = prev[file]?) && old[0] == info.modification_time && old[1] == info.size.to_i64 && old[3] == target
         return old.try(&.[2]) if same && !racy_now && !@racy_watch_paths.includes?(file)
         return unless racy_now || same || digest_watched?(file)
 
@@ -693,7 +694,7 @@ module Hwaro
       # full rebuild runs, exactly as before the digests existed.
       private def identical_rewrite?(path : String, old_stamp : FileStamp, new_stamp : FileStamp) : Bool
         return false unless digest_watched?(path)
-        return false unless old_stamp[1] == new_stamp[1]
+        return false unless old_stamp[1] == new_stamp[1] && old_stamp[3] == new_stamp[3]
 
         old_digest = old_stamp[2]
         !old_digest.nil? && old_digest == new_stamp[2]

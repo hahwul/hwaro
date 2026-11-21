@@ -48,7 +48,7 @@ private class WatchBatchSpecServer < Hwaro::Services::Server
   end
 
   def self.snapshot(path : String, size : Int64) : Snapshot
-    {path => {Time::UNIX_EPOCH, size, nil}} of String => FileStamp
+    {path => {Time::UNIX_EPOCH, size, nil, nil}} of String => FileStamp
   end
 
   def run_watch

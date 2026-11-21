@@ -153,6 +153,8 @@ asset. A file a template reads through a literal `load_data()` path, and the
 `[og.auto_image]` logo and background image, are watched wherever they live;
 saving one runs a full rebuild.
 
+A file symlink in a watched directory triggers a rebuild when it resolves to a different target, even if both targets have the same modification time and size.
+
 ### Removed pages
 
 A cold build starts from an empty output directory, so a page you delete is
