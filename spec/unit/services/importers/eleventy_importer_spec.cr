@@ -78,6 +78,25 @@ describe Hwaro::Services::Importers::EleventyImporter do
       end
     end
 
+    it "uses file modification time when a filename date cannot be parsed" do
+      Dir.mktmpdir do |dir|
+        posts_dir = File.join(dir, "posts")
+        FileUtils.mkdir_p(posts_dir)
+        source = File.join(posts_dir, "2024-02-30-note.md")
+        File.write(source, "---\ntitle: Note\n---\nBody\n")
+        modified = Time.utc(2023, 4, 5, 12, 34, 56)
+        File.utime(modified, modified, source)
+
+        output_dir = File.join(dir, "output")
+        result = Hwaro::Services::Importers::EleventyImporter.new.run(
+          Hwaro::Config::Options::ImportOptions.new(source_type: "eleventy", path: dir, output_dir: output_dir))
+
+        result.imported_count.should eq(1)
+        output = Dir.glob(File.join(output_dir, "posts", "*.md")).first
+        File.read(output).should contain(%(date = "2023-04-05T12:34:56Z"))
+      end
+    end
+
     it "filters out collection tags (post, posts, all)" do
       Dir.mktmpdir do |dir|
         posts_dir = File.join(dir, "blog")
