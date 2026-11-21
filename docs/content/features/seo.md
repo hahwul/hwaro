@@ -145,6 +145,8 @@ generate_feeds = true
 
 Generates `/blog/rss.xml`.
 
+If two pieces of content resolve to the same output path, only the section that owns that path can publish its feed. A section that uses `redirect_to` can still publish a feed when it owns the path.
+
 On the root `content/_index.md` (or a language root such as `_index.ko.md`), `generate_feeds` has no effect: its feed would land on the site (or language) feed's own `/rss.xml`, so that fuller feed is kept and the build prints a warning.
 
 ### Output

@@ -532,6 +532,35 @@ describe "SEO: Custom feed templates" do
   end
 end
 
+describe "SEO: section feeds" do
+  it "removes a section feed when its section loses the output path" do
+    build_site(
+      BASIC_CONFIG,
+      content_files: {
+        "z/_index.md" => "+++\ntitle = \"Original\"\npath = \"shared\"\ngenerate_feeds = true\nredirect_to = \"/z/post/\"\n+++\n",
+        "z/post.md"   => "+++\ntitle = \"Post\"\n+++\nBody",
+      },
+      template_files: {"page.html" => "{{ content }}", "section.html" => "{{ page.title }}"},
+      cache: true,
+    ) do
+      feed_path = "public/shared/rss.xml"
+      File.read(feed_path).should contain("Original")
+      FileUtils.mkdir_p("content/a")
+      File.write("content/a/_index.md", "+++\ntitle = \"Winner\"\npath = \"shared\"\n+++\n")
+
+      options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true)
+      builder = Hwaro::Core::Build::Builder.new
+      Hwaro::Content::Hooks.all.each { |hook| builder.register(hook) }
+      builder.run(options)
+
+      File.read("public/shared/index.html").should eq("Winner")
+      File.exists?(feed_path).should be_false
+      planned = Hwaro::Core::Build::Builder.new.plan_urls(options)
+      planned.map(&.url).should_not contain("/shared/rss.xml")
+    end
+  end
+end
+
 # Regression: a `redirect_to` page is written as a meta-refresh stub whose
 # canonical is the target, yet it was advertised as content in the sitemap,
 # the feeds, search.json and llms.txt (search consoles flag "page with
