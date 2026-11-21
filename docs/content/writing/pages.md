@@ -139,6 +139,8 @@ Pages with a `date` in the future are automatically excluded from builds. This i
 
 The build compares `date` and `expires` with the time the build started, as instants: a page is published when `date` is not after that time, and hidden when `expires` is not after it. A value with an offset (`2024-03-05T09:00:00+09:00`) means exactly that moment; a value without one, including a bare `2024-03-05`, is midnight or the written time in the build machine's local time zone (so on a UTC runner a date-only page dated "today" in Seoul is still in the future until midnight UTC). Set the offset in the front matter when the schedule must not depend on where the site is built.
 
+Quoted date and time values can include fractional seconds such as `2024-03-05 09:00:00.5`, with or without a UTC offset.
+
 ```markdown
 +++
 title = "Coming Soon"

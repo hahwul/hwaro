@@ -33,6 +33,11 @@ describe Hwaro::Utils::DateUtils do
       Hwaro::Utils::DateUtils.parse_content_date("2024-01-15").should eq(Time.local(2024, 1, 15))
     end
 
+    it "preserves fractional seconds in the local zone" do
+      Hwaro::Utils::DateUtils.parse_content_date("2024-01-15 10:00:00.5").should eq(Time.local(2024, 1, 15, 10, 0, 0, nanosecond: 500_000_000))
+      Hwaro::Utils::DateUtils.parse_content_date("2024-01-15T10:00:00.000000001").should eq(Time.local(2024, 1, 15, 10, 0, 0, nanosecond: 1))
+    end
+
     # `Time.parse` ignores trailing input, so an offset written in a form the
     # table did not list (`+05`, after a fraction, after `T … `) was dropped
     # and the value read as local time: a different instant on every machine.

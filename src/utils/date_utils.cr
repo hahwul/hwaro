@@ -118,6 +118,8 @@ module Hwaro
           minutes = (m[11]? || "00").to_i
           return if m[10].to_i > 23 || minutes > 59
           Time.parse_rfc3339("#{clock}#{m[7]?}#{sign}#{m[10]}:#{"%02d" % minutes}")
+        elsif fraction = m[7]?
+          Time.parse("#{clock}#{fraction}", "%Y-%m-%dT%H:%M:%S.%N", Time::Location.local)
         else
           Time.parse(clock, "%Y-%m-%dT%H:%M:%S", Time::Location.local)
         end
