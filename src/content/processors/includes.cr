@@ -163,10 +163,10 @@ module Hwaro
                   inside = true if m[1]?.nil? && marker == name
                 elsif m[1]?.nil?
                   open << marker
-                elsif marker == name || (marker.empty? && open.empty?)
-                  return io.to_s
-                else
+                elsif !open.empty?
                   open.pop?
+                elsif marker == name || marker.empty?
+                  return io.to_s
                 end
                 next
               end
