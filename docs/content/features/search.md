@@ -411,7 +411,7 @@ Each shard is a plain JSON array with exactly the same entry schema as `search.j
 }
 ```
 
-- `url` honors `base_url`'s subpath (`/docs/search/blog.json` on a `https://example.com/docs` deploy) and percent-encodes section names. Always load a shard through its manifest `url`: a section (or language) named `index` is written to `search/_index.json` so it cannot collide with the manifest at `search/index.json`.
+- `url` honors `base_url`'s subpath (`/docs/search/blog.json` on a `https://example.com/docs` deploy) and percent-encodes section names. Always load a shard through its manifest `url`. A section or language named `index` uses `search/_index.json`, and Hwaro adds underscores to other shard filenames as needed to keep them distinct on case-insensitive filesystems.
 - `language` is set in the `language` and `section-language` modes, `section` in the `section` and `section-language` modes; the other is `null`.
 - Shards are listed in id order and the file never carries a timestamp, so the output is deterministic and diff-friendly. A shard whose last page disappears is removed on the next build.
 - `--cache` builds and `hwaro serve` regenerate the shards from the same page set as `search.json`.

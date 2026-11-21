@@ -118,6 +118,60 @@ describe "Hwaro::Content::Search shards" do
         read_manifest(odir)["shards"].as_a.map(&.["id"].as_s).should eq(["docs"])
       end
     end
+
+    it "writes and claims distinct files for colliding shard names" do
+      config = shard_config("section")
+      config.base_url = "https://example.com/nested/search"
+      ids = ["index", "_index", "__index", "INDEX"]
+      pages = ids.map { |id| shard_page("#{id}/a.md", id, "/#{id}/a/", id) }
+      Dir.mktmpdir do |odir|
+        Hwaro::Content::Search.generate(pages, config, odir)
+        shards = read_manifest(odir)["shards"].as_a
+        urls = shards.map(&.["url"].as_s)
+        urls.map(&.downcase).uniq!.size.should eq(ids.size)
+        files = shards.map do |shard|
+          id = shard["id"].as_s
+          path = File.join(odir, shard["url"].as_s.lchop("/nested/search/"))
+          JSON.parse(File.read(path)).as_a.map(&.["title"].as_s).should eq([id])
+          path
+        end
+        manifest = Hwaro::Content::Search.manifest_path(odir)
+        claims = Hwaro::Content::Search.published_outputs(config, odir)
+        (claims - [File.join(odir, "search.json"), manifest]).sort.should eq(files.sort)
+        urls.should contain("/nested/search/search/_index.json")
+        urls.should contain("/nested/search/search/__index.json")
+
+        # A surviving shard may move back to its natural name. The file
+        # still in use must survive, and the previous alternate is pruned.
+        Hwaro::Content::Search.generate(pages.select { |p| p.section == "_index" }, config, odir)
+        Dir.glob(File.join(odir, "search", "*.json")).sort.should eq([File.join(odir, "search", "_index.json"), manifest])
+        JSON.parse(File.read(File.join(odir, "search", "_index.json"))).as_a.map(&.["title"].as_s).should eq(["_index"])
+      end
+    end
+
+    it "cleans up a legacy shard with the manifest's spelling in another case" do
+      config = shard_config("section")
+      page = shard_page("INDEX/a.md", "Legacy", "/INDEX/a/", "INDEX")
+      Dir.mktmpdir do |odir|
+        manifest = Hwaro::Content::Search.manifest_path(odir)
+        shards_dir = File.dirname(manifest)
+        Dir.mkdir(shards_dir)
+        File.write(manifest, %({"shards":[{"id":"INDEX","url":"/search/INDEX.json"}]}))
+        legacy = File.join(shards_dir, "INDEX.json")
+        if File.exists?(legacy)
+          # A case-folding filesystem already treats the legacy name as an
+          # alias for the manifest. The rebuild must not remove that file.
+          File.same?(legacy, manifest).should be_true
+        else
+          File.write(legacy, "[]")
+          Hwaro::Content::Search.published_outputs(config, odir).should contain(legacy)
+        end
+
+        Hwaro::Content::Search.generate([page], config, odir)
+        read_manifest(odir)["shards"].as_a.first["url"].as_s.should eq("/search/_INDEX.json")
+        Dir.children(shards_dir).sort.should eq(["_INDEX.json", "index.json"])
+      end
+    end
   end
 
   describe "shards = \"section\"" do

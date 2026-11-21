@@ -59,9 +59,9 @@ module Hwaro
           manifest_file = manifest_path(output_dir)
           outputs << manifest_file
           shards_dir = File.join(output_dir, SHARDS_DIR)
-          previous_shard_ids(manifest_file).each do |id|
-            path = File.join(shards_dir, "#{id}.json")
-            outputs << path if Utils::OutputGuard.within_output_dir?(path, output_dir)
+          previous_shard_files(manifest_file).each do |name|
+            path = File.join(shards_dir, name)
+            outputs << path if Utils::OutputGuard.within_output_dir?(path, shards_dir)
           end
         end
         outputs
@@ -222,7 +222,7 @@ module Hwaro
       private def self.write_shards(pages : Array(Models::Page), entries : Array(Array(Entry)), config : Models::Config, output_dir : String, verbose : Bool) : Nil
         shards_dir = File.join(output_dir, SHARDS_DIR)
         manifest_file = manifest_path(output_dir)
-        previous_ids = previous_shard_ids(manifest_file)
+        previous_files = previous_shard_files(manifest_file)
 
         groups = {} of String => {language: String?, section: String?, entries: Array(Entry)}
         pages.each_with_index do |page, i|
@@ -231,6 +231,8 @@ module Hwaro
           group[:entries].concat(entries[i])
         end
 
+        ids = groups.keys.sort!
+        files = shard_file_names(ids)
         base_path = config.base_path
         Hwaro::Utils::FileSafe.mkdir_p(shards_dir)
         manifest = JSON.build do |json|
@@ -239,10 +241,11 @@ module Hwaro
             json.field "fields", entry_fields(config)
             json.field "shards" do
               json.array do
-                groups.keys.sort!.each do |id|
+                ids.each do |id|
                   group = groups[id]
                   content = group[:entries].to_json
-                  shard_file = File.join(shards_dir, shard_file_name(id))
+                  name = files[id]
+                  shard_file = File.join(shards_dir, name)
                   Hwaro::Utils::FileSafe.mkdir_p(File.dirname(shard_file))
                   Hwaro::Utils::FileSafe.atomic_write(shard_file, content)
                   Logger.action :create, shard_file if verbose
@@ -250,7 +253,7 @@ module Hwaro
                     json.field "id", id
                     # Percent-encode: a section directory may carry spaces
                     # or non-ASCII the filesystem accepts but a URL must escape.
-                    json.field "url", "#{base_path}/#{SHARDS_DIR}/#{URI.encode_path(shard_file_name(id))}"
+                    json.field "url", "#{base_path}/#{SHARDS_DIR}/#{URI.encode_path(name)}"
                     json.field "language", group[:language]
                     json.field "section", group[:section]
                     json.field "count", group[:entries].size
@@ -262,43 +265,87 @@ module Hwaro
           end
         end
 
-        # Prune shards a previous build listed that this build did not
-        # write (a removed section/language) so a warm `--cache` build or a
-        # `serve` rebuild never leaves a shard the manifest no longer knows.
-        # Only ids from OUR previous manifest are touched, never arbitrary
-        # files under `search/`.
-        (previous_ids - groups.keys).each { |id| remove_stale_shard(shards_dir, id) }
-
         Hwaro::Utils::FileSafe.atomic_write(manifest_file, manifest)
         Logger.action :create, manifest_file if verbose
+
+        # A surviving id can move to another file when the set of names
+        # changes. Prune by the previous manifest's files, even in that case.
+        current = files.values.to_h { |name| {Utils::PathUtils.output_fold_key(name), name} }
+        current[MANIFEST_FILENAME] = MANIFEST_FILENAME
+        (previous_files - files.values).each do |name|
+          if replacement = current[Utils::PathUtils.output_fold_key(name)]?
+            old_info = File.info?(File.join(shards_dir, name))
+            new_info = File.info?(File.join(shards_dir, replacement))
+            # On a case-folding filesystem the old spelling can now refer
+            # to the file we just wrote under its new spelling.
+            next if old_info && new_info && old_info.same_file?(new_info)
+          end
+          remove_stale_shard(shards_dir, name)
+        end
       end
 
-      # File name a shard id is written under. An id that would land on the
-      # manifest (a top-level section or language literally named `index`)
-      # gets a `_` prefix: the manifest is written last and used to clobber
-      # that shard, leaving its URL serving the manifest itself.
-      private def self.shard_file_name(id : String) : String
-        name = "#{id}.json"
-        name == MANIFEST_FILENAME ? "_#{name}" : name
+      private def self.shard_file_names(ids : Array(String)) : Hash(String, String)
+        names = {} of String => String
+        taken = Set{MANIFEST_FILENAME}
+        # Preserve the established filename for a shard literally named
+        # `index`. Claim all other available natural names before assigning
+        # alternatives, so a fallback cannot displace an unrelated shard.
+        if ids.includes?("index")
+          names["index"] = "_index.json"
+          taken << "_index.json"
+        end
+        conflicts = [] of String
+        ids.each do |id|
+          next if names.has_key?(id)
+          name = "#{id}.json"
+          if taken.add?(Utils::PathUtils.output_fold_key(name))
+            names[id] = name
+          else
+            conflicts << id
+          end
+        end
+        conflicts.each do |id|
+          dir, separator, stem = id.rpartition('/')
+          loop do
+            stem = "_#{stem}"
+            name = "#{dir}#{separator}#{stem}.json"
+            if taken.add?(Utils::PathUtils.output_fold_key(name))
+              names[id] = name
+              break
+            end
+          end
+        end
+        names
       end
 
-      private def self.previous_shard_ids(manifest_file : String) : Array(String)
+      private def self.previous_shard_files(manifest_file : String) : Array(String)
         return [] of String unless File.file?(manifest_file)
         parsed = JSON.parse(File.read(manifest_file))
-        # Foreign file (static/search/index.json): anything that is not our
-        # `{"shards": [{"id": ...}]}` shape yields no ids.
         shards = parsed.as_h?.try(&.["shards"]?).try(&.as_a?) || return [] of String
-        shards.compact_map(&.as_h?.try(&.["id"]?).try(&.as_s?))
+        shards.compact_map do |shard|
+          next unless fields = shard.as_h?
+          next unless (id = fields["id"]?.try(&.as_s?)) && (url = fields["url"]?.try(&.as_s?))
+          dir, separator, stem = id.rpartition('/')
+          filename = URI.decode(url.rpartition('/').last)
+          natural = "#{stem}.json"
+          # A generated URL can only add underscores before the id's
+          # basename. Match its suffix, since the site's base path may have
+          # changed and may itself contain a `/search/` segment.
+          next unless filename.ends_with?(natural) && filename.rchop(natural).each_char.all? { |char| char == '_' }
+          name = "#{dir}#{separator}#{filename}"
+          next if name == MANIFEST_FILENAME || name.includes?('\u0000') || name.includes?('\\')
+          path = Path.posix(name)
+          next unless path.relative? && path.normalize.to_s == name
+          name if url.ends_with?("/#{SHARDS_DIR}/#{URI.encode_path(name)}")
+        end.uniq!
       rescue JSON::ParseException | File::Error
         [] of String
       end
 
-      private def self.remove_stale_shard(shards_dir : String, id : String) : Nil
+      private def self.remove_stale_shard(shards_dir : String, name : String) : Nil
         root = File.expand_path(shards_dir)
-        path = File.expand_path(File.join(shards_dir, shard_file_name(id)))
-        # A hand-edited manifest could smuggle `..` into an id; never delete
-        # outside the shard directory.
-        return unless path != root && Utils::PathUtils.within?(path, root)
+        path = File.expand_path(File.join(shards_dir, name))
+        return unless Utils::OutputGuard.safe_to_delete_file?(path, root)
         File.delete?(path)
         # Drop now-empty nested id directories (`search/ko/`) best-effort.
         dir = File.dirname(path)
