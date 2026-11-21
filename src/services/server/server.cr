@@ -40,14 +40,15 @@ module Hwaro
       # NFS/SMB shares, exFAT) where two quick saves can share a timestamp —
       # an mtime-only comparison would permanently miss the second save.
       #
-      # The third slot is a content digest, carried ONLY for the full-rebuild
-      # buckets (data/**, i18n/** — nil everywhere else). Those buckets force
-      # a full rebuild, and a full rebuild re-runs `build.hooks.pre` — so a
-      # hook that rewrites an identical payload into data/ (the pattern #752
-      # documents) retriggered itself forever under a stamp-only comparison
-      # (#755). The digest lets detect_changes drop stamp movement whose
-      # bytes are unchanged. See watch_digest for when it is (re)computed.
-      alias FileStamp = {Time, Int64, String?}
+      # The third slot is a content digest for inputs whose edits force a full
+      # rebuild. Those rebuilds re-run `build.hooks.pre`, and a hook rewriting
+      # a file byte-identically could trigger itself forever (#755). The digest
+      # suppresses those rewrites. Racy timestamps can carry a digest too (see
+      # watch_digest).
+      #
+      # The final slot is the resolved target of a symlink in a watched root.
+      # Retargeting can preserve both mtime and size, so it needs its own field.
+      alias FileStamp = {Time, Int64, String?, String?}
 
       @builder : Core::Build::Builder
       @live_reload_handler : LiveReloadHandler?

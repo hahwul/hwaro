@@ -32,8 +32,8 @@ module Hwaro
         release_output_lock
       end
 
-      def test_scan_mtimes
-        scan_mtimes
+      def test_scan_mtimes(prev : Hash(String, FileStamp)? = nil)
+        scan_mtimes(prev)
       end
 
       def self.test_watcher_ignored?(path : String) : Bool
@@ -1698,8 +1698,8 @@ module Hwaro
     class Server
       def test_detect_changes(old_mtimes : Hash(String, Time), new_mtimes : Hash(String, Time)) : ChangeSet
         detect_changes(
-          old_mtimes.transform_values { |t| {t, 0_i64, nil.as(String?)} },
-          new_mtimes.transform_values { |t| {t, 0_i64, nil.as(String?)} },
+          old_mtimes.transform_values { |t| {t, 0_i64, nil.as(String?), nil.as(String?)} },
+          new_mtimes.transform_values { |t| {t, 0_i64, nil.as(String?), nil.as(String?)} },
         )
       end
 
@@ -1789,8 +1789,8 @@ describe "Server#detect_changes" do
     server = Hwaro::Services::Server.new
     t1 = Time.utc(2025, 1, 1, 0, 0, 0)
 
-    old = {"content/posts/hello.md" => {t1, 10_i64, nil.as(String?)}}
-    new_m = {"content/posts/hello.md" => {t1, 42_i64, nil.as(String?)}}
+    old = {"content/posts/hello.md" => {t1, 10_i64, nil.as(String?), nil.as(String?)}}
+    new_m = {"content/posts/hello.md" => {t1, 42_i64, nil.as(String?), nil.as(String?)}}
 
     cs = server.test_detect_changes(old, new_m)
     cs.modified_content.should eq(["content/posts/hello.md"])
@@ -3215,6 +3215,35 @@ describe "watcher symlink and non-regular entry handling" do
         mtimes.keys.should contain("static/real.css")
         mtimes.keys.should contain("static/alias.css")
         mtimes.keys.should_not contain("static/dangling.css")
+      end
+    end
+  end
+
+  {"static", "data"}.each do |root|
+    it "detects a retargeted #{root} symlink when both targets have the same timestamp and size" do
+      posix_only!("atomic file symlink replacement")
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p(root)
+          FileUtils.mkdir_p("sources")
+          stamp = Time.utc - 2.hours
+          File.write("sources/before.txt", "one")
+          File.write("sources/after.txt", "two")
+          File.touch("sources/before.txt", stamp)
+          File.touch("sources/after.txt", stamp)
+          path = "#{root}/link.txt"
+          File.symlink("../sources/before.txt", path)
+
+          server = Hwaro::Services::Server.new
+          before = server.test_scan_mtimes
+          server.test_scan_mtimes(before).should eq(before)
+          File.symlink("../sources/after.txt", "#{root}/replacement.tmp")
+          File.rename("#{root}/replacement.tmp", path)
+          after = server.test_scan_mtimes(before)
+          after[path][0].should eq(before[path][0])
+          after[path][1].should eq(before[path][1])
+          server.test_detect_changes(before, after).all_changed_files.should eq([path])
+        end
       end
     end
   end
