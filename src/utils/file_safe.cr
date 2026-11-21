@@ -178,7 +178,7 @@ module Hwaro
         40.times do
           break unless File.symlink?(target)
           link = File.readlink(target)
-          target = Path[link].absolute? ? link : File.join(File.dirname(target), link)
+          target = PathUtils.link_target(target, link)
         end
         atomic_write(target, content, File.info?(target).try(&.permissions))
       end

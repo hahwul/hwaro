@@ -109,10 +109,10 @@ module Hwaro
               return within_project?(target) unless File.symlink?(target)
               link = File.readlink?(target)
               return false unless link
-              # As in the writer, the filesystem resolves a symlinked
-              # parent before interpreting any `..` in the relative target.
-              target = Path[link].absolute? ? link : File.join(File.dirname(target), link)
+              target = Hwaro::Utils::PathUtils.link_target(target, link)
             end
+            false
+          rescue File::Error
             false
           end
 
