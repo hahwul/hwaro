@@ -711,13 +711,11 @@ module Hwaro
           {width, height}
         end
 
-        SVG_TAG_RE = /<svg\b[^>]*>/i
-        # `(?:px\s*)?` rather than `(?:px)?\s*`: the two `\s*` runs must not
-        # be able to split the same whitespace, or a long run backtracks
-        # quadratically into PCRE's match limit.
-        SVG_WIDTH_RE   = /\swidth\s*=\s*["']\s*(\d+(?:\.\d+)?)\s*(?:px\s*)?["']/i
-        SVG_HEIGHT_RE  = /\sheight\s*=\s*["']\s*(\d+(?:\.\d+)?)\s*(?:px\s*)?["']/i
-        SVG_VIEWBOX_RE = /\sviewBox\s*=\s*["']\s*-?[\d.]+[\s,]+-?[\d.]+[\s,]+(\d+(?:\.\d+)?)[\s,]+(\d+(?:\.\d+)?)\s*["']/i
+        SVG_TAG_RE     = /<(?:[\w.-]++:)?svg(?=[\s\/>])((?:[^"'<>]++|"[^"]*+"|'[^']*+')*+)>/i
+        SVG_ATTR_RE    = /\s++([^\s=\/>]++)\s*+=\s*+(?:"([^"]*+)"|'([^']*+)')/
+        SVG_NUMBER     = %q([+-]?(?:[0-9]++(?:\.[0-9]*+)?|\.[0-9]++)(?:[eE][+-]?[0-9]++)?)
+        SVG_LENGTH_RE  = /\A\s*+(#{SVG_NUMBER})\s*+(?:px\s*+)?\z/i
+        SVG_VIEWBOX_RE = /\A\s*+#{SVG_NUMBER}[\s,]++#{SVG_NUMBER}[\s,]++(#{SVG_NUMBER})[\s,]++(#{SVG_NUMBER})\s*+\z/
 
         # SVG: the root element's unitless/px `width`/`height`; a missing one
         # follows the `viewBox` aspect ratio, and with neither the viewBox
@@ -727,12 +725,20 @@ module Hwaro
           buf = Bytes.new(65_536)
           read = File.open(path, &.read(buf))
           text = strip_xml_comments(String.new(buf[0, read]).scrub)
-          return unless text && (tag = text.match(SVG_TAG_RE).try(&.[0]))
-          w = tag.match(SVG_WIDTH_RE).try(&.[1].to_f?)
-          h = tag.match(SVG_HEIGHT_RE).try(&.[1].to_f?)
-          if vb = tag.match(SVG_VIEWBOX_RE)
+          return unless text && (tag = text.match(SVG_TAG_RE))
+          w = h = nil
+          view_box = nil
+          tag[1].scan(SVG_ATTR_RE) do |attribute|
+            value = attribute[2]? || attribute[3]
+            case attribute[1].downcase
+            when "width"   then w = svg_pixel_length(value)
+            when "height"  then h = svg_pixel_length(value)
+            when "viewbox" then view_box = value
+            end
+          end
+          if (!w || !h) && (vb = view_box.try(&.match(SVG_VIEWBOX_RE)))
             vb_w, vb_h = vb[1].to_f?, vb[2].to_f?
-            if vb_w && vb_h && vb_w > 0 && vb_h > 0
+            if vb_w && vb_h && vb_w.finite? && vb_h.finite? && vb_w > 0 && vb_h > 0
               w ||= h ? h * vb_w / vb_h : vb_w
               h ||= w * vb_h / vb_w
             end
@@ -741,6 +747,11 @@ module Hwaro
           width, height = w.round, h.round
           return unless width.in?(1.0..Int32::MAX.to_f) && height.in?(1.0..Int32::MAX.to_f)
           {width.to_i32, height.to_i32}
+        end
+
+        private def svg_pixel_length(value : String) : Float64?
+          length = value.match(SVG_LENGTH_RE).try(&.[1].to_f?)
+          length if length && length >= 0
         end
 
         # `text` without its `<!-- … -->` comments, so a commented-out `<svg>`

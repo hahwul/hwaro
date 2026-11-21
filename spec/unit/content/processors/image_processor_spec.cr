@@ -953,6 +953,25 @@ describe "ImageProcessor.dimensions (read-only formats)" do
     end
   end
 
+  it "reads SVG dimensions after a quoted greater-than sign" do
+    Dir.mktmpdir do |dir|
+      svg = %(<svg aria-label='a > b width="999"' width="120" height="40px"></svg>)
+      path = write_bytes(dir, "x.svg", svg.to_slice)
+      Hwaro::Content::Processors::ImageProcessor.dimensions(path).should eq({120, 40})
+    end
+  end
+
+  it "reads SVG lengths and viewBox coordinates in decimal and scientific notation" do
+    Dir.mktmpdir do |dir|
+      processor = Hwaro::Content::Processors::ImageProcessor
+      explicit = %(<svg width="+1.2e2" height=".5e2px"></svg>)
+      processor.dimensions(write_bytes(dir, "explicit.svg", explicit.to_slice)).should eq({120, 50})
+
+      inferred = %(<svg width="1e2" viewBox="+0, -2.5e0, 1e1, .5e1"></svg>)
+      processor.dimensions(write_bytes(dir, "inferred.svg", inferred.to_slice)).should eq({100, 50})
+    end
+  end
+
   it "reads the OS/2 (BITMAPCOREHEADER) BMP size from its 16-bit fields" do
     Dir.mktmpdir do |dir|
       core = Bytes.new(26) { |i| (("BM".bytes + [0_u8] * 12 + le32(12) + le16(123) + le16(77) + le16(1) + le16(24))[i]) }
