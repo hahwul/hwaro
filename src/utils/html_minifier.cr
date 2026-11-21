@@ -121,6 +121,25 @@ module Hwaro
         Regex::Options::IGNORE_CASE
       )
 
+      # Only protected tag candidates inside removable HTML comments are
+      # masked. Preserve the original bytes when a containing block is saved.
+      private COMMENT_PROTECTED_TAG = Regex.new(
+        "</?(?:#{PROTECTED_TAGS.join('|')})(?![\\w-])",
+        Regex::Options::IGNORE_CASE
+      )
+      private COMMENT_TAG_LT = "\x00HW_HTML_COMMENT_LT\x00"
+
+      # These bodies are opaque to the comment scan. In particular, SVG or
+      # MathML can contain XML comments and CDATA, and a script string can
+      # contain `<!--` without opening an HTML comment.
+      private COMMENT_CONTEXT_CLOSERS = %w[script style textarea title iframe xmp noembed noframes noscript svg math].to_h do |name|
+        {name, Regex.new("</#{name}\\s*>", Regex::Options::IGNORE_CASE)}
+      end
+      private COMMENT_CONTEXT_OPEN = Regex.new(
+        "<(#{(COMMENT_CONTEXT_CLOSERS.keys + ["plaintext"]).join('|')})(?=[ \\t\\r\\n\\f/>])",
+        Regex::Options::IGNORE_CASE
+      )
+
       # Sentinel format for protected blocks. `\x00` is illegal in HTML,
       # so the placeholder cannot collide with author content. The
       # `B`/`I`/`H` suffix lets the whitespace collapser look up the
@@ -231,9 +250,10 @@ module Hwaro
       # pair `<pre>` openers with `</script>` closers when the document
       # mixed both. One pass per tag avoids that whole class of bug.
       private def protect_sensitive_blocks(html : String, preserves : Array(String), opts : Regex::MatchOptions) : String
-        result = html
+        result = mask_comment_tag_candidates(html, opts)
+        masked = !result.same?(html)
         opened = Array.new(PROTECTED_TAGS.size, false)
-        html.scan(PROTECTED_OPEN_ANY, options: opts) do |m|
+        result.scan(PROTECTED_OPEN_ANY, options: opts) do |m|
           PROTECTED_TAGS.size.times { |i| opened[i] = true if m[i + 1]? }
         end
         PROTECTED_PATTERNS.each_with_index do |(tag, open_literal, probe, pattern), i|
@@ -248,11 +268,102 @@ module Hwaro
                    end
           result = result.gsub(pattern, options: opts) do |match|
             idx = preserves.size
-            preserves << match
+            preserves << (masked ? match.gsub(COMMENT_TAG_LT, "<") : match)
             "#{prefix}#{idx}#{PRESERVE_SUFFIX}"
           end
         end
-        result
+        masked ? result.gsub(COMMENT_TAG_LT, "<") : result
+      end
+
+      # A tag in a comment can pair with a real tag outside it. Mask only
+      # those candidate delimiters before the existing block extraction, so a
+      # later comment pass never sees a comment split across a placeholder.
+      private def mask_comment_tag_candidates(html : String, opts : Regex::MatchOptions) : String
+        bytes = html.to_slice
+        return html unless possible_comment_tag_candidate?(html, bytes, opts)
+
+        n = bytes.size
+        anchored = opts | Regex::MatchOptions::ANCHORED
+        cursor = 0
+        copied = 0
+        output : String::Builder? = nil
+        while start = bytes.index('<'.ord.to_u8, cursor)
+          cursor = start + 1
+          if prefix_at?(bytes, start, "<!--")
+            from = start + 4
+            stop = comment_end(bytes, from, n)
+            break if stop < 0
+            cursor = stop
+            body_end = stop - 3
+            next if body_end <= from || kept_comment?(bytes, from, body_end)
+            body = html.byte_slice(from, body_end - from)
+            next unless body.matches?(COMMENT_PROTECTED_TAG, options: opts)
+
+            stream = output ||= String::Builder.new(html.bytesize)
+            stream.write(bytes[copied, from - copied])
+            stream << body.gsub(COMMENT_PROTECTED_TAG, options: opts) { |tag| COMMENT_TAG_LT + tag.byte_slice(1) }
+            copied = body_end
+          elsif cursor < n && tag_start_byte?(bytes[cursor])
+            tag_end = find_tag_end(bytes, start, n)
+            break if tag_end < 0
+            cursor = tag_end + 1
+            if opener = COMMENT_CONTEXT_OPEN.match_at_byte_index(html, start, anchored)
+              name = opener[1].downcase(:fold)
+              break if name == "plaintext"
+              if {"svg", "math"}.includes?(name) && bytes[tag_end - 1] == '/'.ord &&
+                 foreign_self_closing?(bytes, opener.byte_end, tag_end - 1)
+                next
+              end
+              closer = COMMENT_CONTEXT_CLOSERS[name].match_at_byte_index(html, cursor, opts)
+              break unless closer
+              cursor = closer.byte_end
+            end
+          end
+        end
+        return html unless output
+        output.write(bytes[copied, n - copied])
+        output.to_s
+      end
+
+      # A textual probe can overcount comment delimiters in raw text or
+      # attributes. It avoids scanning markup on pages with plain comments.
+      private def possible_comment_tag_candidate?(html : String, bytes : Bytes, opts : Regex::MatchOptions) : Bool
+        cursor = 0
+        while start = ByteScan.byte_index(html, "<!--", cursor)
+          from = start + 4
+          stop = comment_end(bytes, from, bytes.size)
+          return false if stop < 0
+          cursor = stop
+          body_end = stop - 3
+          if (left = bytes.index('<'.ord.to_u8, from)) && left < body_end
+            return true if html.byte_slice(left, body_end - left).matches?(COMMENT_PROTECTED_TAG, options: opts)
+          end
+        end
+        false
+      end
+
+      # A foreign start tag's final slash is part of the value if it comes
+      # after `=` or an unquoted value. Whitespace after `=` is allowed.
+      private def foreign_self_closing?(bytes : Bytes, cursor : Int32, slash : Int32) : Bool
+        after_eq = false
+        unquoted = false
+        while cursor < slash
+          byte = bytes[cursor]
+          if intertoken_ws?(byte)
+            unquoted = false
+          elsif after_eq
+            if byte == '"'.ord || byte == '\''.ord
+              cursor = bytes.index(byte, cursor + 1) || slash
+            else
+              unquoted = true
+            end
+            after_eq = false
+          elsif !unquoted && byte == '='.ord
+            after_eq = true
+          end
+          cursor += 1
+        end
+        !after_eq && !unquoted
       end
 
       # Restore in a fixed-point loop: a protected block (e.g. a `<style>`

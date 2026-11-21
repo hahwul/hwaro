@@ -308,6 +308,7 @@ hwaro build -i /path/to/my-site -o ./dist
 - **XML**: 태그 사이 공백을 제거해 파일 크기를 줄입니다.
 
 공백에 민감한 요소(`<pre>`, `<code>`, `<textarea>`, `<script>`, `<style>`, `<svg>`, `<math>`, `<noscript>`)는 공백 처리 전에 추출했다가 그대로 복원하므로 내용을 절대 건드리지 않습니다.
+이 요소를 찾을 때 일반 HTML 주석 안에 있는 태그 모양의 텍스트는 주석의 일부로 처리합니다.
 
 더 공격적인 축소(속성 따옴표 처리, 엔티티 축약 등)가 필요하면 `html-minifier-terser`나 `minify-html` 같은 전용 도구로 `public/`을 후처리합니다.
 
