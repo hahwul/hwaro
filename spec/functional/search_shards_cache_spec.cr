@@ -25,6 +25,7 @@ private def run_shard_builder(cache : Bool)
   builder = Hwaro::Core::Build::Builder.new
   Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
   builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: cache))
+  builder
 end
 
 private def shard_project
@@ -106,6 +107,45 @@ describe "cache: sharded search index converges on the clean build" do
         File.exists?("public/search/docs.json").should be_false
         manifest = JSON.parse(File.read("public/search/index.json"))
         manifest["shards"].as_a.map(&.["id"].as_s).should eq(["_root", "blog"])
+      end
+    end
+  end
+
+  it "refreshes an older mixed root shard on an all-hit cache build" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        shard_project
+        FileUtils.mkdir_p("content/_root")
+        File.write("content/_root/inside.md", "---\ntitle: Inside\n---\nIntro.\n\n{% gal() %}\nMIGRATED\n{% end %}\n")
+        run_shard_builder(true)
+        expected = search_outputs
+        section_file = "public/search/__root.json"
+        root_file = "public/search/_root.json"
+        manifest_file = "public/search/index.json"
+        expected[section_file].should contain("Intro. MIGRATED")
+
+        # Recreate the previous layout, where both groups occupied _root.
+        # Keep the current page cache to represent a same-version upgrade.
+        mixed = (JSON.parse(expected[root_file]).as_a + JSON.parse(expected[section_file]).as_a).to_json
+        manifest = JSON.parse(expected[manifest_file])
+        shards = manifest["shards"].as_a
+        shards.reject! { |shard| shard["id"].as_s == "__root" }
+        root = shards.find! { |shard| shard["id"].as_s == "_root" }.as_h
+        root["count"] = JSON::Any.new(2_i64)
+        root["bytes"] = JSON::Any.new(mixed.bytesize.to_i64)
+        File.write(root_file, mixed)
+        File.delete(section_file)
+        File.write(manifest_file, {"version" => manifest["version"], "fields" => manifest["fields"], "shards" => shards}.to_json)
+
+        stats = run_shard_builder(true).context.not_nil!.stats
+        stats.pages_rendered.should eq(0)
+        stats.cache_hits.should be > 0
+        search_outputs.should eq(expected)
+
+        unchanged_time = Time.utc(2020, 1, 1)
+        File.utime(unchanged_time, unchanged_time, manifest_file)
+        run_shard_builder(true)
+        File.info(manifest_file).modification_time.should eq(unchanged_time)
       end
     end
   end
