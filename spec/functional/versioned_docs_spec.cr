@@ -202,6 +202,25 @@ describe "Versioned docs: URL mapping (latest_at_root = false)" do
       hub.should_not contain("/docs/v1/")
     end
   end
+
+  it "redirects a custom parent only when the latest root ends in a full version segment" do
+    {"manual-v2", "v2"}.each do |segment|
+      content = versioned_content.merge({
+        "docs/v2/_index.md" => %(+++\ntitle = "Latest"\npath = "reference/#{segment}"\n+++\nLatest version),
+      })
+      build_site(VERSIONS_CONFIG_PREFIXED, content_files: content, template_files: {
+        "page.html" => "{{ content }}", "section.html" => "{{ content }}",
+      }) do
+        read("public/reference/#{segment}/index.html").should contain("Latest version")
+        File.exists?("public/reference/manual-/index.html").should be_false
+        if segment == "v2"
+          read("public/reference/index.html").should contain("/reference/v2/")
+        else
+          File.exists?("public/reference/index.html").should be_false
+        end
+      end
+    end
+  end
 end
 
 describe "Versioned docs: multilingual" do

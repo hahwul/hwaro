@@ -107,8 +107,8 @@ module Hwaro
       # remapped away from the `<name>/` shape (a `[permalinks]` rule).
       private def parent_url(url : String, name : String) : String?
         suffix = "#{name}/"
-        return unless url.ends_with?(suffix) && url.size > suffix.size
-        url[0, url.size - suffix.size]
+        return unless url.ends_with?("/#{suffix}")
+        url.rchop(suffix)
       end
 
       # --- Crinja shapes --------------------------------------------------
