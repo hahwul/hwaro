@@ -19,6 +19,11 @@ module Hwaro
       MANIFEST_FILENAME = "index.json"
       MANIFEST_VERSION  = 1
 
+      # Internal cache revision for changes to which entries go into which
+      # shard. The public manifest version still describes the same schema.
+      private MANIFEST_LAYOUT_KEY      = "_layout_revision"
+      private MANIFEST_LAYOUT_REVISION = 1
+
       # Shard id for pages outside every section (`content/about.md`).
       ROOT_SHARD_ID = "_root"
 
@@ -29,6 +34,7 @@ module Hwaro
 
       alias Entry = Hash(String, String | Array(String))
       private alias ShardKey = {id: String, language: String?, section: String?}
+      private record ShardManifest, files : Array(String), current : Bool
 
       # An h2/h3 element of the rendered page, and the `id` attribute in its
       # attribute list (quote-aware: `title="a > b"` does not end the tag).
@@ -52,17 +58,19 @@ module Hwaro
       def self.published_outputs(config : Models::Config, output_dir : String) : Array(String)
         outputs = [] of String
         return outputs unless config.search.enabled
-        sharded = config.search.sharded?
-        if !sharded || config.search.single_file
-          outputs << File.join(output_dir, File.basename(config.search.filename))
+        if path = classic_index_path(config, output_dir)
+          outputs << path
         end
-        if sharded
+        if config.search.sharded?
           manifest_file = manifest_path(output_dir)
           outputs << manifest_file
           shards_dir = File.join(output_dir, SHARDS_DIR)
-          previous_shard_files(manifest_file).each do |name|
-            path = File.join(shards_dir, name)
-            outputs << path if Utils::OutputGuard.within_output_dir?(path, shards_dir)
+          if manifest = read_shard_manifest(manifest_file)
+            manifest.files.each do |name|
+              if path = shard_output_path(shards_dir, name)
+                outputs << path
+              end
+            end
           end
         end
         outputs
@@ -70,18 +78,34 @@ module Hwaro
 
       # Used by both Generate and the Render phase's cache hydration.
       def self.outputs_reusable?(config : Models::Config, output_dir : String) : Bool
-        published_outputs(config, output_dir).all? { |path| File.file?(path) }
+        return true unless config.search.enabled
+        return false if (path = classic_index_path(config, output_dir)) && !File.file?(path)
+        return true unless config.search.sharded?
+
+        manifest = read_shard_manifest(manifest_path(output_dir))
+        return false unless manifest && manifest.current
+        shards_dir = File.join(output_dir, SHARDS_DIR)
+        manifest.files.all? do |name|
+          (path = shard_output_path(shards_dir, name)) && File.file?(path)
+        end
+      end
+
+      private def self.classic_index_path(config : Models::Config, output_dir : String) : String?
+        # `single_file` only applies when shards are enabled.
+        return if config.search.sharded? && !config.search.single_file
+        File.join(output_dir, File.basename(config.search.filename))
+      end
+
+      private def self.shard_output_path(shards_dir : String, name : String) : String?
+        path = File.join(shards_dir, name)
+        path if Utils::OutputGuard.within_output_dir?(path, shards_dir)
       end
 
       def self.generate(pages : Array(Models::Page), config : Models::Config, output_dir : String, verbose : Bool = false, skip_if_unchanged : Bool = false)
         return unless config.search.enabled
 
         sharded = config.search.sharded?
-        # With shards on, `single_file = false` drops the classic file; with
-        # shards off the setting is meaningless and the classic file is the
-        # only output (byte-identical to pre-shard builds).
-        single_file = !sharded || config.search.single_file
-        search_path = File.join(output_dir, File.basename(config.search.filename))
+        search_path = classic_index_path(config, output_dir)
 
         if skip_if_unchanged && outputs_reusable?(config, output_dir)
           Logger.debug "  Search index unchanged (cache hit), skipping."
@@ -123,7 +147,7 @@ module Hwaro
           # A warm `--cache`/serve build starts from the previous output, so
           # the classic file from when pages existed would keep publishing
           # content that is now a draft or opted out. Cold builds have no file.
-          if single_file
+          if search_path
             begin
               File.delete?(search_path)
             rescue File::Error
@@ -138,7 +162,7 @@ module Hwaro
         groups = build_search_data(search_pages, config)
         search_data = groups.flat_map(&.itself)
 
-        if single_file
+        if search_path
           # Both libraries use the same array for now, so Hwaro generates a common format and lets the client build the index.
           # We've kept the names distinct to respect user intent and stay ready for library-specific optimizations later.
           content = case config.search.format.downcase
@@ -242,7 +266,7 @@ module Hwaro
       private def self.write_shards(pages : Array(Models::Page), entries : Array(Array(Entry)), config : Models::Config, output_dir : String, verbose : Bool) : Nil
         shards_dir = File.join(output_dir, SHARDS_DIR)
         manifest_file = manifest_path(output_dir)
-        previous_files = previous_shard_files(manifest_file)
+        previous_files = read_shard_manifest(manifest_file).try(&.files) || [] of String
 
         groups = {} of ShardKey => Array(Entry)
         pages.each_with_index do |page, i|
@@ -259,6 +283,7 @@ module Hwaro
         manifest = JSON.build do |json|
           json.object do
             json.field "version", MANIFEST_VERSION
+            json.field MANIFEST_LAYOUT_KEY, MANIFEST_LAYOUT_REVISION
             json.field "fields", entry_fields(config)
             json.field "shards" do
               json.array do
@@ -340,11 +365,11 @@ module Hwaro
         names
       end
 
-      private def self.previous_shard_files(manifest_file : String) : Array(String)
-        return [] of String unless File.file?(manifest_file)
-        parsed = JSON.parse(File.read(manifest_file))
-        shards = parsed.as_h?.try(&.["shards"]?).try(&.as_a?) || return [] of String
-        shards.compact_map do |shard|
+      private def self.read_shard_manifest(manifest_file : String) : ShardManifest?
+        return unless File.file?(manifest_file)
+        parsed = JSON.parse(File.read(manifest_file)).as_h? || return
+        shards = parsed["shards"]?.try(&.as_a?) || return
+        files = shards.compact_map do |shard|
           next unless fields = shard.as_h?
           next unless (id = fields["id"]?.try(&.as_s?)) && (url = fields["url"]?.try(&.as_s?))
           dir, separator, stem = id.rpartition('/')
@@ -360,8 +385,12 @@ module Hwaro
           next unless path.relative? && path.normalize.to_s == name
           name if url.ends_with?("/#{SHARDS_DIR}/#{URI.encode_path(name)}")
         end.uniq!
+        current = parsed["version"]?.try(&.as_i64?) == MANIFEST_VERSION &&
+                  parsed[MANIFEST_LAYOUT_KEY]?.try(&.as_i64?) == MANIFEST_LAYOUT_REVISION &&
+                  !parsed["fields"]?.try(&.as_a?).nil? && files.size == shards.size
+        ShardManifest.new(files, current)
       rescue JSON::ParseException | File::Error
-        [] of String
+        nil
       end
 
       private def self.remove_stale_shard(shards_dir : String, name : String) : Nil
