@@ -437,6 +437,30 @@ describe Hwaro::Content::Seo::Pwa do
       end
     end
 
+    it "excludes local service worker URL variants from the precache" do
+      Dir.mktmpdir do |dir|
+        site = make_site(<<-TOML, base_url: "https://example.com/project")
+          [pwa]
+          enabled = true
+          precache_urls = ["/sw.js?v=1", "/%73w.js#worker", "/index.html?v=1", "https://assets.example.com/sw.js?v=1"]
+          offline_page = "/sw.js?v=1"
+          TOML
+
+        File.write(File.join(dir, "index.html"), "<html>home</html>")
+
+        Hwaro::Content::Seo::Pwa.generate(site, dir)
+        first = File.read(File.join(dir, "sw.js"))
+        Hwaro::Content::Seo::Pwa.generate(site, dir)
+        second = File.read(File.join(dir, "sw.js"))
+
+        second.should eq(first)
+        second.should_not contain(%("/project/sw.js?v=1"))
+        second.should_not contain(%("/project/%73w.js#worker"))
+        second.should contain(%("/project/index.html?v=1"))
+        second.should contain(%("https://assets.example.com/sw.js?v=1"))
+      end
+    end
+
     it "generates sw.js" do
       Dir.mktmpdir do |dir|
         site = make_site(<<-TOML)

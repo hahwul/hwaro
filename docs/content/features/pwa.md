@@ -112,7 +112,7 @@ registration to your base template:
 
 The generated service worker uses:
 
-- **Precache on install** — URLs listed in `precache_urls` plus `start_url` (and `offline_page`, when set) are cached immediately. An entry with no matching output file is dropped with a build warning, since one missing URL would fail the whole install
+- **Precache on install** — URLs listed in `precache_urls` plus `start_url` (and `offline_page`, when set) are cached immediately. An entry with no matching output file is dropped with a build warning, since one missing URL would fail the whole install. Any local URL resolving to `sw.js` itself is also excluded, including URLs with a query or fragment. An excluded `offline_page` falls back to `start_url`
 - **Asset fetching** — Controlled by `cache_strategy` (see below)
 - **Network-first for navigation** — Page navigations always try the network first, falling back to the offline page
 - **Automatic cache versioning** — Old caches are cleaned up on service worker activation

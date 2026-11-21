@@ -86,8 +86,8 @@ module Hwaro
           base_path = config.base_path
           precache_urls = pwa.precache_urls.map { |u| localize.try(&.call(u)) || config.with_base_path(u) }
           precache_urls << resolved_start unless precache_urls.includes?(resolved_start)
-          if offline = pwa.offline_page
-            resolved_offline = config.with_base_path(offline)
+          resolved_offline = pwa.offline_page.try { |offline| config.with_base_path(offline) }
+          if resolved_offline
             precache_urls << resolved_offline unless precache_urls.includes?(resolved_offline)
           end
 
@@ -96,11 +96,7 @@ module Hwaro
           # hash below would fold the PREVIOUS build's sw.js bytes into
           # CACHE_NAME — changing sw.js, which changes the next build's
           # hash, churning the cache name forever.
-          sw_url = config.with_base_path("/sw.js")
-          if precache_urls.includes?(sw_url)
-            Logger.warn "PWA: sw.js cannot precache itself — dropping #{sw_url.inspect} from the sw.js precache list"
-            precache_urls = precache_urls.reject { |u| u == sw_url }
-          end
+          worker_path = File.expand_path(File.join(output_dir, "sw.js"))
 
           # cache.addAll() is all-or-nothing: a single 404 aborts the whole
           # service-worker install. Drop any site-internal precache URL whose
@@ -108,8 +104,11 @@ module Hwaro
           # not our files, so we trust them) but always keep the launch URL.
           precache_urls = precache_urls.select do |u|
             next true if external_url?(u)
-            next true if u == resolved_start
-            if precache_file_exists?(u, output_dir, base_path)
+            file = precache_file_path(u, output_dir, base_path)
+            if File.expand_path(file) == worker_path
+              Logger.warn "PWA: sw.js cannot precache itself — dropping #{u.inspect} from the sw.js precache list"
+              false
+            elsif u == resolved_start || File.file?(file)
               true
             else
               Logger.warn "PWA: precache URL #{u.inspect} has no matching output file — dropping it from sw.js precache (cache.addAll is all-or-nothing)"
@@ -119,20 +118,12 @@ module Hwaro
 
           precache_json = precache_urls.map(&.inspect).join(",\n  ")
 
-          # The navigation fallback must point at a page that actually exists,
-          # otherwise the offline experience breaks. Fall back to the launch URL
-          # when offline_page resolves to nothing on disk.
-          offline_url = if op = pwa.offline_page
-                          resolved_offline = config.with_base_path(op)
-                          if external_url?(resolved_offline) || precache_file_exists?(resolved_offline, output_dir, base_path)
-                            resolved_offline.inspect
-                          else
-                            Logger.warn "PWA: offline_page #{resolved_offline.inspect} has no matching output file — falling back to start_url #{resolved_start.inspect}"
-                            resolved_start.inspect
-                          end
-                        else
-                          resolved_start.inspect
-                        end
+          # Use the same valid URLs for the offline fallback as for precache.
+          if resolved_offline && !precache_urls.includes?(resolved_offline)
+            Logger.warn "PWA: offline_page #{resolved_offline.inspect} is not precached — falling back to start_url #{resolved_start.inspect}"
+            resolved_offline = nil
+          end
+          offline_url = (resolved_offline || resolved_start).inspect
           root_url = resolved_start.inspect
           # Derive the cache name from the precached URLs AND the bytes of the
           # files they reference, rather than the build clock. Identical content
@@ -303,11 +294,6 @@ module Hwaro
           fpath = File.join(output_dir, rel)
           fpath = File.join(fpath, "index.html") if rel.empty? || rel.ends_with?('/')
           fpath
-        end
-
-        # Does the output file backing this precache URL exist on disk?
-        private def self.precache_file_exists?(url : String, output_dir : String, base_path : String) : Bool
-          File.file?(precache_file_path(url, output_dir, base_path))
         end
 
         # Extensions whose intrinsic size can be read from the file header.
