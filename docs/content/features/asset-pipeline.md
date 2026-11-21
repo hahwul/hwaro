@@ -179,7 +179,7 @@ The built-in minifiers are conservative and safe:
 **CSS:**
 - Removes comments (`/* ... */`)
 - Collapses whitespace
-- Removes whitespace around `{`, `}`, `:`, `;`, `,`
+- Tightens spacing around `{`, `}`, `:`, `;`, `,` while preserving descendant combinators, including in `@supports selector()` tests
 - Strips trailing semicolons before `}`
 
 **JS:**

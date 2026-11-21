@@ -734,6 +734,20 @@ describe Hwaro::Utils::CssMinifier do
       result.should contain("display:grid")
     end
 
+    it "preserves descendant combinators inside @supports selector tests" do
+      css = "@supports selector(.card :hover) { .card { color : red; } }"
+      Hwaro::Utils::CssMinifier.minify(css)
+        .should eq("@supports selector(.card :hover){.card{color:red}}")
+
+      css = "@supports (not SeLeCtOr(:is(.card :hover))) { .card { color : red; } }"
+      Hwaro::Utils::CssMinifier.minify(css)
+        .should eq("@supports (not SeLeCtOr(:is(.card :hover))){.card{color:red}}")
+
+      css = "@supports s\\65 lector(.card :hover) { .card { color : red; } }"
+      Hwaro::Utils::CssMinifier.minify(css)
+        .should eq("@supports s\\65 lector(.card :hover){.card{color:red}}")
+    end
+
     it "preserves descendant combinator in a nested rule inside @media" do
       css = "@media print { .a .b :first-child { margin : 0 ; } }"
       result = Hwaro::Utils::CssMinifier.minify(css)
