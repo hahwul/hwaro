@@ -12,6 +12,7 @@ on:
       - shard.lock
       - "**/*.cr"
       - src/ext/**
+      - src/content/search_ui/**
       - .gitattributes
   push:
     branches: [main]
