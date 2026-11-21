@@ -13,11 +13,6 @@ module Hwaro
         # ordinary pages (`about.md`, deep section pages) as posts.
         POST_SECTIONS = %w[posts blog]
 
-        # Destinations already written this run, used to disambiguate
-        # collisions (e.g. two same-day leaf bundles both named `index.md`)
-        # instead of silently overwriting the earlier export.
-        @written_paths = Set(String).new
-
         # Expanded bundle directory → its index source, for each page bundle
         # flattened into `_posts/` or `_drafts/` this run (see
         # `note_flattened_bundle`).
@@ -216,7 +211,7 @@ module Hwaro
               # address the build gave it and the one the rewritten `@/` links
               # (and every inbound URL) point at.
               relative = file_path.sub(content_dir, "").lstrip('/')
-              url = (front_matter_url(relative, fields) || relative.sub(/\.(?:md|markdown)\z/, "").sub(/(\A|\/)_?index\z/, "\\1")).strip('/')
+              url = (front_matter_url(relative, fields) || relative.sub(MARKDOWN_EXT_RE, "").sub(/(\A|\/)_?index\z/, "\\1")).strip('/')
               yaml_lines << "permalink: #{Hwaro::Utils::FrontmatterWriter.yaml_scalar("/#{url}/")}" unless url.empty?
             end
           end
@@ -337,24 +332,6 @@ module Hwaro
           YAML::Any.new(leftovers).to_yaml.lchop("---\n").chomp
         end
 
-        # Reserve `path` for this run, appending `-1`, `-2`, … (with a
-        # warning) when an earlier file already claimed it. Flattening into
-        # `_posts/` makes collisions possible — two leaf bundles published
-        # the same day used to silently clobber each other.
-        private def disambiguate_path(path : String) : String
-          return path if @written_paths.add?(path)
-
-          ext = File.extname(path)
-          stem = path.chomp(ext)
-          n = 1
-          until @written_paths.add?("#{stem}-#{n}#{ext}")
-            n += 1
-          end
-          unique = "#{stem}-#{n}#{ext}"
-          Logger.warn "Export destination collision: #{path} already written this run; writing #{File.basename(unique)} instead."
-          unique
-        end
-
         # Map a Hwaro content path to its Jekyll-conventional destination.
         # Jekyll has three buckets that look superficially similar but aren't:
         #   - `_posts/<YYYY-MM-DD>-<slug>.md` — dated blog posts, FLAT layout.
@@ -378,7 +355,7 @@ module Hwaro
           is_draft : Bool,
           include_drafts : Bool,
         ) : String
-          relative = file_path.sub(content_dir, "").lstrip('/')
+          relative = normalize_markdown_extension(file_path.sub(content_dir, "").lstrip('/'))
           filename = File.basename(relative)
           dir_part = File.dirname(relative)
 
