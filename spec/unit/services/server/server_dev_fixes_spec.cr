@@ -433,26 +433,49 @@ describe Hwaro::Services::NotFoundHandler do
 end
 
 describe Hwaro::Services::LiveReloadInjectHandler do
-  # Finding 6
-  it "answers HEAD with the injected length and no body" do
+  {
+    "/index.html"     => "index.html",
+    "/encoded%2Ehtml" => "encoded.html",
+    "/page.htm"       => "page.htm",
+    "/mixed.HtMl"     => "mixed.HtMl",
+  }.each do |path, filename|
+    it "matches GET and HEAD live reload headers for #{path}" do
+      Dir.mktmpdir do |dir|
+        html = "<html><body>hi</body></html>"
+        File.write(File.join(dir, filename), html)
+        handler = Hwaro::Services::LiveReloadInjectHandler.new(dir)
+        handler.next = ServeFixesSpy.new
+
+        head_context, head_response, head_io = build_context("HEAD", path)
+        handler.call(head_context)
+        head_response.close
+
+        get_context, get_response, get_io = build_context("GET", path)
+        handler.call(get_context)
+        get_response.close
+
+        injected_size = handler.inject_script(html).bytesize
+        head_io.to_s.should contain("Content-Length: #{injected_size}")
+        get_io.to_s.should contain("Content-Length: #{injected_size}")
+        head_io.to_s.includes?("__hwaro_livereload").should be_false
+        get_io.to_s.includes?("__hwaro_livereload").should be_true
+      end
+    end
+  end
+
+  it "defers percent-encoded assets with non-HTML extensions" do
     Dir.mktmpdir do |dir|
-      File.write(File.join(dir, "index.html"), "<html><body>hi</body></html>")
+      File.write(File.join(dir, "asset.js"), "console.log('ok');")
       handler = Hwaro::Services::LiveReloadInjectHandler.new(dir)
-      handler.next = ServeFixesSpy.new
+      spy = ServeFixesSpy.new
+      handler.next = spy
 
-      head_context, head_response, head_io = build_context("HEAD", "/index.html")
-      handler.call(head_context)
-      head_response.close
+      context, response, io = build_context("GET", "/asset%2Ejs")
+      handler.call(context)
+      response.close
 
-      get_context, get_response, get_io = build_context("GET", "/index.html")
-      handler.call(get_context)
-      get_response.close
-
-      injected_size = handler.inject_script(File.read(File.join(dir, "index.html"))).bytesize
-      head_io.to_s.should contain("Content-Length: #{injected_size}")
-      get_io.to_s.should contain("Content-Length: #{injected_size}")
-      head_io.to_s.includes?("__hwaro_livereload").should be_false
-      get_io.to_s.includes?("__hwaro_livereload").should be_true
+      spy.called.should be_true
+      io.to_s.includes?("__hwaro_livereload").should be_false
     end
   end
 

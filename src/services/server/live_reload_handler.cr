@@ -409,7 +409,11 @@ module Hwaro
           return
         end
 
-        unless path.ends_with?(".html")
+        # The extension itself may be percent-encoded. Keep the fast path
+        # for ordinary assets whose filenames cannot resolve to HTML.
+        html_suffix = html_path?(path)
+        possible_escaped_extension = path.includes?('%') && !path.ends_with?('/')
+        unless html_suffix || possible_escaped_extension
           call_next(context)
           return
         end
@@ -430,7 +434,7 @@ module Hwaro
         # `sanitize_path` made `/a%5Cb.html` and `/%2Fa%2Fb.html` serve pages
         # that every static host 404s.
         relative = DevPath.safe_relative(path)
-        if relative.nil? || relative.empty?
+        unless relative && (html_suffix || html_path?(relative))
           call_next(context)
           return
         end
@@ -467,6 +471,11 @@ module Hwaro
         context.response.content_length = injected.bytesize
         return if method == "HEAD"
         context.response.print(injected)
+      end
+
+      private def html_path?(path : String) : Bool
+        lower = path.downcase(:ascii)
+        lower.ends_with?(".html") || lower.ends_with?(".htm")
       end
 
       # Mirrors HTTP::StaticFileHandler's own canonicalisation test — see
