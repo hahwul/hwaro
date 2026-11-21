@@ -60,16 +60,24 @@ hwaro completion bash > /etc/bash_completion.d/hwaro
 
 #### Zsh
 
-`~/.zshrc`에 추가합니다:
+`~/.zshrc`에서 `compinit`으로 자동 완성을 초기화한 뒤 다음 줄을 추가합니다.
 
-```bash
+```zsh
 eval "$(hwaro completion zsh)"
 ```
 
-fpath에 저장해도 됩니다:
+또는 스크립트를 `_hwaro` 파일로 저장할 수 있습니다.
 
-```bash
+```zsh
+mkdir -p ~/.zsh/completions
 hwaro completion zsh > ~/.zsh/completions/_hwaro
+```
+
+`~/.zshrc`에서 자동 완성을 초기화하기 전에 이 디렉터리를 `fpath`에 추가합니다.
+
+```zsh
+fpath=(~/.zsh/completions $fpath)
+autoload -Uz compinit && compinit
 ```
 
 #### Fish

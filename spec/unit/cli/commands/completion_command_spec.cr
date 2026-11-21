@@ -78,6 +78,44 @@ describe Hwaro::CLI::Commands::CompletionCommand do
   end
 
   describe "zsh completion" do
+    it "registers hwaro when evaluated after compinit" do
+      zsh = Process.find_executable("zsh") || pending!("Zsh is not installed")
+      output = Hwaro::CLI::Commands::CompletionCommand.new.generate_zsh_for_test
+      Dir.mktmpdir do |dir|
+        file = File.join(dir, "_hwaro")
+        File.write(file, output)
+        script = <<-ZSH
+          autoload -Uz compinit && compinit -D || exit 1
+          eval "$(< "$1")" || exit 1
+          [[ ${_comps[hwaro]} == _hwaro ]]
+          ZSH
+        error = IO::Memory.new
+        status = Process.run(zsh, ["-f", "-c", script, "zsh", file], error: error)
+        error.to_s.should be_empty
+        status.success?.should be_true
+      end
+    end
+
+    it "invokes the completion body when autoloaded from fpath" do
+      zsh = Process.find_executable("zsh") || pending!("Zsh is not installed")
+      output = Hwaro::CLI::Commands::CompletionCommand.new.generate_zsh_for_test
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, "_hwaro"), output)
+        script = <<-ZSH
+          fpath=("$1" $fpath)
+          autoload -Uz compinit && compinit -D -u || exit 1
+          [[ ${_comps[hwaro]} == _hwaro ]] || exit 1
+          _arguments() { state=command; }
+          _describe() { print -r -- "completion body invoked"; }
+          _hwaro
+          ZSH
+        result = IO::Memory.new
+        status = Process.run(zsh, ["-f", "-c", script, "zsh", dir], output: result)
+        status.success?.should be_true
+        result.to_s.should eq("completion body invoked\n")
+      end
+    end
+
     it "generates a zsh completion script with compdef header" do
       cmd = Hwaro::CLI::Commands::CompletionCommand.new
       output = cmd.generate_zsh_for_test

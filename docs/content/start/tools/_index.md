@@ -60,16 +60,24 @@ hwaro completion bash > /etc/bash_completion.d/hwaro
 
 #### Zsh
 
-Add to your `~/.zshrc`:
+Add this to your `~/.zshrc` after initializing completion with `compinit`:
 
-```bash
+```zsh
 eval "$(hwaro completion zsh)"
 ```
 
-Or save to your fpath:
+Alternatively, save the script as `_hwaro`:
 
-```bash
+```zsh
+mkdir -p ~/.zsh/completions
 hwaro completion zsh > ~/.zsh/completions/_hwaro
+```
+
+Add the directory to `fpath` before initializing completion in `~/.zshrc`:
+
+```zsh
+fpath=(~/.zsh/completions $fpath)
+autoload -Uz compinit && compinit
 ```
 
 #### Fish
