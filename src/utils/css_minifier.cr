@@ -37,6 +37,7 @@ module Hwaro
       private WS_STRUCTURAL = /[ \t\r\n\f]*([{};,])[ \t\r\n\f]*/
       private WS_COLON      = /[ \t\r\n\f]*:[ \t\r\n\f]*/
       private PAREN_GROUP   = /\(([^)]*)\)/
+      private SELECTOR_TEST = /(?<![\w-])selector\(/i
       private RESTORE_TOKEN = /\x00PRESERVE_(\d{1,9})\x00/
 
       # Perform conservative CSS minification
@@ -338,9 +339,12 @@ module Hwaro
         return run unless run.includes?(':')
         prelude = run.lstrip(" \t\r\n\f")
         return run unless prelude.starts_with?('@')
-        # `@scope (.card :hover) to (…)` parenthesises SELECTORS, where the
-        # space before a pseudo-class is a descendant combinator.
+        # `@scope (.card :hover)` and `@supports selector(.card :hover)`
+        # use parentheses for selectors, where a space can be a combinator.
         return run if prelude[1, 5].compare("scope", case_insensitive: true) == 0
+        # Either name can contain CSS escapes, e.g. `s\65 lector(…)`.
+        return run if prelude.includes?('\\')
+        return run if prelude.matches?(SELECTOR_TEST)
         run.gsub(PAREN_GROUP) { "(" + $1.gsub(WS_COLON, ":") + ")" }
       end
 
