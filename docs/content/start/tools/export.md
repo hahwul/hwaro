@@ -57,6 +57,9 @@ or `.markdown`. When two source files resolve to the same destination after
 normalization, the lowercase source extension keeps the original destination
 and the other file receives a numeric suffix.
 
+The Markdown body keeps its leading indentation and trailing spaces so
+indented code blocks and hard line breaks survive export.
+
 ## JSON Output
 
 ```json
