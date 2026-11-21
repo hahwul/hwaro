@@ -101,7 +101,7 @@ module Hwaro
         path if Utils::OutputGuard.within_output_dir?(path, shards_dir)
       end
 
-      def self.generate(pages : Array(Models::Page), config : Models::Config, output_dir : String, verbose : Bool = false, skip_if_unchanged : Bool = false)
+      def self.generate(pages : Array(Models::Page), config : Models::Config, output_dir : String, verbose : Bool = false, skip_if_unchanged : Bool = false, *, builder : Core::Build::Builder? = nil)
         return unless config.search.enabled
 
         sharded = config.search.sharded?
@@ -143,7 +143,7 @@ module Hwaro
           # An empty manifest still tells a sharded client "nothing to
           # load" instead of a 404, and pruning drops shards a previous
           # build wrote for pages that no longer exist.
-          write_shards(search_pages, [] of Array(Entry), config, output_dir, verbose) if sharded
+          write_shards(search_pages, [] of Array(Entry), config, output_dir, verbose, builder) if sharded
           # A warm `--cache`/serve build starts from the previous output, so
           # the classic file from when pages existed would keep publishing
           # content that is now a draft or opted out. Cold builds have no file.
@@ -184,7 +184,7 @@ module Hwaro
           Logger.action :create, search_path if verbose
         end
 
-        write_shards(search_pages, groups, config, output_dir, verbose) if sharded
+        write_shards(search_pages, groups, config, output_dir, verbose, builder) if sharded
         Logger.info "  Generated search index with #{search_pages.size} pages." if verbose
       end
 
@@ -263,7 +263,7 @@ module Hwaro
       # and shards exist to be fetched on demand. Deterministic: shards are
       # written in id order and the manifest lists them the same way;
       # entries keep the order `search.json` uses.
-      private def self.write_shards(pages : Array(Models::Page), entries : Array(Array(Entry)), config : Models::Config, output_dir : String, verbose : Bool) : Nil
+      private def self.write_shards(pages : Array(Models::Page), entries : Array(Array(Entry)), config : Models::Config, output_dir : String, verbose : Bool, builder : Core::Build::Builder?) : Nil
         shards_dir = File.join(output_dir, SHARDS_DIR)
         manifest_file = manifest_path(output_dir)
         previous_files = read_shard_manifest(manifest_file).try(&.files) || [] of String
@@ -317,8 +317,10 @@ module Hwaro
 
         # A surviving id can move to another file when the set of names
         # changes. Prune by the previous manifest's files, even in that case.
+        # A build may still publish a static copy at a retired path.
         current = files.values.to_h { |name| {Utils::PathUtils.output_fold_key(name), name} }
         current[MANIFEST_FILENAME] = MANIFEST_FILENAME
+        stale = [] of String
         (previous_files - files.values).each do |name|
           if replacement = current[Utils::PathUtils.output_fold_key(name)]?
             old_info = File.info?(File.join(shards_dir, name))
@@ -327,8 +329,16 @@ module Hwaro
             # to the file we just wrote under its new spelling.
             next if old_info && new_info && old_info.same_file?(new_info)
           end
-          remove_stale_shard(shards_dir, name)
+          if builder
+            path = File.join(shards_dir, name)
+            next if Dir.exists?(path)
+            next unless Utils::OutputGuard.safe_to_delete_file?(path, shards_dir)
+            stale << path if Utils::OutputGuard.safe_to_delete_file?(path, output_dir)
+          else
+            remove_stale_shard(shards_dir, name)
+          end
         end
+        builder.try &.prune_unclaimed_outputs(stale, output_dir, keep_raw_copies: false)
       end
 
       private def self.shard_file_names(ids : Array(String)) : Hash(String, String)

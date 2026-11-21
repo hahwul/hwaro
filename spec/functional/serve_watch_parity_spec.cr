@@ -394,6 +394,41 @@ describe "serve watch parity: static edits over generated outputs" do
     end
   end
 
+  it "keeps a shard created incrementally when a static file shares its path" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_shadow_site
+        File.write("config.toml", File.read("config.toml") + %(\n[search]\nenabled = true\nshards = "section"\n))
+        FileUtils.mkdir_p("content/blog")
+        note = "+++\ntitle = \"Blog note\"\nin_search_index = false\n+++\nBody"
+        File.write("content/blog/note.md", note)
+        FileUtils.mkdir_p("static/search")
+        File.write("static/search/blog.json", %({"manual":1}))
+
+        server = Hwaro::Services::Server.new
+        options = watch_parity_options
+        server.watch_parity_builder.run(options).should be_true
+        shard = "public/search/blog.json"
+        File.read(shard).should eq(%({"manual":1}))
+
+        File.write("content/blog/note.md", note.sub("false", "true"))
+        edit = watch_parity_changeset(content: ["content/blog/note.md"])
+        server.watch_parity_effective_strategy(edit, "public").should eq(:incremental)
+        server.watch_parity_apply_changeset(edit, options)
+        generated = File.read(shard)
+        generated.should contain("Blog note")
+
+        File.write("static/search/blog.json", %({"manual":2}))
+        server.watch_parity_apply_changeset(watch_parity_changeset(static: ["static/search/blog.json"]), options)
+        File.read(shard).should eq(generated)
+
+        File.write("content/blog/note.md", note)
+        server.watch_parity_apply_changeset(edit, options)
+        File.read(shard).should eq(%({"manual":2}))
+      end
+    end
+  end
+
   # The lane used to copy the file before escalating, so the full rebuild's
   # own static copy found the destination up to date, recorded nothing, and
   # the OG generator counted its manifest hit on the user's bytes.

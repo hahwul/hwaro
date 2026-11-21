@@ -50,7 +50,7 @@ module Hwaro
           0
         end
 
-        def self.generate(pages : Array(Models::Page), site : Models::Site, output_dir : String, verbose : Bool = false, skip_if_unchanged : Bool = false)
+        def self.generate(pages : Array(Models::Page), site : Models::Site, output_dir : String, verbose : Bool = false, skip_if_unchanged : Bool = false, *, builder : Core::Build::Builder? = nil)
           # Check if sitemap is enabled
           return unless site.config.sitemap.enabled
 
@@ -88,7 +88,7 @@ module Hwaro
             empty_xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" \
                         "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n" \
                         "</urlset>\n"
-            write_files(output_dir, File.basename(site.config.sitemap.filename), [empty_xml], "", verbose)
+            write_files(output_dir, File.basename(site.config.sitemap.filename), [empty_xml], "", verbose, builder)
             return
           end
 
@@ -186,7 +186,7 @@ module Hwaro
           end
 
           parts = split(ends, header.bytesize + footer.bytesize).map { |(from, to)| "#{header}#{entries.byte_slice(from, to - from)}#{footer}" }
-          write_files(output_dir, File.basename(site.config.sitemap.filename), parts, base, verbose)
+          write_files(output_dir, File.basename(site.config.sitemap.filename), parts, base, verbose, builder)
           Logger.info "  Generated sitemap with #{sitemap_pages.size} URLs#{parts.size > 1 ? " in #{parts.size} files" : ""}." if verbose
         end
 
@@ -216,8 +216,8 @@ module Hwaro
         # write the parts as `filename-N` and `filename` as the index listing
         # them. Parts an earlier, larger sitemap listed that this one does
         # not need are removed, so a site that shrinks back under the limit
-        # stops publishing them.
-        private def self.write_files(output_dir : String, filename : String, parts : Array(String), base : String, verbose : Bool) : Nil
+        # stops publishing them. The builder keeps paths with a live owner.
+        private def self.write_files(output_dir : String, filename : String, parts : Array(String), base : String, verbose : Bool, builder : Core::Build::Builder?) : Nil
           main = Path[output_dir, filename].to_s
           previous = listed_part_count(main)
           files = parts.size == 1 ? [] of String : parts
@@ -239,9 +239,12 @@ module Hwaro
           end
           Hwaro::Utils::FileSafe.atomic_write(main, content)
           Logger.action :create, main if verbose
-          (files.size + 1..previous).each do |i|
-            path = Path[output_dir, part_name(filename, i)].to_s
-            File.delete(path) if File.file?(path)
+          stale = (files.size + 1..previous).map { |i| Path[output_dir, part_name(filename, i)].to_s }
+          if builder
+            stale.select! { |path| !Dir.exists?(path) && Utils::OutputGuard.safe_to_delete_file?(path, output_dir) }
+            builder.prune_unclaimed_outputs(stale, output_dir, keep_raw_copies: false)
+          else
+            stale.each { |path| File.delete(path) if File.file?(path) }
           end
         end
       end

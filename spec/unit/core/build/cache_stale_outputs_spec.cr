@@ -816,6 +816,29 @@ describe "warm --cache builds" do
     end
   end
 
+  it "restores static files when the sitemap stops publishing split parts" do
+    with_cached_site do
+      FileUtils.mkdir_p("static")
+      static_xml = "<static-sitemap/>\n"
+      File.write("static/sitemap-1.xml", static_xml)
+      cached_build
+
+      # Model the index left by a previous build with more than 50,000 URLs.
+      File.write("public/sitemap.xml", Hwaro::Content::Seo::Sitemap::INDEX_HEADER + <<-XML)
+          <sitemap>
+            <loc>http://localhost/sitemap-1.xml</loc>
+          </sitemap>
+        </sitemapindex>
+        XML
+      File.write("public/sitemap-1.xml", "<urlset/>\n")
+      File.delete("content/posts/gone.md")
+
+      cached_build
+      File.read("public/sitemap.xml").should contain("<urlset")
+      File.read("public/sitemap-1.xml").should eq(static_xml)
+    end
+  end
+
   it "removes the main feed once feeds are disabled" do
     with_cached_site do
       base = File.read("config.toml")

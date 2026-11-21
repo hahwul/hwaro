@@ -21,10 +21,10 @@ private SHARD_CONFIG = <<-TOML
   shards = "section"
   TOML
 
-private def run_shard_builder(cache : Bool)
+private def run_shard_builder(cache : Bool, output_dir : String = "public")
   builder = Hwaro::Core::Build::Builder.new
   Hwaro::Content::Hooks.all.each { |h| builder.register(h) }
-  builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: cache))
+  builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: output_dir, parallel: false, cache: cache))
   builder
 end
 
@@ -107,6 +107,42 @@ describe "cache: sharded search index converges on the clean build" do
         File.exists?("public/search/docs.json").should be_false
         manifest = JSON.parse(File.read("public/search/index.json"))
         manifest["shards"].as_a.map(&.["id"].as_s).should eq(["_root", "blog"])
+      end
+    end
+  end
+
+  it "restores a static file when its generated shard disappears" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        shard_project
+        File.write("config.toml", SHARD_CONFIG + <<-TOML)
+
+          [[content.generate]]
+          source = "articles"
+          section = "generated"
+          slug = "slug"
+          title = "title"
+          TOML
+        FileUtils.mkdir_p("data")
+        articles = %([{"slug":"story","title":"Generated Story"}])
+        File.write("data/articles.json", articles)
+        FileUtils.mkdir_p("static/search")
+        static_bytes = %({"local":"static source"}\n)
+        File.write("static/search/generated.json", static_bytes)
+
+        run_shard_builder(true)
+        File.read("public/search/generated.json").should contain("Generated Story")
+
+        File.write("data/articles.json", "[]")
+        run_shard_builder(true)
+        run_shard_builder(false, output_dir: "cold")
+        File.read("cold/search/generated.json").should eq(static_bytes)
+        File.read("public/search/generated.json").should eq(static_bytes)
+        File.read("public/search/index.json").should eq(File.read("cold/search/index.json"))
+
+        File.write("data/articles.json", articles)
+        run_shard_builder(true)
+        File.read("public/search/generated.json").should contain("Generated Story")
       end
     end
   end

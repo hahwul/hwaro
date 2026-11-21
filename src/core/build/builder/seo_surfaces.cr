@@ -76,7 +76,7 @@ module Hwaro
         # fail-loud default via its own ParallelHelper.execute call.
         private def regenerate_seo_surfaces(pages : Array(Models::Page), site : Models::Site, output_dir : String, verbose : Bool, parallel : Bool, include_robots : Bool = false, options : Config::Options::BuildOptions? = nil)
           seo_tasks = [
-            -> { Content::Seo::Sitemap.generate(pages, site, output_dir, verbose); nil },
+            -> { Content::Seo::Sitemap.generate(pages, site, output_dir, verbose, builder: self); nil },
             -> {
               written = Content::Seo::Feeds.generate(pages, site.config, output_dir, verbose, templates: @templates, renderer: feed_template_renderer)
               track_feed_outputs(written, output_dir, prune: true)
@@ -88,7 +88,7 @@ module Hwaro
           # preserved, not just the generated files.
           seo_tasks << -> { Content::Seo::Robots.generate(site.config, output_dir, verbose); nil } if include_robots
           seo_tasks << -> { Content::Seo::Llms.generate(site.config, pages, output_dir, verbose); nil }
-          seo_tasks << -> { Content::Search.generate(pages, site.config, output_dir, verbose); nil }
+          seo_tasks << -> { Content::Search.generate(pages, site.config, output_dir, verbose, builder: self); nil }
           # Auto-OG images: the incremental/rerender passes never run the
           # BeforeRender `og_image:generate` hook, so a re-parsed page's
           # OG file went stale even though its HTML keeps the auto-assigned

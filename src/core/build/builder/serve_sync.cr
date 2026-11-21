@@ -88,8 +88,8 @@ module Hwaro
         # Every output file something other than a page's own render or the
         # static copy writes: the generators' claims (404.html, feeds,
         # sitemap, robots, llms, the search index, taxonomy pages, raw content
-        # files, bundles), the feeds and taxonomy files the last serve pass
-        # wrote, the PWA files, and the alias stubs / `/page/N/` pages page
+        # files, bundles), the current feed, taxonomy, sitemap and search
+        # files, the PWA files, and the alias stubs / `/page/N/` pages page
         # renders derived. A cold build writes all of them after copying
         # `static/`, so a static file at one of these paths never wins there.
         private def generated_output_paths(output_dir : String) : Array(String)
@@ -104,7 +104,13 @@ module Hwaro
               recorded.each_value { |derived| paths.concat(derived) }
             end
           end
-          @config.try { |cfg| paths.concat(Content::Seo::Pwa.published_outputs(cfg, output_dir)) }
+          if config = @config
+            paths.concat(Content::Seo::Pwa.published_outputs(config, output_dir))
+            # An incremental content edit can create a shard or a sitemap
+            # part that the last full build did not claim.
+            paths.concat(Content::Search.published_outputs(config, output_dir))
+            paths.concat(Content::Seo::Sitemap.published_outputs(config, output_dir))
+          end
           paths
         end
 
@@ -508,7 +514,9 @@ module Hwaro
         # Paths are compared through `kept_output?`, which also treats a spelling
         # that differs only by case as kept when it is the same file on disk
         # (a case-folding filesystem: APFS, NTFS).
-        def prune_unclaimed_outputs(candidates : Enumerable(String), output_dir : String) : Nil
+        # `keep_raw_copies: false` requires a current claim or write for raw
+        # output. A source file alone cannot vouch for old generator bytes.
+        def prune_unclaimed_outputs(candidates : Enumerable(String), output_dir : String, *, keep_raw_copies : Bool = true) : Nil
           return if candidates.empty?
           cwd = Dir.current
           exact = Set(String).new
@@ -536,7 +544,7 @@ module Hwaro
               # build publishes the static bytes there, so put them back.
               Hwaro::Utils::FileSafe.mkdir_p(File.dirname(path))
               Hwaro::Utils::FileSafe.atomic_copy(source, path)
-            elsif relative && content_source_publishes?(relative)
+            elsif keep_raw_copies && relative && content_source_publishes?(relative)
               # Same for a `[content.files]` copy; left as is rather than
               # re-copied, since raw files may be processed (minified) on the
               # way out.
