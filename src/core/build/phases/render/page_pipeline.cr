@@ -6,28 +6,22 @@
 module Hwaro::Core::Build::Phases::Render
   # Does anything after the render phase read a cache-hit page's `content`?
   #
-  # The Generate phase's skip (`generate_outputs_unchanged?`) is not the
-  # only consumer:
-  #   * the taxonomy hook (BeforeGenerate) regenerates every term page AND
-  #     every per-term feed on every build, skip or no skip, and the feeds
-  #     read `page.content` — an all-hit warm build with `taxonomy.feed`
-  #     shipped raw `{% shortcode %}` markup into `tags/<term>/rss.xml`;
-  #   * `serve` keeps the Builder alive: its incremental rebuilds regenerate
-  #     search.json / feeds / taxonomy pages from the in-memory page set
-  #     after every edit, so a `serve --cache` whose start was an all-hit
-  #     build served corrupted search.json and feeds from the first edit on.
-  #   * `generate_seo_outputs` never lets the feeds join the skip while a
-  #     user feed template exists or the templates changed
-  #     (`feeds_need_regeneration?`), so an all-hit
-  #     warm build still regenerates rss.xml — from `page.content`. Without
-  #     hydration that feed carried raw shortcode markup, unresolved `@/`
-  #     links and no base_path: the exact corruption #775 fixed, back on the
-  #     one site shape that overrides the feed template.
+  # Search and feed generators can run on an all-hit build when an output
+  # file is missing. Use their skip probes so they always receive rendered
+  # content when regenerating. Taxonomy feeds and feed templates may also
+  # trigger generation, and serve keeps the page set for future rebuilds.
   private def cached_content_needed?(ctx : Lifecycle::BuildContext, site : Models::Site) : Bool
     return true unless generate_outputs_unchanged?(ctx)
     return true if ctx.options.serve_mode
     return true if feeds_need_regeneration?
-    site.config.taxonomies.any?(&.feed)
+    return true if site.config.taxonomies.any?(&.feed)
+
+    config = site.config
+    output_dir = ctx.options.output_dir
+    return true unless Content::Search.outputs_reusable?(config, output_dir)
+    return false unless config.feeds.enabled || site.sections.any?(&.generate_feeds)
+
+    Content::Seo::Feeds.reusable_outputs(ctx.all_pages, config, output_dir, warn_on_collision: false).nil?
   end
 
   # Does any Generate-phase output read `page.content` back?

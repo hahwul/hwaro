@@ -241,6 +241,58 @@ describe "cache: generated outputs converge on the clean build" do
     end
   end
 
+  {"rss.xml", "search.json", "search/_root.json"}.each do |name|
+    it "restores a missing #{name} with fully rendered content on an all-hit build" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          shortcode_project
+          File.write("config.toml", CACHE_CONFIG + "\nshards = \"section\"\n")
+          run_builder(true, false).should be_true
+
+          path = File.join("public", name)
+          expected = File.read(path)
+          expected.should contain("INNER")
+          expected.should_not contain("{%")
+          File.delete(path)
+
+          run_builder(true, false).should be_true
+          File.file?(path).should be_true
+          File.read(path).should eq(expected)
+        end
+      end
+    end
+  end
+
+  it "keeps a section-only feed intact and restores it when deleted on an all-hit build" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        shortcode_project
+        File.write("config.toml", <<-TOML)
+          title = "Cache Site"
+          base_url = "http://localhost/sub"
+
+          [feeds]
+          enabled = false
+          TOML
+        FileUtils.mkdir_p("content/blog")
+        File.rename("content/shorty.md", "content/blog/shorty.md")
+        File.write("content/blog/_index.md", "+++\ntitle = \"Blog\"\ngenerate_feeds = true\n+++\n")
+        File.write("templates/section.html", "{{ content }}")
+        run_builder(true, false).should be_true
+
+        path = "public/blog/rss.xml"
+        expected = File.read(path)
+        expected.should contain("<div class=\"gal\">")
+        run_builder(true, false).should be_true
+        File.read(path).should eq(expected)
+
+        File.delete(path)
+        run_builder(true, false).should be_true
+        File.read(path).should eq(expected)
+      end
+    end
+  end
+
   it "prunes outputs from a previous generator version" do
     Dir.mktmpdir do |dir|
       Dir.cd(dir) do

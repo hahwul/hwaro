@@ -67,6 +67,11 @@ module Hwaro
         outputs
       end
 
+      # Used by both Generate and the Render phase's cache hydration.
+      def self.outputs_reusable?(config : Models::Config, output_dir : String) : Bool
+        published_outputs(config, output_dir).all? { |path| File.file?(path) }
+      end
+
       def self.generate(pages : Array(Models::Page), config : Models::Config, output_dir : String, verbose : Bool = false, skip_if_unchanged : Bool = false)
         return unless config.search.enabled
 
@@ -77,13 +82,9 @@ module Hwaro
         single_file = !sharded || config.search.single_file
         search_path = File.join(output_dir, File.basename(config.search.filename))
 
-        if skip_if_unchanged
-          present = (!single_file || File.exists?(search_path)) &&
-                    (!sharded || File.exists?(manifest_path(output_dir)))
-          if present
-            Logger.debug "  Search index unchanged (cache hit), skipping."
-            return
-          end
+        if skip_if_unchanged && outputs_reusable?(config, output_dir)
+          Logger.debug "  Search index unchanged (cache hit), skipping."
+          return
         end
 
         # Filter out drafts, pages opted out of the index, `render = false`
