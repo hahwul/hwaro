@@ -246,7 +246,7 @@ module Hwaro
           # A refused destination (outside `output_dir`) is reported as
           # skipped; the bundle-asset accounting below only describes files
           # that accompany an exported post, so it is skipped too.
-          return :skipped unless write_file(out_path, "#{frontmatter}\n\n#{body.strip}\n", output_dir, verbose)
+          return :skipped unless write_file(out_path, "#{frontmatter}\n\n#{body.strip("\r\n")}\n", output_dir, verbose)
 
           note_exported_index(file_path, content_dir)
           note_flattened_bundle(file_path, content_dir, out_path, output_dir)

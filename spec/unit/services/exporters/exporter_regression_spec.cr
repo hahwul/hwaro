@@ -1,5 +1,30 @@
 require "../../../spec_helper"
 
+describe "exported Markdown whitespace" do
+  {
+    "hugo"   => Hwaro::Services::Exporters::HugoExporter,
+    "jekyll" => Hwaro::Services::Exporters::JekyllExporter,
+  }.each do |target, exporter_type|
+    it "preserves leading code indentation and trailing line spaces in #{target}" do
+      Dir.mktmpdir do |dir|
+        content_dir = File.join(dir, "content")
+        output_dir = File.join(dir, "export")
+        FileUtils.mkdir_p(content_dir)
+        body = "    [literal](@/guide.md)\n    next code line\n\nFirst prose line.  \nLast prose line.  \n"
+        File.write(File.join(content_dir, "example.md"), "+++\ntitle = \"Example\"\n+++\n\n#{body}")
+
+        result = exporter_type.new.run(Hwaro::Config::Options::ExportOptions.new(
+          target_type: target, content_dir: content_dir, output_dir: output_dir,
+        ))
+
+        result.success.should be_true
+        root = target == "hugo" ? File.join(output_dir, "content") : output_dir
+        File.read(File.join(root, "example.md")).should end_with("\n\n#{body}")
+      end
+    end
+  end
+end
+
 describe "exporter manifests" do
   {
     "hugo"   => Hwaro::Services::Exporters::HugoExporter,
