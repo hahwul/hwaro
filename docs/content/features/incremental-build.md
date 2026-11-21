@@ -191,6 +191,9 @@ scratch on every switch. `hwaro serve --cache` keeps a separate cache (see
 below), so a serve session never costs the next `hwaro build --cache` its
 record of `public/`.
 
+If a generated search index, search shard, or feed is deleted from the output
+directory, the next `--cache` build recreates it from rendered page content.
+
 A `--cache` build's output is therefore byte-identical to a clean build's, and
 `hwaro build --full` is not needed to clear anything. (`--full` only clears the
 cache, so it does nothing at all without `--cache`; a plain `hwaro build`

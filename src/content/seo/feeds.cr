@@ -55,30 +55,27 @@ module Hwaro
         # `generate_feed` dropped, a renamed feed file. Planned by the same
         # `each_feed` the writer walks, so the two cannot drift. Taxonomy
         # feeds are claimed by the taxonomy generator.
-        def self.published_outputs(pages : Array(Models::Page), config : Models::Config, output_dir : String) : Array(String)
+        def self.published_outputs(pages : Array(Models::Page), config : Models::Config, output_dir : String, *, warn_on_collision : Bool = true) : Array(String)
           outputs = [] of String
-          each_feed(pages, config, output_dir) do |feed|
+          each_feed(pages, config, output_dir, warn_on_collision: warn_on_collision) do |feed|
             outputs << feed_output_file(feed, config)
           end
           outputs
+        end
+
+        # Used by both Generate and the Render phase's cache hydration.
+        def self.reusable_outputs(pages : Array(Models::Page), config : Models::Config, output_dir : String, *, warn_on_collision : Bool = true) : Array(String)?
+          outputs = published_outputs(pages, config, output_dir, warn_on_collision: warn_on_collision)
+          outputs if outputs.all? { |path| File.file?(path) }
         end
 
         # Returns every feed file this build publishes: the ones written, or,
         # when skipped as unchanged, the ones already on disk
         # (`published_outputs`).
         def self.generate(pages : Array(Models::Page), config : Models::Config, output_dir : String, verbose : Bool = false, skip_if_unchanged : Bool = false, templates : Hash(String, String)? = nil, renderer : Renderer? = nil) : Array(String)
-          if skip_if_unchanged && config.feeds.enabled
-            # Basename only: process_feed refuses nested filename components
-            # (path-traversal defense), so the skip probe must match the
-            # path that is actually written.
-            # Every feed the build publishes, not just the main one: a
-            # deleted language or section feed was never written again.
-            feed_file = safe_feed_filename(config.feeds.filename, config.feeds.type)
-            if File.exists?(File.join(output_dir, feed_file)) &&
-               (published = published_outputs(pages, config, output_dir)).all? { |path| File.exists?(path) }
-              Logger.debug "  Feeds unchanged (cache hit), skipping."
-              return published
-            end
+          if skip_if_unchanged && (published = reusable_outputs(pages, config, output_dir))
+            Logger.debug "  Feeds unchanged (cache hit), skipping."
+            return published
           end
 
           written = [] of String
@@ -95,7 +92,7 @@ module Hwaro
         # `generate_feeds` lands on `/rss.xml`, `_index.ko.md` on
         # `/ko/rss.xml`) is dropped with a warning, because written second it
         # replaced the fuller site/language feed with a subset.
-        private def self.each_feed(pages : Array(Models::Page), config : Models::Config, output_dir : String, & : FeedSpec ->) : Nil
+        private def self.each_feed(pages : Array(Models::Page), config : Models::Config, output_dir : String, *, warn_on_collision : Bool = true, & : FeedSpec ->) : Nil
           specs = [] of FeedSpec
           each_planned_feed(pages, config, output_dir) { |feed| specs << feed }
 
@@ -107,7 +104,7 @@ module Hwaro
             if feed.kind == "section"
               file = feed_output_file(feed, config)
               unless claimed.add?(file)
-                Logger.warn "Skipping the feed of section '#{feed.section_url}': #{file} is already published by another feed"
+                Logger.warn "Skipping the feed of section '#{feed.section_url}': #{file} is already published by another feed" if warn_on_collision
                 next
               end
             end
