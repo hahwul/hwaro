@@ -134,7 +134,7 @@ module Hwaro
                     i += 2
                     break
                   end
-                  had_newline = true if chars[i] == '\n' || chars[i] == '\r'
+                  had_newline = true if line_terminator?(chars[i])
                   i += 1
                 end
                 if had_newline

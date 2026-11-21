@@ -630,10 +630,12 @@ describe Hwaro::Utils::JsMinifier do
 
     it "emits a newline for a block comment containing a line terminator (ASI)" do
       # A multi-line comment counts as a LineTerminator for automatic
-      # semicolon insertion, so `return /*\n*/ 42` must stay `return` and
+      # semicolon insertion, so `return /*…*/ 42` must stay `return` and
       # `42` on separate lines — collapsing to one line changes semantics.
-      result = Hwaro::Utils::JsMinifier.minify("return /*\n*/ 42")
-      result.should eq("return\n 42")
+      ['\n', '\r', '\u2028', '\u2029'].each do |line_terminator|
+        result = Hwaro::Utils::JsMinifier.minify("return /*#{line_terminator}*/ 42")
+        result.should eq("return\n 42")
+      end
     end
 
     it "handles terser-style pure annotations without fusing tokens" do

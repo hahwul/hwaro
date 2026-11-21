@@ -184,7 +184,7 @@ The built-in minifiers are conservative and safe:
 
 **JS:**
 - Removes single-line comments (`// ...`) outside strings
-- Removes multi-line comments (`/* ... */`)
+- Removes block comments (`/* ... */`), keeping a newline when the comment contains a JavaScript line terminator, including U+2028 and U+2029
 - Preserves string literals (single, double, and template)
 - Removes blank lines
 
