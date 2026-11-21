@@ -340,6 +340,14 @@ module Hwaro
         within?(real_path, real_root)
       end
 
+      # A relative link starts in the directory that holds it. Resolve that
+      # directory first so Windows cannot collapse `..` against the spelling
+      # of a directory symlink before following it.
+      def link_target(path : String, link : String) : String
+        return link if Path[link].absolute?
+        File.join(File.realpath(File.dirname(path)), link)
+      end
+
       # Publishing follows symlinks, so check the resolved target as well as
       # the project boundary before exposing a source file in site output.
       def publishable_project_source?(path : String, root : String) : Bool
