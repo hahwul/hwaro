@@ -151,37 +151,40 @@ module Hwaro
             end
           end
 
-          # Zoned forms come first: `Time.parse` ignores trailing input, so a
-          # zone-less format would accept "10:30:00-03:30" and drop the offset.
           # The space-separated forms include `Time#to_s` output
           # ("2024-03-05 08:00:00 UTC"), which is how front matter and data
           # file datetimes reach templates.
           T_ZONED     = {"%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S.%N%z", "%Y-%m-%dT%H:%M%z"}
-          T_LOCAL     = {"%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M"}
-          SPACE_ZONED = {"%Y-%m-%d %H:%M:%S %z", "%Y-%m-%d %H:%M:%S%z", "%Y-%m-%d %H:%M:%S.%N %z", "%Y-%m-%d %H:%M %z", "%Y-%m-%d %H:%M%z"}
-          SPACE_LOCAL = {"%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"}
+          T_LOCAL     = {"%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S.%N", "%Y-%m-%dT%H:%M"}
+          SPACE_ZONED = {"%Y-%m-%d %H:%M:%S %z", "%Y-%m-%d %H:%M:%S%z", "%Y-%m-%d %H:%M:%S.%N %z", "%Y-%m-%d %H:%M:%S.%N%z", "%Y-%m-%d %H:%M %z", "%Y-%m-%d %H:%M%z"}
+          SPACE_LOCAL = {"%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S.%N", "%Y-%m-%d %H:%M"}
 
-          # No date-only fallback for longer strings: `%Y-%m-%d` consumes only
-          # the first 10 chars, which would silently reformat garbage like
-          # "2024-01-15xxx" instead of passing it through unchanged.
+          # Time.parse accepts a matching prefix. A literal appended to both
+          # the input and the format requires it to consume the whole value.
+          private PARSE_TERMINATOR = '\u0001'
+
           def self.parse_string(value : String) : Time?
-            return try_parse(value, "%Y-%m-%d") if value.size <= 10
+            return if value.includes?(PARSE_TERMINATOR)
+            size = value.size
+            return try_parse(value + PARSE_TERMINATOR, "%Y-%m-%d") if size <= 10
+
             if value[10].in?('T', 't')
-              value = value.upcase # RFC 3339 allows a lowercase `t` and `z`
               zoned, local = T_ZONED, T_LOCAL
             else
               zoned, local = SPACE_ZONED, SPACE_LOCAL
             end
+            # RFC 3339 allows lowercase t and z.
+            input = value.upcase + PARSE_TERMINATOR
             # Longer than the zone-less minute form ("2024-01-15T10:30").
-            if value.size > 16
-              zoned.each { |fmt| try_parse(value, fmt).try { |time| return time } }
+            if size > 16
+              zoned.each { |fmt| try_parse(input, fmt).try { |time| return time } }
             end
-            local.each { |fmt| try_parse(value, fmt).try { |time| return time } }
+            local.each { |fmt| try_parse(input, fmt).try { |time| return time } }
             nil
           end
 
           private def self.try_parse(value : String, format : String) : Time?
-            Time.parse(value, format, Time::Location::UTC)
+            Time.parse(value, format + PARSE_TERMINATOR, Time::Location::UTC)
           rescue Time::Format::Error | Time::Error | ArgumentError
             nil
           end
