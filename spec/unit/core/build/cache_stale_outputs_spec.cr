@@ -38,11 +38,11 @@ private def with_cached_site(&)
   end
 end
 
-private def cached_build
+private def cached_build(stream : Bool = false)
   builder = Hwaro::Core::Build::Builder.new
   Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
   builder.run(Hwaro::Config::Options::BuildOptions.new(
-    output_dir: "public", parallel: false, cache: true, highlight: false,
+    output_dir: "public", parallel: false, cache: true, highlight: false, stream: stream,
   )).should be_true
   builder
 end
@@ -63,6 +63,28 @@ class Hwaro::Core::Build::Builder
 end
 
 describe "warm --cache builds" do
+  {false, true}.each do |stream|
+    it "removes a cached alias when another page takes its URL (stream=#{stream})" do
+      with_cached_site do
+        File.write("content/posts/gone.md", "+++\ntitle = \"Gone\"\n+++\ngone body")
+        File.write("content/posts/keep.md", "+++\ntitle = \"Keep\"\naliases = [\"/legacy/index.htm\"]\n+++\nkeep body")
+        cached_build(stream)
+        File.read("public/legacy/index.htm").should contain("/posts/keep/")
+
+        File.write("content/posts/gone.md", "+++\ntitle = \"Gone\"\naliases = [\"/legacy/\"]\n+++\ngone body")
+        cached_build(stream)
+
+        cold = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| cold.register(hookable) }
+        cold.run(Hwaro::Config::Options::BuildOptions.new(
+          output_dir: "cold", parallel: false, highlight: false, stream: stream,
+        )).should be_true
+        Dir.children("public/legacy").sort.should eq(Dir.children("cold/legacy").sort)
+        File.read("public/legacy/index.html").should eq(File.read("cold/legacy/index.html"))
+      end
+    end
+  end
+
   it "removes the output of a deleted page" do
     with_cached_site do
       cached_build
