@@ -256,11 +256,19 @@ module Hwaro
           i = stop
         else
           j = i
+          content_end = i
           while j < n && bytes[j] != ')'.ord
+            if bytes[j] == '\\'.ord && j + 1 < n
+              # An escaped `)` or space belongs to the URL, even at its end.
+              j += 1
+              content_end = j + 1
+            elsif !space_byte?(bytes[j])
+              content_end = j + 1
+            end
             j += 1
           end
           return if j >= n
-          inner = String.new(bytes[i, j - i]).rstrip(" \t\r\n\f")
+          inner = String.new(bytes[i, content_end - i])
           i = j
         end
 

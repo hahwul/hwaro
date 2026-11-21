@@ -211,6 +211,16 @@ describe Hwaro::Utils::CssMinifier do
       result.should contain("url('/images/bg.png')")
     end
 
+    it "preserves URL text after an escaped closing parenthesis" do
+      css = ".icon { background: url( icons/a\\)/*draft*/ok.svg ); /* outside */ }"
+      Hwaro::Utils::CssMinifier.minify(css).should eq(".icon{background:url(icons/a\\)/*draft*/ok.svg)}")
+    end
+
+    it "preserves escaped trailing whitespace in an unquoted URL" do
+      css = ".icon { background: url( icons/name\\   ); }"
+      Hwaro::Utils::CssMinifier.minify(css).should eq(".icon{background:url(icons/name\\ )}")
+    end
+
     it "preserves multiple url() values in one rule" do
       css = ".x { background: url(http://a.com/1.png), url(http://b.com/2.png); }"
       result = Hwaro::Utils::CssMinifier.minify(css)

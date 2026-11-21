@@ -180,6 +180,7 @@ The built-in minifiers are conservative and safe:
 - Removes comments (`/* ... */`)
 - Collapses whitespace
 - Tightens spacing around `{`, `}`, `:`, `;`, `,` while preserving descendant combinators, including in `@supports selector()` tests
+- Preserves escaped characters in `url()` values, including closing parentheses and spaces in unquoted URLs
 - Strips trailing semicolons before `}`
 
 **JS:**
