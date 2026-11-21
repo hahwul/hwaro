@@ -515,16 +515,21 @@ module Hwaro
           path = claim_path(resolved)
           dir = File.dirname(path)
 
+          # Resolve the deepest existing ancestor before creating children.
+          # An external symlink at `output_dir/posts` can make `mkdir_p` create
+          # `outside/bundle` even though the later write is refused.
+          unless Utils::PathUtils.destination_within?(dir, output_dir)
+            Logger.warn "Skipped (destination directory resolves outside the output directory): #{dir}"
+            return {false, nil}
+          end
+
           Hwaro::Utils::FileSafe.mkdir_p(dir) unless @dry_run || Dir.exists?(dir)
 
           # `within_output_dir?` above is lexical. If the section directory
           # (or any ancestor) is a symlink pointing out of the tree, that
           # check still passes and `File.write` follows the link straight out
-          # of `output_dir`. Re-check with symlinks resolved now that the
-          # directory exists. A dry run creates no directories, so it can only
-          # perform this resolved check against directories that already exist
-          # — which is exactly the pre-existing-symlink case the real run
-          # would refuse, keeping the dry-run manifest honest.
+          # of `output_dir`. Re-check after creation in case the path changed
+          # while mkdir_p ran.
           if Dir.exists?(dir) && !Utils::PathUtils.resolves_within?(dir, output_dir)
             Logger.warn "Skipped (destination directory resolves outside the output directory): #{dir}"
             return {false, nil}

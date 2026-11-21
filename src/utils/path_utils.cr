@@ -455,6 +455,25 @@ module Hwaro
         path
       end
 
+      # Check a destination that may not exist yet against its output root.
+      # Resolve existing ancestors so an external symlink cannot hide behind
+      # a missing child. A dangling link is not a creatable directory: treat
+      # it as outside instead of mistaking it for an ordinary missing child.
+      def destination_within?(path : String, root : String) : Bool
+        {path, root}.each do |candidate|
+          current = candidate
+          until File.exists?(current)
+            return false if File.symlink?(current)
+            parent = File.dirname(current)
+            break if parent == current
+            current = parent
+          end
+        end
+        within?(resolved_real_path(path), resolved_real_path(root))
+      rescue File::Error | IO::Error
+        false
+      end
+
       # `path` with glob metacharacters escaped, so a content-derived
       # directory can prefix a glob pattern
       # (`Dir.glob(File.join(glob_escape(dir), "**", "*"))`) and match

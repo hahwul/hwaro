@@ -339,6 +339,40 @@ describe "importer regressions" do
         Dir.glob(File.join(outside, "*")).should be_empty
       end
     end
+
+    it "rejects a missing bundle directory behind an external ancestor symlink" do
+      posix_only!("symlink destination behavior differs on Windows")
+      Dir.mktmpdir do |dir|
+        source = File.join(dir, "content", "posts", "bundle")
+        FileUtils.mkdir_p(source)
+        File.write(File.join(source, "index.md"), "+++\ntitle = \"Bundle\"\n+++\n\n![f](feature.png)\n")
+        File.write(File.join(source, "feature.png"), "notapng")
+
+        outside = File.join(dir, "outside")
+        FileUtils.mkdir_p(outside)
+        output_dir = File.join(dir, "out")
+        FileUtils.mkdir_p(output_dir)
+        File.symlink(outside, File.join(output_dir, "posts"))
+        options = Hwaro::Config::Options::ImportOptions.new(
+          source_type: "hugo", path: dir, output_dir: output_dir,
+        )
+
+        preview = Hwaro::Services::Importers::HugoImporter.new
+        preview.dry_run = true
+        preview.run(options)
+        preview.file_actions.should be_empty
+
+        Hwaro::Services::Importers::HugoImporter.new.run(options)
+        Dir.children(outside).should be_empty
+
+        File.delete(File.join(output_dir, "posts"))
+        File.symlink(File.join(dir, "missing"), File.join(output_dir, "posts"))
+        dangling_preview = Hwaro::Services::Importers::HugoImporter.new
+        dangling_preview.dry_run = true
+        dangling_preview.run(options)
+        dangling_preview.file_actions.should be_empty
+      end
+    end
   end
 
   # (5) By the time an outer list was converted the inner one was already
