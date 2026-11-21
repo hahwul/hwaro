@@ -765,6 +765,16 @@ describe Hwaro::Utils::CssMinifier do
       result.should contain("margin:0")
     end
 
+    it "keeps the descendant combinator after CSS hex escape whitespace" do
+      css = "#\\31  .label { color: red; }"
+      Hwaro::Utils::CssMinifier.minify(css).should eq("#\\31  .label{color:red}")
+    end
+
+    it "keeps a CRLF hex escape terminator separate from selector whitespace" do
+      css = "#\\000031\r\n  .label { color: red; }"
+      Hwaro::Utils::CssMinifier.minify(css).should eq("#\\000031\r\n .label{color:red}")
+    end
+
     it "preserves descendant combinator before pseudo-class in an @scope prelude" do
       css = "@scope (.card :hover) to (.slot :first-child) { img { x : y } }"
       Hwaro::Utils::CssMinifier.minify(css)

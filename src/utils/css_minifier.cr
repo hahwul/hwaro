@@ -8,7 +8,7 @@
 # - Collapse whitespace
 # - Remove whitespace around structural characters
 # - Strip trailing semicolons before }
-# - Preserve url() contents and string literals
+# - Preserve url() contents, string literals and hex escape terminators
 #
 # Comments, string literals and `url(...)` values are recognised in a
 # SINGLE left-to-right scan rather than by three ordered regex passes.
@@ -75,8 +75,8 @@ module Hwaro
         result.strip
       end
 
-      # Single scan that drops comments and replaces string literals and
-      # `url(...)` values with placeholders. Operates on the UTF-8 byte view:
+      # Single scan that drops comments and protects strings, `url(...)`
+      # values and hex escape terminators. Operates on the UTF-8 byte view:
       # every delimiter it looks for is 7-bit ASCII and a UTF-8 continuation
       # byte is always >= 0x80, so a byte scan can never mistake part of a
       # multi-byte character for a delimiter — and it avoids the O(n²) that
@@ -101,6 +101,18 @@ module Hwaro
             escaped = false
             case b
             when '\\'.ord
+              if stop = hex_escape_space_end(bytes, i, n)
+                # CSS consumes one whitespace after a hex escape. A second
+                # space can be a descendant combinator, so collapse only
+                # the whitespace after the escape. Keep the backslash
+                # visible to collapse_prelude's escaped selector check.
+                io.write_byte(b)
+                stash(io, preserves, String.new(bytes[i + 1, stop - i - 1]))
+                last = bytes[stop - 1]
+                stmt_start = false
+                i = stop
+                next
+              end
               # `\'`, `\"`, `\/*`, `\{` outside a string are escaped
               # identifier characters (Tailwind `before:content-['']`), never
               # a string/comment opener or a statement boundary.
@@ -162,6 +174,18 @@ module Hwaro
             i += 1
           end
         end
+      end
+
+      # A hex escape consumes up to six digits and one CSS whitespace. CSS
+      # treats CRLF as a single newline, so preserve both bytes together.
+      private def hex_escape_space_end(bytes : Bytes, start : Int32, n : Int32) : Int32?
+        i = start + 1
+        while i < n && i - start <= 6 && bytes[i].unsafe_chr.hex?
+          i += 1
+        end
+        return if i == start + 1 || i == n || !space_byte?(bytes[i])
+        i += 1 if bytes[i] == '\r'.ord && bytes[i + 1]? == '\n'.ord
+        i + 1
       end
 
       # The index of the `{`, `;` or `}` that ends the statement containing
