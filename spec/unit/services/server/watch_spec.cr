@@ -35,6 +35,90 @@ module Hwaro
   end
 end
 
+private class WatchBatchSpecServer < Hwaro::Services::Server
+  alias Snapshot = Hash(String, FileStamp)
+
+  private class Finished < Exception
+  end
+
+  getter applied = [] of Hwaro::Services::ChangeSet
+
+  def initialize(@snapshots : Array(Snapshot?))
+    super()
+  end
+
+  def self.snapshot(path : String, size : Int64) : Snapshot
+    {path => {Time::UNIX_EPOCH, size, nil}} of String => FileStamp
+  end
+
+  def run_watch
+    watch_for_changes(Hwaro::Config::Options::BuildOptions.new)
+  rescue Finished
+  end
+
+  private def sleep(_duration : Time::Span)
+    raise Finished.new if @snapshots.empty?
+  end
+
+  private def scan_mtimes(_prev : Snapshot? = nil) : Snapshot
+    @snapshots.shift || raise IO::Error.new("scripted watcher scan failure")
+  end
+
+  private def apply_changeset(changeset : Hwaro::Services::ChangeSet, _build_options : Hwaro::Config::Options::BuildOptions)
+    @applied << changeset
+  end
+end
+
+describe "serve: debounced watcher batches" do
+  it "reports a tracked file removed after a brief replacement" do
+    path = "content/page.md"
+    before = WatchBatchSpecServer.snapshot(path, 10_i64)
+    missing = WatchBatchSpecServer::Snapshot.new
+    replacement = WatchBatchSpecServer.snapshot(path, 20_i64)
+    server = WatchBatchSpecServer.new([before, missing, replacement, missing, missing] of WatchBatchSpecServer::Snapshot?)
+
+    server.run_watch
+
+    server.applied.map(&.removed_files).should eq([[path]])
+  end
+
+  it "rebuilds for tracked files replaced with the same stamp" do
+    first_path = "content/first.md"
+    second_path = "content/second.md"
+    first = WatchBatchSpecServer.snapshot(first_path, 10_i64)
+    second = WatchBatchSpecServer.snapshot(second_path, 20_i64)
+    before = first.merge(second)
+    server = WatchBatchSpecServer.new([before, second, first, before, before] of WatchBatchSpecServer::Snapshot?)
+
+    server.run_watch
+
+    server.applied.map(&.added_files).should eq([[first_path, second_path]])
+  end
+
+  it "skips a file created, edited and deleted during the same batch" do
+    path = "content/temporary.md"
+    missing = WatchBatchSpecServer::Snapshot.new
+    created = WatchBatchSpecServer.snapshot(path, 10_i64)
+    edited = WatchBatchSpecServer.snapshot(path, 20_i64)
+    server = WatchBatchSpecServer.new([missing, created, edited, missing, missing] of WatchBatchSpecServer::Snapshot?)
+
+    server.run_watch
+
+    server.applied.should be_empty
+  end
+
+  it "retries a detected change when a debounce scan fails" do
+    path = "content/page.md"
+    before = WatchBatchSpecServer.snapshot(path, 10_i64)
+    edited = WatchBatchSpecServer.snapshot(path, 20_i64)
+    server = WatchBatchSpecServer.new([before, edited, nil, edited, edited] of WatchBatchSpecServer::Snapshot?)
+
+    with_captured_log { server.run_watch }
+
+    server.applied.map(&.modified_content).should eq([[path]])
+  end
+end
+
 # A literal `load_data()` path outside every watch root was never stamped, so
 # editing it rebuilt nothing for the rest of the session.
 describe "serve: load_data sources outside the watch roots" do
