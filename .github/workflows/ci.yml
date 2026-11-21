@@ -16,6 +16,11 @@ on:
       - packaging/docker/entrypoint.sh
       - action.yml
       - "**/*.cr"
+      # The compiler builds stb C sources and embeds fonts and search assets.
+      - "src/ext/**/*.c"
+      - "src/ext/**/*.h"
+      - "src/ext/fonts/**/*.ttf"
+      - "src/content/search_ui/**"
       # The Nix packaging silently rotted for several releases because nothing
       # built it; build-nix exists to catch that, so it has to run when these
       # change too.
@@ -94,8 +99,9 @@ jobs:
             # any of them gets its full matrix back. A `gh` failure widens both:
             # losing coverage must never be the quiet outcome of an API hiccup.
             if files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename'); then
-              grep -qE '^(flake\.nix|flake\.lock|packaging/nix/shards\.nix|shard\.lock|shard\.yml|\.github/workflows/ci\.yml)$' <<<"$files" && nix="$nix_all"
-              grep -qE '^(packaging/docker/[^/]+|action\.yml|shard\.lock|shard\.yml|\.github/workflows/ci\.yml)$' <<<"$files" && docker="$docker_all"
+              native='src/ext/.+\.(c|h)'
+              grep -qE "^($native|flake\.nix|flake\.lock|packaging/nix/shards\.nix|shard\.lock|shard\.yml|\.github/workflows/ci\.yml)$" <<<"$files" && nix="$nix_all"
+              grep -qE "^($native|packaging/docker/[^/]+|action\.yml|shard\.lock|shard\.yml|\.github/workflows/ci\.yml)$" <<<"$files" && docker="$docker_all"
             else
               echo "::warning::could not list the PR's files; building the full matrices"
               nix="$nix_all"
