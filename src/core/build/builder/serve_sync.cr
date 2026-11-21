@@ -11,7 +11,8 @@ module Hwaro
         # Copy only the specified static files to the output directory.
         # Used by serve mode when only static files have changed.
         #
-        # Returns true when one of the copies would land on a file a PAGE owns
+        # Returns true when a source is no longer publishable and its old
+        # output needs pruning, or when a copy would land on a file a page owns
         # (`static/about/index.html` beside a page whose url is `/about/`) or
         # a generator writes (`static/robots.txt`, `static/404.html`, a
         # taxonomy page, an alias stub — see `generated_output_paths`). The
@@ -28,7 +29,7 @@ module Hwaro
           cwd = Dir.current
           build_outputs = owned_output_paths(output_dir).map { |path| File.expand_path(path, cwd) }.to_set
           generated_output_paths(output_dir).each { |path| build_outputs << File.expand_path(path, cwd) }
-          shadowed = false
+          needs_rebuild = false
           changed_files.each do |src_path|
             # Same eligibility rule as the full build's collect_static_files
             # (phases/initialize.cr): a symlinked file whose target escapes
@@ -37,7 +38,22 @@ module Hwaro
             # than a raise — raising here escaped into the watcher loop,
             # which then failed every single iteration and could never
             # rebuild again.
-            next unless publishable_static_info(src_path)
+            unless publishable_static_info(src_path)
+              # The source can still exist at the same path but stop
+              # publishing, for example after a symlink is retargeted.
+              # Reuse the output claims so a full build can prune its old
+              # files, including the compiled CSS of an SCSS source.
+              candidates = stale_outputs_for_removed([src_path], output_dir)
+              # A generator owns a collision with a regular static copy.
+              # Compiled Sass can itself be the generated output to prune.
+              unless config.try(&.sass_source?(src_path))
+                candidates.reject! { |path| build_outputs.includes?(File.expand_path(path, cwd)) }
+              end
+              needs_rebuild ||= @generated_claims_mutex.synchronize do
+                candidates.any? { |path| @generated_output_claims.includes?(path) }
+              end
+              next
+            end
 
             relative = path_relative_to(src_path, "static")
             next if static_config.excluded?(relative)
@@ -69,7 +85,7 @@ module Hwaro
             # reset per build) and a generator with its own cache — the auto
             # OG images' manifest — kept the static bytes as a cache hit.
             if build_outputs.includes?(canonical_dest)
-              shadowed = true
+              needs_rebuild = true
               next
             end
 
@@ -79,10 +95,11 @@ module Hwaro
             # (see Builder#note_static_copy): a later `--cache`-filtered
             # render must not skip the page whose output this just replaced.
             note_static_copy(canonical_dest)
+            claim_generated_output(dest_path, static_copy: true)
             copied += 1
           end
           Logger.outcome("copied", "#{copied} static #{copied == 1 ? "file" : "files"}") if copied > 0
-          shadowed
+          needs_rebuild
         end
 
         # Every output file something other than a page's own render or the

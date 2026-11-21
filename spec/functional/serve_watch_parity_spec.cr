@@ -431,6 +431,62 @@ describe "serve watch parity: static edits over generated outputs" do
       end
     end
   end
+
+  {"item.txt" => "item.txt", "theme.scss" => "theme.css"}.each do |source, output|
+    it "prunes #{output} when its static symlink points to a skipped target" do
+      posix_only!("replacing file symlinks")
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          write_shadow_site
+          File.open("config.toml", "a") { |io| io << "\n[sass]\nenabled = true\n" }
+          FileUtils.mkdir_p("sources")
+          FileUtils.mkdir_p(".hwaro")
+          File.write("sources/#{source}", "body { color: red; }")
+          File.write(".hwaro/scratch.txt", "body { color: blue; }")
+          path = "static/#{source}"
+          File.symlink("../sources/#{source}", path)
+
+          server = Hwaro::Services::Server.new
+          options = watch_parity_options
+          builder = server.watch_parity_builder
+          builder.run(options).should be_true
+          File.read("public/#{output}").should contain("red")
+
+          changeset = watch_parity_changeset(static: [path])
+          skipped = "../.hwaro/scratch.txt"
+          {skipped, "../sources/#{source}", skipped}.each do |target|
+            File.symlink(target, "static/replace.tmp")
+            File.rename("static/replace.tmp", path)
+            server.watch_parity_apply_changeset(changeset, options)
+            if target == skipped
+              File.exists?("public/#{output}").should be_false
+              builder.copy_changed_static([path], "public").should be_false
+            else
+              File.read("public/#{output}").should contain("red")
+            end
+          end
+        end
+      end
+    end
+  end
+
+  it "does not rebuild for a skipped static symlink at a live generated path" do
+    posix_only!("file symlinks")
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_shadow_site
+        FileUtils.mkdir_p(".hwaro")
+        File.write(".hwaro/scratch.txt", "local scratch")
+        File.delete("static/robots.txt")
+        File.symlink("../.hwaro/scratch.txt", "static/robots.txt")
+
+        builder = Hwaro::Services::Server.new.watch_parity_builder
+        builder.run(watch_parity_options).should be_true
+        File.read("public/robots.txt").should contain("User-agent")
+        builder.copy_changed_static(["static/robots.txt"], "public").should be_false
+      end
+    end
+  end
 end
 
 private def write_auto_includes_site
