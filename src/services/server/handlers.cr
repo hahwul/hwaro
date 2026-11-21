@@ -549,6 +549,9 @@ module Hwaro
           # concatenation, so this is reachable in ordinary use.) Issue the
           # same redirect ourselves, prefixed, before it can.
           if target = noncanonical_target(context.request.path)
+            # The access logger reads request.resource after this handler
+            # returns, including on this early redirect path.
+            context.request.path = path
             redirect(context, "#{@base_path}#{target}")
             return
           end

@@ -704,6 +704,18 @@ describe Hwaro::Services::BasePathHandler do
     context.request.resource.should eq("/myblog/posts/")
   end
 
+  it "restores the original request path after a canonicalizing redirect" do
+    handler = Hwaro::Services::BasePathHandler.new("/myblog")
+    handler.next = ServeFixesSpy.new
+
+    context, response, _ = build_context("GET", "/myblog//posts/?q=1")
+    handler.call(context)
+    response.close
+
+    context.response.headers["Location"].should eq("/myblog/posts/?q=1")
+    context.request.resource.should eq("/myblog//posts/?q=1")
+  end
+
   it "leaves a protocol-relative redirect alone" do
     handler = Hwaro::Services::BasePathHandler.new("/myblog")
     handler.next = ServeFixesRedirector.new("//cdn.example.com/x")
