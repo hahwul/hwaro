@@ -52,6 +52,8 @@ Add to your `~/.bashrc`:
 eval "$(hwaro completion bash)"
 ```
 
+This works with Bash's built-in completion; the optional `bash-completion` package is not required.
+
 Or save to a file:
 
 ```bash
