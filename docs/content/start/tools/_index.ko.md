@@ -52,6 +52,8 @@ Hwaro는 셸별 자동 완성 스크립트를 생성해 명령, 하위 명령, �
 eval "$(hwaro completion bash)"
 ```
 
+Bash 기본 완성 기능으로 동작하며, 선택 사항인 `bash-completion` 패키지를 설치하지 않아도 됩니다.
+
 파일로 저장해도 됩니다:
 
 ```bash

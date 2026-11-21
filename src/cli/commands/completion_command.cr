@@ -132,7 +132,15 @@ module Hwaro
 
             _hwaro_completions() {
                 local cur prev words cword
-                _init_completion || return
+                if declare -F _init_completion >/dev/null 2>&1; then
+                    _init_completion || return
+                else
+                    # bash-completion is optional; Bash itself supplies these
+                    # variables when it invokes a completion function.
+                    words=("${COMP_WORDS[@]}")
+                    cword=$COMP_CWORD
+                    cur="${COMP_WORDS[COMP_CWORD]}"
+                fi
 
                 local commands="#{command_names}"
 
