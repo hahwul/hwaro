@@ -53,6 +53,7 @@ eval "$(hwaro completion bash)"
 ```
 
 This works with Bash's built-in completion; the optional `bash-completion` package is not required.
+At a subcommand prompt, type `-` to complete command flags (for example, `hwaro tool --<TAB>`).
 
 Or save to a file:
 

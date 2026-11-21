@@ -187,7 +187,11 @@ module Hwaro
             subcommand_names = cmd.subcommands.map(&.name).join(" ")
             result += <<-BASH
               if [[ $cword -eq 2 ]]; then
-                  COMPREPLY=($(compgen -W "#{subcommand_names}" -- "$cur"))
+                  if [[ $cur == -* ]]; then
+                      COMPREPLY=($(compgen -W "#{flags}" -- "$cur"))
+                  else
+                      COMPREPLY=($(compgen -W "#{subcommand_names}" -- "$cur"))
+                  fi
                   return 0
               fi
               local subcmd="${words[2]}"
@@ -216,7 +220,11 @@ module Hwaro
             choices = cmd.positional_choices.join(" ")
             result += <<-BASH
               if [[ $cword -eq 2 ]]; then
-                  COMPREPLY=($(compgen -W "#{choices}" -- "$cur"))
+                  if [[ $cur == -* ]]; then
+                      COMPREPLY=($(compgen -W "#{flags}" -- "$cur"))
+                  else
+                      COMPREPLY=($(compgen -W "#{choices}" -- "$cur"))
+                  fi
               else
                   COMPREPLY=($(compgen -W "#{flags}" -- "$cur"))
               fi
