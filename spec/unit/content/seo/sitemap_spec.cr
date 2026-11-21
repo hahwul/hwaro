@@ -511,6 +511,12 @@ describe "Sitemap split" do
       part2.should end_with("</urlset>\n")
       Hwaro::Content::Seo::Sitemap.published_outputs(config, dir).map { |p| File.basename(p) }.should eq(["sitemap.xml", "sitemap-1.xml", "sitemap-2.xml"])
 
+      missing_part = File.join(dir, "sitemap-2.xml")
+      File.delete(missing_part)
+      Hwaro::Content::Seo::Sitemap.generate(pages, site, dir, skip_if_unchanged: true)
+      File.file?(missing_part).should be_true
+      File.read(missing_part).should eq(part2)
+
       Hwaro::Content::Seo::Sitemap.generate(pages[0, 50_000], site, dir)
       File.read(File.join(dir, "sitemap.xml")).scan("<url>").size.should eq(50_000)
       File.exists?(File.join(dir, "sitemap-1.xml")).should be_false

@@ -52,6 +52,8 @@ exclude = ["/private", "/drafts"]
 
 사이트맵 프로토콜은 파일 하나에 URL 50,000개, 크기 50 MB(압축 전)까지만 허용하며, 이보다 큰 파일은 검색 엔진이 받아들이지 않습니다. 사이트맵이 둘 중 하나라도 넘으면 `sitemap.xml`은 번호가 붙은 파트(각각 URL 최대 50,000개)를 가리키는 사이트맵 인덱스가 됩니다. 파트 이름은 `filename`을 따릅니다(`sitemap-1.xml`, `sitemap-2.xml`, …). `robots.txt`는 계속 `sitemap.xml`을 가리킵니다. 한도 이하이면 위와 같은 `<urlset>` 하나가 출력되고, 이전의 더 큰 빌드가 만든 파트는 지워집니다.
 
+`--cache`를 사용하는 증분 빌드는 사이트맵 인덱스가 가리키는 파일 중 누락된 파일을 복구합니다.
+
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
