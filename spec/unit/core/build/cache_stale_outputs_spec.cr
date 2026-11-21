@@ -38,11 +38,11 @@ private def with_cached_site(&)
   end
 end
 
-private def cached_build(stream : Bool = false)
+private def cached_build(stream : Bool = false, minify : Bool = false)
   builder = Hwaro::Core::Build::Builder.new
   Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
   builder.run(Hwaro::Config::Options::BuildOptions.new(
-    output_dir: "public", parallel: false, cache: true, highlight: false, stream: stream,
+    output_dir: "public", parallel: false, cache: true, highlight: false, stream: stream, minify: minify,
   )).should be_true
   builder
 end
@@ -735,6 +735,99 @@ describe "warm --cache builds" do
         cached_build
 
         File.read("public/thing/index.html").should contain("thing body")
+      end
+    end
+
+    {false, true}.each do |minify|
+      it "publishes a raw file where a removed page bundle had a directory (minify=#{minify})" do
+        with_cached_site do
+          FileUtils.mkdir_p("content/catalog.json")
+          File.write("content/catalog.json/index.md", "Original bundle page")
+          cached_build(minify: minify)
+          File.read("public/catalog.json/index.html").should contain("Original bundle page")
+
+          File.rename("content/catalog.json", "previous-catalog")
+          File.write("content/catalog.json", %({ "items": [] }\n))
+          cached_build(minify: minify)
+
+          cold = Hwaro::Core::Build::Builder.new
+          Hwaro::Content::Hooks.all.each { |hookable| cold.register(hookable) }
+          cold.run(Hwaro::Config::Options::BuildOptions.new(
+            output_dir: "cold", parallel: false, highlight: false, minify: minify,
+          )).should be_true
+          File.file?("public/catalog.json").should be_true
+          File.read("public/catalog.json").should eq(File.read("cold/catalog.json"))
+        end
+      end
+    end
+
+    it "keeps a cached page when a raw file needs its directory" do
+      with_cached_site do
+        File.write("content/catalog.md", %(+++\npath = "catalog.json"\n+++\nLive page))
+        cached_build
+
+        File.write("content/catalog.json", %({ "items": [] }\n))
+        warm = cached_build
+        warm.context.not_nil!.stats.pages_rendered.should eq(0)
+
+        cold = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| cold.register(hookable) }
+        cold.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "cold", parallel: false, highlight: false)).should be_true
+        Dir.children("public/catalog.json").should eq(["index.html"])
+        Dir.children("public/catalog.json").sort.should eq(Dir.children("cold/catalog.json").sort)
+        File.read("public/catalog.json/index.html").should eq(File.read("cold/catalog.json/index.html"))
+      end
+    end
+
+    it "publishes a raw file in place of a page's old directory after a path edit" do
+      with_cached_site do
+        File.write("content/catalog.md", %(+++\npath = "catalog.json"\n+++\nCatalog page))
+        cached_build
+
+        File.write("content/catalog.md", %(+++\npath = "archive"\n+++\nCatalog page))
+        File.write("content/catalog.json", %({ "items": [] }\n))
+        cached_build
+
+        File.read("public/archive/index.html").should contain("Catalog page")
+        File.read("public/catalog.json").should eq(%({ "items": [] }\n))
+      end
+    end
+
+    it "preserves an unrelated file in the old output directory" do
+      with_cached_site do
+        FileUtils.mkdir_p("content/{catalog}.json")
+        File.write("content/{catalog}.json/index.md", "Original bundle page")
+        cached_build
+        File.write("public/{catalog}.json/notes.txt", "Keep these notes")
+
+        File.rename("content/{catalog}.json", "previous-catalog")
+        File.write("content/{catalog}.json", %({ "items": [] }\n))
+        cached_build
+
+        File.read("public/{catalog}.json/notes.txt").should eq("Keep these notes")
+        File.exists?("public/{catalog}.json/index.html").should be_false
+        File.exists?("public/{catalog}.json/{catalog}.json").should be_false
+      end
+    end
+
+    it "keeps a remapped bundle's asset directory when a raw file needs its path" do
+      with_cached_site do
+        FileUtils.mkdir_p("content/bundle/catalog.json")
+        File.write("content/bundle/index.md", %(+++\npath = "published"\n+++\nBundle page))
+        File.write("content/bundle/catalog.json/logo.png", "Logo bytes")
+        cached_build
+
+        FileUtils.mkdir_p("content/published")
+        File.write("content/published/catalog.json", %({ "items": [] }\n))
+        cached_build
+
+        cold = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| cold.register(hookable) }
+        cold.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "cold", parallel: false, highlight: false)).should be_true
+        Dir.children("public/published/catalog.json").should eq(["logo.png"])
+        Dir.children("cold/published/catalog.json").should eq(["logo.png"])
+        File.read("public/published/catalog.json/logo.png").should eq("Logo bytes")
+        File.read("cold/published/catalog.json/logo.png").should eq("Logo bytes")
       end
     end
 

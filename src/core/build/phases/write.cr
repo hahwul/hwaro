@@ -152,10 +152,13 @@ module Hwaro::Core::Build::Phases::Write
 
   # Process raw files (JSON, XML) with minification
   private def process_raw_files(raw_files : Array(Lifecycle::RawFile), output_dir : String, minify : Bool, verbose : Bool, written : Set(String), shadowed : Set(String)) : Int32
+    return 0 if raw_files.empty?
+
     count = 0
+    bundle_dirs = bundle_output_directories(output_dir)
 
     raw_files.each do |raw_file|
-      next unless output_path = publish_raw_file(raw_file.source_path, raw_file.relative_path, output_dir, minify, shadowed)
+      next unless output_path = publish_raw_file(raw_file.source_path, raw_file.relative_path, output_dir, minify, shadowed, bundle_dirs: bundle_dirs)
 
       written << File.expand_path(output_path)
       # A raw/content file has no cache entry, so nothing else remembers that
@@ -175,7 +178,7 @@ module Hwaro::Core::Build::Phases::Write
   # file was refused. Shared with serve's content-file republish so an edited
   # file gets the bytes a full build would write. `shadowed` defaults to a
   # fresh `content_copy_shadowed_outputs`.
-  def publish_raw_file(source_path : String, relative_path : String, output_dir : String, minify : Bool, shadowed : Set(String)? = nil) : String?
+  def publish_raw_file(source_path : String, relative_path : String, output_dir : String, minify : Bool, shadowed : Set(String)? = nil, *, bundle_dirs : {Set(String), Bool}? = nil) : String?
     # NFC, like the page and bundle-asset outputs beside it, whatever form
     # the source name is stored in (Utils::PermalinkResolver).
     output_path = File.join(output_dir, Utils::PathUtils.nfc(relative_path))
@@ -185,7 +188,8 @@ module Hwaro::Core::Build::Phases::Write
       Logger.warn "Skipping raw file outside output directory: #{relative_path}"
       return
     end
-    return if content_copy_shadowed?(source_path, output_path, shadowed || content_copy_shadowed_outputs(output_dir))
+    shadowed ||= content_copy_shadowed_outputs(output_dir)
+    return if content_copy_shadowed?(source_path, output_path, shadowed)
 
     # The copy below (and File.read) follows symlinks, so a raw-file symlink
     # whose target escapes the project or names a protected project file
@@ -193,6 +197,17 @@ module Hwaro::Core::Build::Phases::Write
     # the bundle-asset and static copy guards.
     if File.symlink?(source_path) && !Hwaro::Utils::PathUtils.publishable_project_source?(source_path, Dir.current)
       Logger.warn "Skipping raw file symlink with an unsafe target: #{source_path}"
+      return
+    end
+
+    # Atomic copy normally accepts a directory destination. A raw file has
+    # an exact output path. The bundle lane runs after this one, so its
+    # planned directories take precedence even if they do not yet exist.
+    directories, folds_case = bundle_dirs || bundle_output_directories(output_dir)
+    key = File.expand_path(output_path, output_cwd)
+    key = Utils::PathUtils.output_fold_key(key) if folds_case
+    if directories.includes?(key) || (Dir.exists?(output_path) && !reclaim_raw_output_directory(output_path, output_dir, shadowed))
+      Logger.warn "Not publishing #{source_path}: #{output_path} is needed as a directory."
       return
     end
 
@@ -230,6 +245,53 @@ module Hwaro::Core::Build::Phases::Write
     end
 
     output_path
+  end
+
+  # Parents of planned bundle assets. A raw file can share an asset's own
+  # path (the raw writer's bytes win), but it cannot sit on a directory the
+  # bundle lane needs later in the same pass.
+  private def bundle_output_directories(output_dir : String) : {Set(String), Bool}
+    directories = Set(String).new
+    paths = bundle_asset_outputs(output_dir)
+    return {directories, false} if paths.empty?
+
+    cwd = output_cwd
+    root = File.expand_path(output_dir, cwd)
+    folds_case = Utils::PathUtils.case_folding_fs?(root)
+    paths.each do |path|
+      dir = File.dirname(File.expand_path(path, cwd))
+      while dir != root && Utils::PathUtils.within?(dir, root)
+        key = folds_case ? Utils::PathUtils.output_fold_key(dir) : dir
+        break unless directories.add?(key)
+        dir = File.dirname(dir)
+      end
+    end
+    {directories, folds_case}
+  end
+
+  # Only replace a directory whose contents the build previously published
+  # and no current output still needs. A cache-hit page did not write this
+  # pass, so the stale-directory helper's mtime check alone cannot protect it.
+  private def reclaim_raw_output_directory(path : String, output_dir : String, shadowed : Set(String)) : Bool
+    return false unless @kept_output_dir
+    previous = @previous_page_outputs | @previous_generated_claims
+    if cache = @cache
+      previous.concat(cache.current_output_files(include_replaced: true))
+      cache.previous_generated_outputs.each { |relative| previous << File.join(output_dir, relative) }
+    end
+
+    cwd = output_cwd
+    prior_files = Set(String).new
+    prior_folded = {} of String => Array(String)
+    live_files = Set(String).new
+    live_folded = {} of String => Array(String)
+    previous.each { |file| keep_output(file, cwd, prior_files, prior_folded) }
+    (shadowed | generated_output_claims).each { |file| keep_output(file, cwd, live_files, live_folded) }
+    respell = Set(String).new
+    remove_stale_dir_in_the_way(path) do |file|
+      kept_output?(file, cwd, prior_files, prior_folded, respell) &&
+        !kept_output?(file, cwd, live_files, live_folded, respell)
+    end
   end
 
   # `{source, destination}` of each of `page`'s bundle assets. Nil when the
@@ -403,7 +465,7 @@ module Hwaro::Core::Build::Phases::Write
       begin
         Hwaro::Utils::FileSafe.atomic_write(path, content)
       rescue ex : Hwaro::HwaroError
-        raise ex unless remove_stale_dir_in_the_way(path)
+        raise ex unless remove_stale_dir_in_the_way(path) { true }
         Hwaro::Utils::FileSafe.atomic_write(path, content)
       end
     end
@@ -476,17 +538,25 @@ module Hwaro::Core::Build::Phases::Write
   # `legacy.html` now wins its path). Finalize prunes the old files only
   # after the render, so the write failed until the tree was wiped by hand.
   # True when it was removed.
-  private def remove_stale_dir_in_the_way(path : String) : Bool
+  private def remove_stale_dir_in_the_way(path : String, & : String -> Bool) : Bool
     return false unless kept = @kept_output_dir
     return false unless File.info?(path, follow_symlinks: false).try(&.directory?)
     return false unless Utils::OutputGuard.safe_to_delete_directory?(path, kept)
     claims = generated_output_claims.map { |claim| File.expand_path(claim) }.to_set
-    match = File::MatchOptions.glob_default | File::MatchOptions::DotFiles
-    Dir.glob(File.join(Utils::PathUtils.glob_escape(path), "**", "*"), match: match) do |entry|
-      info = File.info?(entry, follow_symlinks: false)
-      next if info.try(&.directory?)
-      return false unless info.try(&.file?)
-      return false if written_this_build?(entry) || claims.includes?(File.expand_path(entry))
+    pending = [path]
+    until pending.empty?
+      dir = pending.pop
+      Dir.each_child(dir) do |name|
+        entry = File.join(dir, name)
+        info = File.info?(entry, follow_symlinks: false)
+        if info.try(&.directory?)
+          pending << entry
+        else
+          return false unless info.try(&.file?)
+          return false if written_this_build?(entry) || claims.includes?(File.expand_path(entry))
+          return false unless yield entry
+        end
+      end
     end
     FileUtils.rm_rf(path)
     true
