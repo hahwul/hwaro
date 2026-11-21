@@ -217,6 +217,9 @@ precedence. This also applies to percent-encoded spellings of the file name
 and to case differences on case-insensitive filesystems. An alias that names
 a file (`/legacy.html`) where a page publishes a directory (`/legacy.html/`)
 yields to the page the same way.
+If aliases on the same page need a file and a directory at the same path
+(`"/legacy.html"` and `"/legacy.html/sub/"`), the first alias in `aliases`
+is published and the build warns about the second.
 
 ### Custom Metadata
 

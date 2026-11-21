@@ -420,6 +420,9 @@ module Hwaro
         # full build and per incremental/rerender pass (see
         # compute_output_url_winners). Nil until the first render pass.
         @output_url_winners : Hash(String, String)? = nil
+        # Same-page alias conflicts still have one source owner, so the URL
+        # winner map alone cannot distinguish the alias that must be skipped.
+        @suppressed_aliases : Set({String, String}) = Set({String, String}).new
         # Relative output file (including index.html) → path of the page
         # that publishes its own HTML there, from the same pass. Generated
         # writers (paginator, taxonomy pages) consult it so they never
