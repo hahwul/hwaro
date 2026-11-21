@@ -149,11 +149,11 @@ end
 
 class Hwaro::Content::Search
   def self.confine_shard_file_name(id : String) : String
-    shard_file_name(id)
+    shard_file_names([id])[id]
   end
 
   def self.confine_remove_stale_shard(shards_dir : String, id : String) : Nil
-    remove_stale_shard(shards_dir, id)
+    remove_stale_shard(shards_dir, confine_shard_file_name(id))
   end
 end
 
