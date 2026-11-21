@@ -353,6 +353,22 @@ describe Hwaro::Services::FrontmatterConverter do
   end
 
   describe "#convert_to_toml" do
+    it "reports invalid JSON front matter as a content error" do
+      Dir.mktmpdir do |dir|
+        file_path = File.join(dir, "post.md")
+        [%({"title": "Test"), %({"title": })].each do |content|
+          File.write(file_path, content)
+          result = Hwaro::Services::FrontmatterConverter.new(dir).convert_to_toml
+
+          result.success.should be_false
+          result.error_count.should eq(1)
+          result.content_error_count.should eq(1)
+          result.skipped_count.should eq(0)
+          File.read(file_path).should eq(content)
+        end
+      end
+    end
+
     it "converts YAML files in content directory to TOML" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")

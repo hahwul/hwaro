@@ -184,6 +184,14 @@ module Hwaro
         end
 
         if current_format == FrontmatterFormat::Unknown
+          # The build treats a leading JSON object opener as front matter
+          # intent even when the object cannot be parsed. Do not report a
+          # broken header as a successful "without front matter" skip.
+          if Utils::FrontmatterScanner.json_start?(content)
+            reason = Utils::FrontmatterScanner.find_json_end(content) ? "invalid JSON" : "unbalanced braces"
+            Logger.error "  Failed to convert: #{file_path} — #{reason} in JSON front matter"
+            return ConversionStatus::Failed
+          end
           skips[SkipReason::NoFrontmatter] = (skips[SkipReason::NoFrontmatter]? || 0) + 1
           return ConversionStatus::Skipped
         end
