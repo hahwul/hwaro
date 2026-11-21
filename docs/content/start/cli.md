@@ -416,7 +416,7 @@ The watcher groups rapid saves into a single batch and rebuilds from the final f
 
 **About live reload:**
 
-Live reload is **enabled by default**. The server injects a small WebSocket client script into every HTML response, and after each successful rebuild, connected browsers automatically refresh the page, so no manual reload is needed. The client uses exponential backoff (1s to 30s) for reconnection, so restarting the server won't break the connection permanently.
+Live reload is **enabled by default**. The server injects a small WebSocket client script into every HTML response, and after each successful rebuild, connected browsers automatically refresh the page, so no manual reload is needed. The injector recognizes `.html` and `.htm` extensions in any case, including when the request URL percent-encodes the extension. The client uses exponential backoff (1s to 30s) for reconnection, so restarting the server won't break the connection permanently.
 
 When a save changes **only stylesheets** (a `.css` file under `static/`, a Sass source, or a CSS asset-bundle source), the browser swaps the affected `<link rel="stylesheet">` tags in place instead of reloading, so scroll position and page state survive. Plain static CSS is matched by path; Sass and bundle output refresh every same-origin stylesheet. Anything else in the same save (HTML, JS, images, a bundle fingerprint that moves its filename) still triggers a full reload, and a build error still shows the overlay.
 
