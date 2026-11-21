@@ -412,6 +412,8 @@ The server watches for file changes and rebuilds automatically. It uses **smart 
 
 A save that also touches `static/` alongside `templates/` or `content/` still takes the template re-render or incremental path above, not a full rebuild. See [Serve mode](/features/incremental-build/#serve-mode) for the exact rules.
 
+The watcher groups rapid saves into a single batch and rebuilds from the final file state. A temporary file created and deleted within the same batch does not trigger a rebuild.
+
 **About live reload:**
 
 Live reload is **enabled by default**. The server injects a small WebSocket client script into every HTML response, and after each successful rebuild, connected browsers automatically refresh the page, so no manual reload is needed. The client uses exponential backoff (1s to 30s) for reconnection, so restarting the server won't break the connection permanently.

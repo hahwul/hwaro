@@ -139,7 +139,6 @@ module Hwaro
       end
 
       # Merge another ChangeSet into this one, combining all buckets.
-      # Used during debounce to batch rapid successive changes.
       #
       # Order-aware semantics (self happens first, then other):
       # - add→remove cancels out (file created then deleted = no-op)

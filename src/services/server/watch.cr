@@ -34,35 +34,27 @@ module Hwaro
           # of the serve session while the HTTP server keeps running.
           begin
             current_mtimes = scan_mtimes(last_mtimes)
-            if current_mtimes != last_mtimes
-              changeset = detect_changes(last_mtimes, current_mtimes)
-              last_mtimes = current_mtimes
+            next if current_mtimes == last_mtimes
 
-              # Debounce: wait for changes to settle before rebuilding.
-              # This batches rapid successive saves (e.g. multi-file save,
-              # IDE format-on-save) into a single rebuild.
-              unless changeset.empty?
-                changeset, last_mtimes = debounce_changes(changeset, last_mtimes)
+            changeset = detect_changes(last_mtimes, current_mtimes)
+            unless changeset.empty?
+              changeset, current_mtimes = debounce_changes(changeset, last_mtimes, current_mtimes)
+            end
 
-                begin
-                  # apply_changeset owns the @rebuild_failed reset: it clears
-                  # the flag only after a SUCCESSFUL rebuild. Resetting here
-                  # unconditionally used to clobber the flag apply_changeset
-                  # had just set for a Bool-failure build (pre-hook failure /
-                  # phase abort return false without raising), breaking the
-                  # full-rebuild-recovery contract for that path.
-                  apply_changeset(changeset, build_options)
-                rescue ex
-                  # Surface the failure both in the terminal and the
-                  # browser. Without the WS push the developer sees the
-                  # stale page and keeps editing on top of a broken
-                  # build until they happen to glance at the terminal.
-                  @rebuild_failed = true
-                  Logger.error "[Watch] Build failed: #{truncate_build_error(ex.message || "")}"
-                  Logger.debug "[Watch] Backtrace: #{ex.backtrace?.try(&.first(5).join("\n    ")) || "unavailable"}"
-                  push_build_error(ex.message || "Build failed")
-                end
-              end
+            # If a debounce scan fails, retry from the previous snapshot.
+            last_mtimes = current_mtimes
+            next if changeset.empty?
+
+            begin
+              # apply_changeset updates @rebuild_failed after successful
+              # rebuilds and rebuilds that report failure via false.
+              apply_changeset(changeset, build_options)
+            rescue ex
+              # Surface the failure in both the terminal and the browser.
+              @rebuild_failed = true
+              Logger.error "[Watch] Build failed: #{truncate_build_error(ex.message || "")}"
+              Logger.debug "[Watch] Backtrace: #{ex.backtrace?.try(&.first(5).join("\n    ")) || "unavailable"}"
+              push_build_error(ex.message || "Build failed")
             end
           rescue ex
             Logger.error "[Watch] Watcher iteration failed: #{ex.message} (retrying)"
@@ -71,34 +63,40 @@ module Hwaro
         end
       end
 
-      # Wait for rapid successive changes to settle, merging all detected
-      # changesets into one.  Returns the merged changeset.
-      private def debounce_changes(initial : ChangeSet, last_mtimes : Hash(String, FileStamp)) : {ChangeSet, Hash(String, FileStamp)}
-        merged = initial
-        current_mtimes = last_mtimes
-        iterations = 0
+      # Diff the settled scan against the pre-batch snapshot so temporary
+      # files cancel out and a tracked file's final removal is preserved.
+      private def debounce_changes(
+        initial : ChangeSet,
+        previous_mtimes : Hash(String, FileStamp),
+        current_mtimes : Hash(String, FileStamp),
+      ) : {ChangeSet, Hash(String, FileStamp)}
+        removed = initial.removed_files.to_set
+        settled_mtimes = debounce_mtimes(current_mtimes, removed)
+        return {initial, settled_mtimes} if settled_mtimes.same?(current_mtimes)
 
-        loop do
-          sleep DEBOUNCE_INTERVAL
-          iterations += 1
-
-          new_mtimes = scan_mtimes(current_mtimes)
-          if new_mtimes != current_mtimes
-            additional = detect_changes(current_mtimes, new_mtimes)
-            current_mtimes = new_mtimes
-            merged = merged.merge(additional) unless additional.empty?
-
-            if iterations >= MAX_DEBOUNCE_ITERATIONS
-              Logger.debug "[Watch] Debounce cap reached (#{MAX_DEBOUNCE_ITERATIONS} iterations). Proceeding with rebuild."
-              break
-            end
-          else
-            # No more changes — settled
-            break
-          end
+        # A file removed and re-created during the batch is an addition even
+        # when the replacement preserves the old size and mtime.
+        revived = removed.select { |path| previous_mtimes.has_key?(path) && settled_mtimes.has_key?(path) }
+        unless revived.empty?
+          previous_mtimes = previous_mtimes.dup
+          revived.each { |path| previous_mtimes.delete(path) }
         end
 
-        {merged, current_mtimes}
+        {detect_changes(previous_mtimes, settled_mtimes), settled_mtimes}
+      end
+
+      # Wait for rapid successive changes to settle and return the final scan.
+      private def debounce_mtimes(current_mtimes : Hash(String, FileStamp), removed : Set(String)) : Hash(String, FileStamp)
+        MAX_DEBOUNCE_ITERATIONS.times do
+          sleep DEBOUNCE_INTERVAL
+          new_mtimes = scan_mtimes(current_mtimes)
+          return current_mtimes if new_mtimes == current_mtimes
+          current_mtimes.each_key { |path| removed << path unless new_mtimes.has_key?(path) }
+          current_mtimes = new_mtimes
+        end
+
+        Logger.debug "[Watch] Debounce cap reached (#{MAX_DEBOUNCE_ITERATIONS} iterations). Checking final snapshot."
+        current_mtimes
       end
 
       # Diff two mtime snapshots and return a categorised ChangeSet.
