@@ -104,12 +104,14 @@ module Hwaro
           # followed hop by hop to where `File.write` would create the file;
           # a loop resolves nowhere and is refused.
           def link_target_within_project?(path : String) : Bool
-            target = File.expand_path(path)
+            target = path
             40.times do
               return within_project?(target) unless File.symlink?(target)
               link = File.readlink?(target)
               return false unless link
-              target = File.expand_path(link, File.dirname(target))
+              # As in the writer, the filesystem resolves a symlinked
+              # parent before interpreting any `..` in the relative target.
+              target = Path[link].absolute? ? link : File.join(File.dirname(target), link)
             end
             false
           end

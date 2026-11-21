@@ -643,6 +643,9 @@ See [Tools & Completion](/start/tools/) for detailed usage.
 it. `agents-md --write` writes through an `AGENTS.md`
 symlink that resolves inside the project (such as `AGENTS.md -> CLAUDE.md`) and
 refuses one that resolves outside it.
+`tool platform` applies the same rule to output files. Relative targets are
+resolved from the directory holding the link, even when the output path
+reaches that directory through another symlink.
 
 ### completion
 

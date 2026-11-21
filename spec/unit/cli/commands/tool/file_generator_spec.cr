@@ -108,6 +108,27 @@ describe Hwaro::CLI::Commands::Tool::FileGenerator do
         end
       end
     end
+
+    {false, true}.each do |target_exists|
+      it "resolves a relative output link from its actual directory (target exists: #{target_exists})" do
+        Dir.mktmpdir do |dir|
+          Dir.cd(dir) do
+            Dir.mkdir_p("configs/nested")
+            File.write("netlify-base.toml", "old") if target_exists
+            File.symlink("configs/nested", "shortcuts")
+            File.symlink("../../netlify-base.toml", "configs/nested/publish.toml")
+
+            with_captured_log do
+              Hwaro::CLI::Commands::Tool::FileGenerator.emit("shortcuts/publish.toml", "generated", false, target_exists)
+            end
+
+            File.read("netlify-base.toml").should eq("generated")
+            File.symlink?("shortcuts").should be_true
+            File.symlink?("configs/nested/publish.toml").should be_true
+          end
+        end
+      end
+    end
   end
 end
 

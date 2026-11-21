@@ -645,6 +645,8 @@ hwaro tool export hugo --dry-run
 건너뜁니다. `agents-md --write`는
 `AGENTS.md`가 프로젝트 안을 가리키는 심볼릭 링크(예: `AGENTS.md -> CLAUDE.md`)이면 링크 대상에
 쓰고, 프로젝트 밖을 가리키는 링크이면 쓰기를 거부합니다.
+`tool platform`도 출력 파일에 같은 규칙을 적용합니다. 출력 경로가 다른 심볼릭 링크를 거쳐도
+상대 경로로 지정한 대상은 링크가 실제로 있는 디렉터리를 기준으로 찾습니다.
 
 ### completion
 
