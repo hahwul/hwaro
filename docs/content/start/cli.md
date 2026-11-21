@@ -302,6 +302,7 @@ The minify flag shrinks generated files while keeping them visually identical to
 - **XML**: Removes whitespace between tags for smaller file sizes.
 
 Whitespace-sensitive elements (`<pre>`, `<code>`, `<textarea>`, `<script>`, `<style>`, `<svg>`, `<math>`, `<noscript>`) are extracted before any whitespace pass and restored verbatim, so their contents are never touched.
+Tag-shaped text inside ordinary HTML comments is treated as comment text when locating these elements.
 
 For more aggressive output shrinking (attribute quoting, entity collapsing, etc.) post-process `public/` with a dedicated tool such as `html-minifier-terser` or `minify-html`.
 

@@ -278,6 +278,34 @@ describe Hwaro::Utils::HtmlMinifier do
           .should eq("<p><b>a</b> <pre-view>x</pre-view></p><pre>y</pre>")
       end
 
+      it "ignores protected tag openers in a removable HTML comment" do
+        html = "<!-- <pre> is a tag -->\n<p>Keep this</p>\n<pre>x\n\ny</pre>\n<!-- footer -->\n<p>and this</p>"
+        Hwaro::Utils::HtmlMinifier.minify(html).should eq("<p>Keep this</p><pre>x\n\ny</pre><p>and this</p>")
+      end
+
+      it "preserves ordinary comments within protected elements and blocks within conditional comments" do
+        html = "<pre>one\n\n<!-- <code> note -->\n\ntwo</pre><!--[if IE]><pre>ie\n\nonly</pre><![endif]-->"
+        Hwaro::Utils::HtmlMinifier.minify(html).should eq(html)
+      end
+
+      it "ignores a protected closing tag inside a comment in a protected block" do
+        html = "<pre>one\n\n<!-- </pre> note -->\n\ntwo\n\n</pre>"
+        Hwaro::Utils::HtmlMinifier.minify(html).should eq(html)
+      end
+
+      it "ignores comment delimiters in raw text and quoted attributes while finding real comments" do
+        script = %(<script>const open = "<!--";\n\nconst close = "-->";</script>)
+        paragraph = %(<p data-comment="<!--">Keep this</p>)
+        html = %(#{script}#{paragraph}<!-- <pre> in a comment --><pre>x\n\ny</pre><!-- footer -->)
+        Hwaro::Utils::HtmlMinifier.minify(html).should eq("#{script}#{paragraph}<pre>x\n\ny</pre>")
+      end
+
+      it "preserves SVG comments and CDATA while finding later HTML comments" do
+        svg = %(<svg><!-- keep --><style><![CDATA[.x::after { content: "</style><script><!--"; }]]></style><text>x\n\ny</text></svg>)
+        html = %(#{svg}<!-- <pre> in a comment --><p>Keep this</p><pre>z\n\nw</pre><!-- footer -->)
+        Hwaro::Utils::HtmlMinifier.minify(html).should eq("#{svg}<p>Keep this</p><pre>z\n\nw</pre>")
+      end
+
       it "does not let a literal <script> string inside <style> derail extraction" do
         # `<style>` is extracted before `<script>` precisely so the
         # script pass cannot mis-pair a real `</script>` elsewhere
