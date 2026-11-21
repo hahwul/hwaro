@@ -172,8 +172,9 @@ module Hwaro
           end
 
           pages.each do |page|
-            # Check if it's a section and has feed generation enabled
-            if page.is_a?(Models::Section) && page.generate_feeds && page.render && !page.draft && !page.unpublished
+            # Only the section that owns this output path may publish its
+            # feed. A redirecting section still owns its path and its entries.
+            if page.is_a?(Models::Section) && page.generate_feeds && page.render && !page.draft && !page.unpublished && !page.output_suppressed
               section_pages = section_feed_pages(page, pages_by_section, sections_by_parent)
 
               # A section feed is a per-language surface: the section object
