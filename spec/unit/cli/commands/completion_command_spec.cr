@@ -22,6 +22,43 @@ describe Hwaro::CLI::Commands::CompletionCommand do
   before_each { ensure_commands_registered }
 
   describe "bash completion" do
+    it "offers parent flags at the subcommand and positional-choice slot" do
+      bash = Process.find_executable("bash")
+      pending!("Bash is not installed") unless bash
+
+      Dir.mktmpdir do |dir|
+        script_path = File.join(dir, "hwaro.bash")
+        File.write(script_path, Hwaro::CLI::Commands::CompletionCommand.new.generate_bash_for_test)
+
+        output = IO::Memory.new
+        errors = IO::Memory.new
+        shell = <<-'BASH'
+          source "$1"
+          COMP_WORDS=(hwaro tool --)
+          COMP_CWORD=2
+          _hwaro_completions
+          printf '%s\n' "${COMPREPLY[*]}"
+          COMP_WORDS=(hwaro completion --)
+          COMP_CWORD=2
+          _hwaro_completions
+          printf '%s\n' "${COMPREPLY[*]}"
+          COMP_WORDS=(hwaro tool li)
+          COMP_CWORD=2
+          _hwaro_completions
+          printf '%s\n' "${COMPREPLY[*]}"
+          COMP_WORDS=(hwaro completion ba)
+          COMP_CWORD=2
+          _hwaro_completions
+          printf '%s\n' "${COMPREPLY[*]}"
+          BASH
+        status = Process.run(bash.not_nil!, ["--noprofile", "--norc", "-c", shell, "bash", script_path], env: {"BASH_ENV" => ""}, output: output, error: errors)
+
+        status.success?.should be_true
+        errors.to_s.should be_empty
+        output.to_s.should eq("--quiet --help\n--quiet --help\nlist\nbash\n")
+      end
+    end
+
     it "completes commands in plain Bash without bash-completion" do
       bash = Process.find_executable("bash")
       pending!("Bash is not installed") unless bash

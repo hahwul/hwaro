@@ -53,6 +53,7 @@ eval "$(hwaro completion bash)"
 ```
 
 Bash 기본 완성 기능으로 동작하며, 선택 사항인 `bash-completion` 패키지를 설치하지 않아도 됩니다.
+하위 명령을 입력할 자리에서 `-`를 입력하면 명령 옵션도 완성할 수 있습니다(예: `hwaro tool --<TAB>`).
 
 파일로 저장해도 됩니다:
 
