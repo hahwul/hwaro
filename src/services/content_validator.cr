@@ -10,6 +10,7 @@ require "toml"
 require "./content_lister"
 require "./doctor"
 require "./internal_link_index"
+require "../utils/date_utils"
 require "../utils/errors"
 require "../utils/frontmatter_scanner"
 require "../utils/logger"
@@ -22,7 +23,7 @@ module Hwaro
       TOML_FRONTMATTER_RE = Utils::FrontmatterScanner::TOML_FRONTMATTER_RE
       YAML_FRONTMATTER_RE = Utils::FrontmatterScanner::YAML_FRONTMATTER_RE
 
-      alias FrontmatterValue = String | Bool | Int64 | Float64?
+      alias FrontmatterValue = String | Bool | Int64 | Float64 | Time?
 
       # Parsed front matter plus the tag list carried OUT-OF-BAND. Tags
       # used to be smuggled through the field hash under a fake "_tags"
@@ -108,8 +109,8 @@ module Hwaro
         end
 
         # date format check
-        if date.is_a?(String) && !date.as(String).empty?
-          check_date_format(file_path, date.as(String), issues)
+        if date.is_a?(String) && !date.empty?
+          check_date_format(file_path, date, issues)
         end
 
         # tag convention check (mixed-case warning)
@@ -143,7 +144,7 @@ module Hwaro
               when Bool    then result[key] = raw
               when Int64   then result[key] = raw
               when Float64 then result[key] = raw
-              when Time    then result[key] = raw.to_s
+              when Time    then result[key] = raw
               end
             end
             # Extract tags as comma-separated string for convention check.
@@ -183,7 +184,7 @@ module Hwaro
                 elsif f = value.as_f?
                   result[k] = f
                 elsif t = value.as_time?
-                  result[k] = t.to_s
+                  result[k] = t
                 end
               end
               # Extract tags for convention check (same `[taxonomies]`
@@ -266,46 +267,10 @@ module Hwaro
       end
 
       private def check_date_format(file_path : String, date_str : String, issues : Array(Issue))
-        # Fractional seconds (`10:00:00.123Z`, what JavaScript's
-        # `toISOString` and most exporters write) are RFC 3339 and the build
-        # parses them; without `(\.\d+)?` every such date was flagged, which
-        # failed `--strict` / `--max-warnings` on content that builds.
-        unless date_str.matches?(/^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2}| [A-Z][A-Za-z]*| [+-]\d{2}:?\d{2})?)?$/)
-          issues << Issue.new(id: "content-date-invalid", level: :warning, category: "content", file: file_path,
-            message: "Date format may be invalid: \"#{date_str}\"")
-          return
-        end
+        return if Utils::DateUtils.parse_content_date(date_str)
 
-        formats = [
-          "%Y-%m-%d %H:%M:%S",
-          "%Y-%m-%dT%H:%M:%S",
-          "%Y-%m-%dT%H:%M:%S%z",
-          "%Y-%m-%dT%H:%M:%S%:z",
-          "%Y-%m-%d",
-        ]
-
-        parsed = false
-        formats.each do |fmt|
-          Time.parse(date_str, fmt, Time::Location::UTC)
-          parsed = true
-          break
-        rescue Time::Format::Error | Time::Error | ArgumentError
-          next
-        end
-
-        # Try RFC 3339 as last resort
-        unless parsed
-          begin
-            Time.parse_rfc3339(date_str)
-            parsed = true
-          rescue Time::Format::Error | Time::Error | ArgumentError
-          end
-        end
-
-        unless parsed
-          issues << Issue.new(id: "content-date-invalid", level: :warning, category: "content", file: file_path,
-            message: "Date format may be invalid: \"#{date_str}\"")
-        end
+        issues << Issue.new(id: "content-date-invalid", level: :warning, category: "content", file: file_path,
+          message: "Date format may be invalid: \"#{date_str}\"")
       end
 
       private def check_tag_conventions(file_path : String, tags : Array(String), issues : Array(Issue))

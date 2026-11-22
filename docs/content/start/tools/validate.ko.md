@@ -84,7 +84,7 @@ checked: 0 errors, 2 warnings, 2 info
 | `content-description-missing` | warning | description 누락 |
 | `content-alt-text-missing` | warning | 대체 텍스트가 없는 이미지 |
 | `content-internal-link-broken` | warning | 깨진 `@/` 내부 링크 |
-| `content-date-invalid` | warning | 인식할 수 없는 날짜 형식 |
+| `content-date-invalid` | warning | 빌드에서 해석할 수 없는 날짜 문자열 |
 | `content-frontmatter-toml-error` | error | TOML 프론트 매터 파싱 오류 |
 | `content-frontmatter-yaml-error` | error | YAML 프론트 매터 파싱 오류 |
 | `content-frontmatter-json-error` | error | JSON 프론트 매터 파싱 오류 |

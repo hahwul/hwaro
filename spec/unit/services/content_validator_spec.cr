@@ -431,6 +431,26 @@ describe Hwaro::Services::ContentValidator do
       end
     end
 
+    it "agrees with the build on date strings, including invalid times and offsets" do
+      Dir.mktmpdir do |dir|
+        cases = {
+          "short-offset.md"  => {"2024-05-01T10:00:00+09", true},
+          "local-time.md"    => {"2024-5-1t10:00:00.5", true},
+          "spaced-offset.md" => {"2024-05-01 10:00:00.5 +09:00", true},
+          "bad-hour.md"      => {"2024-05-01T99:00:00", false},
+          "bad-offset.md"    => {"2024-05-01T10:00:00+09:99", false},
+        }
+        cases.each do |filename, (date, accepted)|
+          Hwaro::Utils::DateUtils.parse_content_date(date).nil?.should eq(!accepted)
+          File.write(File.join(dir, filename), %(+++\ntitle = "Post"\ndescription = "Desc"\ndate = "#{date}"\n+++\n\nBody.\n))
+        end
+
+        issues = Hwaro::Services::ContentValidator.new(dir).run
+        warnings = issues.select { |issue| issue.id == "content-date-invalid" }
+        warnings.map { |issue| File.basename(issue.file.not_nil!) }.sort!.should eq(["bad-hour.md", "bad-offset.md"])
+      end
+    end
+
     it "detects YAML frontmatter parse errors" do
       Dir.mktmpdir do |dir|
         content_dir = File.join(dir, "content")

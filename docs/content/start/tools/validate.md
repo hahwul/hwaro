@@ -84,7 +84,7 @@ says why it failed.
 | `content-description-missing` | warning | Missing description |
 | `content-alt-text-missing` | warning | Image without alt text |
 | `content-internal-link-broken` | warning | Broken `@/` internal link |
-| `content-date-invalid` | warning | Unrecognized date format |
+| `content-date-invalid` | warning | Date string that the build cannot parse |
 | `content-frontmatter-toml-error` | error | TOML frontmatter parse error |
 | `content-frontmatter-yaml-error` | error | YAML frontmatter parse error |
 | `content-frontmatter-json-error` | error | JSON frontmatter parse error |
