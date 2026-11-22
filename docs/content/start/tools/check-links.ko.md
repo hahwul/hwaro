@@ -66,6 +66,10 @@ hwaro tool check-links --ignore-url twitter.com --allow-status 403,429
 7. 내부 링크의 `#fragment`를 빌드된 HTML과 대조 ([앵커](#앵커) 참고)
 8. 깨졌거나 접근할 수 없는 링크 보고
 
+HTML에서는 `<a>`의 `href`와 `<img>`, `<source>`의 `src` 및 `srcset`을 검사합니다.
+`srcset`의 각 후보는 URL에 포함된 쉼표까지 보존해 검사합니다. HTTP와 HTTPS
+스킴은 대소문자를 구분하지 않습니다.
+
 사설/내부 주소(localhost, RFC 1918 대역, `.local`/`.internal` 호스트)로
 해석되는 외부 링크에는 요청을 보내지 않습니다. 이런 링크는 사람용 출력과
 JSON의 `skipped_external` 항목 모두에 "건너뜀"으로 보고됩니다.
