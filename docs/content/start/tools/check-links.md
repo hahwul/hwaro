@@ -69,6 +69,10 @@ failing CI.
    [Anchors](#anchors))
 8. Reports broken or unreachable links
 
+In raw HTML, the checker reads `href` on `<a>` and `src` and `srcset` on
+`<img>` and `<source>`. Each `srcset` candidate is checked using its full URL,
+including any commas in the URL. HTTP and HTTPS schemes are case-insensitive.
+
 External links that resolve to private or internal addresses (localhost,
 RFC 1918 ranges, `.local`/`.internal` hosts) are never contacted. They are
 reported as skipped instead, both in the human output and under

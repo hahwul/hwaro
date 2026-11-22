@@ -102,6 +102,40 @@ describe "check-links scan guards" do
       guard_urls(%(<img src="{{ page.image }}"><a href="mailto:a@b.com">m</a>))
         .should be_empty
     end
+
+    it "only checks link attributes belonging to the corresponding HTML tag" do
+      body = <<-HTML
+        <a data-href="/lazy/" title="text href='/example/' >" src="/wrong/" HREF="/real/" href="/duplicate/">link</a>
+        <img href="/wrong/" data-src="/lazy.png" SRC="/real.png">
+        <source srcset="/real.webp">
+        <a-card href="/custom/">card</a-card>
+        <span title="<a href='/text/'>">text</span>
+        HTML
+
+      guard_urls(body).should eq(["/real/", "/real.png", "/real.webp"])
+    end
+
+    it "keeps commas inside srcset URLs and skips the whole data URL" do
+      guard_urls(%(<img srcset="data:image/png;base64,AAAA 1x, /이미지,large.png 2x, /fallback.png">))
+        .should eq(["/이미지,large.png", "/fallback.png"])
+    end
+
+    it "preserves spaces inside a quoted HTML link destination" do
+      guard_urls(%(<a href="/my page/?q=1#intro">x</a>)).should eq(["/my page/"])
+    end
+
+    it "uses the same HTML attribute rules when collecting external URLs" do
+      Dir.mktmpdir do |dir|
+        body = <<-HTML
+          <a data-href="https://example.com/lazy" title="href='https://example.com/text'" href="https://example.com/real">link</a>
+          <img srcset="data:image/png;base64,AAAA 1x, https://example.com/image,large.png 2x">
+          HTML
+        File.write(File.join(dir, "a.md"), body)
+
+        urls = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new.scan_guard_external_for_test(dir).map(&.url)
+        urls.should eq(["https://example.com/real", "https://example.com/image,large.png"])
+      end
+    end
   end
 
   # Finding 11: `run` scans the tree twice, so an unreadable file warned twice.
@@ -121,8 +155,36 @@ describe "check-links scan guards" do
     end
   end
 
+  describe "HTTP schemes" do
+    it "collects HTTP destinations with mixed-case schemes in Markdown and HTML" do
+      Dir.mktmpdir do |dir|
+        body = <<-MD
+          [inline](HTTPS://example.com/Inline?q=Value) and [reference][doc].
+
+          [doc]: Http://example.com/Reference
+
+          <a href="hTTps://example.com/HTML">link</a>
+          MD
+        File.write(File.join(dir, "a.md"), body)
+
+        urls = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new.scan_guard_external_for_test(dir).map(&.url)
+        urls.should eq(["https://example.com/Inline?q=Value", "http://example.com/Reference", "https://example.com/HTML"])
+      end
+    end
+  end
+
   # `<https://…>` autolinks render as links but were never scanned.
   describe "autolinks" do
+    it "ignores autolink syntax inside quoted HTML attributes in a paragraph" do
+      Dir.mktmpdir do |dir|
+        body = %q(See <span title="<https://example.com/example>">this</span> and <https://example.com/real>.)
+        File.write(File.join(dir, "a.md"), body)
+
+        urls = Hwaro::CLI::Commands::Tool::DeadlinkCommand.new.scan_guard_external_for_test(dir).map(&.url)
+        urls.should eq(["https://example.com/real"])
+      end
+    end
+
     it "checks an autolinked external URL, but not one inside code" do
       Dir.mktmpdir do |dir|
         File.write(File.join(dir, "a.md"), "+++\ntitle = \"A\"\n+++\nSee <https://example.com/auto?q=1> and `<https://example.com/code>`.\n")
