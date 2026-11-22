@@ -3,6 +3,38 @@ require "../../spec_helper"
 # Regression specs for defects found by dogfooding `hwaro tool convert`.
 # Numbering matches the audit report.
 describe "convert regressions" do
+  describe "YAML key collisions" do
+    [Hwaro::Services::FrontmatterFormat::JSON, Hwaro::Services::FrontmatterFormat::TOML].each do |target|
+      it "leaves a file unchanged if converting to #{target} would lose a YAML key" do
+        Dir.mktmpdir do |dir|
+          root = File.join(dir, "root.md")
+          nested = File.join(dir, "nested.md")
+          valid = File.join(dir, "valid.md")
+          root_source = %(---\n1: numeric\n"1": string\n---\n\nRoot body.\n)
+          nested_source = %(---\nextra:\n  values:\n    - 2024-01-01: date\n      "2024-01-01": string\n---\n\nNested body.\n)
+          File.write(root, root_source)
+          File.write(nested, nested_source)
+          File.write(valid, %(---\n1: numeric\n"2": string\n---\n\nValid body.\n))
+
+          converter = Hwaro::Services::FrontmatterConverter.new(dir)
+          result = Hwaro::Services::ConversionResult.new
+          output = with_captured_log do
+            result = target.json? ? converter.convert_to_json : converter.convert_to_toml
+          end
+
+          result.success.should be_false
+          result.error_count.should eq(2)
+          result.converted_count.should eq(1)
+          output.should contain(%(YAML keys convert to the same key "1"))
+          output.should contain(%(YAML keys convert to the same key "2024-01-01"))
+          File.read(root).should eq(root_source)
+          File.read(nested).should eq(nested_source)
+          converter.detect_format(File.read(valid)).should eq(target)
+        end
+      end
+    end
+  end
+
   # (6) `hwaro tool convert` in a directory with no `content/` exited 1 with
   # no diagnostic at all in human mode — the reason was produced and then
   # thrown away, reachable only via `--json`. Every sibling `tool` command

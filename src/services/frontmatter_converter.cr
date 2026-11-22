@@ -442,6 +442,31 @@ module Hwaro
         {json_str, body}
       end
 
+      private def parse_yaml_for_conversion(source : String) : YAML::Any
+        parsed = YAML.parse(source)
+        check_yaml_keys(parsed)
+        parsed
+      end
+
+      # JSON and TOML require string keys. Distinct YAML keys such as `1`
+      # and `"1"` must not overwrite one another during an in-place rewrite.
+      private def check_yaml_keys(value : YAML::Any, depth : Int32 = 0) : Nil
+        Utils::Nesting.check!(depth)
+        case raw = value.raw
+        when Hash
+          seen = Set(String).new
+          raw.each do |key, child|
+            text = Utils::FrontmatterWriter.key_string(key)
+            unless seen.add?(text)
+              raise ArgumentError.new("Distinct YAML keys convert to the same key #{text.inspect}")
+            end
+            check_yaml_keys(child, depth + 1)
+          end
+        when Array
+          raw.each { |child| check_yaml_keys(child, depth + 1) }
+        end
+      end
+
       private def yaml_to_toml(content : String) : String?
         # Extract YAML frontmatter
         if match = content.match(YAML_FRONTMATTER_RE)
@@ -449,7 +474,7 @@ module Hwaro
           body = match[2]
 
           begin
-            yaml_data = YAML.parse(yaml_str)
+            yaml_data = parse_yaml_for_conversion(yaml_str)
             toml_str = convert_yaml_to_toml_string(yaml_data)
 
             "#{TOML_DELIMITER}\n#{toml_str}#{TOML_DELIMITER}\n#{body}"
@@ -481,7 +506,7 @@ module Hwaro
           yaml_str = match[1]
           body = match[2]
           begin
-            yaml_data = YAML.parse(yaml_str)
+            yaml_data = parse_yaml_for_conversion(yaml_str)
             json_str = yaml_to_json_string(yaml_data)
             "#{json_str}\n#{body}"
           rescue ex

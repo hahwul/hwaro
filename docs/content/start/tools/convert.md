@@ -70,6 +70,8 @@ mappings are lossy:
 - Keys that are not plain words (digits first, a leading `-`, `inf`, `nan`,
   spaces, dots) are quoted in TOML, and an unquoted YAML date key
   (`2024-01-01: v`) becomes the string key `"2024-01-01"`.
+- If distinct YAML keys such as `1` and `"1"` would become the same string
+  in JSON or TOML, conversion reports the collision and leaves the file untouched.
 - A leading UTF-8 BOM is dropped.
 
 ## JSON Output
