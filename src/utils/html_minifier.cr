@@ -837,15 +837,46 @@ module Hwaro
       # tag is unterminated (in which case the caller falls back to
       # emitting the byte literally and continues).
       private def find_tag_end(bytes : Bytes, start : Int32, n : Int32) : Int32
+        scan_tag(bytes, start, n) { }
+      end
+
+      # Walk the tag opening at `bytes[start]` (`<`) the way an HTML
+      # tokenizer reads its attributes, yielding each index after the `<`
+      # with whether that byte is part of a quoted value, and return the
+      # index of the closing `>` (-1 when unterminated). As in HTML, a quote
+      # opens a value only where a value starts, right after `=`: the
+      # apostrophe in `alt=Bob's` or `title=it's` is part of an unquoted
+      # value. Toggling on every quote paired that apostrophe with the next
+      # one in the document, so the "tag" ran on over the following markup
+      # and the real quoted values in it were collapsed as tag whitespace
+      # (`title='x > y'` became `title='x> y'`).
+      private def scan_tag(bytes : Bytes, start : Int32, n : Int32, &) : Int32
         i = start + 1
         quote = 0_u8
+        after_eq = false
+        unquoted = false
         while i < n
           b = bytes[i]
           if quote != 0_u8
+            yield i, true
             quote = 0_u8 if b == quote
+          elsif b == '>'.ord
+            return i
           else
-            return i if b == '>'.ord
-            quote = b if b == '"'.ord || b == '\''.ord
+            ws = intertoken_ws?(b)
+            if unquoted
+              unquoted = !ws
+            elsif after_eq
+              if b == '"'.ord || b == '\''.ord
+                quote = b
+              elsif !ws
+                unquoted = true
+              end
+              after_eq = ws
+            elsif b == '='.ord
+              after_eq = true
+            end
+            yield i, quote != 0_u8
           end
           i += 1
         end
@@ -875,18 +906,12 @@ module Hwaro
       private def tag_verbatim?(bytes : Bytes, start : Int32, tag_end : Int32) : Bool
         last = bytes[tag_end - 1]
         return false if last >= 0x80 || last == '/'.ord || last.unsafe_chr.ascii_whitespace?
-        quote = 0_u8
-        i = start + 1
-        while i < tag_end
+        scan_tag(bytes, start, tag_end + 1) do |i, quoted|
+          next if quoted
           b = bytes[i]
-          if quote != 0_u8
-            quote = 0_u8 if b == quote
-          elsif b == '"'.ord || b == '\''.ord
-            quote = b
-          elsif b == '\t'.ord || b == '\n'.ord || b == '\r'.ord || (b == ' '.ord && bytes[i - 1] == ' '.ord)
+          if b == '\t'.ord || b == '\n'.ord || b == '\r'.ord || (b == ' '.ord && bytes[i - 1] == ' '.ord)
             return false
           end
-          i += 1
         end
         true
       end
@@ -906,45 +931,22 @@ module Hwaro
         # We can't easily trim trailing whitespace from an already-
         # written IO, so do it in a local buffer.
         body = String.build(tag_end - start + 1) do |buf|
-          i = start
-          # Copy `<` (and optional `/`)
-          buf.write_byte(bytes[i])
-          i += 1
-          if i < tag_end && bytes[i] == '/'.ord
-            buf.write_byte(bytes[i])
-            i += 1
-          end
-          # Copy the tag name run.
-          while i < tag_end && (
-                  (bytes[i] >= 'a'.ord && bytes[i] <= 'z'.ord) ||
-                  (bytes[i] >= 'A'.ord && bytes[i] <= 'Z'.ord) ||
-                  (bytes[i] >= '0'.ord && bytes[i] <= '9'.ord) ||
-                  bytes[i] == '-'.ord || bytes[i] == ':'.ord
-                )
-            buf.write_byte(bytes[i])
-            i += 1
-          end
-          # Walk the attribute area collapsing whitespace and
-          # respecting quotes.
+          # `<` and the tag name are copied as they are (neither holds
+          # whitespace); in the attribute area whitespace collapses outside
+          # quoted values.
+          buf.write_byte(bytes[start])
           last_was_space = false
-          quote = 0_u8
-          while i < tag_end
+          scan_tag(bytes, start, tag_end + 1) do |i, quoted|
             b = bytes[i]
-            if quote != 0_u8
-              buf.write_byte(b)
-              quote = 0_u8 if b == quote
-              last_was_space = false
-            elsif b == ' '.ord || b == '\t'.ord || b == '\n'.ord || b == '\r'.ord
+            if !quoted && (b == ' '.ord || b == '\t'.ord || b == '\n'.ord || b == '\r'.ord)
               unless last_was_space
                 buf.write_byte(' '.ord.to_u8)
                 last_was_space = true
               end
             else
               buf.write_byte(b)
-              quote = b if b == '"'.ord || b == '\''.ord
               last_was_space = false
             end
-            i += 1
           end
         end
         # Drop trailing whitespace before the `>`. For self-closing

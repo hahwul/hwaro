@@ -708,6 +708,24 @@ describe Hwaro::Utils::HtmlMinifier do
     # Regression: ` />` after an UNQUOTED attribute value was tightened to
     # `/>`, which makes the slash part of the value — `href=/favicon.ico/`
     # (a 404) and `content=width=device-width/`.
+    # Regression: every quote in a tag toggled the quoted state, so the
+    # apostrophe of an unquoted `alt=Bob's` paired with the next apostrophe
+    # in the page; the "tag" ran on over the following markup, and the real
+    # quoted values in it lost their inner whitespace.
+    it "reads an apostrophe in an unquoted attribute value as part of the value" do
+      html = "<p><img src=a.png alt=Bob's>\n<a title='x > y'  data-x=\"a  b\">link</a></p>"
+      Hwaro::Utils::HtmlMinifier.minify(html)
+        .should eq("<p><img src=a.png alt=Bob's> <a title='x > y' data-x=\"a  b\">link</a></p>")
+      html = "<span title=it's\n  class=x>a</span>\n<span data-q='a  b'>c</span>"
+      Hwaro::Utils::HtmlMinifier.minify(html)
+        .should eq("<span title=it's class=x>a</span> <span data-q='a  b'>c</span>")
+    end
+
+    it "still opens a quoted value after = and whitespace" do
+      html = "<a title =  'x  >  y'   href=\"/z\">w</a>"
+      Hwaro::Utils::HtmlMinifier.minify(html).should eq("<a title = 'x  >  y' href=\"/z\">w</a>")
+    end
+
     it "keeps the space before a self-closing slash after an unquoted value" do
       Hwaro::Utils::HtmlMinifier.minify("<link rel=icon href=/favicon.ico />").should eq("<link rel=icon href=/favicon.ico />")
       Hwaro::Utils::HtmlMinifier.minify("<img src=a.png alt=x />").should eq("<img src=a.png alt=x />")
