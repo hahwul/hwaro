@@ -74,9 +74,16 @@ module Hwaro
       # (rendered, not a redirect stub) before any other, then the first
       # path in byte order; the others are returned so callers can report
       # them.
-      def link_translations!(pages : Array(Models::Page), config : Models::Config) : Array(KeyCollision)
+      #
+      # `unwritten` holds the paths of pages that lose their output URL to
+      # another page (the build's output-path collisions). Such a page is no
+      # more linkable than a headless one: its URL serves the page that won
+      # it, so a switcher row or hreflang alternate naming it sent readers
+      # and search engines to unrelated content.
+      def link_translations!(pages : Array(Models::Page), config : Models::Config, unwritten : Set(String) = Set(String).new) : Array(KeyCollision)
         collisions = [] of KeyCollision
         return collisions unless multilingual?(config)
+        linkable = ->(p : Models::Page) { p.render && !p.has_redirect? && !unwritten.includes?(p.path) }
 
         groups = Hash({String?, String, Bool}, Array(Models::Page)).new { |h, k| h[k] = [] of Models::Page }
         pages.each do |page|
@@ -106,11 +113,11 @@ module Hwaro
             # A linkable page (written, not a redirect stub) beats one the
             # links below would skip anyway, so a headless duplicate never
             # leaves its language unlinked; then the first path wins.
-            group_pages.sort_by! { |p| {p.render && !p.has_redirect? ? 0 : 1, p.path} }.each do |p|
+            group_pages.sort_by! { |p| {linkable.call(p) ? 0 : 1, p.path} }.each do |p|
               code = language_code(p, config)
               if winner = by_code[code]?
-                # A headless or redirecting page is never linked anyway.
-                collisions << KeyCollision.new(key, code, winner, p) if p.render && !p.has_redirect?
+                # A headless, redirecting or unwritten page is never linked anyway.
+                collisions << KeyCollision.new(key, code, winner, p) if linkable.call(p)
                 p.translations = [] of Models::TranslationLink
               else
                 by_code[code] = p
@@ -130,8 +137,9 @@ module Hwaro
               # A headless (`render = false`) translation is never written
               # and a `redirect_to` stub only bounces elsewhere: linking
               # either from the switcher or hreflang advertises a 404 or a
-              # non-canonical URL (the sitemap already filters both).
-              next if !target.same?(current_page) && (!target.render || target.has_redirect?)
+              # non-canonical URL (the sitemap already filters both). An
+              # unwritten one names another page's URL.
+              next if !target.same?(current_page) && !linkable.call(target)
               Models::TranslationLink.new(
                 code: code,
                 url: target.url,

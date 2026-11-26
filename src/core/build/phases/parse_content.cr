@@ -22,8 +22,12 @@ module Hwaro::Core::Build::Phases::ParseContent
       # discovery surface then see a matched term `_index.md` as headless.
       mark_term_metadata(ctx.sections, match_term_files(ctx.pages, ctx.sections, config))
       @translation_key_collisions.clear
-      warn_translation_key_collisions(Content::Multilingual.link_translations!(ctx.all_pages, config))
-      Content::Versions.link!(ctx.all_pages, config)
+      # A page that loses its URL to another page is never written, so it is
+      # no one's translation or version counterpart (as it is no one's
+      # prev/next).
+      unwritten = output_losers(ctx.all_pages)
+      warn_translation_key_collisions(Content::Multilingual.link_translations!(ctx.all_pages, config, unwritten))
+      Content::Versions.link!(ctx.all_pages, config, unwritten)
     end
 
     # Build subsections first (needed for flat navigation ordering)

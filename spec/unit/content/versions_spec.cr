@@ -1,4 +1,5 @@
 require "../../spec_helper"
+require "../../support/build_helper"
 
 private def versioned_page(config : Hwaro::Models::Config, path : String, url : String, language : String? = nil) : Hwaro::Models::Page
   page = Hwaro::Models::Page.new(path)
@@ -154,6 +155,41 @@ describe Hwaro::Content::Versions do
       Hwaro::Content::Versions.link!([v1, v2], config)
 
       v1.version_links.find!(&.latest).exists.should be_false
+    end
+  end
+end
+
+# A counterpart that loses its output path to another page is never written:
+# the URL serves the page that won it, so the switcher must not call it
+# existing and an old version must not canonicalize on it.
+describe "version counterparts that lose their output path" do
+  it "treats the losing counterpart as missing" do
+    config = <<-TOML
+      title = "T"
+      base_url = "https://example.com"
+      [[versions.list]]
+      name = "v2"
+      path = "docs/v2"
+      latest = true
+      [[versions.list]]
+      name = "v1"
+      path = "docs/v1"
+      TOML
+    build_site(config,
+      content_files: {
+        "docs/v2/_index.md"  => "+++\ntitle = \"Docs\"\n+++\n",
+        "docs/v1/_index.md"  => "+++\ntitle = \"Docs v1\"\n+++\n",
+        "docs/v2/a.md"       => "+++\ntitle = \"A\"\nslug = \"install\"\n+++\na",
+        "docs/v2/install.md" => "+++\ntitle = \"Install v2\"\n+++\nv2",
+        "docs/v1/install.md" => "+++\ntitle = \"Install v1\"\n+++\nv1",
+      },
+      template_files: {
+        "page.html"    => "{% for v in page.version_links %}[{{ v.name }} {{ v.url }} {{ v.exists }}]{% endfor %}|{{ canonical_tag }}",
+        "section.html" => "",
+      }) do
+      v1 = File.read("public/docs/v1/install/index.html")
+      v1.should start_with("[v2 /docs/ false][v1 /docs/v1/install/ true]|")
+      v1.should contain(%(<link rel="canonical" href="https://example.com/docs/v1/install/">))
     end
   end
 end

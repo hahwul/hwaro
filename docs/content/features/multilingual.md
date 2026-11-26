@@ -86,6 +86,8 @@ Hwaro automatically links translated pages based on their filenames. Pages with 
 
 For example, `hello.md`, `hello.ko.md`, and `hello.ja.md` are all linked as translations.
 
+A variant that is never written is left out of the links (`page.translations`, hreflang tags and sitemap alternates): a `render = false` page, a `redirect_to` stub, and a page that loses its URL to another page (the build's duplicate output path warning), whose URL serves that other page.
+
 ### Translation Keys
 
 When the file names differ per language, set the same `translation_key` in each translation's front matter (Hugo's `translationKey`):
