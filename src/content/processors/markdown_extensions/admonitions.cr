@@ -49,68 +49,105 @@ module Hwaro
         # rendered as body text under the default "Note" heading. Obsidian's
         # optional fold marker (`[!NOTE]+` / `[!NOTE]-`, group 4) is dropped,
         # unless `foldable` (`[markdown] wikilinks`) renders it as <details>.
-        ADMONITION_BLOCKQUOTE_RE = /<blockquote>\s*<p>\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\](?<fold>[+-]?)([^\n]*?)(?:\n|(?=<\/p>))\s*(.*?)<\/blockquote>/im
+        #
+        # The rest runs to the `</blockquote>` that closes THIS blockquote
+        # (`matching_blockquote_close`): a lazy match to the first one ended
+        # the admonition inside a nested quote (`> > quoted`), emitting its
+        # `</div>` before the inner `</blockquote>` — mis-nested tags that
+        # left a stray `</blockquote>` after the admonition.
+        ADMONITION_OPEN_RE = /<blockquote>\s*<p>\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\](?<fold>[+-]?)([^\n]*?)(?:\n|(?=<\/p>))\s*/i
+        BLOCKQUOTE_TAG_RE  = /<(\/?)blockquote(?=[\s>\/])[^>]*+>/i
 
-        # Post-processing: rewrite GitHub `> [!TYPE]` blockquotes as admonition divs.
-        # Note: the lazy match against `</blockquote>` means a nested blockquote
-        # inside the admonition will close the match early. Acceptable for v1 —
-        # GitHub admonitions don't support nested blockquotes either.
+        # Byte offset of the `</blockquote>` closing the blockquote whose
+        # content starts at `from`, counting nested blockquotes (a render
+        # hook's `<blockquote class=…>` included). Unbalanced raw HTML that
+        # never returns to depth zero falls back to the first closer, as the
+        # lazy match did; nil when there is no closer at all.
+        private def matching_blockquote_close(html : String, from : Int32) : Int32?
+          depth = 1
+          first = nil
+          pos = from
+          while m = BLOCKQUOTE_TAG_RE.match_at_byte_index(html, pos)
+            pos = m.byte_end(0)
+            if m[1].empty?
+              depth += 1
+            else
+              first ||= m.byte_begin(0)
+              depth -= 1
+              return m.byte_begin(0) if depth.zero?
+            end
+          end
+          first
+        end
+
+        # Post-processing: rewrite GitHub `> [!TYPE]` blockquotes as admonition
+        # divs, including one nested in another (`> > [!TIP]`).
         def postprocess_admonitions(html : String, foldable : Bool = false) : String
           return html unless Utils::ByteScan.includes?(html, "[!")
+          return html unless m = ADMONITION_OPEN_RE.match(html)
 
-          html.gsub(ADMONITION_BLOCKQUOTE_RE) do |_|
-            type = $1
-            fold = foldable ? $~["fold"] : ""
-            title_line = $3
-            rest = $4
-            # Two or more trailing spaces on the marker line become a hard
-            # break in markd (`[!NOTE]  ` → `[!NOTE]<br />\n`), and the break
-            # tag sits before the newline group 2 stops at — so it landed in
-            # the title and a bare marker lost its "Note" heading to an empty
-            # `<br />`. It is line-end residue, never title text.
-            title_line = title_line.sub(/\s*<br\s*\/?>\s*\z/, "")
-            # An inline element that wraps from the marker line onto the next
-            # (`[!WARNING] see [the\n> docs](…)`) cannot be a title: cutting
-            # it at the soft break split `<a>` between title and body. Treat
-            # the whole paragraph as body, as before custom titles existed.
-            unless inline_html_balanced?(title_line)
-              rest = "#{title_line}\n#{rest}"
-              title_line = ""
+          String.build(html.bytesize) do |io|
+            pos = 0
+            while m
+              break unless close = matching_blockquote_close(html, m.byte_end(0))
+              io.write(html.to_slice[pos, m.byte_begin(0) - pos])
+              body = html.byte_slice(m.byte_end(0), close - m.byte_end(0))
+              io << render_admonition(m[1], foldable ? m["fold"] : "", m[3], postprocess_admonitions(body, foldable))
+              pos = close + "</blockquote>".bytesize
+              m = ADMONITION_OPEN_RE.match_at_byte_index(html, pos)
             end
-            custom_title = title_line.strip
-            type_lower = type.downcase
-            # The custom title is already inline-rendered (and escaped) by
-            # markd — it was part of the paragraph — so it is emitted as-is.
-            type_title = custom_title.empty? ? type.capitalize : custom_title
+            io.write(html.to_slice[pos, html.bytesize - pos])
+          end
+        end
 
-            body = if rest.lstrip.starts_with?("</p>")
-                     # Marker was alone on its paragraph; remaining content
-                     # already consists of well-formed block elements.
-                     rest.sub(/\A\s*<\/p>\s*/, "").strip
-                   elsif rest.strip.empty?
-                     # Title-only admonition with no body.
-                     ""
-                   else
-                     # Body text shared the marker's paragraph (soft break).
-                     # The closing </p> is already inside `rest`.
-                     "<p>#{rest.lstrip}".strip
-                   end
+        private def render_admonition(type : String, fold : String, title_line : String, rest : String) : String
+          # Two or more trailing spaces on the marker line become a hard
+          # break in markd (`[!NOTE]  ` → `[!NOTE]<br />\n`), and the break
+          # tag sits before the newline group 2 stops at — so it landed in
+          # the title and a bare marker lost its "Note" heading to an empty
+          # `<br />`. It is line-end residue, never title text.
+          title_line = title_line.sub(/\s*<br\s*\/?>\s*\z/, "")
+          # An inline element that wraps from the marker line onto the next
+          # (`[!WARNING] see [the\n> docs](…)`) cannot be a title: cutting
+          # it at the soft break split `<a>` between title and body. Treat
+          # the whole paragraph as body, as before custom titles existed.
+          unless inline_html_balanced?(title_line)
+            rest = "#{title_line}\n#{rest}"
+            title_line = ""
+          end
+          custom_title = title_line.strip
+          type_lower = type.downcase
+          # The custom title is already inline-rendered (and escaped) by
+          # markd — it was part of the paragraph — so it is emitted as-is.
+          type_title = custom_title.empty? ? type.capitalize : custom_title
 
-            String.build do |str|
-              if fold.empty?
-                str << %(<div class="admonition admonition-#{type_lower}">\n)
-                str << %(<p class="admonition-title">#{type_title}</p>\n)
-              else
-                # Obsidian fold: `-` starts collapsed, `+` open.
-                str << %(<details class="admonition admonition-#{type_lower}") << (fold == "+" ? " open>\n" : ">\n")
-                str << %(<summary class="admonition-title">#{type_title}</summary>\n)
-              end
-              unless body.empty?
-                str << body
-                str << '\n'
-              end
-              str << (fold.empty? ? "</div>" : "</details>")
+          body = if rest.lstrip.starts_with?("</p>")
+                   # Marker was alone on its paragraph; remaining content
+                   # already consists of well-formed block elements.
+                   rest.sub(/\A\s*<\/p>\s*/, "").strip
+                 elsif rest.strip.empty?
+                   # Title-only admonition with no body.
+                   ""
+                 else
+                   # Body text shared the marker's paragraph (soft break).
+                   # The closing </p> is already inside `rest`.
+                   "<p>#{rest.lstrip}".strip
+                 end
+
+          String.build do |str|
+            if fold.empty?
+              str << %(<div class="admonition admonition-#{type_lower}">\n)
+              str << %(<p class="admonition-title">#{type_title}</p>\n)
+            else
+              # Obsidian fold: `-` starts collapsed, `+` open.
+              str << %(<details class="admonition admonition-#{type_lower}") << (fold == "+" ? " open>\n" : ">\n")
+              str << %(<summary class="admonition-title">#{type_title}</summary>\n)
             end
+            unless body.empty?
+              str << body
+              str << '\n'
+            end
+            str << (fold.empty? ? "</div>" : "</details>")
           end
         end
       end
