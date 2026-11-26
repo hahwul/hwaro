@@ -212,7 +212,7 @@ module Hwaro
             parser.on("--cache", "Enable build caching (skip unchanged files)") { cache = true }
             parser.on("--full", "Force a complete rebuild (ignore cache)") { full = true }
             parser.on("--stream", "Enable streaming build to reduce memory usage") { stream = true }
-            parser.on("--memory-limit SIZE", "Memory limit for streaming build (e.g. 2G, 512M)") { |size| memory_limit = size }
+            parser.on("--memory-limit SIZE", "Memory limit for streaming build (e.g. 2G, 512M)") { |size| memory_limit = CLI.utf8_flag!("--memory-limit", size) }
 
             # Skip options
             parser.on("--skip-highlighting", "Disable syntax highlighting") { highlight = false }

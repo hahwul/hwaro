@@ -184,7 +184,7 @@ module Hwaro
             CLI.register_jobs(parser) { |n| workers = n }
             parser.on("--cache", "Enable build caching (skip unchanged files)") { cache = true }
             parser.on("--stream", "Enable streaming build to reduce memory usage") { stream = true }
-            parser.on("--memory-limit SIZE", "Memory limit for streaming build (e.g. 2G, 512M)") { |size| memory_limit = size }
+            parser.on("--memory-limit SIZE", "Memory limit for streaming build (e.g. 2G, 512M)") { |size| memory_limit = CLI.utf8_flag!("--memory-limit", size) }
             parser.on("--fast-start", "Render homepage + latest N pages first, then background-render the rest") { fast_start = true }
             parser.on("--fast-start-count N", "Number of recent pages to render up front with --fast-start (default: 20)") do |n|
               parsed = n.to_i?
@@ -219,7 +219,7 @@ module Hwaro
             parser.on("--no-live-reload", "Disable live reload on file changes") { live_reload = false }
             parser.on("--allow-host HOST", "Also answer this Host name (repeatable; '*' disables the Host check)") { |h| allow_hosts << h }
             parser.on("--header NAME:VALUE", "Add custom response header (repeatable)") do |h|
-              key, value = parse_header(h)
+              key, value = parse_header(CLI.utf8_flag!("--header", h))
               headers[key] = value
             end
 

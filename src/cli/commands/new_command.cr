@@ -264,10 +264,10 @@ module Hwaro
             parser.banner = "Usage: hwaro new <path> [options]"
 
             # Content metadata
-            parser.on("-t TITLE", "--title TITLE", "Content title") { |t| title = t }
+            parser.on("-t TITLE", "--title TITLE", "Content title") { |t| title = CLI.utf8_flag!("--title", t) }
             parser.on("--date DATE", "Content date (default: now)") { |d| date = d }
             parser.on("--draft", "Mark as draft") { draft = true }
-            parser.on("--tags TAGS", "Comma-separated tags") { |t| tags = t.split(",").map(&.strip).reject(&.empty?) }
+            parser.on("--tags TAGS", "Comma-separated tags") { |t| tags = CLI.utf8_flag!("--tags", t).split(",").map(&.strip).reject(&.empty?) }
             parser.on("-s NAME", "--section NAME", "Section directory (e.g. blog, docs)") { |s| section = s }
             parser.on("-a NAME", "--archetype NAME", "Archetype to use") { |a| archetype = a }
             # `--bundle` / `--no-bundle` are mutually exclusive in intent but
