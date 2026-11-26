@@ -1818,3 +1818,25 @@ describe "Creator with [content] ignore" do
     end
   end
 end
+
+# Regression: TOML and YAML front matter fold a newline in `--title` / `--tags`
+# to a space; JSON kept it, so the same `hwaro new` gave a JSON page a
+# different title than a TOML or YAML one.
+describe "Hwaro::Services::Creator front matter format parity" do
+  it "gives the same title and tags in every format" do
+    parsed = %w[toml yaml json].map do |fmt|
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          config = Hwaro::Models::Config.new
+          config.content_new.front_matter_format = fmt
+          options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "two\nlines", tags: ["a\nb"])
+          Hwaro::Services::Creator.new.run(options, config)
+          result = Hwaro::Content::Processors::Markdown.new.parse(File.read("content/post.md"), "content/post.md")
+          {result[:title], result[:tags]}
+        end
+      end
+    end
+    parsed.uniq.should eq([{"two lines", ["a b"]}])
+  end
+end
