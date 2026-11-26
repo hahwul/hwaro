@@ -200,6 +200,17 @@ describe Hwaro::Content::Processors::Xml do
       result.should eq(input)
     end
 
+    # Regression: whitespace was `\s`, which (PCRE2 UCP) matches U+00A0. A
+    # no-break space between two tags is character data: it was deleted as
+    # "indentation", and an element holding one was taken for element-only
+    # content, so its word-separating line breaks were removed too.
+    it "keeps a no-break space between tags as character data" do
+      input = "<p>\n\u00a0\n<b>x</b></p>"
+      Hwaro::Content::Processors::Xml.minify(input).should eq(input)
+      input = "<t>\u00a0<b>bold</b>\n<i>italic</i></t>"
+      Hwaro::Content::Processors::Xml.minify(input).should eq(input)
+    end
+
     it "still removes indentation around comments in element-only content" do
       input = "<root>\n  <!-- note -->\n  <a>1</a>\n  <b>2</b>\n</root>"
       result = Hwaro::Content::Processors::Xml.minify(input)
