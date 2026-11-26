@@ -348,6 +348,17 @@ describe Hwaro::Models::Page do
       Hwaro::Utils::PathUtils.split_safe_segments(page.url.lchop("/"))[0].should eq(["posts", "x<img src=y>"])
     end
 
+    # Browsers delete a raw tab, LF or CR from a URL they parse, so a
+    # `tab<TAB>x.md` page was linked as `/posts/tabx/`, a 404.
+    it "percent-encodes a tab, line feed or carriage return" do
+      page = Hwaro::Models::Page.new("posts/a.md")
+      page.url = "/posts/tab\tx/a\nb\rc/"
+      page.url.should eq("/posts/tab%09x/a%0Ab%0Dc/")
+      Hwaro::Utils::PathUtils.split_safe_segments(page.url.lchop("/"))[0].should eq(["posts", "tab\tx", "a\nb\rc"])
+      page.url = page.url
+      page.url.should eq("/posts/tab%09x/a%0Ab%0Dc/")
+    end
+
     # `%de` decodes to a lone 0xDE byte, which the output path scrubbed to
     # U+FFFD: the page was written where its URL could never reach.
     it "escapes a % whose run does not decode to UTF-8" do

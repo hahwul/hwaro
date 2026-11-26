@@ -608,6 +608,10 @@ module Hwaro
       # inside an `href` is valid HTML, but the AMP converter rewrites tags
       # by pattern and turned it into markup whose quote ended the attribute.
       #
+      # A tab, line feed or carriage return (a `a\tb.md` file name) is escaped
+      # as well: browsers delete them from any URL they parse, so a raw one
+      # linked `/posts/ab/`, a 404, and left the sitemap `<loc>` invalid.
+      #
       # A `%` that starts no escape (`100%.md`) is escaped: `/posts/100%/` is
       # not a valid URL, and servers that reject it answer 400. So is every
       # `%` when the name's `%XX` runs do not decode to UTF-8 (`100%deal.md`):
@@ -625,14 +629,15 @@ module Hwaro
         if value.includes?('%')
           value = URI.decode(value).valid_encoding? ? value.gsub(/%(?![0-9A-Fa-f]{2})/, "%25") : value.gsub('%', "%25")
         end
-        if value.includes?('#') || value.includes?('?') || value.includes?('"') || value.includes?('<') || value.includes?('>')
+        if value.each_char.any? { |char| URL_DELIMITER_ESCAPES.has_key?(char) }
           value.gsub(URL_DELIMITER_ESCAPES)
         else
           value
         end
       end
 
-      URL_DELIMITER_ESCAPES = {'#' => "%23", '?' => "%3F", '"' => "%22", '<' => "%3C", '>' => "%3E"}
+      URL_DELIMITER_ESCAPES = {'#' => "%23", '?' => "%3F", '"' => "%22", '<' => "%3C", '>' => "%3E",
+                               '\t' => "%09", '\n' => "%0A", '\r' => "%0D"}
 
       # Generate permalink (absolute URL)
       def generate_permalink(base_url : String) : String
