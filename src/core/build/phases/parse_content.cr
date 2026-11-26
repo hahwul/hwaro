@@ -1025,7 +1025,10 @@ module Hwaro::Core::Build::Phases::ParseContent
       racy_digest = Cache.stable_mtime?(mtime_ms, now_ms) ? nil : Digest::MD5.hexdigest(raw_content)
       page.source_read = {mtime_ms, info.size.to_i64, racy_digest}
     end
-    data = Processor::Markdown.parse(raw_content, source_path, @config.try { |c| Content::FrontMatterSchema.declared_keys(c) })
+    config = @config
+    data = Processor::Markdown.parse(raw_content, source_path,
+      config.try { |c| Content::FrontMatterSchema.declared_keys(c) },
+      config.try { |c| Content::FrontMatterSchema.taxonomy_names(c).to_set })
 
     # A serve incremental re-parse works on the LIVE page object, and
     # `og_image:generate` (a BeforeRender hook the incremental paths never

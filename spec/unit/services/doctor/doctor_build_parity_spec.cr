@@ -370,5 +370,18 @@ describe Hwaro::Services::Doctor do
         log.should contain("unknown front-matter key 'titel'")
       end
     end
+
+    # The build warns about non-string list members only for taxonomies; a
+    # `[[content.schema]]` field is a declared key but page data. Doctor
+    # passed only the declared keys and kept warning about it.
+    it "warns about non-string list members only for taxonomies, like the build" do
+      Dir.mktmpdir do |dir|
+        parity_site(dir, "[[taxonomies]]\nname = \"genres\"\n\n[[content.schema]]\nsections = [\"**\"]\n[content.schema.fields.sizes]\ntype = \"array\"\n")
+        write_file(dir, "content/a.md", "+++\ntitle = \"A\"\nsizes = [1.5, 2.5]\ngenres = [1.5]\n+++\nx")
+        log = with_captured_log { parity_doctor(dir).run }
+        log.should_not contain("`sizes`")
+        log.should contain("`genres` has a non-string value (1.5)")
+      end
+    end
   end
 end

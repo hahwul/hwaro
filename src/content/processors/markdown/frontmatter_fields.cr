@@ -135,7 +135,14 @@ module Hwaro
           Logger.warn "#{file_path}: `#{key}` must be a list of strings — ignored."
         end
 
-        private def extract_taxonomies(front_matter : TOML::Table | YAML::Any | JSON::Any, keys : Array(String), file_path : String = "") : Hash(String, Array(String))
+        # Every top-level list is collected (the parser does not know which
+        # taxonomies the site configures), but only a taxonomy's own terms are
+        # worth a "non-string value — ignored" warning: `sizes = [1.5, 2.5]` or
+        # a `[[gallery]]` table array is ordinary page data, kept whole in
+        # `page.extra`, and the warning sent authors hunting for a problem
+        # that did not exist. `taxonomy_names` are the configured taxonomies;
+        # `categories` is the one taxonomy that is also a known key.
+        private def extract_taxonomies(front_matter : TOML::Table | YAML::Any | JSON::Any, keys : Array(String), file_path : String = "", taxonomy_names : Set(String)? = nil) : Hash(String, Array(String))
           taxonomies = {} of String => Array(String)
 
           # Iterate all keys: TOML::Table yields {String, TOML::Any},
@@ -150,7 +157,8 @@ module Hwaro
             next if NON_TAXONOMY_ARRAY_KEYS.includes?(key)
             next unless val = front_matter[key]?
             if arr = val.as_a?
-              taxonomies[key] = fm_terms(arr, key, file_path)
+              taxonomy = key == "categories" || taxonomy_names.try(&.includes?(key))
+              taxonomies[key] = fm_terms(arr, key, taxonomy ? file_path : "")
             elsif key == "categories"
               # The one taxonomy name that is also a KNOWN key (so it never
               # reaches `extra` or the typo hint): a bare value vanished
