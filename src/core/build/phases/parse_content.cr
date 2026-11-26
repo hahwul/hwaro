@@ -796,7 +796,12 @@ module Hwaro::Core::Build::Phases::ParseContent
     source = HTML.escape(site.config.with_base_path(target.url))
     # The closing blank line ends the `</div>` HTML block, so the next line
     # is Markdown again (otherwise it is raw HTML, dropped under `safe`).
-    %(<div class="transclusion" data-source="#{source}">\n\n#{body}\n\n</div>\n).gsub('\n', "\n#{prefix}").insert(0, prefix)
+    # The wrapper is hwaro's markup, marked like the extensions' so `safe`
+    # keeps it: unmarked, safe mode dropped the opening tag but kept the
+    # `</div>`, which then closed an enclosing container or admonition
+    # instead (mis-nested tags).
+    opener = Content::Processors::MarkdownExtensions.trust(%(<div class="transclusion" data-source="#{source}">), site.config.markdown.safe)
+    %(#{opener}\n\n#{body}\n\n</div>\n).gsub('\n', "\n#{prefix}").insert(0, prefix)
   end
 
   private def include_output_dir : String?
