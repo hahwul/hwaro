@@ -326,6 +326,8 @@ rules = [
 
 규칙을 설정하지 않으면 Hwaro는 기본 전체 허용 규칙을 생성합니다. 규칙의 `allow`와 `disallow`가 모두 비어 있으면 모호한 동작을 막기 위해 명시적인 `Allow: /`가 추가됩니다.
 
+`robots.txt`는 기본으로 생성됩니다. 직접 작성한 `static/robots.txt`는 생성된 파일로 대체되며 빌드가 경고를 출력합니다. 직접 작성한 파일을 게시하려면 `enabled = false`로 설정하세요. 다른 생성 파일(사이트맵, 피드, `llms.txt`, 검색 인덱스)도 마찬가지로 같은 경로의 `static/` 파일이나 페이지의 [출력 형식](/ko/features/output-formats/) 파일을 대체하고, 그 경로를 되돌려 줄 설정을 알려 주는 경고를 출력합니다.
+
 ### Content Signals
 
 규칙에 `content_signal` 테이블을 넣으면 [Content Signals](https://contentsignals.org/) 줄을 출력합니다. 크롤러가 가져간 콘텐츠를 어떻게 써도 되는지 알리는 지시어입니다:

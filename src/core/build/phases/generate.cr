@@ -147,6 +147,13 @@ module Hwaro::Core::Build::Phases::Generate
       },
     ] of Proc(Nil)
     ParallelHelper.execute(tasks, ctx.options.parallel)
+
+    config = site.config
+    replaced = Content::Seo::Sitemap.published_outputs(config, output_dir).map { |path| {path, "set [sitemap] enabled = false"} }
+    replaced.concat(Content::Seo::Feeds.published_outputs(all_pages, config, output_dir, warn_on_collision: false).map { |path| {path, "rename or turn off that feed ([feeds])"} })
+    replaced << {File.join(output_dir, File.basename(config.robots.filename)), "set [robots] enabled = false"} if config.robots.enabled
+    replaced.concat(Content::Seo::Llms.published_outputs(config, output_dir).map { |path| {path, "set [llms] enabled = false"} })
+    warn_replaced_outputs(replaced, all_pages, output_dir)
   end
 
   # The search index. Kept separate from `generate_seo_outputs` because the
@@ -157,6 +164,47 @@ module Hwaro::Core::Build::Phases::Generate
       skip_if_unchanged: generate_outputs_unchanged?(ctx), builder: self)
     # Claimed whether written or skipped: the claim list is "what this build
     # publishes" (see Phases::Finalize).
-    Content::Search.published_outputs(site.config, ctx.options.output_dir).each { |path| claim_generated_output(path) }
+    published = Content::Search.published_outputs(site.config, ctx.options.output_dir)
+    published.each { |path| claim_generated_output(path) }
+    warn_replaced_outputs(published.map { |path| {path, "set another [search] filename"} }, ctx.all_pages, ctx.options.output_dir)
+  end
+
+  # A generated file wins over anything else published at its path: a
+  # `static/` file (cold and `--cache` builds alike, see
+  # `static_copy_over_skippable_output?`) or a page's `[outputs]` format file
+  # (the home page's `index.xml` under `[feeds] filename = "index.xml"`).
+  # Both were replaced silently: a hand-written `static/robots.txt` lost its
+  # `Disallow` rules to the default allow-all file, and `alternate_output_tags`
+  # kept advertising a format file that now held the feed. Say so, with the
+  # setting that hands the path back. `outputs` pairs each generated file
+  # with that setting.
+  private def warn_replaced_outputs(outputs : Array({String, String}), pages : Array(Models::Page), output_dir : String) : Nil
+    return if outputs.empty?
+    config = @site.try(&.config)
+    format_files = {} of String => {String, String}
+    if config
+      pages.each do |page|
+        next unless page.render
+        formats = effective_output_formats(page, config)
+        next if formats.empty?
+        format_output_paths(page, output_dir, formats).each do |path|
+          format_files[File.expand_path(path)] ||= {page.path, File.extname(path).lchop('.')}
+        end
+      end
+    end
+
+    static = static_publish_config
+    prefix = output_dir.ends_with?('/') ? output_dir : "#{output_dir}/"
+    outputs.each do |(path, setting)|
+      next unless path.starts_with?(prefix)
+      relative = path[prefix.size..]
+      if owner = format_files[File.expand_path(path)]?
+        Logger.warn "#{relative}: the #{owner[1]} output of '#{owner[0]}' is replaced by a generated file at the same path; #{setting}, or drop that output format, to keep it"
+      end
+      source = File.join("static", relative)
+      if File.file?(source) && !static.excluded?(relative)
+        Logger.warn "#{source} is replaced by the generated #{relative}; #{setting} to publish your own file"
+      end
+    end
   end
 end
