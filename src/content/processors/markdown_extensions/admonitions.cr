@@ -63,11 +63,11 @@ module Hwaro
         # hook's `<blockquote class=…>` included). Unbalanced raw HTML that
         # never returns to depth zero falls back to the first closer, as the
         # lazy match did; nil when there is no closer at all.
-        private def matching_blockquote_close(html : String, from : Int32) : Int32?
+        private def matching_blockquote_close(html : String, from : Int32, options : Regex::MatchOptions) : Int32?
           depth = 1
           first = nil
           pos = from
-          while m = BLOCKQUOTE_TAG_RE.match_at_byte_index(html, pos)
+          while m = BLOCKQUOTE_TAG_RE.match_at_byte_index(html, pos, options)
             pos = m.byte_end(0)
             if m[1].empty?
               depth += 1
@@ -82,19 +82,30 @@ module Hwaro
 
         # Post-processing: rewrite GitHub `> [!TYPE]` blockquotes as admonition
         # divs, including one nested in another (`> > [!TIP]`).
-        def postprocess_admonitions(html : String, foldable : Bool = false) : String
+        #
+        # Each nesting level rescans and copies its body, so the levels
+        # rewritten are capped: a page nesting admonitions a thousand deep
+        # (a megabyte of `> > > …`) took seconds. Deeper ones stay
+        # blockquotes.
+        MAX_ADMONITION_NESTING = 8
+
+        def postprocess_admonitions(html : String, foldable : Bool = false, depth : Int32 = 0) : String
           return html unless Utils::ByteScan.includes?(html, "[!")
-          return html unless m = ADMONITION_OPEN_RE.match(html)
+          # One UTF-8 check: PCRE2 otherwise revalidates the whole page on
+          # every match, quadratic in the admonition count.
+          options = html.valid_encoding? ? Regex::MatchOptions::NO_UTF_CHECK : Regex::MatchOptions::None
+          return html unless m = ADMONITION_OPEN_RE.match_at_byte_index(html, 0, options)
 
           String.build(html.bytesize) do |io|
             pos = 0
             while m
-              break unless close = matching_blockquote_close(html, m.byte_end(0))
+              break unless close = matching_blockquote_close(html, m.byte_end(0), options)
               io.write(html.to_slice[pos, m.byte_begin(0) - pos])
               body = html.byte_slice(m.byte_end(0), close - m.byte_end(0))
-              io << render_admonition(m[1], foldable ? m["fold"] : "", m[3], postprocess_admonitions(body, foldable))
+              body = postprocess_admonitions(body, foldable, depth + 1) if depth + 1 < MAX_ADMONITION_NESTING
+              io << render_admonition(m[1], foldable ? m["fold"] : "", m[3], body)
               pos = close + "</blockquote>".bytesize
-              m = ADMONITION_OPEN_RE.match_at_byte_index(html, pos)
+              m = ADMONITION_OPEN_RE.match_at_byte_index(html, pos, options)
             end
             io.write(html.to_slice[pos, html.bytesize - pos])
           end

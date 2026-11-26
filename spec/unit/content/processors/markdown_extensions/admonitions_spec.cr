@@ -39,6 +39,18 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
         HTML
     end
 
+    it "stays linear in the admonition count and nesting depth" do
+      # Every match revalidated the page's UTF-8, and every nesting level
+      # rescanned and copied its body.
+      many = "<blockquote>\n<p>[!NOTE]\nx é</p>\n</blockquote>\n" * 40_000
+      deep = (1..2000).join { "<blockquote>\n<p>[!NOTE]</p>\n" } + "x" + "</blockquote>\n" * 2000
+      t = Time.instant
+      Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(many).scan("admonition-note").size.should eq(40_000)
+      out = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(deep)
+      (Time.instant - t).should be < 5.seconds # quadratic took 30s+
+      out.scan("admonition-note").size.should eq(Hwaro::Content::Processors::MarkdownExtensions::MAX_ADMONITION_NESTING)
+    end
+
     it "falls back to the first closer when raw HTML leaves the quote unbalanced" do
       html = "<blockquote>\n<p>[!NOTE]</p>\n<blockquote>\n<p>x</p>\n</blockquote>\nrest"
       Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html).should eq(
