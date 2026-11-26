@@ -621,13 +621,15 @@ module Hwaro
           newline
         end
 
+        # `inline_html` (ext/markd_image_alt_html_fix.cr) escapes what lands
+        # in an image's alt attribute.
         def html_inline(node : Markd::Node, entering : Bool)
           return super unless @options.safe?
           if kept = keep_trusted(node.text)
-            return literal(kept)
+            return inline_html(kept)
           end
           return super unless node.text.includes?("<!--HWARO-SHORTCODE-PLACEHOLDER-")
-          literal(keep_shortcode_placeholders(node.text))
+          inline_html(keep_shortcode_placeholders(node.text))
         end
 
         TRUSTED_OPEN_RE    = Regex.new("<(#{Markd::Rule::TAG_NAME_STRING}) #{MarkdownExtensions::TRUSTED_MARK}#{Markd::Rule::ATTRIBUTE}*\\s*/?>")
