@@ -123,7 +123,7 @@ module Hwaro
           section_pagination(page, site).paginated_pages.each do |paginated|
             number = paginated.page_number
             next if number == 1 || paginated_output_path(page, number, output_dir, page.paginate_path).nil?
-            planned << PlannedUrl.new("#{url.rstrip('/')}/#{page.paginate_path}/#{number}/", "pagination", source)
+            planned << PlannedUrl.new("#{url.rstrip('/')}/#{page.paginate_url_path}/#{number}/", "pagination", source)
           end
         end
 
@@ -157,7 +157,7 @@ module Hwaro
         # `rss.xml` are themselves. The characters of a file name that a URL
         # cannot hold raw are escaped as `Page#url=` escapes them.
         private def output_file_url(file : String) : String
-          url = "/#{file.gsub('\\', '/').gsub('%', "%25").gsub(Models::Page::URL_DELIMITER_ESCAPES)}"
+          url = "/#{Models::Page.escape_url_chars(file.gsub('\\', '/').gsub('%', "%25"))}"
           url.ends_with?("/index.html") ? url.rchop("index.html") : url
         end
       end

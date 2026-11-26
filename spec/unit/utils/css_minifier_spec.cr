@@ -879,5 +879,17 @@ describe Hwaro::Utils::CssMinifier do
         ".b{color:blue;background:url(x.png)}")
       Hwaro::Utils::CssMinifier.minify(".a\\/* { color : red }\n.b { color : blue }").should eq(".a\\/*{color:red}.b{color:blue}")
     end
+
+    # Regression: an escaped `{`, `}`, `;` or `,` in a selector was still
+    # split on by the whitespace and colon passes. `.a\, .b` lost its
+    # descendant combinator, and after `.x\;` the selector `.card :hover`
+    # was tightened into the different selector `.card:hover`.
+    it "keeps escaped structural characters in a selector out of the structure passes" do
+      Hwaro::Utils::CssMinifier.minify(".a\\, .b { color: red }").should eq(".a\\, .b{color:red}")
+      Hwaro::Utils::CssMinifier.minify(".\\{a\\} .c { color: red }").should eq(".\\{a\\} .c{color:red}")
+      Hwaro::Utils::CssMinifier.minify("@media print { .card :hover, .x\\; { color: red } }")
+        .should eq("@media print{.card :hover,.x\\;{color:red}}")
+      Hwaro::Utils::CssMinifier.minify(".a\\;b :focus { color : red ; }").should eq(".a\\;b :focus{color:red}")
+    end
   end
 end

@@ -85,3 +85,21 @@ describe "TOML date followed by whitespace (ext/toml_datetime_fix)" do
     TOML.parse("d = 2024-05-01 10:20:30Z")["d"].raw.as(Time).hour.should eq(10)
   end
 end
+
+describe "TOML lowercase datetime delimiters (ext/toml_datetime_fix)" do
+  # Regression: TOML accepts `t` and `z` as well as `T` and `Z` (the ABNF
+  # names "T, t, or space"; ABNF literals are case-insensitive), but only
+  # the uppercase forms lexed, so a valid front matter date aborted the build.
+  it "reads a lowercase t delimiter and z offset like the uppercase forms" do
+    upper = TOML.parse("d = 2024-03-05T10:20:30Z")["d"].raw.as(Time)
+    TOML.parse("d = 2024-03-05t10:20:30z")["d"].raw.as(Time).should eq(upper)
+    TOML.parse("d = 2024-03-05t10:20:30Z")["d"].raw.as(Time).should eq(upper)
+    TOML.parse("d = 2024-03-05 10:20:30z")["d"].raw.as(Time).utc?.should be_true
+    TOML.parse("d = 2024-03-05t10:20:30.5z")["d"].raw.as(Time).nanosecond.should eq(500_000_000)
+  end
+
+  it "reads a lowercase t before an offset or a local time" do
+    TOML.parse("d = 2024-03-05t08:20:30+09:00")["d"].raw.as(Time).offset.should eq(9 * 3600)
+    TOML.parse("d = 2024-03-05t08:20:30")["d"].raw.as(Time).hour.should eq(8)
+  end
+end

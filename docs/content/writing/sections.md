@@ -191,7 +191,7 @@ Access subsections in templates:
 
 ```jinja
 {% for sub in section.subsections %}
-<a href="{{ sub.url }}">{{ sub.title | e }}</a>
+<a href="{{ base_url }}{{ sub.url }}">{{ sub.title | e }}</a>
 <small>({{ sub.pages_count }})</small>
 {% endfor %}
 ```

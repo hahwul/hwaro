@@ -14,8 +14,12 @@ module Hwaro
         private PRESERVE_TOKEN_RE = /\x00HWXMLP(\d{1,9})\x00/
 
         # A whitespace-only text node that spans a line break — the
-        # pretty-printing between tags this minifier removes.
-        private INDENT_RE    = /\A\s*\n\s*\z/
+        # pretty-printing between tags this minifier removes. Whitespace is
+        # XML's `S` (space, tab, CR, LF), not `\s`: Crystal compiles patterns
+        # with PCRE2's UCP flag, where `\s` also matches U+00A0, and a
+        # no-break space between two tags is character data, not indentation.
+        private INDENT_RE    = /\A[ \t\r\n]*\n[ \t\r\n]*\z/
+        private XML_WS       = " \t\r\n"
         private XML_SPACE_RE = /\sxml:space\s*=\s*["'](preserve|default)["']/
 
         # Simple XML minification - removes excess whitespace.
@@ -49,14 +53,14 @@ module Hwaro
                 # `title="a    b"`), otherwise the minifier silently corrupts
                 # attribute content. Comments and CDATA sections are
                 # placeholders here and never reach this branch.
-                io << token.gsub(/("[^"]*"|'[^']*')|\s{2,}/) do |m|
+                io << token.gsub(/("[^"]*"|'[^']*')|[ \t\r\n]{2,}/) do |m|
                   (m.starts_with?('"') || m.starts_with?('\'')) ? m : " "
                 end
               else
                 io << token
               end
             end
-          end.strip
+          end.strip(XML_WS)
           return result if preserved.empty?
           result.gsub(PRESERVE_TOKEN_RE) do
             # to_i? bounds-guards a counterfeit token (NUL is illegal in
@@ -164,7 +168,7 @@ module Hwaro
             idx = $1.to_i?
             idx && idx < preserved.size && preserved[idx].starts_with?("<!--") ? "" : "x"
           end
-          !stripped.strip.empty?
+          !stripped.strip(XML_WS).empty?
         end
       end
     end

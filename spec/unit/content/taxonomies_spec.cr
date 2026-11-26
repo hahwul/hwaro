@@ -173,6 +173,30 @@ describe Hwaro::Content::Taxonomies do
       end
     end
 
+    # A term that fits on one pager still reports the configured page size,
+    # as a section with `paginate` does: it reported the term's page count.
+    it "reports paginate_by as the page size of a term that fits on one pager" do
+      config = Hwaro::Models::Config.new
+      tax = Hwaro::Models::TaxonomyConfig.new("tags")
+      tax.paginate_by = 5
+      config.taxonomies = [tax]
+      site = Hwaro::Models::Site.new(config)
+      site.pages = (1..3).map do |i|
+        page = Hwaro::Models::Page.new("post#{i}.md")
+        page.title = "Post #{i}"
+        page.url = "/blog/post#{i}/"
+        page.tags = ["crystal"]
+        page
+      end
+
+      Dir.mktmpdir do |output_dir|
+        templates = {"taxonomy_term" => "by={{ paginator.paginate_by }} per={{ pagination_obj.per_page }} n={{ paginator.pages | length }}"}
+        Hwaro::Content::Taxonomies.generate(site, output_dir, templates)
+
+        File.read(File.join(output_dir, "tags", "crystal", "index.html")).should eq("by=5 per=5 n=3")
+      end
+    end
+
     it "keeps redirect_to stubs out of a term feed, like every other feed" do
       config = Hwaro::Models::Config.new
       config.base_url = "https://example.com"

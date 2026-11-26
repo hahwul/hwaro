@@ -101,7 +101,7 @@ With elif:
 Inline, as an expression (the `else` part is optional and renders empty when left out):
 
 ```jinja
-<a href="{{ item.url }}" class="{{ 'active' if item.url == page.url else '' }}">{{ item.name | e }}</a>
+<a href="{{ item.href }}" class="{{ 'active' if item.url == page.url else '' }}">{{ item.name | e }}</a>
 {% set label = page.title if page.title else "Untitled" %}
 ```
 
@@ -111,7 +111,7 @@ Inline, as an expression (the `else` part is optional and renders empty when lef
 
 ```jinja
 {% for p in section.pages %}
-<li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
+<li><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></li>
 {% endfor %}
 ```
 
@@ -145,7 +145,7 @@ Take part of a list or string with `[start:stop:step]`, as in Jinja2. Any part c
 
 ```jinja
 {% for p in section.pages[:5] %}
-<li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
+<li><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></li>
 {% endfor %}
 
 {{ page.title[:40] | e }}
@@ -213,7 +213,7 @@ Define reusable snippets with `{% macro %}`, usually in a partial, and import th
 
 ```jinja
 {% macro card(p, show_date=true) %}
-<a href="{{ p.url }}">{{ p.title | e }}</a>
+<a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a>
 {% if show_date and p.date %}<time>{{ p.date }}</time>{% endif %}
 {% endmacro %}
 ```
@@ -363,7 +363,7 @@ Output literal Jinja syntax:
 {% if section.pages %}
 <ul>
 {% for p in section.pages %}
-  <li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
+  <li><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></li>
 {% endfor %}
 </ul>
 {% else %}

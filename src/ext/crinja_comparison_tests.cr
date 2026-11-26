@@ -40,3 +40,56 @@ struct Crinja::Value
     end
   end
 end
+
+# Jinja2's number tests, `value % 2 == 0` (`even`), `value % 2 == 1` (`odd`)
+# and `value % num == 0` (`divisibleby`), in the value's own type. Upstream
+# converted both sides to Int32 first, so any integer past 2**31 (a
+# timestamp, an ID from a data file) failed the build with "Arithmetic
+# overflow", and a float was truncated: `2.5 is even` and
+# `3.5 is divisibleby 3` were true. A numeric string is still read as an
+# integer (a CSV field), as before.
+module Crinja::Test
+  def self.__number(value : Crinja::Value) : Int64 | Float64
+    case raw = value.raw
+    when Float                      then raw.to_f64
+    when Int                        then raw.to_i64
+    when String, Crinja::SafeString then raw.to_s.to_i64
+    else                                 value.to_i.to_i64
+    end
+  end
+
+  # Python's `%`: the result takes the divisor's sign.
+  def self.__modulo(value : Int64 | Float64, divisor : Int64 | Float64) : Int64 | Float64
+    raise DivisionByZeroError.new if divisor == 0
+    return 0_i64 if divisor == -1 && value.is_a?(Int64) # Int64::MIN % -1 overflows
+    value.is_a?(Int64) && divisor.is_a?(Int64) ? value % divisor : value.to_f64 % divisor.to_f64
+  end
+end
+
+Crinja.test(:even) { Crinja::Test.__modulo(Crinja::Test.__number(target), 2_i64) == 0 }
+Crinja.test(:odd) { Crinja::Test.__modulo(Crinja::Test.__number(target), 2_i64) == 1 }
+Crinja.test({num: Crinja::UNDEFINED}, :divisibleby) do
+  Crinja::Test.__modulo(Crinja::Test.__number(target), Crinja::Test.__number(arguments["num"])) == 0
+end
+
+# `lower` / `upper` are Python's `str.islower()` / `str.isupper()`: at least
+# one cased character, and none of the other case. Upstream required EVERY
+# character to be a lowercase (uppercase) letter, so a space, digit or
+# punctuation mark made `"hello world" is lower` false, and the empty
+# string was both lower and upper.
+module Crinja::Test
+  def self.__cased?(text : String, upper : Bool) : Bool
+    cased = false
+    text.each_char do |char|
+      if upper ? char.uppercase? : char.lowercase?
+        cased = true
+      elsif char.titlecase? || (upper ? char.lowercase? : char.uppercase?)
+        return false
+      end
+    end
+    cased
+  end
+end
+
+Crinja.test(:lower) { Crinja::Test.__cased?(target.to_s, upper: false) }
+Crinja.test(:upper) { Crinja::Test.__cased?(target.to_s, upper: true) }

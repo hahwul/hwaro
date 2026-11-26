@@ -72,6 +72,21 @@ module Hwaro
       end
     end
 
+    # `value` of a text flag (a title, tags, a size, a pattern, a header),
+    # or a usage error when it is not valid UTF-8. argv carries raw bytes —
+    # a latin-1 terminal or a script passes `caf\xE9` as is — and the
+    # regexes those values meet raise PCRE2's "UTF-8 error", which reached
+    # the runner as an unclassified exit 1 with no JSON under `--json`.
+    # Path flags are not checked: a non-UTF-8 file name is a valid path.
+    def self.utf8_flag!(flag : String, value : String) : String
+      return value if value.valid_encoding?
+      raise Hwaro::HwaroError.new(
+        code: Hwaro::Errors::HWARO_E_USAGE,
+        message: "#{flag} value is not valid UTF-8: #{value.scrub.inspect}",
+        hint: "Pass the value as UTF-8 text (check the terminal's or script's encoding).",
+      )
+    end
+
     # Register a FlagInfo on an OptionParser, eliminating manual duplication
     # between FLAGS metadata and OptionParser definitions.
     def self.register_flag(parser : OptionParser, flag : FlagInfo, &block : String ->)

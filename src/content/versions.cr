@@ -39,7 +39,12 @@ module Hwaro
       # `docs/v1/install.ko.md` ↔ `docs/v2/install.ko.md`. A headless
       # (`render = false`) counterpart is never written, so it does not
       # count as existing.
-      def link!(pages : Array(Models::Page), config : Models::Config) : Nil
+      #
+      # `unwritten` holds the paths of pages that lose their output URL to
+      # another page. Like a headless one, such a counterpart does not exist:
+      # its URL serves the page that won it, so `exists`, the switcher URL and
+      # an old version's canonical pointed at unrelated content.
+      def link!(pages : Array(Models::Page), config : Models::Config, unwritten : Set(String) = Set(String).new) : Nil
         versions = config.versions
         return unless versions.enabled?
 
@@ -55,7 +60,7 @@ module Hwaro
           rel = counterpart_path(version, page, config)
           next unless rel
           by_key[{version.name, page.language, rel}] ||= page
-          if page.render && page.is_a?(Models::Section) && page.section == version.path
+          if page.render && !unwritten.includes?(page.path) && page.is_a?(Models::Section) && page.section == version.path
             versions.written_roots[{version.name, lang_prefix(page, config)}] ||= page.url
           end
         end
@@ -69,7 +74,7 @@ module Hwaro
           prefix = lang_prefix(page, config)
           page.version_links = versions.list.map do |other|
             target = by_key[{other.name, page.language, rel}]?
-            target = nil if target && !target.render
+            target = nil if target && (!target.render || unwritten.includes?(target.path))
             url = target ? target.url : root_url(config, other, prefix)
             Models::VersionLink.new(other.name, other.label, other.latest, url, !target.nil?, other.same?(version))
           end
@@ -171,6 +176,13 @@ module Hwaro
 
         def size : Int32
           @items.size
+        end
+
+        # Printed as the list it is (`{{ versions }}`, `| e`, `| string`).
+        # The object default printed `#<…VersionList:0x10916ed00>`, an
+        # address that differs on every build.
+        def to_s(io : IO) : Nil
+          Crinja::Finalizer.stringify(io, @items)
         end
 
         def unsafe_fetch(index : Int) : Crinja::Value

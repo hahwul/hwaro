@@ -13,13 +13,23 @@ module Hwaro
             build_json(json, value.raw)
           end
 
+          # Any sequence is a JSON array: a tuple (a `dictsort` / `groupby`
+          # pair), as in Jinja2, and a list-like object such as `versions`.
+          # Through `to_s` they were `"[Crinja::Value<\"k\">, …]"` and
+          # `"#<…VersionList:0x…>"`.
           def self.build_json(json : JSON::Builder, raw)
             case raw
             when Crinja::Value      then build_json(json, raw.raw)
             when Crinja::SafeString then json.string(raw.to_s)
-            when Array              then json.array { raw.each { |v| build_json(json, v) } }
+            when Indexable          then json.array { raw.each { |v| build_json(json, v) } }
             when Hash               then json.object { raw.each { |k, v| json.field(k.to_s) { build_json(json, v) } } }
-            when String, Int32, Int64, Float64, Bool, Nil
+            when Float64
+              # `nan` / `inf` are valid TOML and YAML (`ratio = nan`), but JSON
+              # has no spelling for them and `Float64#to_json` raises — which
+              # aborted the build as a template error for a front matter or
+              # data value. Write `null`, as JavaScript's JSON.stringify does.
+              raw.finite? ? raw.to_json(json) : json.null
+            when String, Int32, Int64, Bool, Nil
               raw.to_json(json)
             else
               json.string(raw.to_s)

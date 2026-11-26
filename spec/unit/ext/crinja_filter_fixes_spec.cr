@@ -99,6 +99,29 @@ describe "Crinja built-in filter fixes" do
       render_filter("{{ true | int }}|{{ false | int }}|{{ 4.7 | int }}|{{ '42' | int }}|{{ 'x' | int(5) }}")
         .should eq("1|0|4|42|5")
     end
+
+    # `int` went through Int32: a larger numeric string gave the default and
+    # a larger float (or NaN) raised "Arithmetic overflow".
+    it "converts integers past Int32, and NaN to the default" do
+      render_filter("{{ '3000000000' | int }}|{{ 3000000000.0 | int }}|{{ ('3000000000.5' | int) + 1 }}")
+        .should eq("3000000000|3000000000|3000000001")
+      render_filter("{{ '1e3' | int }}|{{ '12.5' | int }}|{{ -2.9 | int }}|{{ 'nan' | float | int(7) }}|{{ 'inf' | float | int }}")
+        .should eq("1000|12|-2|7|0")
+      render_filter("{{ 'x' | int(3000000000) }}|{{ 'x' | int(2.5) }}|{{ 'x' | int(default='n/a') }}")
+        .should eq("3000000000|2.5|n/a")
+    end
+
+    # Python's int(string, base): a prefix only in its own base (or base 0),
+    # underscores between digits. Crystal read `0x10` as 16 in base 10,
+    # refused `1_000`, and raised on `base=0`.
+    it "reads base prefixes and digit underscores as Python does" do
+      render_filter("{{ '0x10' | int }}|{{ '0b101' | int }}|{{ '0x10' | int(base=16) }}|{{ '0x_ff' | int(base=16) }}|{{ '0o17' | int(base=0) }}|{{ '010' | int(base=0) }}")
+        .should eq("0|0|16|255|15|10")
+      render_filter("{{ '1_000' | int }}|{{ ' 1_0 ' | int }}|{{ '1_000.5' | int }}|{{ '1__0' | int }}|{{ '_1' | int }}|{{ '1_' | int }}|{{ '1_e3' | int }}")
+        .should eq("1000|10|1000|0|0|0|0")
+      render_filter("{{ '-0x10' | int(base=16) }}|{{ '+-5' | int }}|{{ '10' | int(base=1) }}|{{ 'f_f' | int(base=16) }}")
+        .should eq("-16|0|10|255")
+    end
   end
 
   describe "min and max" do
@@ -148,6 +171,52 @@ describe "Crinja built-in filter fixes" do
       expect_raises(Crinja::TypeError) do
         Crinja.new.from_string("{{ xs | min }}").render({"xs" => Crinja.value([1.0, Float64::NAN])})
       end
+    end
+  end
+
+  # `1 Bytes`, and anything from a thousand petabytes up printed `none`.
+  describe "filesizeformat" do
+    it "writes one byte in the singular and sizes past a petabyte" do
+      render_filter("{{ 1 | filesizeformat }}|{{ 0 | filesizeformat }}|{{ -0.5 | filesizeformat }}|{{ 999 | filesizeformat }}|{{ 1000 | filesizeformat(true) }}")
+        .should eq("1 Byte|0 Bytes|0 Bytes|999 Bytes|1000 Bytes")
+      render_filter("{{ 1000000000000000000 | filesizeformat }}|{{ 2000000000000000000 | filesizeformat(true) }}|{{ (1000000000000000000.0 * 1000) | filesizeformat }}")
+        .should eq("1.0 EB|1.7 EiB|1.0 ZB")
+      render_filter("{{ 1500 | filesizeformat }}|{{ 1500 | filesizeformat(true) }}|{{ '1024' | filesizeformat }}")
+        .should eq("1.5 kB|1.5 KiB|1.0 kB")
+    end
+  end
+
+  # A mapping came back, so `group.grouper` (the Jinja2 idiom) failed with
+  # "group.grouper is undefined" and `[0]` was empty.
+  describe "groupby" do
+    it "gives (grouper, list) groups with Jinja2's attribute names" do
+      items = %([{'y': 2024, 't': 'a'}, {'y': 2023, 't': 'b'}, {'y': 2024, 't': 'c'}])
+      render_filter("{% for g in #{items} | groupby('y') %}{{ g.grouper }}={{ g.list | map(attribute='t') | join }};{% endfor %}")
+        .should eq("2024=ac;2023=b;")
+      render_filter("{{ (#{items} | groupby('y'))[0].grouper }}|{{ #{items} | groupby('y') | map(attribute='grouper') | join(',') }}")
+        .should eq("2024|2024,2023")
+    end
+
+    it "still unpacks a group into key and items, in first-seen order" do
+      render_filter("{% for k, v in [{'a': 'x'}, {'a': 'y'}, {'a': 'x'}] | groupby('a') %}{{ k }}{{ v | length }};{% endfor %}")
+        .should eq("x2;y1;")
+      render_filter("{{ [] | groupby('a') | length }}|{{ missing | groupby('a') | length }}").should eq("0|0")
+    end
+  end
+
+  # The printer was never flushed (`{"a" => 1, …}` printed `{"b" =>`), and an
+  # undefined value printed its object address.
+  describe "pprint" do
+    it "prints the whole value" do
+      render_filter("{{ d | pprint }}").should eq(%({"b" => 2, "a" => 1, "C" => 3}))
+      render_filter("{{ [1, [2, 3], 'x'] | pprint }}").should eq(%([1, [2, 3], "x"]))
+      long = render_filter("{{ range(40) | list | pprint }}")
+      long.should start_with("[0,\n 1,\n")
+      long.should end_with("\n 39]")
+    end
+
+    it "prints an undefined value as Jinja2 does, the same every time" do
+      render_filter("{{ missing | pprint }}|{{ d.missing | pprint }}").should eq("Undefined|Undefined")
     end
   end
 end

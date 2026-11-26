@@ -163,6 +163,18 @@ module Hwaro::Core::Build::Phases::Render
     end
   end
 
+  # TOC titles of headings holding a shortcode carry its placeholder (see
+  # `Markdown#toc_title`): fill in the shortcode's output as text, as the
+  # heading shows it.
+  private def resolve_toc_shortcodes(headers : Array(Models::TocHeader), shortcode_results : Hash(String, String)) : Nil
+    headers.each do |header|
+      if Utils::ByteScan.includes?(header.title, "<!--HWARO-SHORTCODE-PLACEHOLDER-")
+        header.title = Processor::Markdown.heading_text(replace_shortcode_placeholders(header.title, shortcode_results))
+      end
+      resolve_toc_shortcodes(header.children, shortcode_results)
+    end
+  end
+
   private def render_page_content(
     page : Models::Page,
     site : Models::Site,
@@ -237,6 +249,7 @@ module Hwaro::Core::Build::Phases::Render
 
       # Replace shortcode placeholders with their rendered HTML content
       html_content = replace_shortcode_placeholders(html_content, shortcode_results)
+      resolve_toc_shortcodes(toc_headers, shortcode_results) unless shortcode_results.empty?
       warn_unpublished_bundle_links(page, html_content)
 
       # Resolve internal @/ links to actual page URLs
@@ -475,12 +488,15 @@ module Hwaro::Core::Build::Phases::Render
   # same — gating on the literal "section" silently dropped its
   # `section_list` and `paginator`. Only that explicit opt-in counts: a
   # custom template under the site-wide `[pagination]` default keeps listing
-  # every page, as it always has. The homepage keeps its own `index`
-  # template, and a section on the plain `page` fallback is left alone.
+  # every page, as it always has. A root `_index.md` opts in the same way,
+  # whether it renders with `template = "home"` or the `index` template: it
+  # is a section, and leaving it out lost the `paginate` it set (and the
+  # `paginator` its template reads). A section on the plain `page` fallback
+  # is left alone.
   private def paginated_section?(page : Models::Page, template_name : String) : Bool
     page.is_a?(Models::Section) && !page.has_redirect? &&
       (template_name == "section" || page.template == "section" ||
-        (template_name != "page" && !page.home? && (page.pagination_enabled == true || (page.paginate || 0) > 0)))
+        (template_name != "page" && (page.pagination_enabled == true || (page.paginate || 0) > 0)))
   end
 
   # Only `render_page` passes `warn: true`. Every other caller is a lookup
@@ -549,7 +565,7 @@ module Hwaro::Core::Build::Phases::Render
     # FenceTracker + inline-code masking the shortcode pre-filter uses
     # (content_may_contain_shortcodes?) so the two can't disagree about
     # what is fenced.
-    tracker = Content::Processors::FenceTracker.new(raw_html_code: false)
+    tracker = Content::Processors::FenceTracker.new(raw_html_code: false, footnote_bodies: true)
     raw.each_line(chomp: false) do |line|
       next if tracker.fence_line?(line)
       next unless line.includes?("{{<")

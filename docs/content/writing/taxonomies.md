@@ -206,7 +206,7 @@ Custom page list, looking up the current term's pages via `get_taxonomy()`:
 {% for term in tax.items if term.name == taxonomy_term %}
 <ul>
 {% for p in term.pages %}
-  <li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
+  <li><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></li>
 {% endfor %}
 </ul>
 {% endfor %}

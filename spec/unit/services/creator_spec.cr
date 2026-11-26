@@ -179,6 +179,24 @@ describe Hwaro::Services::Creator do
       end
     end
 
+    # Regression: the placeholder regex raised a bare "Regex match error:
+    # UTF-8 error" (unclassified exit 1, no file named) on a latin-1 archetype.
+    it "rejects a non-UTF-8 archetype with a classified error naming it" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("archetypes")
+          File.write("archetypes/default.md", "+++\ntitle = \"{{ title }}\"\n+++\ncaf\xE9\n".to_slice)
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "T")
+          err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Creator.new.run(options) }
+          err.code.should eq(Hwaro::Errors::HWARO_E_IO)
+          err.message.to_s.should contain("archetypes/default.md")
+          File.exists?("content/post.md").should be_false
+        end
+      end
+    end
+
     # Regression: archetype substitution injected the raw title/date, so a
     # title containing a double quote (`My "Quoted" Post`) produced invalid
     # TOML (`title = "My "Quoted" Post"`) and the generated file failed to
@@ -1816,5 +1834,27 @@ describe "Creator with [content] ignore" do
         log.should_not contain("[content] ignore")
       end
     end
+  end
+end
+
+# Regression: TOML and YAML front matter fold a newline in `--title` / `--tags`
+# to a space; JSON kept it, so the same `hwaro new` gave a JSON page a
+# different title than a TOML or YAML one.
+describe "Hwaro::Services::Creator front matter format parity" do
+  it "gives the same title and tags in every format" do
+    parsed = %w[toml yaml json].map do |fmt|
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          config = Hwaro::Models::Config.new
+          config.content_new.front_matter_format = fmt
+          options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "two\nlines", tags: ["a\nb"])
+          Hwaro::Services::Creator.new.run(options, config)
+          result = Hwaro::Content::Processors::Markdown.new.parse(File.read("content/post.md"), "content/post.md")
+          {result[:title], result[:tags]}
+        end
+      end
+    end
+    parsed.uniq.should eq([{"two lines", ["a b"]}])
   end
 end

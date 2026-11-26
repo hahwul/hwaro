@@ -75,7 +75,7 @@ module Hwaro
         # line end — `<style-guide>` or `<pre-view>` is an ordinary element —
         # and the block ends at the first line containing ANY of the closing
         # tags, whichever element opened it.
-        RAW_HTML_CODE_OPEN_RE  = /\A {0,3}<(?:pre|script|style|textarea)(?:[\s>]|\z)/i
+        RAW_HTML_CODE_OPEN_RE  = /\A {0,3}<(pre|script|style|textarea)(?:[\s>]|\z)/i
         RAW_HTML_CODE_CLOSE_RE = /<\/(?:pre|script|style|textarea)\s*>/i
 
         # Starts of CommonMark HTML blocks that run to a blank line (Markd's
@@ -102,6 +102,10 @@ module Hwaro
         # only keeps today's under-protective behavior.
         ATX_HEADING_RE = /\A {0,3}\#{1,6}(?:[ \t]|\r?\n?\z)/
 
+        # A footnote definition line, in the shape
+        # `MarkdownExtensions.preprocess_footnotes` extracts.
+        FOOTNOTE_DEF_RE = /\A {0,3}\[\^[^\]]+\]:[^\n]/
+
         @in_fence = false
         @fence_char = '`'
         @fence_len = 0
@@ -111,12 +115,17 @@ module Hwaro
         @fence_base = 0
         @in_raw_html_code = false
         @raw_html_code_bq_depth = 0
+        # The open raw-HTML code block's tag (`pre`, `script`…), when it
+        # opened at the top level, outside any blockquote or list item.
+        @raw_html_code_top_tag : String? = nil
         @in_indented_code = false
         @indented_code_column = 4
         @indented_code_bq_depth = 0
-        # Open list items as {blockquote depth, content column}, outermost
-        # first.
-        @list_items = [] of {Int32, Int32}
+        # Open list items as {blockquote depth, content column, serial},
+        # outermost first. The serial (never reused) tells an item apart
+        # from a sibling that later opens at the same column.
+        @list_items = [] of {Int32, Int32, Int32}
+        @item_serial = 0
         @prev_blank = true
         @prev_atx_heading = false
         # Byte offset of the innermost item's text on the last marker line
@@ -148,6 +157,17 @@ module Hwaro
         @paragraph_open = false
         @paragraph_depth = 0
         @paragraph_column = 0
+        # Inside a footnote definition's body (`footnote_bodies: true` only):
+        # the lines after a `[^label]: text` line that
+        # `MarkdownExtensions.preprocess_footnotes` collects into the note —
+        # blank lines and 4-space/tab-indented ones, up to the first other
+        # line. They are footnote text, not
+        # indented code: the collector consumes them before Markd runs, so a
+        # blank-line-separated second paragraph (`    More text.`) must not
+        # read as an indented-code run. Treating it as code kept shortcodes
+        # and wikilinks there literal while the paragraph still rendered as
+        # footnote text.
+        @footnote_body = false
         # The last line fed was raw HTML to Markd: it opened or continued a
         # generic HTML block (no inline parsing happens there).
         getter? html_block_line = false
@@ -156,6 +176,14 @@ module Hwaro
         # item CommonMark forbids from interrupting a paragraph (an empty one,
         # or an ordered one not starting at 1), which is continuation text.
         getter? list_item_line = false
+        # Content column and serial (see `item_open?`) of the list item
+        # holding the last line fed, when that line sits outside any
+        # blockquote (0 and nil otherwise, and for a line `fence_line?`
+        # passed through verbatim). On a list marker line it is the item
+        # enclosing the one the marker opens. Markup a pass puts in place of
+        # the line starts at that column to stay inside that item.
+        getter line_container_column = 0
+        getter line_container_item : Int32? = nil
 
         # `raw_html_code: false` turns off raw-HTML code-block tracking and
         # generic HTML-block tracking.
@@ -165,9 +193,16 @@ module Hwaro
         # behaviour of seeing inside. `html_blocks: false` keeps the raw
         # code blocks opaque but turns generic HTML-block tracking off
         # (definition-list extraction, which escapes raw-HTML term lines).
-        def initialize(raw_html_code : Bool = true, html_blocks : Bool = raw_html_code)
+        # `footnote_bodies: true` reads a footnote definition's indented
+        # continuation lines as text instead of indented code (see
+        # `@footnote_body`), for the walkers whose rewrite also applies on a
+        # footnote's first line — shortcodes and wikilinks. Block-level
+        # walkers (tables, transclusion) keep reading them as code: a
+        # footnote body holds no block elements.
+        def initialize(raw_html_code : Bool = true, html_blocks : Bool = raw_html_code, footnote_bodies : Bool = false)
           @track_raw_html_code = raw_html_code
           @track_html_blocks = raw_html_code && html_blocks
+          @track_footnote_bodies = footnote_bodies
         end
 
         # Feed the next line (with or without its trailing newline).
@@ -183,6 +218,19 @@ module Hwaro
           @paragraph_open = false
           @html_block_line = false
           @list_item_line = false
+          @line_container_column = 0
+          @line_container_item = nil
+
+          if @footnote_body
+            # The collector's own rule: a blank or indented line continues
+            # the note, any other line ends it. Markd sees each consumed line
+            # as a blank one.
+            if line.blank? || line.starts_with?("    ") || line.starts_with?('\t')
+              @prev_blank = true
+              return false
+            end
+            @footnote_body = false
+          end
 
           if @in_fence
             content, depth = strip_blockquote_markers(line, @fence_bq_depth)
@@ -239,9 +287,13 @@ module Hwaro
               end
             end
 
-            if content.includes?('<') && RAW_HTML_CODE_OPEN_RE.matches?(content)
+            if content.includes?('<') && (raw = RAW_HTML_CODE_OPEN_RE.match(content))
               @in_raw_html_code = !RAW_HTML_CODE_CLOSE_RE.matches?(content)
               @raw_html_code_bq_depth = depth
+              # The opener sits at column 0-3, so it is in a list item only
+              # if one has its content there; a line opening an HTML block
+              # is never a lazy continuation, so an item further right ends.
+              @raw_html_code_top_tag = (raw[1].downcase if depth.zero? && list_item_at(0, content.size - content.lstrip.size).nil?)
               @prev_blank = false
               return true
             end
@@ -288,9 +340,16 @@ module Hwaro
           end
 
           in_paragraph = paragraph_open && depth == @paragraph_depth && column >= @paragraph_column
+          if depth.zero? && (holder = list_item_at(depth, column))
+            @line_container_column, @line_container_item = holder[1], holder[2]
+          end
           marker_item = blank ? nil : track_list_item(content, depth, column, text_start, prefix)
           @list_item_line = !marker_item.nil? && (!in_paragraph || interrupting_item?(content, text_start))
           container_column = marker_item || list_content_column(depth, column)
+          if depth.zero? && !marker_item
+            holder = list_item_at(depth, column)
+            @line_container_column, @line_container_item = holder ? {holder[1], holder[2]} : {0, nil}
+          end
           opened_html = !blank && !in_html_block && @track_html_blocks &&
                         open_html_block(content, depth, column, container_column, paragraph_open && depth == @paragraph_depth && column >= @paragraph_column)
 
@@ -320,6 +379,7 @@ module Hwaro
             @prev_blank = false
             true
           else
+            @footnote_body = @track_footnote_bodies && !blank && line.includes?("[^") && FOOTNOTE_DEF_RE.matches?(line)
             @prev_blank = blank
             @prev_atx_heading = heading
             unless blank || heading || in_html_block || opened_html || @empty_item_open
@@ -329,6 +389,32 @@ module Hwaro
             end
             false
           end
+        end
+
+        # The line that closes a block still open after the last line fed,
+        # so markup a pass appends after it (a container's `</div>`, the
+        # footnote block) does not land inside it; nil when none is open.
+        # CommonMark runs an unclosed fence, and a `<pre>`/`<script>`/
+        # `<style>`/`<textarea>` block, to the end of the document. A fence
+        # in a list item is closed at the item's content column, so markup
+        # emitted there is still in the item. One inside a blockquote needs
+        # no closer: the appended marker-less line ends the quote and the
+        # fence with it. Only a raw-HTML block opened at the top level gets
+        # its end tag: the tracker does not follow one in a list item to
+        # the item's end.
+        def open_block_closer : String?
+          if @in_fence
+            return unless @fence_bq_depth.zero?
+            " " * @fence_base + @fence_char.to_s * @fence_len
+          elsif @in_raw_html_code && (tag = @raw_html_code_top_tag)
+            "</#{tag}>"
+          end
+        end
+
+        # Whether the list item with this serial (`line_container_item`) is
+        # still open after the last line fed.
+        def item_open?(serial : Int32) : Bool
+          @list_items.any? { |item| item[2] == serial }
         end
 
         private def indented?(content : String) : Bool
@@ -530,10 +616,16 @@ module Hwaro
         # The content column of the innermost open item (at this blockquote
         # depth) that a line starting at `column` sits inside; 0 outside any.
         private def list_content_column(depth : Int32, column : Int32) : Int32
+          list_item_at(depth, column).try(&.[1]) || 0
+        end
+
+        # The innermost open item (at this blockquote depth) that a line
+        # starting at `column` sits inside.
+        private def list_item_at(depth : Int32, column : Int32) : {Int32, Int32, Int32}?
           @list_items.reverse_each do |item|
-            return item[1] if item[0] == depth && item[1] <= column
+            return item if item[0] == depth && item[1] <= column
           end
-          0
+          nil
         end
 
         # A list marker less than 4 columns right of its container's content
@@ -588,7 +680,7 @@ module Hwaro
             content_column = column + marker_size + (simple ? width : 1)
 
             @list_items.reject! { |item| item[0] == depth && item[1] > column } if first
-            @list_items << {depth, content_column}
+            @list_items << {depth, content_column, @item_serial += 1}
             pushed = content_column
             @empty_item_open = rest.byte_slice(marker_size).blank?
             break unless simple

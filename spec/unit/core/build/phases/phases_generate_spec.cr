@@ -102,3 +102,90 @@ describe Hwaro::Core::Build::Phases::Generate do
     end
   end
 end
+
+# A generated SEO file wins over whatever else lands on its path, and that
+# used to happen silently: a hand-written `static/robots.txt` lost its rules
+# to the default allow-all file, and the home page's `index.xml` output
+# format was overwritten by a feed named `index.xml`.
+describe "generated files replacing other outputs" do
+  it "warns when a generated file replaces a static file" do
+    log = with_captured_log do
+      build_site(
+        %(title = "T"\nbase_url = "https://example.com"\n),
+        content_files: {"post.md" => "+++\ntitle = \"P\"\n+++\nbody"},
+        template_files: {"page.html" => "{{ content }}", "section.html" => "{{ content }}"},
+        static_files: {"robots.txt" => "User-agent: *\nDisallow: /secret/\n", "notes.txt" => "n"},
+      ) do |dir|
+        File.read(File.join(dir, "public", "robots.txt")).should_not contain("/secret/")
+        File.read(File.join(dir, "public", "notes.txt")).should eq("n")
+      end
+    end
+    log.should contain("static/robots.txt is replaced by the generated robots.txt; set [robots] enabled = false to publish your own file")
+    log.should_not contain("notes.txt")
+  end
+
+  # The static copy refuses a symlink aimed outside the project, so nothing
+  # of the user's is replaced and there is nothing to warn about.
+  it "keeps quiet about a static symlink the copy does not publish" do
+    posix_only!("needs a symlink")
+    Dir.mktmpdir do |outside|
+      secret = File.join(outside, "robots.txt")
+      File.write(secret, "User-agent: *\nDisallow: /\n")
+      build_site(
+        %(title = "T"\nbase_url = "https://example.com"\n),
+        content_files: {"post.md" => "+++\ntitle = \"P\"\n+++\nbody"},
+        template_files: {"page.html" => "{{ content }}", "section.html" => "{{ content }}"},
+      ) do
+        FileUtils.mkdir_p("static")
+        File.symlink(secret, "static/robots.txt")
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+        log = with_captured_log do
+          builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "./public/"))
+        end
+        log.should contain("Skipping static symlink pointing outside the project")
+        log.should_not contain("is replaced by the generated")
+        File.read("public/robots.txt").should_not contain("Disallow: /\n")
+      end
+    end
+  end
+
+  it "names the static file whatever form the output directory takes" do
+    log = with_captured_log do
+      build_site(
+        %(title = "T"\nbase_url = "https://example.com"\n[llms]\nenabled = true\n),
+        content_files: {"post.md" => "+++\ntitle = \"P\"\n+++\nbody"},
+        template_files: {"page.html" => "{{ content }}", "section.html" => "{{ content }}"},
+        static_files: {"llms.txt" => "mine"},
+        output_dir: "./pub/",
+      ) { }
+    end
+    log.should contain("static/llms.txt is replaced by the generated llms.txt; set [llms] enabled = false to publish your own file")
+  end
+
+  it "keeps quiet when the generator is off" do
+    log = with_captured_log do
+      build_site(
+        %(title = "T"\nbase_url = "https://example.com"\n[robots]\nenabled = false\n),
+        content_files: {"post.md" => "+++\ntitle = \"P\"\n+++\nbody"},
+        template_files: {"page.html" => "{{ content }}", "section.html" => "{{ content }}"},
+        static_files: {"robots.txt" => "User-agent: *\nDisallow: /secret/\n"},
+      ) do |dir|
+        File.read(File.join(dir, "public", "robots.txt")).should contain("/secret/")
+      end
+    end
+    log.should_not contain("is replaced by the generated")
+  end
+
+  it "warns when a feed replaces the home page's output format file" do
+    log = with_captured_log do
+      build_site(
+        %(title = "T"\nbase_url = "https://example.com"\n[feeds]\nenabled = true\nfilename = "index.xml"\n[outputs]\nsection = ["xml"]\n),
+        content_files: {"_index.md" => "+++\ntitle = \"Home\"\n+++\n", "post.md" => "+++\ntitle = \"P\"\ndate = \"2024-01-01\"\n+++\nbody"},
+        template_files: {"page.html" => "{{ content }}", "section.html" => "{{ content }}",
+                         "section.xml.jinja" => "<home>{{ page.title }}</home>"},
+      ) { }
+    end
+    log.should contain("index.xml: the xml output of '_index.md' is replaced by a generated file at the same path")
+  end
+end

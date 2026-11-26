@@ -147,6 +147,13 @@ module Hwaro::Core::Build::Phases::Generate
       },
     ] of Proc(Nil)
     ParallelHelper.execute(tasks, ctx.options.parallel)
+
+    config = site.config
+    replaced = Content::Seo::Sitemap.published_outputs(config, output_dir).map { |path| {path, "set [sitemap] enabled = false"} }
+    replaced.concat(Content::Seo::Feeds.published_outputs(all_pages, config, output_dir, warn_on_collision: false).map { |path| {path, "rename or turn off that feed ([feeds])"} })
+    replaced << {File.join(output_dir, File.basename(config.robots.filename)), "set [robots] enabled = false"} if config.robots.enabled
+    replaced.concat(Content::Seo::Llms.published_outputs(config, output_dir).map { |path| {path, "set [llms] enabled = false"} })
+    warn_replaced_outputs(replaced, all_pages, output_dir)
   end
 
   # The search index. Kept separate from `generate_seo_outputs` because the
@@ -157,6 +164,62 @@ module Hwaro::Core::Build::Phases::Generate
       skip_if_unchanged: generate_outputs_unchanged?(ctx), builder: self)
     # Claimed whether written or skipped: the claim list is "what this build
     # publishes" (see Phases::Finalize).
-    Content::Search.published_outputs(site.config, ctx.options.output_dir).each { |path| claim_generated_output(path) }
+    published = Content::Search.published_outputs(site.config, ctx.options.output_dir)
+    published.each { |path| claim_generated_output(path) }
+    warn_replaced_outputs(published.map { |path| {path, "set another [search] filename"} }, ctx.all_pages, ctx.options.output_dir)
+  end
+
+  # A generated file wins over anything else published at its path: a
+  # `static/` file (cold and `--cache` builds alike, see
+  # `static_copy_over_skippable_output?`) or a page's `[outputs]` format file
+  # (the home page's `index.xml` under `[feeds] filename = "index.xml"`).
+  # Both were replaced silently: a hand-written `static/robots.txt` lost its
+  # `Disallow` rules to the default allow-all file, and `alternate_output_tags`
+  # kept advertising a format file that now held the feed. Say so, with the
+  # setting that hands the path back. `outputs` pairs each generated file
+  # with that setting.
+  private def warn_replaced_outputs(outputs : Array({String, String}), pages : Array(Models::Page), output_dir : String) : Nil
+    return if outputs.empty?
+    root = File.expand_path(output_dir)
+    # Output-relative and slash-separated (`File.join` writes `\` on
+    # Windows, so a hand-built `"public/"` prefix matched nothing there).
+    replaced = outputs.compact_map do |(path, setting)|
+      relative = Utils::PathUtils.relative_path(File.expand_path(path), root)
+      {relative, setting} if relative && !relative.empty?
+    end
+
+    # A format file is always `<page dir>/index.<fmt>`, so the page scan is
+    # skipped unless a generated file carries such a name.
+    format_files = {} of String => {String, String}
+    config = @site.try(&.config)
+    if config && replaced.any? { |(relative, _)| File.basename(relative).starts_with?("index.") }
+      pages.each do |page|
+        next unless page.render
+        formats = effective_output_formats(page, config)
+        next if formats.empty?
+        format_output_paths(page, output_dir, formats).each do |path|
+          next unless relative = Utils::PathUtils.relative_path(File.expand_path(path), root)
+          format_files[relative] ||= {page.path, File.extname(path).lchop('.')}
+        end
+      end
+    end
+
+    static = static_publish_config
+    replaced.each do |(relative, setting)|
+      if owner = format_files[relative]?
+        Logger.warn "#{relative}: the #{owner[1]} output of '#{owner[0]}' is replaced by a generated file at the same path; #{setting}, or drop that output format, to keep it"
+      end
+      if static_published?(File.join("static", relative), relative, static)
+        Logger.warn "static/#{relative} is replaced by the generated #{relative}; #{setting} to publish your own file"
+      end
+    end
+  end
+
+  # Whether the static copy would publish `source`: a regular file the
+  # `[static]` excludes keep, and no symlink the copy refuses to follow
+  # (one aimed outside the project or at a protected target).
+  private def static_published?(source : String, relative : String, static : Models::StaticConfig) : Bool
+    return false if !File.file?(source) || static.excluded?(relative)
+    !File.symlink?(source) || Utils::PathUtils.publishable_project_source?(source, Dir.current)
   end
 end

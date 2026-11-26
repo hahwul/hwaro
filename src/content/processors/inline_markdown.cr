@@ -199,7 +199,11 @@ module Hwaro
         # included): a stray unmatched `$$` would otherwise pair with a
         # legitimate `$$` several paragraphs later and swallow all the prose
         # in between. Blank lines are invalid inside LaTeX display math
-        # anyway, so no real formula is lost.
+        # anyway, so no real formula is lost. A line of nothing but `>`
+        # markers is the blank line of a blockquote and ends it too: the
+        # math pass re-quotes each line of a quoted formula's `<div>`, so
+        # such a line split the div across two quote paragraphs (the tail
+        # rendered as text, its `\]` collapsed to `]`).
         #
         # The body runs to the first `$$` and reads one way only, so its
         # loop is possessive: the lazy per-character form it replaces
@@ -214,7 +218,7 @@ module Hwaro
         # stops, so each run is taken whole (possessive): one JIT frame per
         # character failed a page with a ~100 KB formula on
         # "JIT stack limit reached".
-        DISPLAY_MATH_RE = /\$\$((?:[^\n$]++|\$(?!\$)|\n(?![ \t\r]*\n))*+)\$\$/
+        DISPLAY_MATH_RE = /\$\$((?:[^\n$]++|\$(?!\$)|\n(?![ \t\r>]*+\n))*+)\$\$/
         INLINE_MATH_RE  = /(?<![\\$])\$(?!\s)((?:[^\n$\\]++|\\[^\n])+?)(?<![\s\\])\$(?!\d)/
 
         # Placeholder comments left by `Core::Build::ShortcodeProcessor` for

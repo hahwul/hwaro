@@ -408,6 +408,24 @@ describe Hwaro::Utils::CrinjaUtils do
     end
   end
 
+  # Crystal's CSV lexer read a NUL byte as end of input: `load_data()`, a
+  # remote CSV and every other caller silently lost the rows after it.
+  describe ".parse_data_string CSV with a NUL byte" do
+    it "raises a MalformedCSVError naming the line instead of dropping rows" do
+      err = expect_raises(CSV::MalformedCSVError) do
+        Hwaro::Utils::CrinjaUtils.parse_data_string("a,b\n1,2\nx\0y\n3,4\n", "csv")
+      end
+      err.message.to_s.should contain("NUL")
+      err.line_number.should eq(3)
+      err.column_number.should eq(2)
+    end
+
+    it "still parses ordinary CSV" do
+      rows = Hwaro::Utils::CrinjaUtils.parse_data_string("a,b\n1,2\n3,4\n", "csv").not_nil!
+      rows.raw.as(Array).size.should eq(3)
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Cyclic YAML (self-referencing anchor)
   # ---------------------------------------------------------------------------
@@ -453,5 +471,17 @@ describe Hwaro::Utils::CrinjaUtils do
         value.to_s.should eq(expected), input
       end
     end
+  end
+end
+
+# Regression: a YAML data key that the YAML reader types as a timestamp
+# (`2024-01-15:`) was named by `Time#to_s` — "2024-01-15 00:00:00 +09:00",
+# a different key in every machine zone — so `site.data.releases["2024-01-15"]`
+# never matched, while the same data in TOML or JSON was keyed "2024-01-15".
+describe "Hwaro::Utils::CrinjaUtils.from_yaml timestamp keys" do
+  it "keys a date like TOML and JSON do, in any zone" do
+    yaml = YAML.parse("2024-01-15:\n  v: 1\n2024-01-15T10:00:00Z: x\n404: nf\n")
+    toml = Hwaro::Utils::CrinjaUtils.from_toml(TOML.parse(%("2024-01-15" = { v = 1 }\n"2024-01-15T10:00:00Z" = "x"\n"404" = "nf"\n)))
+    Hwaro::Utils::CrinjaUtils.from_yaml(yaml).as_h.keys.map(&.to_s).should eq(toml.as_h.keys.map(&.to_s))
   end
 end

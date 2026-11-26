@@ -221,11 +221,13 @@ module Hwaro
         end
 
         # True when `dir` holds files besides its content pages — the
-        # resources `copy_bundle_assets` would carry along.
+        # resources `copy_bundle_assets` would carry along. Symlinks are
+        # ruled out before `File.file?`, which follows the link and raises
+        # on one that cannot resolve (a self-loop).
         private def bundle_assets?(dir : String) : Bool
           Dir.children(dir).any? do |entry|
             path = File.join(dir, entry)
-            File.file?(path) && !File.symlink?(path) && !entry.ends_with?(".md") && !entry.ends_with?(".markdown") && !entry.ends_with?(".mdx")
+            !File.symlink?(path) && File.file?(path) && !entry.ends_with?(".md") && !entry.ends_with?(".markdown") && !entry.ends_with?(".mdx")
           end
         end
 

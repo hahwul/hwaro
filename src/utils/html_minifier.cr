@@ -6,9 +6,8 @@
 #   1. Whitespace-sensitive elements (<pre>, <textarea>, <script>,
 #      <style>, <code>, <svg>, <math>, <noscript>) are extracted as
 #      opaque, typed placeholders before any whitespace pass touches
-#      the document and restored verbatim at the end. Each tag is
-#      handled in its own pass so a stray alternation in non-greedy
-#      matching can't pair an open <pre> with a close </script>.
+#      the document and restored verbatim at the end, in document
+#      order, each open tag paired only with a close tag of its own name.
 #      Placeholders carry the element's default display classification
 #      (block or inline) so the whitespace collapse can treat the
 #      sealed block as if it were still its original tag for the
@@ -54,26 +53,31 @@ module Hwaro
       # deliberately NOT listed: whitespace adjacent to them renders as a
       # visible space and must be preserved.
       BLOCK_TAGS = Set{
-        "address", "article", "aside", "base", "blockquote", "body",
+        "address", "article", "aside", "blockquote", "body",
         "caption", "col", "colgroup", "dd", "details", "dialog",
         "div", "dl", "dt", "fieldset", "figcaption", "figure",
         "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6",
         "head", "header", "hgroup", "hr", "html",
-        "li", "link", "main", "menu", "meta", "nav", "noscript",
+        "li", "main", "menu", "nav", "noscript",
         "ol", "p", "pre", "script", "section",
-        "source", "style", "summary", "table", "tbody", "td",
-        "tfoot", "th", "thead", "title", "tr", "track", "ul",
+        "style", "summary", "table", "tbody", "td",
+        "tfoot", "th", "thead", "title", "tr", "ul",
       }
+
+      # Void elements that render nothing (display:none). Like a hidden
+      # placeholder (PROTECTED_HIDDEN) they are no block boundary: a
+      # microdata `<meta itemprop>` between two inline siblings
+      # (`<span>Jane</span> <meta …> <span>wrote</span>`), or the `<source>`
+      # opening an inline `<picture>`, leaves the space around it visible,
+      # and classing them as block deleted it ("Janewrote"). Between two
+      # hidden neighbours — the run of `<meta>`/`<link>` tags in `<head>` —
+      # the whitespace is still stripped.
+      HIDDEN_TAGS = Set{"base", "link", "meta", "source", "track"}
 
       # Tags whose content must be preserved verbatim. Extracted into
       # placeholders before any whitespace pass and restored afterward.
       # `code` is included because inline-code snippets often carry
       # whitespace that authors expect to ship unchanged.
-      #
-      # Order matters: a `<style>` body may legitimately contain the
-      # literal string `<script>` (e.g. `content: "<script>"`), so
-      # `style` is extracted first to remove that text from view
-      # before the `script` pass runs.
       PROTECTED_TAGS = %w[pre textarea style script code svg math noscript]
 
       # Classification of protected tags by default HTML display so
@@ -88,37 +92,23 @@ module Hwaro
       # treating the script as block deleted that gap ("ac").
       PROTECTED_HIDDEN = Set{"script", "style", "noscript"}
 
-      # Per-tag extraction patterns, compiled once at load time. minify()
-      # runs once per rendered page, so building these eight Regex objects
-      # inside protect_sensitive_blocks paid a PCRE2 compile per tag per
-      # page. Array (not Hash) to preserve PROTECTED_TAGS order — `style`
-      # must be extracted before `script` (see comment above).
-      private PROTECTED_PATTERNS = PROTECTED_TAGS.map do |tag|
-        {tag,
-        # Cheap presence probe: most pages carry no <textarea>, <math>,
-        # <noscript>, …, and the heavy `.*?` extraction pattern below has
-        # no fast no-match path (every '<' in the document is a candidate
-        # start). The lowercase literal decides via `ByteScan`'s memchr scan
-        # for the markdown-rendered common case; the case-insensitive probe
-        # covers author-written uppercase tags.
-         "<#{tag}",
-         Regex.new("<#{tag}", Regex::Options::IGNORE_CASE),
-         # `(?![\w-])`, not `\b`: a custom element such as `<pre-view>`
-         # or `<math-field>` is not the protected tag, and `\b` matched it
-         # and sealed everything up to the next real `</pre>` as one block.
-         Regex.new(
-           "<#{tag}(?![\\w-])[^>]*>.*?</#{tag}\\s*>",
-           Regex::Options::IGNORE_CASE | Regex::Options::MULTILINE
-         )}
-      end
-
-      # Every protected tag's probe in one caseless pass, one capture group
-      # per tag in PROTECTED_TAGS order. Eight separate probes each walked
-      # every `<` of the page; a tag this pass does not see cannot appear
-      # later either (extraction only replaces text with `<`-free tokens).
-      private PROTECTED_OPEN_ANY = Regex.new(
-        "<(?:#{PROTECTED_TAGS.map { |tag| "(#{tag})" }.join('|')})",
-        Regex::Options::IGNORE_CASE
+      # One extraction pattern for every protected tag. The backreference
+      # pairs each open tag with a close tag of the same name, and a single
+      # left-to-right gsub takes the blocks in document order: the first
+      # protected element to open wins, so the body of a `<script>` or
+      # `<style>` is never searched for another protected tag. One pass per
+      # tag (pre, textarea, style, script, …) did not have that property —
+      # a `'<pre'` string inside a script was paired with the next real
+      # `</pre>` further down the page, the script's own `</script>` went
+      # into that block, and the script source before the string was left
+      # to the whitespace passes (a template literal lost its blank lines).
+      #
+      # `(?![\w-])`, not `\b`: a custom element such as `<pre-view>` or
+      # `<math-field>` is not the protected tag, and `\b` matched it and
+      # sealed everything up to the next real `</pre>` as one block.
+      private PROTECTED_BLOCK = Regex.new(
+        "<(#{PROTECTED_TAGS.join('|')})(?![\\w-])[^>]*>.*?</\\1\\s*>",
+        Regex::Options::IGNORE_CASE | Regex::Options::MULTILINE
       )
 
       # Only protected tag candidates inside removable HTML comments are
@@ -243,22 +233,14 @@ module Hwaro
         result.strip
       end
 
-      # Extract whitespace-sensitive elements one tag at a time. A
-      # single regex with alternation in the open/close tag (e.g.
-      # `<(pre|script)>...</(pre|script)>`) does not enforce that both
-      # sides reference the same tag, which let prior implementations
-      # pair `<pre>` openers with `</script>` closers when the document
-      # mixed both. One pass per tag avoids that whole class of bug.
+      # Extract whitespace-sensitive elements into placeholders, in
+      # document order (see PROTECTED_BLOCK).
       private def protect_sensitive_blocks(html : String, preserves : Array(String), opts : Regex::MatchOptions) : String
         result = mask_comment_tag_candidates(html, opts)
         masked = !result.same?(html)
-        opened = Array.new(PROTECTED_TAGS.size, false)
-        result.scan(PROTECTED_OPEN_ANY, options: opts) do |m|
-          PROTECTED_TAGS.size.times { |i| opened[i] = true if m[i + 1]? }
-        end
-        PROTECTED_PATTERNS.each_with_index do |(tag, open_literal, probe, pattern), i|
-          next unless opened[i]
-          next unless ByteScan.includes?(result, open_literal) || result.matches?(probe, options: opts)
+        result = result.gsub(PROTECTED_BLOCK, options: opts) do |match, m|
+          # `:fold`, so a LONG S `<ſcript>` is the script it matched as.
+          tag = m[1].downcase(:fold)
           prefix = if PROTECTED_INLINE.includes?(tag)
                      PRESERVE_PREFIX_INLINE
                    elsif PROTECTED_HIDDEN.includes?(tag)
@@ -266,11 +248,9 @@ module Hwaro
                    else
                      PRESERVE_PREFIX_BLOCK
                    end
-          result = result.gsub(pattern, options: opts) do |match|
-            idx = preserves.size
-            preserves << (masked ? match.gsub(COMMENT_TAG_LT, "<") : match)
-            "#{prefix}#{idx}#{PRESERVE_SUFFIX}"
-          end
+          idx = preserves.size
+          preserves << (masked ? match.gsub(COMMENT_TAG_LT, "<") : match)
+          "#{prefix}#{idx}#{PRESERVE_SUFFIX}"
         end
         masked ? result.gsub(COMMENT_TAG_LT, "<") : result
       end
@@ -366,10 +346,11 @@ module Hwaro
         !after_eq && !unquoted
       end
 
-      # Restore in a fixed-point loop: a protected block (e.g. a `<style>`
-      # extracted before `<script>`) can be captured *inside* a later block, so
-      # the first restore leaves an inner placeholder behind. Re-scan until no
-      # token remains; a dangling index returns $0 unchanged. The original
+      # Restore in a fixed-point loop: a caller's preserved block may hold
+      # another block's placeholder, which the first restore leaves behind.
+      # (`minify` itself extracts in one non-overlapping pass, so its blocks
+      # never nest.) Re-scan until no token remains; a dangling index returns
+      # $0 unchanged. The original
       # termination argument — "restored content is author HTML, which cannot
       # contain a valid \x00-delimited token because NUL is illegal in author
       # input" — turned out to be false (NUL reaches the rendered page through
@@ -528,11 +509,11 @@ module Hwaro
       #   * keep a single space only when both neighbours are inline,
       #     preserving the visible gap between adjacent inline elements
       #     like `<a>x</a> <a>y</a>`.
-      # A hidden placeholder (script/style/noscript) is neither: next to
-      # an inline neighbour its space is kept, between two hidden ones
-      # (the usual run of tags in `<head>`) it is stripped.
-      # ponytail: decided per pair, so `<b>a</b><script/> <script/><b>c</b>`
-      # still loses its one space; look past hidden runs if that shows up.
+      # A hidden token (script/style/noscript placeholder, HIDDEN_TAGS) is
+      # neither: next to an inline neighbour its space is kept, and between
+      # two hidden ones (the usual run of tags in `<head>`) it is stripped —
+      # unless it is the only gap between the inline content on either side
+      # of the hidden run (see hidden_run_gap?).
       private def collapse_inter_token_whitespace(html : String) : String
         # A byte scan that makes REGEX_INTERTOKEN_WS's choices (same start
         # positions, same token extents, same retry on a failed start)
@@ -582,9 +563,12 @@ module Hwaro
             next_block = intertoken_block?(bytes, ws_end, next_end)
             return collapse_inter_token_whitespace_regex(html) if prior_block.nil? || next_block.nil?
             io.write(bytes[copied, prior_end - copied])
-            unless prior_block || next_block || (intertoken_hidden?(bytes, i) && intertoken_hidden?(bytes, ws_end))
-              io << ' '
-            end
+            # One space survives unless a block neighbour, or a hidden pair
+            # that is not the run's only gap, makes it invisible.
+            stripped = prior_block || next_block ||
+                       (intertoken_hidden?(bytes, i, prior_end) && intertoken_hidden?(bytes, ws_end, next_end) &&
+                        !hidden_run_gap?(bytes, i, next_end, last_gt))
+            io << ' ' unless stripped
             copied = ws_end
             i = ws_end
           end
@@ -632,6 +616,15 @@ module Hwaro
         if bytes[start] == 0_u8
           return prefix_at?(bytes, start, PRESERVE_PREFIX_BLOCK)
         end
+        return unless key = tag_name_key(bytes, start, stop)
+        BLOCK_TAG_KEYS.includes?(key)
+      end
+
+      # The lowercased name of the tag at `bytes[start...stop]` packed into
+      # an integer the way BLOCK_TAG_KEYS / HIDDEN_TAG_KEYS are (0 when it is
+      # longer than any name in either set), or nil when a non-ASCII byte
+      # ends the ASCII run of the name.
+      private def tag_name_key(bytes : Bytes, start : Int32, stop : Int32) : UInt128?
         j = start + 1
         j += 1 if bytes[j] == '/'.ord
         name_start = j
@@ -641,14 +634,64 @@ module Hwaro
           j += 1
         end
         return if j < stop && bytes[j] >= 0x80
-        return false if j - name_start > BLOCK_TAG_MAX
+        return 0_u128 if j - name_start > BLOCK_TAG_MAX
         key = 0_u128
         (name_start...j).each { |k| key = (key << 8) | bytes[k].unsafe_chr.downcase.ord }
-        BLOCK_TAG_KEYS.includes?(key)
+        key
       end
 
-      private def intertoken_hidden?(bytes : Bytes, start : Int32) : Bool
-        prefix_at?(bytes, start, PRESERVE_PREFIX_HIDDEN)
+      # True when the whitespace between two hidden tokens — the left one
+      # starting at `start`, the right one ending at `stop` — is the only
+      # gap between the inline content around their run. The run renders
+      # nothing, so `a<script>…</script> <script>…</script>b` reads "a b",
+      # and stripping that space joined the words. It is not the only gap
+      # when whitespace sits right before the run (that one is kept, or a
+      # block makes the gap invisible), and it is invisible when the run
+      # starts or ends at a block boundary. A neighbour the byte scan cannot
+      # classify counts as inline content, which keeps the space.
+      private def hidden_run_gap?(bytes : Bytes, start : Int32, stop : Int32, last_gt : Int32) : Bool
+        n = bytes.size
+        k = start
+        loop do
+          return false if k == 0
+          b = bytes[k - 1]
+          return false if intertoken_ws?(b)
+          # The token ending at `k`: a placeholder closes with NUL, a tag
+          # with `>` (a `>` of text or of a quoted value fails the check).
+          token = if b == 0_u8
+                    k >= 2 ? bytes.rindex(0_u8, k - 2) : nil
+                  elsif b == '>'.ord
+                    bytes.rindex('<'.ord.to_u8, k - 1)
+                  end
+          break unless token && intertoken_end(bytes, token, n, last_gt) == k
+          block = intertoken_block?(bytes, token, k)
+          break if block.nil?
+          return false if block
+          break unless intertoken_hidden?(bytes, token, k)
+          k = token
+        end
+        k = stop
+        loop do
+          while k < n && intertoken_ws?(bytes[k])
+            k += 1
+          end
+          return false if k >= n
+          token_end = intertoken_end(bytes, k, n, last_gt)
+          return true if token_end < 0
+          block = intertoken_block?(bytes, k, token_end)
+          return true if block.nil?
+          return false if block
+          return true unless intertoken_hidden?(bytes, k, token_end)
+          k = token_end
+        end
+      end
+
+      # A hidden placeholder, or a HIDDEN_TAGS tag. Only asked once
+      # `intertoken_block?` has classified the token, so a tag's name is
+      # ASCII here.
+      private def intertoken_hidden?(bytes : Bytes, start : Int32, stop : Int32) : Bool
+        return prefix_at?(bytes, start, PRESERVE_PREFIX_HIDDEN) if bytes[start] == 0_u8
+        HIDDEN_TAG_KEYS.includes?(tag_name_key(bytes, start, stop) || 0_u128)
       end
 
       private def prefix_at?(bytes : Bytes, start : Int32, prefix : String) : Bool
@@ -658,11 +701,14 @@ module Hwaro
       # BLOCK_TAGS names packed one byte each into an integer (they are at
       # most BLOCK_TAG_MAX ASCII bytes), so a token's name is looked up
       # without building a String.
-      private BLOCK_TAG_MAX  = BLOCK_TAGS.max_of(&.bytesize)
-      private BLOCK_TAG_KEYS = BLOCK_TAGS.map { |tag| tag.each_byte.reduce(0_u128) { |key, b| (key << 8) | b } }.to_set
+      private BLOCK_TAG_MAX   = BLOCK_TAGS.max_of(&.bytesize)
+      private BLOCK_TAG_KEYS  = BLOCK_TAGS.map { |tag| tag.each_byte.reduce(0_u128) { |key, b| (key << 8) | b } }.to_set
+      private HIDDEN_TAG_KEYS = HIDDEN_TAGS.map { |tag| tag.each_byte.reduce(0_u128) { |key, b| (key << 8) | b } }.to_set
 
       private def collapse_inter_token_whitespace_regex(html : String) : String
         values = tagged_value_spans(html)
+        bytes = html.to_slice
+        last_gt = bytes.rindex('>'.ord.to_u8) || -1
         html.gsub(REGEX_INTERTOKEN_WS) do
           # Tag-shaped text inside a quoted value (`data-x='<div>  <p>'`)
           # is the value's own bytes, not markup.
@@ -670,7 +716,8 @@ module Hwaro
           prior = $1
           # $2 = whitespace run (discarded except when we re-emit one space)
           nxt = $3
-          if block_token?(prior) || block_token?(nxt) || (hidden_token?(prior) && hidden_token?(nxt))
+          if block_token?(prior) || block_token?(nxt) ||
+             (hidden_token?(prior) && hidden_token?(nxt) && !hidden_run_gap?(bytes, $~.byte_begin(1), $~.byte_end(3), last_gt))
             prior
           else
             "#{prior} "
@@ -729,7 +776,12 @@ module Hwaro
       end
 
       private def hidden_token?(token : String) : Bool
-        token.starts_with?(PRESERVE_PREFIX_HIDDEN)
+        return true if token.starts_with?(PRESERVE_PREFIX_HIDDEN)
+        if m = REGEX_TAG_NAME.match(token)
+          HIDDEN_TAGS.includes?(m[1].downcase)
+        else
+          false
+        end
       end
 
       # Collapse whitespace runs *inside* tag openings to a single
@@ -785,34 +837,51 @@ module Hwaro
       # tag is unterminated (in which case the caller falls back to
       # emitting the byte literally and continues).
       private def find_tag_end(bytes : Bytes, start : Int32, n : Int32) : Int32
+        scan_tag(bytes, start, n) { }
+      end
+
+      # Walk the tag opening at `bytes[start]` (`<`) the way an HTML
+      # tokenizer reads its attributes, yielding each index after the `<`
+      # with whether that byte is part of a quoted value and whether it is
+      # part of an unquoted one, and return the
+      # index of the closing `>` (-1 when unterminated). As in HTML, a quote
+      # opens a value only where a value starts, right after `=`: the
+      # apostrophe in `alt=Bob's` or `title=it's` is part of an unquoted
+      # value. Toggling on every quote paired that apostrophe with the next
+      # one in the document, so the "tag" ran on over the following markup
+      # and the real quoted values in it were collapsed as tag whitespace
+      # (`title='x > y'` became `title='x> y'`).
+      private def scan_tag(bytes : Bytes, start : Int32, n : Int32, &) : Int32
         i = start + 1
         quote = 0_u8
+        after_eq = false
+        unquoted = false
         while i < n
           b = bytes[i]
           if quote != 0_u8
+            yield i, true, false
             quote = 0_u8 if b == quote
+          elsif b == '>'.ord
+            return i
           else
-            return i if b == '>'.ord
-            quote = b if b == '"'.ord || b == '\''.ord
+            ws = intertoken_ws?(b)
+            if unquoted
+              unquoted = !ws
+            elsif after_eq
+              if b == '"'.ord || b == '\''.ord
+                quote = b
+              elsif !ws
+                unquoted = true
+              end
+              after_eq = ws
+            elsif b == '='.ord
+              after_eq = true
+            end
+            yield i, quote != 0_u8, unquoted
           end
           i += 1
         end
         -1
-      end
-
-      # True when the attribute right before a trailing ` /` has an
-      # UNQUOTED value (`<link href=/favicon.ico />`). There the space is what
-      # ends the value: `href=/favicon.ico/` makes the slash part of the URL
-      # (`/favicon.ico/`, a 404). A quoted value, a bare attribute name or the
-      # tag name itself is ended by its own syntax, so `<br />` → `<br/>` and
-      # `alt="x" />` → `alt="x"/>` stay safe.
-      private def unquoted_value_before_slash?(body : String) : Bool
-        rest = body.rchop(" /")
-        last = rest.split(' ').last? || ""
-        eq = last.index('=')
-        return false unless eq
-        value = last[(eq + 1)..]
-        !value.empty? && !value.ends_with?('"') && !value.ends_with?('\'')
       end
 
       # True when `emit_collapsed_tag` would copy the tag unchanged, as most
@@ -823,18 +892,12 @@ module Hwaro
       private def tag_verbatim?(bytes : Bytes, start : Int32, tag_end : Int32) : Bool
         last = bytes[tag_end - 1]
         return false if last >= 0x80 || last == '/'.ord || last.unsafe_chr.ascii_whitespace?
-        quote = 0_u8
-        i = start + 1
-        while i < tag_end
+        scan_tag(bytes, start, tag_end + 1) do |i, quoted|
+          next if quoted
           b = bytes[i]
-          if quote != 0_u8
-            quote = 0_u8 if b == quote
-          elsif b == '"'.ord || b == '\''.ord
-            quote = b
-          elsif b == '\t'.ord || b == '\n'.ord || b == '\r'.ord || (b == ' '.ord && bytes[i - 1] == ' '.ord)
+          if b == '\t'.ord || b == '\n'.ord || b == '\r'.ord || (b == ' '.ord && bytes[i - 1] == ' '.ord)
             return false
           end
-          i += 1
         end
         true
       end
@@ -853,46 +916,31 @@ module Hwaro
         # we can collapse and trim, then emit `>` at the end.
         # We can't easily trim trailing whitespace from an already-
         # written IO, so do it in a local buffer.
+        slash_ends_unquoted = false
         body = String.build(tag_end - start + 1) do |buf|
-          i = start
-          # Copy `<` (and optional `/`)
-          buf.write_byte(bytes[i])
-          i += 1
-          if i < tag_end && bytes[i] == '/'.ord
-            buf.write_byte(bytes[i])
-            i += 1
-          end
-          # Copy the tag name run.
-          while i < tag_end && (
-                  (bytes[i] >= 'a'.ord && bytes[i] <= 'z'.ord) ||
-                  (bytes[i] >= 'A'.ord && bytes[i] <= 'Z'.ord) ||
-                  (bytes[i] >= '0'.ord && bytes[i] <= '9'.ord) ||
-                  bytes[i] == '-'.ord || bytes[i] == ':'.ord
-                )
-            buf.write_byte(bytes[i])
-            i += 1
-          end
-          # Walk the attribute area collapsing whitespace and
-          # respecting quotes.
+          # `<` and the tag name are copied as they are (neither holds
+          # whitespace); in the attribute area whitespace collapses outside
+          # quoted values.
+          buf.write_byte(bytes[start])
           last_was_space = false
-          quote = 0_u8
-          while i < tag_end
+          last_unquoted = false
+          scan_tag(bytes, start, tag_end + 1) do |i, quoted, unquoted|
             b = bytes[i]
-            if quote != 0_u8
-              buf.write_byte(b)
-              quote = 0_u8 if b == quote
-              last_was_space = false
-            elsif b == ' '.ord || b == '\t'.ord || b == '\n'.ord || b == '\r'.ord
+            if !quoted && (b == ' '.ord || b == '\t'.ord || b == '\n'.ord || b == '\r'.ord)
               unless last_was_space
                 buf.write_byte(' '.ord.to_u8)
                 last_was_space = true
               end
             else
+              if b == '/'.ord && !quoted
+                # The tokenizer's own state, not the value's last character:
+                # `alt=x'` is unquoted although it ends in a quote.
+                slash_ends_unquoted = last_unquoted && !unquoted
+              end
+              last_unquoted = unquoted
               buf.write_byte(b)
-              quote = b if b == '"'.ord || b == '\''.ord
               last_was_space = false
             end
-            i += 1
           end
         end
         # Drop trailing whitespace before the `>`. For self-closing
@@ -902,8 +950,13 @@ module Hwaro
         # is suffix-equality (byte-safe), so it works even when
         # the byte preceding the `" /"` is part of a multi-byte
         # UTF-8 sequence inside a quoted attribute value.
+        # The space is kept when it is what ends an UNQUOTED value
+        # (`<link href=/favicon.ico />`): `href=/favicon.ico/` makes the
+        # slash part of the URL (a 404). A quoted value, a bare attribute
+        # name or the tag name is ended by its own syntax, so `<br />` →
+        # `<br/>` and `alt="x" />` → `alt="x"/>` stay safe.
         body = body.rstrip
-        if body.ends_with?(" /") && !unquoted_value_before_slash?(body)
+        if body.ends_with?(" /") && !slash_ends_unquoted
           body = body.rchop(" /") + "/"
         end
         io << body

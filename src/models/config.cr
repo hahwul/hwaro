@@ -321,14 +321,35 @@ module Hwaro
 
       # `File.exists?` admits a directory or an unreadable file, and the raw
       # `File::Error` then reached the runner as a bare "Error: ..." line.
+      #
+      # TOML is UTF-8 only, and environment substitution runs a regex over
+      # the raw text before the TOML parser sees it: a stray latin-1 byte next
+      # to a `$` made PCRE2 raise "Regex match error: UTF-8 error", an
+      # unclassified exit 1 that named no file (and no JSON under `--json`).
       private def self.read_config_file(path : String) : String
-        File.read(path)
+        content = File.read(path)
+        return content if content.valid_encoding?
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_CONFIG,
+          message: "Invalid TOML in #{path}: invalid UTF-8 byte sequence at line #{first_invalid_utf8_line(content)}",
+          hint: "Save #{path} as UTF-8.",
+        )
       rescue ex : IO::Error
         raise Hwaro::HwaroError.new(
           code: Hwaro::Errors::HWARO_E_CONFIG,
           message: "Cannot read #{path}: #{ex.message}",
           hint: "Make sure #{path} is a readable file.",
         )
+      end
+
+      private def self.first_invalid_utf8_line(content : String) : Int32
+        line = 1
+        reader = Char::Reader.new(content)
+        while reader.has_next? && !reader.error
+          line += 1 if reader.current_char == '\n'
+          reader.next_char
+        end
+        line
       end
 
       def self.load(config_path : String = "config.toml", env : String? = nil) : Config

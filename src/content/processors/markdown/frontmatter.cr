@@ -72,7 +72,12 @@ module Hwaro
         end
 
         # Returns parsed metadata and content
-        def parse(raw_content : String, file_path : String = "", declared_keys : Set(String)? = nil)
+        # `taxonomy_names` are the configured taxonomies: only their list
+        # members (and `categories`') are warned about as unusable terms, see
+        # `extract_taxonomies`. It is separate from `declared_keys`, which
+        # also holds `[[content.schema]]` field names, so a caller that
+        # reports warnings must pass both (the build and doctor do).
+        def parse(raw_content : String, file_path : String = "", declared_keys : Set(String)? = nil, taxonomy_names : Set(String)? = nil)
           # A UTF-8 BOM would defeat every `\A`-anchored fence below and the
           # leading-`{` JSON test, silently turning the front matter into body
           # text. Strip it first so BOM'd files parse like any other.
@@ -86,11 +91,11 @@ module Hwaro
           # with no `key:` line) must keep its FULL content — assigning
           # match[2] up front silently dropped the first block.
           if match = raw_content.match(TOML_FRONT_MATTER_REGEX)
-            if result = extract_from_toml(match[1], file_path, declared_keys, raw_content)
+            if result = extract_from_toml(match[1], file_path, declared_keys, raw_content, taxonomy_names)
               markdown_content = match[2]
             end
           elsif match = raw_content.match(YAML_FRONT_MATTER_REGEX)
-            if result = extract_from_yaml(match[1], file_path, declared_keys, raw_content)
+            if result = extract_from_yaml(match[1], file_path, declared_keys, raw_content, taxonomy_names)
               markdown_content = match[2]
             elsif yaml_empty_front_matter?(match[1])
               # `---\n---` / comment-only blocks are EMPTY front matter:
@@ -110,7 +115,7 @@ module Hwaro
             if end_idx = Utils::FrontmatterScanner.find_json_end(raw_content)
               # find_json_end returns a BYTE offset; slice on bytes so multibyte
               # (CJK/emoji/accented) JSON frontmatter isn't split mid-codepoint.
-              result = extract_from_json(raw_content.byte_slice(0, end_idx), file_path, declared_keys)
+              result = extract_from_json(raw_content.byte_slice(0, end_idx), file_path, declared_keys, taxonomy_names)
               body = raw_content.byte_slice(end_idx)
               markdown_content = Utils::FrontmatterScanner.json_body(body)
             elsif !file_path.empty?
@@ -255,7 +260,7 @@ module Hwaro
         end
 
         # Extract front matter fields from TOML content
-        private def extract_from_toml(raw : String, file_path : String, declared_keys : Set(String)?, content : String)
+        private def extract_from_toml(raw : String, file_path : String, declared_keys : Set(String)?, content : String, taxonomy_names : Set(String)?)
           toml_fm = begin
             TOML.parse(raw)
           rescue ex
@@ -294,7 +299,7 @@ module Hwaro
           warn_typo_keys(unknown_keys, file_path, declared_keys)
 
           front_matter_keys = toml_fm.keys
-          taxonomies = extract_taxonomies(toml_fm, front_matter_keys, file_path)
+          taxonomies = extract_taxonomies(toml_fm, front_matter_keys, file_path, taxonomy_names)
           tags = fm_string_array(toml_fm, "tags", file_path)
           tags = taxonomies["tags"]? || tags if tags.empty?
           taxonomies["tags"] = tags if tags.present?
@@ -322,7 +327,7 @@ module Hwaro
         end
 
         # Extract front matter fields from YAML content
-        private def extract_from_yaml(raw : String, file_path : String, declared_keys : Set(String)?, content : String)
+        private def extract_from_yaml(raw : String, file_path : String, declared_keys : Set(String)?, content : String, taxonomy_names : Set(String)?)
           yaml_fm = begin
             YAML.parse(raw)
           rescue ex
@@ -354,15 +359,18 @@ module Hwaro
           extra = {} of String => Models::ExtraValue
           unknown_keys = [] of String
           if fm_hash = yaml_fm.as_h?
+            # Keys go through `key_string`, as nested keys already did (see
+            # `extract_extra_value`): an unquoted `2024:` or `404:` key is an
+            # integer to the YAML reader, and `as_s?` dropped it — from the
+            # top level and from `extra` alike — while the same key in TOML
+            # or JSON front matter (always a string there) reached
+            # `page.extra`.
             fm_hash.each do |key_any, value|
-              key = key_any.as_s?
-              next unless key
+              key = Utils::FrontmatterWriter.key_string(key_any)
               next if KNOWN_FRONT_MATTER_KEYS.includes?(key)
               if key == "extra" && (inner = value.as_h?)
                 inner.each do |inner_key_any, inner_value|
-                  inner_key = inner_key_any.as_s?
-                  next unless inner_key
-                  extra[inner_key] = extract_extra_value(inner_value)
+                  extra[Utils::FrontmatterWriter.key_string(inner_key_any)] = extract_extra_value(inner_value)
                 end
                 next
               end
@@ -372,8 +380,8 @@ module Hwaro
           end
           warn_typo_keys(unknown_keys, file_path, declared_keys)
 
-          front_matter_keys = yaml_fm.as_h?.try(&.keys).try(&.compact_map(&.as_s?)) || [] of String
-          taxonomies = extract_taxonomies(yaml_fm, front_matter_keys, file_path)
+          front_matter_keys = yaml_fm.as_h?.try(&.keys).try(&.map { |k| Utils::FrontmatterWriter.key_string(k) }) || [] of String
+          taxonomies = extract_taxonomies(yaml_fm, front_matter_keys, file_path, taxonomy_names)
           tags = fm_string_array(yaml_fm, "tags", file_path)
           tags = taxonomies["tags"]? || tags if tags.empty?
           taxonomies["tags"] = tags if tags.present?
@@ -399,7 +407,7 @@ module Hwaro
         end
 
         # Extract front matter fields from JSON content
-        private def extract_from_json(raw : String, file_path : String, declared_keys : Set(String)? = nil)
+        private def extract_from_json(raw : String, file_path : String, declared_keys : Set(String)?, taxonomy_names : Set(String)?)
           json_fm = begin
             JSON.parse(raw)
           rescue ex
@@ -436,7 +444,7 @@ module Hwaro
           warn_typo_keys(unknown_keys, file_path, declared_keys)
 
           front_matter_keys = fm_hash.keys
-          taxonomies = extract_taxonomies(json_fm, front_matter_keys, file_path)
+          taxonomies = extract_taxonomies(json_fm, front_matter_keys, file_path, taxonomy_names)
           tags = fm_string_array(json_fm, "tags", file_path)
           tags = taxonomies["tags"]? || tags if tags.empty?
           taxonomies["tags"] = tags if tags.present?

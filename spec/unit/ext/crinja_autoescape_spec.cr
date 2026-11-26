@@ -294,10 +294,39 @@ describe "Crinja autoescape" do
       on(%({{ "http://example.com/" | urlize }})).should contain(%(<a href="http://example.com/"))
     end
 
+    # Jinja2 3.1's output: the trailing `.`/`,`/`)`/`&gt;` was linked too
+    # (`href="https://example.com."`), and a `www.` href was relative.
+    it "urlize leaves trailing punctuation out of the link and gives www. a scheme" do
+      a = ->(url : String, text : String) { %(<a href="#{url}" rel="noopener">#{text}</a>) }
+      on(%({{ "Visit https://example.com. Or https://x.com/, too" | urlize }})).should eq("Visit #{a.call("https://example.com", "https://example.com")}. Or #{a.call("https://x.com/", "https://x.com/")}, too")
+      on(%({{ "(see https://x.com/a) and https://w.org/Foo_(bar)." | urlize }})).should eq("(see #{a.call("https://x.com/a", "https://x.com/a")}) and #{a.call("https://w.org/Foo_(bar)", "https://w.org/Foo_(bar)")}.")
+      on(%({{ "<https://x.com/> http://x.com/..." | urlize }})).should eq("&lt;#{a.call("https://x.com/", "https://x.com/")}&gt; #{a.call("http://x.com/", "http://x.com/")}...")
+      on(%({{ "go to www.example.com/a." | urlize }})).should eq("go to #{a.call("https://www.example.com/a", "www.example.com/a")}.")
+      off(%({{ "Visit https://example.com." | urlize }})).should eq("Visit #{a.call("https://example.com", "https://example.com")}.")
+    end
+
+    # Each line lost its terminator: "one\ntwo" printed "onetwo".
+    it "urlize keeps the text's line breaks (both modes)" do
+      link = %(<a href="http://x.com/" rel="noopener">http://x.com/</a>)
+      on(%({{ "one\\ntwo\\r\\n\\nhttp://x.com/\\nend" | urlize }})).should eq("one\ntwo\r\n\n#{link}\nend")
+      off(%({{ "one\\ntwo\\nhttp://x.com/\\n" | urlize }})).should eq("one\ntwo\n#{link}\n")
+    end
+
     it "r2#6 replace does not escape the search, and counts matches in the source" do
       on(%({{ s | replace("<i>", "") }})).should eq("s&amp;</i>")
       on(%({% set a %}ab{% endset %}{{ a | replace("a", "aX", 2) }})).should eq("aXb")
       on(%({% set a %}ab{% endset %}{{ a | replace("a", "aX", -1) }})).should eq("aXb")
+    end
+
+    # Plain text re-ran `sub` on the partly-replaced string (Jinja2 3.1's
+    # output, which is Python's `str.replace`, in every mode).
+    it "replace with a count replaces the first matches of the original text" do
+      {true, false}.each do |ae|
+        render = ->(src : String) { ae_render(src, autoescape: ae) }
+        render.call(%({{ "aaa" | replace("a", "ab", 2) }}|{{ "abc" | replace("b", "bb", 2) }})).should eq("ababa|abbc")
+        render.call(%({{ "abc" | replace("", "-", 2) }}|{{ "ab" | replace("", "-", 5) }})).should eq("-a-bc|-a-b-")
+        render.call(%({{ "xyxy" | replace("x", "yx", -1) }}|{{ 1212 | replace("1", "11", 2) }})).should eq("yxyyxy|112112")
+      end
     end
 
     it "r2#7 a safe truncation suffix stays safe, with any target" do
@@ -536,6 +565,24 @@ describe "Crinja autoescape" do
           render.call(%({{ "<b>" | safe | e }})).should eq("<b>")
           render.call("{{ dest | e }}").should eq("/a?b=1&amp;c=2")
         end
+      end
+    end
+  end
+
+  # `| e` of a list or mapping printed Crystal's debug form
+  # (`[Crinja::Value&lt;&quot;a&quot;&gt;, …]`); Jinja2 escapes `str(value)`,
+  # the text `{{ value }}` prints.
+  describe "| e on a list or mapping" do
+    it "escapes the printed form of the collection, in every mode" do
+      vars = {
+        "tags" => Crinja::Value.new([Crinja::Value.new("a"), Crinja::Value.new("<b>")]),
+        "d"    => Crinja::Value.new({"k" => Crinja::Value.new(1)}),
+      } of String => Crinja::Value
+      [true, false].each do |ae|
+        env = Hwaro::Content::Processors::TemplateEngine.new(ae).env
+        env.from_string("{{ tags | e }}").render(vars).should eq("[&#39;a&#39;, &#39;&lt;b&gt;&#39;]")
+        env.from_string("{{ d | escape }}|{{ [1, [2]] | e }}").render(vars).should eq("{&#39;k&#39; =&gt; 1}|[1, [2]]")
+        env.from_string("{{ tags | e }}").render(vars).should eq(env.from_string("{{ tags | forceescape }}").render(vars))
       end
     end
   end

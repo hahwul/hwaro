@@ -202,7 +202,7 @@ describe Hwaro::Utils::HtmlMinifier do
       end
     end
 
-    describe "hidden elements (script, style, noscript)" do
+    describe "hidden elements (script, style, noscript, meta, link, …)" do
       # They render nothing, so the whitespace beside one still separates
       # the inline content around it.
       it "keeps the space between inline siblings around a script" do
@@ -213,6 +213,56 @@ describe Hwaro::Utils::HtmlMinifier do
       it "keeps the space before a noscript between inline siblings" do
         Hwaro::Utils::HtmlMinifier.minify("<p><b>a</b> <noscript><i>n</i></noscript><b>c</b></p>")
           .should eq("<p><b>a</b> <noscript><i>n</i></noscript><b>c</b></p>")
+      end
+
+      it "keeps the space around a microdata <meta> between inline siblings" do
+        Hwaro::Utils::HtmlMinifier.minify("<p><span itemprop=\"author\">Jane</span>\n<meta itemprop=\"datePublished\" content=\"2024-01-01\">\n<span>wrote</span></p>")
+          .should eq("<p><span itemprop=\"author\">Jane</span> <meta itemprop=\"datePublished\" content=\"2024-01-01\"> <span>wrote</span></p>")
+      end
+
+      it "keeps the space before a <picture> whose first child is a <source>" do
+        Hwaro::Utils::HtmlMinifier.minify("<p>see<picture>\n<source srcset=\"a.webp\" type=\"image/webp\">\n<img src=\"a.jpg\" alt=\"a\">\n</picture>here</p>")
+          .should eq("<p>see<picture> <source srcset=\"a.webp\" type=\"image/webp\"> <img src=\"a.jpg\" alt=\"a\"> </picture>here</p>")
+      end
+
+      it "keeps the space around a <link> or <track> between inline siblings" do
+        Hwaro::Utils::HtmlMinifier.minify("<p><b>a</b> <link rel=\"x\" href=\"y\"> <b>c</b></p>")
+          .should eq("<p><b>a</b> <link rel=\"x\" href=\"y\"> <b>c</b></p>")
+        Hwaro::Utils::HtmlMinifier.minify("<p><b>a</b> <track src=\"t.vtt\"/><b>c</b></p>")
+          .should eq("<p><b>a</b> <track src=\"t.vtt\"/><b>c</b></p>")
+      end
+
+      # The whitespace between two hidden tokens used to be stripped
+      # unconditionally, so when it was the only gap between the words
+      # around the run they joined ("ab").
+      it "keeps the only space between inline content around a run of hidden tokens" do
+        Hwaro::Utils::HtmlMinifier.minify("<p>a<script>x()</script>\n<script>y()</script>b</p>")
+          .should eq("<p>a<script>x()</script> <script>y()</script>b</p>")
+        Hwaro::Utils::HtmlMinifier.minify("<p><b>a</b><meta itemprop=\"x\" content=\"1\">\n<meta itemprop=\"y\" content=\"2\"><b>c</b></p>")
+          .should eq("<p><b>a</b><meta itemprop=\"x\" content=\"1\"> <meta itemprop=\"y\" content=\"2\"><b>c</b></p>")
+        Hwaro::Utils::HtmlMinifier.minify("<p>a<style>i{}</style> <link rel=\"x\" href=\"y\"> <script>z()</script>b</p>")
+          .should eq("<p>a<style>i{}</style> <link rel=\"x\" href=\"y\"><script>z()</script>b</p>")
+      end
+
+      it "decides a hidden run the same way in the regex fallback" do
+        # A non-ASCII tag name between two tokens sends the whole page
+        # through the regex version of the whitespace pass.
+        Hwaro::Utils::HtmlMinifier.minify("<x-é>q</x-é>\n<p>a<script>x()</script>\n<script>y()</script>b</p>\n<div>\n<script>z()</script>\n<script>w()</script>\n</div>")
+          .should eq("<x-é>q</x-é><p>a<script>x()</script> <script>y()</script>b</p><div><script>z()</script><script>w()</script></div>")
+      end
+
+      it "strips the space in a hidden run that already has one, or touches a block" do
+        Hwaro::Utils::HtmlMinifier.minify("<p>a <script>x()</script> <script>y()</script>b</p>")
+          .should eq("<p>a <script>x()</script><script>y()</script>b</p>")
+        Hwaro::Utils::HtmlMinifier.minify("<div><p>a</p><script>x()</script> <script>y()</script>b</div>")
+          .should eq("<div><p>a</p><script>x()</script><script>y()</script>b</div>")
+        Hwaro::Utils::HtmlMinifier.minify("<div>a<script>x()</script> <script>y()</script></div>")
+          .should eq("<div>a<script>x()</script><script>y()</script></div>")
+      end
+
+      it "still strips whitespace between two hidden void elements" do
+        Hwaro::Utils::HtmlMinifier.minify("<head>\n<base href=\"/\">\n<link rel=\"a\" href=\"b\">\n<meta name=\"x\">\n<script src=\"a.js\"></script>\n</head>")
+          .should eq("<head><base href=\"/\"><link rel=\"a\" href=\"b\"><meta name=\"x\"><script src=\"a.js\"></script></head>")
       end
 
       it "still strips whitespace between hidden and block neighbours" do
@@ -307,14 +357,31 @@ describe Hwaro::Utils::HtmlMinifier do
       end
 
       it "does not let a literal <script> string inside <style> derail extraction" do
-        # `<style>` is extracted before `<script>` precisely so the
-        # script pass cannot mis-pair a real `</script>` elsewhere
-        # with a `<script>` text fragment that lived inside CSS.
+        # The style opens first, so its body is one block and the
+        # `<script>` text inside it is never paired with a real
+        # `</script>` elsewhere.
         html = "<style>p::before { content: \"<script>\" }</style>\n<p>hi</p>\n<script>real()</script>"
         result = Hwaro::Utils::HtmlMinifier.minify(html)
         result.should contain("<style>p::before { content: \"<script>\" }</style>")
         result.should contain("<script>real()</script>")
         result.should contain("<p>hi</p>")
+      end
+
+      it "does not pair a '<pre' string inside a script with a later real </pre>" do
+        # Each protected tag used to be extracted in its own pass, `pre`
+        # first: the `'<pre'` in the script opened a block that ran to the
+        # code block's `</pre>`, taking the script's own `</script>` with it,
+        # and the script source before the string was minified as markup.
+        script = "<script>\nconst tpl = `\n  <p>a</p>\n\n  <p>b</p>  \n`;\nif (html.startsWith('<pre')) wrap();\n</script>"
+        html = "<div>#{script}</div>\n<p>Code:</p>\n<pre><code>x = 1\n\ny = 2</code></pre>"
+        Hwaro::Utils::HtmlMinifier.minify(html)
+          .should eq("<div>#{script}</div><p>Code:</p><pre><code>x = 1\n\ny = 2</code></pre>")
+      end
+
+      it "does not pair a '<textarea' string inside a style with a later real </textarea>" do
+        style = "<style>\n.note::before { content: \"<textarea\" }\n\n.a  .b { color: red }\n</style>"
+        html = "#{style}\n<form><textarea>a\n\n b </textarea></form>"
+        Hwaro::Utils::HtmlMinifier.minify(html).should eq("#{style}<form><textarea>a\n\n b </textarea></form>")
       end
 
       it "preserves XML comments inside <svg>" do
@@ -439,11 +506,14 @@ describe Hwaro::Utils::HtmlMinifier do
       end
 
       # The byte-level passes defer to the Unicode-aware regex rules here:
-      # KELVIN SIGN downcases to `k` (so the name is `link`, a block tag) and
-      # LONG S matches `s` case-insensitively (so the tag is protected).
+      # KELVIN SIGN downcases to `k` (so the name is `blockquote`, a block
+      # tag, or `link`, a hidden one) and LONG S matches `s`
+      # case-insensitively (so the tag is protected).
       it "classifies a tag name with a non-ASCII letter by its Unicode downcase" do
+        html = "<b>x</b>\n<blocKquote>\n<b>y</b>"
+        Hwaro::Utils::HtmlMinifier.minify(html).should eq("<b>x</b><blocKquote><b>y</b>")
         html = "<b>x</b>\n<linK rel=\"a\">\n<b>y</b>"
-        Hwaro::Utils::HtmlMinifier.minify(html).should eq("<b>x</b><linK rel=\"a\"><b>y</b>")
+        Hwaro::Utils::HtmlMinifier.minify(html).should eq("<b>x</b> <linK rel=\"a\"> <b>y</b>")
       end
 
       it "protects a script tag spelled with LONG S" do
@@ -626,14 +696,31 @@ describe Hwaro::Utils::HtmlMinifier do
         result.should eq("<script>HW_HTML_PB_0</script>")
       end
 
-      it "still restores legitimately nested protected blocks" do
-        # `style` is extracted before `script`, so the script's preserved body
-        # holds a style placeholder that only a second restore pass resolves.
-        # The pass cap must stay wide enough for that (depth <= preserves.size).
+      it "keeps a protected block quoted inside another one intact" do
+        # The script opens first, so its body (with the `<style>` string) is
+        # one block; nothing inside it is extracted separately.
         html = "<div> <script>var x = \"<style>body{}</style>\";</script> </div>"
         result = Hwaro::Utils::HtmlMinifier.minify(html)
         result.should eq("<div><script>var x = \"<style>body{}</style>\";</script></div>")
       end
+    end
+
+    # Regression: every quote in a tag toggled the quoted state, so the
+    # apostrophe of an unquoted `alt=Bob's` paired with the next apostrophe
+    # in the page; the "tag" ran on over the following markup, and the real
+    # quoted values in it lost their inner whitespace.
+    it "reads an apostrophe in an unquoted attribute value as part of the value" do
+      html = "<p><img src=a.png alt=Bob's>\n<a title='x > y'  data-x=\"a  b\">link</a></p>"
+      Hwaro::Utils::HtmlMinifier.minify(html)
+        .should eq("<p><img src=a.png alt=Bob's> <a title='x > y' data-x=\"a  b\">link</a></p>")
+      html = "<span title=it's\n  class=x>a</span>\n<span data-q='a  b'>c</span>"
+      Hwaro::Utils::HtmlMinifier.minify(html)
+        .should eq("<span title=it's class=x>a</span> <span data-q='a  b'>c</span>")
+    end
+
+    it "still opens a quoted value after = and whitespace" do
+      html = "<a title =  'x  >  y'   href=\"/z\">w</a>"
+      Hwaro::Utils::HtmlMinifier.minify(html).should eq("<a title = 'x  >  y' href=\"/z\">w</a>")
     end
 
     # Regression: ` />` after an UNQUOTED attribute value was tightened to
@@ -645,6 +732,20 @@ describe Hwaro::Utils::HtmlMinifier do
       Hwaro::Utils::HtmlMinifier.minify("<img alt=\"a b\" />").should eq("<img alt=\"a b\"/>")
       Hwaro::Utils::HtmlMinifier.minify("<input disabled />").should eq("<input disabled/>")
       Hwaro::Utils::HtmlMinifier.minify("<br />").should eq("<br/>")
+    end
+
+    # Regression: whether the value before ` /` was quoted was read from its
+    # last character, so an unquoted value ending in a quote char
+    # (`alt=x''`, `href=/a/b'`) counted as quoted and the slash joined it.
+    it "keeps the space before a self-closing slash after an unquoted value ending in a quote" do
+      Hwaro::Utils::HtmlMinifier.minify("<img src=a.png alt=x' />").should eq("<img src=a.png alt=x' />")
+      Hwaro::Utils::HtmlMinifier.minify("<a href=/a/b' />").should eq("<a href=/a/b' />")
+      Hwaro::Utils::HtmlMinifier.minify("<img alt=x'' />").should eq("<img alt=x'' />")
+      Hwaro::Utils::HtmlMinifier.minify("<img alt=x\"  />").should eq("<img alt=x\" />")
+      # A quoted value holding `=` and spaces is still ended by its quote.
+      Hwaro::Utils::HtmlMinifier.minify("<img alt=\"a b=c\"  />").should eq("<img alt=\"a b=c\"/>")
+      Hwaro::Utils::HtmlMinifier.minify("<img title='k=v x' alt=y  />").should eq("<img title='k=v x' alt=y />")
+      Hwaro::Utils::HtmlMinifier.minify("<img alt='x' \n />").should eq("<img alt='x'/>")
     end
 
     # Regression: the comment and trailing-space passes were plain regexes

@@ -75,11 +75,11 @@ series_weight = 1
 {% if page.series_pages | length > 1 %}
 <div class="series-pager">
   {% if page.series_index > 1 %}
-    <a href="{{ page.series_pages[page.series_index - 2].url }}">← Previous</a>
+    <a href="{{ base_url }}{{ page.series_pages[page.series_index - 2].url }}">← Previous</a>
   {% endif %}
   <span>Part {{ page.series_index }} of {{ page.series_pages | length }}</span>
   {% if page.series_index < page.series_pages | length %}
-    <a href="{{ page.series_pages[page.series_index].url }}">Next →</a>
+    <a href="{{ base_url }}{{ page.series_pages[page.series_index].url }}">Next →</a>
   {% endif %}
 </div>
 {% endif %}

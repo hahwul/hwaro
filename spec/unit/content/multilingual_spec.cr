@@ -351,3 +351,22 @@ describe "translation_key build warnings" do
     log.should_not contain("translation_key")
   end
 end
+
+# A page that loses its output path to another page (`slug` collision) is
+# never written: its URL serves the winner. Linking it as a translation sent
+# the language switcher, hreflang and sitemap alternates to unrelated content.
+describe "translations of a page that loses its output path" do
+  it "does not link the losing page's URL" do
+    build_site(KEY_SITE_CONFIG,
+      content_files: {
+        "blog/news.md"        => "+++\ntitle = \"News\"\n+++\nnews",
+        "blog/zz-about.md"    => "+++\ntitle = \"About\"\nslug = \"news\"\n+++\nabout",
+        "blog/zz-about.ko.md" => "+++\ntitle = \"소개\"\n+++\nabout ko",
+      },
+      template_files: {"page.html" => KEY_TEMPLATE, "section.html" => "", "index.html" => ""}) do
+      File.read("public/ko/blog/zz-about/index.html").should eq("|")
+      File.read("public/blog/news/index.html").should eq("|")
+      File.read("public/sitemap.xml").should_not contain(%(hreflang="en" href="https://example.com/blog/news/"))
+    end
+  end
+end

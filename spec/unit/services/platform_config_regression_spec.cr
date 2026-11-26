@@ -45,6 +45,46 @@ describe "PlatformConfig alias-scan stability" do
     end
   end
 
+  # A FIFO named `x.md` was read like a page: `File.read` blocked until a
+  # writer appeared, so `hwaro tool platform` hung. A helper process opens
+  # the writer after 3s so the pre-fix code fails on time instead of hanging.
+  it "skips a FIFO named like a page instead of blocking on it" do
+    posix_only!("mkfifo")
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("content/posts")
+        File.write("content/posts/good.md", "---\ntitle: Good\naliases:\n  - /kept/\n---\nBody\n")
+        fifo = File.join(dir, "content/posts/pipe.md")
+        pending!("needs mkfifo") unless Process.run("mkfifo", [fifo]).success?
+        unblock = Process.new("sh", ["-c", "sleep 3; exec 3>\"$1\"", "sh", fifo])
+
+        started = Time.instant
+        result = Hwaro::Services::PlatformConfig.new(Hwaro::Models::Config.new).generate("netlify")
+        elapsed = Time.instant - started
+        unblock.terminate rescue nil
+        unblock.wait
+
+        result.should contain("from = \"/kept/\"")
+        elapsed.should be < 2.seconds
+      end
+    end
+  end
+
+  it "skips a page symlink that loops onto itself and keeps the other aliases" do
+    posix_only!("symlink loop")
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("content/posts")
+        File.write("content/posts/good.md", "---\ntitle: Good\naliases:\n  - /kept/\n---\nBody\n")
+        File.symlink("loop.md", File.join(dir, "content/posts/loop.md"))
+
+        result = ""
+        with_captured_log { result = Hwaro::Services::PlatformConfig.new(Hwaro::Models::Config.new).generate("netlify") }
+        result.should contain("from = \"/kept/\"")
+      end
+    end
+  end
+
   # Finding 3: toml_escape only handled \ and ", so an alias containing a
   # newline produced an unparseable netlify.toml. Control characters are now
   # escaped (chosen over skipping, matching the existing escape-not-drop
@@ -201,6 +241,22 @@ describe "PlatformConfig alias publish state" do
         result = Hwaro::Services::PlatformConfig.new(config).generate("netlify")
         result.should contain(%(from = "/old-a/"))
         result.should contain(%(from = "/old-d/"))
+      end
+    end
+  end
+
+  # The alias scan re-parses every page; with the config's declared keys,
+  # as the build passes them, a `[[content.schema]]` field is no typo.
+  it "warns about front matter the way the build does" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("content/posts")
+        File.write("content/posts/p.md", "+++\ntitle = \"P\"\nauthor = \"me\"\naliases = [\"/old/\"]\n+++\nBody\n")
+        config = load_config("[[content.schema]]\nsections = [\"**\"]\n[content.schema.fields.author]\ntype = \"string\"\n")
+        result = ""
+        log = with_captured_log { result = Hwaro::Services::PlatformConfig.new(config).generate("netlify") }
+        result.should contain("from = \"/old/\"")
+        log.should_not contain("'author'")
       end
     end
   end

@@ -44,9 +44,15 @@ class Crinja::Parser::ExpressionParser
   # end the call instead. A bare argument is no conditional either:
   # `n is divisibleby 2 if c else d` is `(n is divisibleby 2) if c else d`,
   # as in Jinja2.
+  #
+  # Nor can a bare filter's argument start with `,`, `:` or `}`: those end
+  # the list item, call argument, dict entry or slice bound the filter is in.
+  # Reading on raised "Unexpected COMMA" for `[a | upper, b]`,
+  # `format(x | e, y)`, `macro(page.title | lower, 2)` or `{"k": v | e}`.
   private def parse_call_expression(identifier, with_parenthesis = true)
     return previous_def if with_parenthesis
-    if current_token.kind == Kind::IDENTIFIER && current_token.value.in?("if", "else", "in")
+    if current_token.kind.in?(Kind::COMMA, Kind::DICT_ASSIGN, Kind::RIGHT_CURLY) ||
+       (current_token.kind == Kind::IDENTIFIER && current_token.value.in?("if", "else", "in"))
       return AST::CallExpression.new(identifier, AST::ExpressionList.new([] of AST::ExpressionNode),
         Hash(AST::IdentifierLiteral, AST::ExpressionNode).new).at(identifier.location_start, current_token.location)
     end

@@ -1,4 +1,5 @@
 require "../../spec_helper"
+require "../../support/build_helper"
 
 private def versioned_page(config : Hwaro::Models::Config, path : String, url : String, language : String? = nil) : Hwaro::Models::Page
   page = Hwaro::Models::Page.new(path)
@@ -154,6 +155,92 @@ describe Hwaro::Content::Versions do
       Hwaro::Content::Versions.link!([v1, v2], config)
 
       v1.version_links.find!(&.latest).exists.should be_false
+    end
+  end
+
+  # The object printed and serialized as `#<…VersionList:0x10916ed00>`, an
+  # address that changed on every build.
+  describe "the versions variable in filters" do
+    it "prints and serializes as the list of its entries" do
+      config = load_config(<<-TOML)
+        title = "T"
+        base_url = "https://example.com"
+        [[versions.list]]
+        name = "v2"
+        path = "docs/v2"
+        latest = true
+        [[versions.list]]
+        name = "v1"
+        path = "docs/v1"
+        TOML
+      vars = {"versions" => Hwaro::Content::Versions.versions_value(config, "")}
+      {true, false}.each do |ae|
+        json = render_crinja("{{ versions | tojson }}", vars, autoescape: ae)
+        JSON.parse(json).as_a.map(&.["name"].as_s).should eq(["v2", "v1"])
+        listed = "[{'name' => 'v2', 'label' => 'v2', 'latest' => true, 'url' => '/docs/'}, " \
+                 "{'name' => 'v1', 'label' => 'v1', 'latest' => false, 'url' => '/docs/v1/'}]"
+        escaped = HTML.escape(listed)
+        render_crinja("{{ versions }}|{{ versions | e }}|{{ versions | string }}", vars, autoescape: ae)
+          .should eq(ae ? "#{escaped}|#{escaped}|#{escaped}" : "#{listed}|#{escaped}|#{listed}")
+      end
+    end
+  end
+end
+
+# A counterpart that loses its output path to another page is never written:
+# the URL serves the page that won it, so the switcher must not call it
+# existing and an old version must not canonicalize on it.
+describe "version counterparts that lose their output path" do
+  it "treats the losing counterpart as missing" do
+    config = <<-TOML
+      title = "T"
+      base_url = "https://example.com"
+      [[versions.list]]
+      name = "v2"
+      path = "docs/v2"
+      latest = true
+      [[versions.list]]
+      name = "v1"
+      path = "docs/v1"
+      TOML
+    build_site(config,
+      content_files: {
+        "docs/v2/_index.md"  => "+++\ntitle = \"Docs\"\n+++\n",
+        "docs/v1/_index.md"  => "+++\ntitle = \"Docs v1\"\n+++\n",
+        "docs/v2/a.md"       => "+++\ntitle = \"A\"\nslug = \"install\"\n+++\na",
+        "docs/v2/install.md" => "+++\ntitle = \"Install v2\"\n+++\nv2",
+        "docs/v1/install.md" => "+++\ntitle = \"Install v1\"\n+++\nv1",
+      },
+      template_files: {
+        "page.html"    => "{% for v in page.version_links %}[{{ v.name }} {{ v.url }} {{ v.exists }}]{% endfor %}|{{ canonical_tag }}",
+        "section.html" => "",
+      }) do
+      v1 = File.read("public/docs/v1/install/index.html")
+      v1.should start_with("[v2 /docs/ false][v1 /docs/v1/install/ true]|")
+      v1.should contain(%(<link rel="canonical" href="https://example.com/docs/v1/install/">))
+    end
+  end
+end
+
+describe "version root sections that lose their output path" do
+  # `docs/v1/_index.ko.md` loses `/ko/docs/v1/` to `a.ko.md`, so it is no
+  # v1 Korean root: a Korean page with no v1 counterpart must not link its
+  # v1 row to `a.ko.md`.
+  it "does not take a collision-losing section as the version root" do
+    build_site(
+      %(title = "T"\nbase_url = "https://example.com"\ndefault_language = "en"\n[languages.en]\nlanguage_name = "English"\n[languages.ko]\nlanguage_name = "Korean"\n[[versions.list]]\nname = "v2"\npath = "docs/v2"\nlatest = true\n[[versions.list]]\nname = "v1"\npath = "docs/v1"\n),
+      content_files: {
+        "docs/v1/_index.md"    => "+++\ntitle = \"V1\"\n+++\n",
+        "docs/v1/_index.ko.md" => "+++\ntitle = \"V1\"\n+++\n",
+        "docs/v2/_index.md"    => "+++\ntitle = \"V2\"\n+++\n",
+        "docs/v2/_index.ko.md" => "+++\ntitle = \"V2\"\n+++\n",
+        "a.ko.md"              => "+++\ntitle = \"Other\"\npath = \"docs/v1\"\n+++\n",
+        "docs/v2/b.ko.md"      => "+++\ntitle = \"B2\"\n+++\n",
+      },
+      template_files: {"page.html"    => "{% for v in page.version_links %}[{{ v.name }} {{ v.url }} {{ v.exists }}]{% endfor %}",
+                       "section.html" => ""},
+    ) do |dir|
+      File.read(File.join(dir, "public", "ko", "docs", "b", "index.html")).should eq("[v2 /ko/docs/b/ true][v1 /docs/v1/ false]")
     end
   end
 end

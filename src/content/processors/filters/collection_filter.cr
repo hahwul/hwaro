@@ -20,6 +20,23 @@ module Hwaro
             end
           end
 
+          # `attribute` of a mapping `item` (`where`, `sort_by`, `group_by`):
+          # its own key, as always, else a dotted path into it
+          # (`extra.weight`, `taxonomies.tags.0`), as `sort`, `map` and
+          # `selectattr` read one. Only the whole name was looked up, so
+          # `sort_by(attribute="extra.weight")` left the list unsorted and
+          # `where(attribute="extra.featured", value=true)` matched nothing.
+          # nil when neither exists; raises for a non-mapping item, which
+          # each filter skips as before.
+          def self.field(item : Crinja::Value, attribute : Crinja::Value) : Crinja::Value?
+            item.as_h[attribute]? || begin
+              if attribute.to_s.includes?('.')
+                value = Crinja::Filter.__attr_path(attribute, item)
+                value unless value.undefined?
+              end
+            end
+          end
+
           def self.register(env : Crinja)
             # Array where filter
             env.filters["where"] = Crinja.filter({attribute: nil, value: nil}) do
@@ -29,9 +46,7 @@ module Hwaro
                 val = arguments["value"]
 
                 arr.select do |item|
-                  item_hash = item.as_h
-                  item_val = item_hash[attr_key]?
-                  item_val == val
+                  CollectionFilters.field(item, attr_key) == val
                 rescue Exception
                   false
                 end
@@ -50,8 +65,8 @@ module Hwaro
                 # lexicographically ("1","10","2"). Strings/dates fall back to
                 # string comparison; a missing attribute sorts as "".
                 sorted = arr.sort do |a, b|
-                  av = a.as_h[attr_key]? || Crinja::Value.new("")
-                  bv = b.as_h[attr_key]? || Crinja::Value.new("")
+                  av = CollectionFilters.field(a, attr_key) || Crinja::Value.new("")
+                  bv = CollectionFilters.field(b, attr_key) || Crinja::Value.new("")
                   cmp = if av.number? && bv.number?
                           av.as_number <=> bv.as_number
                         else
@@ -75,8 +90,7 @@ module Hwaro
                 groups = {} of String => Array(Crinja::Value)
 
                 arr.each do |item|
-                  item_hash = item.as_h
-                  key = item_hash[attr_key]?.try(&.to_s) || ""
+                  key = CollectionFilters.field(item, attr_key).try(&.to_s) || ""
                   groups[key] ||= [] of Crinja::Value
                   groups[key] << item
                 rescue Exception

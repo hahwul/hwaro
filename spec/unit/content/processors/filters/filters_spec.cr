@@ -115,6 +115,25 @@ describe "CollectionFilters" do
     end
   end
 
+  # Only the whole attribute name was looked up: `extra.weight` left the list
+  # unsorted, and `where` / `group_by` found nothing.
+  describe "where / sort_by / group_by with a dotted attribute" do
+    items = %([{'n': 'a', 'extra': {'w': 2, 'f': true}}, {'n': 'b', 'extra': {'w': 10}}, {'n': 'c', 'extra': {'w': 1, 'f': true}}, {'n': 'd'}])
+
+    it "reads the path into each item" do
+      render_crinja("{{ #{items} | sort_by(attribute='extra.w') | map(attribute='n') | join }}").should eq("dcab")
+      render_crinja("{{ #{items} | sort_by(attribute='extra.w', reverse=true) | map(attribute='n') | join }}").should eq("bacd")
+      render_crinja("{{ #{items} | where(attribute='extra.f', value=true) | map(attribute='n') | join }}").should eq("ac")
+      render_crinja("{% for g in #{items} | group_by(attribute='extra.f') %}{{ g.grouper }}={{ g.list | map(attribute='n') | join }};{% endfor %}")
+        .should eq("true=ac;=bd;")
+      render_crinja("{{ [{'t': ['x', 'y']}, {'t': ['z']}] | where(attribute='t.0', value='z') | length }}").should eq("1")
+    end
+
+    it "still prefers a key that contains the dot" do
+      render_crinja("{{ [{'a.b': 1, 'a': {'b': 2}}] | where(attribute='a.b', value=1) | length }}").should eq("1")
+    end
+  end
+
   describe "group_by" do
     it "groups array of hashes by attribute" do
       items = crinja_hash_array([
@@ -532,6 +551,17 @@ describe "MiscFilters" do
       JSON.parse(result).as_a.map(&.as_i).should eq([1])
       # Clamped to <= 16 spaces per level, not billions.
       result.should_not match(/ {17,}/)
+    end
+
+    # A tuple was stringified: `d | dictsort | tojson` gave
+    # `["[Crinja::Value<\"a\">, Crinja::Value<1>]"]`. Jinja2 writes arrays.
+    it "writes a tuple (dictsort / groupby pairs) as a JSON array" do
+      vars = {"d" => Crinja::Value.new({"b" => Crinja::Value.new(2), "a" => Crinja::Value.new("x")})}
+      [true, false].each do |ae|
+        render_crinja("{{ d | dictsort | tojson }}", vars, autoescape: ae).should eq(%([["a","x"],["b",2]]))
+        render_crinja("{{ d | dictsort | jsonify }}", vars, autoescape: ae).should eq(%([["a","x"],["b",2]]))
+        render_crinja("{{ (1, [2, (3,)]) | tojson }}", vars, autoescape: ae).should eq("[1,[2,[3]]]")
+      end
     end
   end
 

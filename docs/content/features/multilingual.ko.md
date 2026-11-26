@@ -86,6 +86,8 @@ Hwaro는 파일 이름을 기준으로 번역된 페이지를 자동으로 연�
 
 예를 들어 `hello.md`, `hello.ko.md`, `hello.ja.md`는 모두 번역 관계로 연결됩니다.
 
+실제로 출력되지 않는 페이지는 번역 링크(`page.translations`, hreflang 태그, 사이트맵 대체 링크)에서 빠집니다. `render = false` 페이지, `redirect_to` 스텁, 그리고 다른 페이지에 URL을 빼앗긴 페이지(빌드의 중복 출력 경로 경고)가 그렇습니다. 그 URL에는 다른 페이지가 출력되기 때문입니다.
+
 ### 번역 키
 
 언어마다 파일 이름이 다르다면 각 번역의 프론트 매터에 같은 `translation_key`를 지정합니다(Hugo의 `translationKey`):
@@ -345,7 +347,7 @@ back = "뒤로"
   <a href="/about/">{{ "nav.about" | t }}</a>
 </nav>
 
-<a href="{{ page.url }}">{{ "common.read_more" | t }}</a>
+<a href="{{ base_url }}{{ page.url }}">{{ "common.read_more" | t }}</a>
 ```
 
 ### 폴백 동작

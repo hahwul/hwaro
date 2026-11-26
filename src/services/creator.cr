@@ -712,7 +712,7 @@ module Hwaro
           archetype_path = File.join(ARCHETYPES_DIR, "#{explicit_archetype}.md")
           if File.file?(archetype_path)
             Logger.debug "Using archetype: #{archetype_path}"
-            return File.read(archetype_path)
+            return read_archetype(archetype_path)
           else
             raise Hwaro::HwaroError.new(
               code: Hwaro::Errors::HWARO_E_USAGE,
@@ -739,7 +739,7 @@ module Hwaro
 
             if File.file?(archetype_path)
               Logger.debug "Using archetype: #{archetype_path}"
-              return File.read(archetype_path)
+              return read_archetype(archetype_path)
             end
           end
         end
@@ -748,7 +748,7 @@ module Hwaro
         default_archetype = File.join(ARCHETYPES_DIR, "default.md")
         if File.file?(default_archetype)
           Logger.debug "Using default archetype: #{default_archetype}"
-          return File.read(default_archetype)
+          return read_archetype(default_archetype)
         end
 
         # 4. No archetype found
@@ -762,6 +762,19 @@ module Hwaro
           code: Hwaro::Errors::HWARO_E_IO,
           message: "Cannot read archetype: #{ex.message}",
           hint: "Check the file permissions under #{ARCHETYPES_DIR}/.",
+        )
+      end
+
+      # Placeholder filling and directive parsing are regex passes, and PCRE2
+      # raises on invalid UTF-8: a latin-1 archetype failed `hwaro new` with a
+      # bare "Regex match error: UTF-8 error" naming no file.
+      private def read_archetype(path : String) : String
+        content = File.read(path)
+        return content if content.valid_encoding?
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_IO,
+          message: "Archetype #{path} is not valid UTF-8.",
+          hint: "Save #{path} as UTF-8.",
         )
       end
 
@@ -931,15 +944,22 @@ module Hwaro
       end
 
       private def build_json_front_matter(title : String, date : String, is_draft : Bool, tags : Array(String), extra : Array({String, String, Bool})) : String
+        # Newlines fold to spaces, as `escape_string` folds them for TOML and
+        # YAML: the same `hwaro new --title` must not give a JSON page a
+        # different title than a TOML or YAML one.
         fields = {} of String => JSON::Any
-        fields["title"] = JSON::Any.new(title)
-        fields["date"] = JSON::Any.new(date)
-        extra.each { |(f, v, literal)| fields[f] = literal ? JSON.parse(v) : JSON::Any.new(v) }
+        fields["title"] = JSON::Any.new(single_line(title))
+        fields["date"] = JSON::Any.new(single_line(date))
+        extra.each { |(f, v, literal)| fields[f] = literal ? JSON.parse(v) : JSON::Any.new(single_line(v)) }
         fields["draft"] = JSON::Any.new(true) if is_draft
         unless tags.empty?
-          fields["tags"] = JSON::Any.new(tags.map { |t| JSON::Any.new(t) })
+          fields["tags"] = JSON::Any.new(tags.map { |t| JSON::Any.new(single_line(t)) })
         end
         "#{JSON::Any.new(fields).to_pretty_json}\n\n"
+      end
+
+      private def single_line(value : String) : String
+        value.gsub("\n", " ")
       end
 
       private def escape_string(value : String) : String
@@ -948,7 +968,7 @@ module Hwaro
         # trailing `\"` escapes the closing quote).
         # Control characters (a pasted `\r`, ESC, DEL) are escaped too: a raw
         # one makes the quoted scalar invalid TOML/YAML for every other reader.
-        Utils::FrontmatterWriter.escape_toml_string(value.gsub("\n", " "))
+        Utils::FrontmatterWriter.escape_toml_string(single_line(value))
       end
     end
   end

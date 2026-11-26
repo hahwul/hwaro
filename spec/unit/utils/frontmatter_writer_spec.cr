@@ -325,15 +325,13 @@ describe Hwaro::Utils::FrontmatterWriter do
     end
 
     # Everything this builder writes has to be readable by the TOML parser
-    # hwaro itself uses, or `tool convert to-toml` hands the next build a file
-    # it cannot parse. toml.cr accumulates an integer's digits positively and
-    # only applies the sign afterwards, so Int64::MIN — a legal TOML integer,
-    # and a value any YAML/JSON front matter can carry — raised "Arithmetic
-    # overflow" on the way back in.
-    it "keeps Int64::MIN readable by emitting its exact digits" do
+    # hwaro itself uses. Int64::MIN used to be quoted because toml.cr could
+    # not read it back; the reader takes it now (ext/toml_float_fix.cr), so it
+    # stays an integer.
+    it "emits Int64::MIN as a readable TOML integer" do
       doc = toml_build({"n" => YAML::Any.new(Int64::MIN)})
-      doc.should contain("-9223372036854775808")
-      TOML.parse(doc)["n"].should eq("-9223372036854775808")
+      doc.should contain("n = -9223372036854775808")
+      TOML.parse(doc)["n"].raw.should eq(Int64::MIN)
     end
 
     it "still emits ordinary large integers as bare TOML integers" do
@@ -380,42 +378,29 @@ describe Hwaro::Utils::FrontmatterWriter do
       TOML.parse(doc)["tags"].as_a.should be_empty
     end
 
-    # toml.cr refuses arrays that mix type families.
-    it "promotes an int/float mix to floats so the array stays homogeneous" do
+    # Regression: arrays used to be coerced to one type (ints promoted to
+    # floats, other mixes stringified, tables turned into JSON text) because
+    # toml.cr once refused mixed arrays. It reads them now (TOML 1.0), and the
+    # coercion changed what a converted page rendered.
+    it "keeps each member of a mixed array its own type" do
       doc = toml_build({"nums" => YAML::Any.new([YAML::Any.new(1_i64), YAML::Any.new(2.5)])})
-      TOML.parse(doc)["nums"].as_a.map(&.raw).should eq([1.0, 2.5])
+      TOML.parse(doc)["nums"].as_a.map(&.raw).should eq([1_i64, 2.5])
+      doc = toml_build({"mixed" => YAML::Any.new([YAML::Any.new(1_i64), YAML::Any.new("two"), YAML::Any.new(true)])})
+      TOML.parse(doc)["mixed"].as_a.map(&.raw).should eq([1_i64, "two", true])
     end
 
-    # Int64::MIN serializes as a quoted string, so an otherwise all-integer
-    # array holding it would become `["-9223372036854775808", 1]` — the mixed
-    # array toml.cr refuses — unless the whole array is coerced with it.
-    it "keeps an integer array holding Int64::MIN homogeneous" do
+    it "keeps Int64::MIN an integer inside an array" do
       doc = toml_build({"nums" => YAML::Any.new([YAML::Any.new(Int64::MIN), YAML::Any.new(1_i64)])})
-      TOML.parse(doc)["nums"].as_a.should eq(["-9223372036854775808", "1"])
+      TOML.parse(doc)["nums"].as_a.map(&.raw).should eq([Int64::MIN, 1_i64])
     end
 
-    # The promoted `N.0` spelling has the same re-read problem: toml.cr keeps
-    # multiplying the Int64 integer part by 10 for each fractional digit, so
-    # `9223372036854775807.0` overflowed. The exponent spelling survives, and
-    # 2^63 is exactly representable, so no value is lost either.
-    it "promotes a large int in a float array to a re-readable float" do
+    it "keeps a large int next to a float an integer" do
       doc = toml_build({"nums" => YAML::Any.new([YAML::Any.new(Int64::MAX), YAML::Any.new(2.5)])})
-      TOML.parse(doc)["nums"].as_a.map(&.raw).should eq([Int64::MAX.to_f64, 2.5])
-    end
-
-    it "coerces any other scalar mix to strings" do
-      doc = toml_build({"mixed" => YAML::Any.new([YAML::Any.new(1_i64), YAML::Any.new("two")])})
-      TOML.parse(doc)["mixed"].as_a.should eq(["1", "two"])
-    end
-
-    it "coerces a bool/string mix to strings" do
-      doc = toml_build({"mixed" => YAML::Any.new([YAML::Any.new(true), YAML::Any.new("x")])})
-      TOML.parse(doc)["mixed"].as_a.should eq(["true", "x"])
+      TOML.parse(doc)["nums"].as_a.map(&.raw).should eq([Int64::MAX, 2.5])
     end
 
     # A hash reached from inside an array cannot become a [table] section, so
-    # it is emitted as an inline table — valid only while the array stays
-    # homogeneous.
+    # it is emitted as an inline table.
     it "emits a hash inside an all-table array as an inline table" do
       value = YAML::Any.new([
         YAML.parse({"k" => "v"}.to_yaml),
@@ -425,25 +410,16 @@ describe Hwaro::Utils::FrontmatterWriter do
       TOML.parse(doc)["items"].as_a.map(&.as_h["k"]).should eq(["v", "w"])
     end
 
-    # Regression: `["plain", {k = "v"}]` is exactly the mixed array toml.cr
-    # refuses, so `tool convert to-toml` used to write a file that the next
-    # `hwaro build` rejected with "cannot mix types in array".
-    it "keeps a scalar/table mix parseable by stringifying the table" do
+    it "keeps a table or array mixed with scalars structured" do
       value = YAML::Any.new([
         YAML::Any.new("plain"),
         YAML.parse({"k" => "v"}.to_yaml),
-      ])
-      doc = toml_build({"items" => value})
-      TOML.parse(doc)["items"].as_a.should eq(["plain", %q({"k":"v"})])
-    end
-
-    it "keeps a scalar/array mix parseable by stringifying the array" do
-      value = YAML::Any.new([
-        YAML::Any.new("plain"),
         YAML::Any.new([YAML::Any.new("a"), YAML::Any.new("b")]),
       ])
-      doc = toml_build({"items" => value})
-      TOML.parse(doc)["items"].as_a.should eq(["plain", %q(["a","b"])])
+      items = TOML.parse(toml_build({"items" => value}))["items"].as_a
+      items[0].should eq("plain")
+      items[1].as_h["k"].should eq("v")
+      items[2].as_a.should eq(["a", "b"])
     end
 
     it "never emits an array TOML cannot reparse, whatever the mix" do

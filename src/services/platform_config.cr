@@ -402,9 +402,23 @@ module Hwaro
           next unless info
           if info.directory?
             scan_content_for_aliases(path, redirects)
-          elsif PAGE_EXTENSIONS.includes?(Path[entry].extension.downcase)
+          elsif PAGE_EXTENSIONS.includes?(Path[entry].extension.downcase) && regular_file?(path, info)
             extract_aliases_from_file(path, redirects)
           end
+        end
+      end
+
+      # Regular files only, as the build reads content: a FIFO named `x.md`
+      # blocked `File.read` forever and hung `hwaro tool platform`. `lstat`
+      # is the entry's own (unfollowed) info; a symlink counts when its
+      # target is a regular file. A dangling or looping link is skipped (the
+      # draft scan already warned about it) — `File.file?` would RAISE ELOOP.
+      private def regular_file?(path : String, lstat : File::Info) : Bool
+        return lstat.file? unless lstat.symlink?
+        begin
+          File.info?(path).try(&.file?) || false
+        rescue File::Error
+          false
         end
       end
 
@@ -426,7 +440,12 @@ module Hwaro
 
       private def extract_aliases_from_file(path : String, redirects : Array(Tuple(String, String)))
         raw_content = File.read(path)
-        data = Processor::Markdown.parse(raw_content, path)
+        # Same declared keys and taxonomy names as the build's parse, so the
+        # front-matter warnings this re-parse prints are the build's own (a
+        # `[[content.schema]]` field is not a typo of a known key).
+        data = Processor::Markdown.parse(raw_content, path,
+          Content::FrontMatterSchema.declared_keys(@config),
+          Content::FrontMatterSchema.taxonomy_names(@config).to_set)
         # Mirror the build's publish filter: drafts, headless pages, and
         # outside-window (future/expired) content write no output and must
         # not fail platform generation over a date-token permalink they

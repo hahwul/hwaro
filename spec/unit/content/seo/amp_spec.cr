@@ -220,7 +220,7 @@ describe Hwaro::Content::Seo::Amp do
       result.should contain("<amp-img")
       result.should contain("layout=\"responsive\"")
       # The img should NOT be wrapped in a container div
-      result.should_not contain(%(<div class="amp-img-container"><amp-img))
+      result.should_not contain(%(<span class="amp-img-container"><amp-img))
     end
 
     # Markdown renders images as self-closing `<img … />`. The conversion regex
@@ -774,9 +774,29 @@ describe Hwaro::Content::Seo::Amp do
       # Markdown wraps a standalone image in <p>...</p>.
       html = %(<html><head></head><body><p><img src="/x.png" alt="x" /></p></body></html>)
       result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
-      result.should contain(%(<div class="amp-img-container">))
+      result.should contain(%(<span class="amp-img-container">))
       # The block container must not be nested directly inside <p>.
-      result.should_not match(/<p>\s*<div class="amp-img-container"/)
+      result.should_not match(/<p>\s*<span class="amp-img-container"/)
+    end
+
+    it "keeps an image container that shares its paragraph or link inline" do
+      page = Hwaro::Models::Page.new("test.md")
+      page.url = "/test/"
+      config = Hwaro::Models::Config.new
+
+      # A <div> container here closed the <p> early (text and `</p>` left
+      # dangling), and the sole-child unwrap ran on from the first paragraph
+      # to the second one's container, dropping both paragraph tags.
+      html = %(<html><head></head><body><p>See <img src="/x.png" alt="x" /> here.</p>\n) +
+             %(<p><a href="/y/"><img src="/y.png" alt="y" /></a></p>\n) +
+             %(<p><img src="/a.png" alt="a" /> tail</p>\n<p><img src="/b.png" alt="b" /></p></body></html>)
+      result = Hwaro::Content::Seo::Amp.convert_to_amp(html, page, config)
+      result.should_not contain(%(<div class="amp-img-container">))
+      result.should contain(%(<p>See <span class="amp-img-container"><amp-img src="/x.png" alt="x" layout="fill"></amp-img></span> here.</p>))
+      result.should contain(%(<p><a href="/y/"><span class="amp-img-container">))
+      result.should contain(%(<p><span class="amp-img-container"><amp-img src="/a.png" alt="a" layout="fill"></amp-img></span> tail</p>))
+      result.should contain(%(\n<span class="amp-img-container"><amp-img src="/b.png" alt="b" layout="fill"></amp-img></span></body>))
+      result.should contain(".amp-img-container{display:block;")
     end
   end
 

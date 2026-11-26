@@ -9,6 +9,7 @@ require "yaml"
 require "json"
 require "toml"
 require "crinja"
+require "./frontmatter_writer"
 
 module Hwaro
   module Utils
@@ -114,7 +115,12 @@ module Hwaro
         elsif h = value.as_h?
           converted = {} of String => Crinja::Value
           h.each do |k, v|
-            converted[k.to_s] = from_yaml(v, depth + 1)
+            # `key_string`, not `to_s`: an unquoted `2024-01-15:` key is a
+            # timestamp to the YAML reader, and its `to_s` named the entry
+            # "2024-01-15 00:00:00 +09:00" — a different key in every
+            # machine zone, and never the "2024-01-15" the same data in TOML
+            # or JSON is keyed by.
+            converted[FrontmatterWriter.key_string(k)] = from_yaml(v, depth + 1)
           end
           Crinja::Value.new(converted)
         elsif s = value.as_s?
@@ -253,6 +259,15 @@ module Hwaro
         when "toml"        then from_toml(TOML.parse(content))
         when "yaml", "yml" then from_yaml(YAML.parse(content))
         when "csv"
+          # Crystal's CSV lexer reads a NUL byte as end of input, so every
+          # row after one vanished without an error. Reject it the way the
+          # JSON, YAML and TOML parsers do.
+          if nul = content.index('\0')
+            before = content[0, nul]
+            line = before.count('\n') + 1
+            column = nul - (before.rindex('\n') || -1)
+            raise CSV::MalformedCSVError.new("NUL byte (U+0000) is not allowed in CSV", line, column)
+          end
           rows = CSV.parse(content).map do |row|
             Crinja::Value.new(row.map { |cell| Crinja::Value.new(cell.strip) })
           end

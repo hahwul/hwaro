@@ -22,6 +22,15 @@ module Hwaro
       # New: Paginate path - custom path pattern for pagination (e.g., "page", "p")
       property paginate_path : String
 
+      # `paginate_path` as it appears in the pager URLs (`paginator.next`,
+      # the nav, `<link rel="next">`): escaped like `page.url`, so a `#` or
+      # `?` in it (`paginate_path = "p#2"`) no longer ends the path and links
+      # `/blog/p`. The pager pages themselves are still written under the raw
+      # `paginate_path` directory, which the escaped URL addresses.
+      def paginate_url_path : String
+        Page.url_form(@paginate_path)
+      end
+
       # Pages in this section
       property pages : Array(Page) = [] of Page
 

@@ -22,8 +22,13 @@ module Hwaro::Core::Build::Phases::ParseContent
       # discovery surface then see a matched term `_index.md` as headless.
       mark_term_metadata(ctx.sections, match_term_files(ctx.pages, ctx.sections, config))
       @translation_key_collisions.clear
-      warn_translation_key_collisions(Content::Multilingual.link_translations!(ctx.all_pages, config))
-      Content::Versions.link!(ctx.all_pages, config)
+      # A page that loses its URL to another page is never written, so it is
+      # no one's translation or version counterpart (as it is no one's
+      # prev/next). Only the two linkers read it, and both are no-ops on a
+      # site with neither languages nor versions.
+      unwritten = config.multilingual? || config.versions.enabled? ? output_losers(ctx.all_pages) : Set(String).new
+      warn_translation_key_collisions(Content::Multilingual.link_translations!(ctx.all_pages, config, unwritten))
+      Content::Versions.link!(ctx.all_pages, config, unwritten)
     end
 
     # Build subsections first (needed for flat navigation ordering)
@@ -108,10 +113,12 @@ module Hwaro::Core::Build::Phases::ParseContent
   # summary ships inside every listing that embeds `{{ p.summary }}`), then
   # relative links rooted at the page — listings and other pages print the
   # summary too, so a bundle's `![](photo.jpg)` must not resolve against
-  # THEIR URL.
+  # THEIR URL, and a `#frag` link to a heading past the marker must name the
+  # page, not the listing.
   private def finish_summary_html(html : String, page : Models::Page, site : Models::Site, pages_by_path : Hash(String, Models::Page), images_ready : Bool) : String
     html = resolve_internal_links(html, pages_by_path, page, site)
     html = Content::Processors::InternalLinkResolver.absolutize_links(html, page.url, document_relative_only: true)
+    html = Content::Processors::InternalLinkResolver.anchor_links_to_page(html, page.url)
     html = Content::Processors::InternalLinkResolver.prefix_root_relative_links(html, site.config.base_url, site.config.base_path,
       pass_link_routes(site, pages_by_path))
     html = apply_responsive_images(html, page, site.config) if images_ready
@@ -597,6 +604,10 @@ module Hwaro::Core::Build::Phases::ParseContent
       spans = [] of String
       masked, spans = mask_inline_code(mask_body_fences(chunk, spans), spans)
       masked = mask_raw_blocks(masked, spans)
+      # A commented-out include stays literal, as a commented-out shortcode
+      # does: an included file's own comments (`<!-- #region -->`) ended the
+      # author's comment early.
+      masked = mask_html_comments(masked, spans)
       # With `[markdown] math`, math is stashed out first, as the wikilink
       # walk does, so an embed inside display math stays literal.
       expanded = if math && masked.includes?('$')
@@ -792,7 +803,12 @@ module Hwaro::Core::Build::Phases::ParseContent
     source = HTML.escape(site.config.with_base_path(target.url))
     # The closing blank line ends the `</div>` HTML block, so the next line
     # is Markdown again (otherwise it is raw HTML, dropped under `safe`).
-    %(<div class="transclusion" data-source="#{source}">\n\n#{body}\n\n</div>\n).gsub('\n', "\n#{prefix}").insert(0, prefix)
+    # The wrapper is hwaro's markup, marked like the extensions' so `safe`
+    # keeps it: unmarked, safe mode dropped the opening tag but kept the
+    # `</div>`, which then closed an enclosing container or admonition
+    # instead (mis-nested tags).
+    opener = Content::Processors::MarkdownExtensions.trust(%(<div class="transclusion" data-source="#{source}">), site.config.markdown.safe)
+    %(#{opener}\n\n#{body}\n\n</div>\n).gsub('\n', "\n#{prefix}").insert(0, prefix)
   end
 
   private def include_output_dir : String?
@@ -1025,7 +1041,10 @@ module Hwaro::Core::Build::Phases::ParseContent
       racy_digest = Cache.stable_mtime?(mtime_ms, now_ms) ? nil : Digest::MD5.hexdigest(raw_content)
       page.source_read = {mtime_ms, info.size.to_i64, racy_digest}
     end
-    data = Processor::Markdown.parse(raw_content, source_path, @config.try { |c| Content::FrontMatterSchema.declared_keys(c) })
+    config = @config
+    data = Processor::Markdown.parse(raw_content, source_path,
+      config.try { |c| Content::FrontMatterSchema.declared_keys(c) },
+      config.try { |c| Content::FrontMatterSchema.taxonomy_names(c).to_set })
 
     # A serve incremental re-parse works on the LIVE page object, and
     # `og_image:generate` (a BeforeRender hook the incremental paths never

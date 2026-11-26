@@ -303,6 +303,8 @@ The full article continues here...
 
 The summary renders like the body: shortcodes, Markdown extensions and render hooks apply. A marker placed inside a block shortcode's body (`{% note() %}` … `{% end %}`) ends the summary inside that block, and the summary closes the block at that point. The same goes for raw HTML: a marker inside `<details>` … `</details>` (or any element left open) ends the summary there, and the summary closes the open elements, so a listing that prints it is not swallowed by an unclosed tag.
 
+Links in a summary keep pointing where they point on the page, wherever the summary is printed: a relative link (`![](photo.jpg)` in a page bundle) is rooted at the page, and so is a `#fragment` link the summary itself does not carry (`[see below](#details)` aimed at a heading past the marker). A fragment inside the summary, such as a footnote reference whose note is in the summary, stays as written.
+
 ### Automatic summaries
 
 A page with neither a marker nor a `description` gets an automatic summary: the first 70 words of its rendered body, wrapped in a single `<p>` and followed by an ellipsis (`…`) when text was cut. The excerpt is built from the rendered HTML, so shortcodes are expanded and code blocks, headings, images and figures are skipped, so it reads as prose.
@@ -434,7 +436,9 @@ Tables work inside admonitions and plain blockquotes: prefix every row with `>` 
 
 Disable by setting `admonitions = false` under `[markdown]` in `config.toml`.
 
-Limitations: a nested blockquote inside an admonition body closes the outer admonition early. There is no inline escape. Backslash-escaping (`\[!NOTE\]`) renders the same characters and still triggers the admonition, so disable the feature if you need to render the literal token.
+An admonition body can hold a nested blockquote (`> > quoted`) or another admonition (`> > [!TIP]`).
+
+Limitations: there is no inline escape. Backslash-escaping (`\[!NOTE\]`) renders the same characters and still triggers the admonition, so disable the feature if you need to render the literal token.
 
 ### Custom Heading IDs
 

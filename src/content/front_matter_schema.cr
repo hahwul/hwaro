@@ -146,11 +146,13 @@ module Hwaro
                end
         root.as_h?.try do |h|
           h.each do |k, v|
-            key = k.is_a?(String) ? k : k.as_s?
-            next if key.nil? || v.raw.nil?
+            # The parser's key spelling (`Utils::FrontmatterWriter.key_string`
+            # for YAML), so a schema field sees exactly the keys page.extra has.
+            key = k.is_a?(String) ? k : Utils::FrontmatterWriter.key_string(k)
+            next if v.raw.nil?
             if key == "extra" && (inner = v.as_h?)
               inner.each do |ik, iv|
-                inner_key = ik.is_a?(String) ? ik : (ik.as_s? || ik.to_s)
+                inner_key = ik.is_a?(String) ? ik : Utils::FrontmatterWriter.key_string(ik)
                 own_extra[inner_key] = value_of(iv) unless iv.raw.nil?
               end
               next
