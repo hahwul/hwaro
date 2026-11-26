@@ -133,7 +133,7 @@ module Hwaro::Core::Build::Phases::Render
         # its render, so they beat a redirect stub too. Without the claim the
         # winner was write order: the pager page on a cold build, the stub on
         # a `--cache` build that re-rendered only the aliasing page.
-        if owner = pager_page_owner(norm, writers)
+        if (alias_file = alias_output_file(a)) && (owner = pager_page_owner(alias_file, writers))
           Logger.warn "Duplicate alias output path '#{norm}' — alias on '#{page.path}' collides with a pagination page of '#{owner}' and is not written"
           winners[norm] = owner
           next
@@ -361,14 +361,18 @@ module Hwaro::Core::Build::Phases::Render
     claim_page_urls(output_writers(pages), {} of String => String, {} of String => String, {} of String => String, quiet: true)[0]
   end
 
-  # The section whose render writes the pager page `url`
-  # (`<section url><paginate_path>/<N>/`, N ≥ 2), or nil.
-  private def pager_page_owner(url : String, writers : Array(Models::Page)) : String?
+  # The section whose render writes the pager page file `file_key`
+  # (`<section dir>/<paginate_path>/<N>/index.html`, N ≥ 2, the decoded
+  # output path `paginated_output_path` writes), or nil. Compared as files,
+  # not URLs: a pager URL escapes `paginate_path` (`/blog/p%23x/2/`) while
+  # its directory keeps the raw name (`blog/p#x/2/`).
+  private def pager_page_owner(file_key : String, writers : Array(Models::Page)) : String?
     return unless (site = @site) && (templates = @templates)
     writers.each do |section|
       next unless section.is_a?(Models::Section)
-      base = "#{section.url.rstrip('/')}/#{section.paginate_path}/"
-      next unless url.starts_with?(base) && (match = url[base.size..].match(/\A([1-9]\d*)\/\z/))
+      next unless dir = url_output_path(section.url.lchop("/").rstrip("/"))
+      base = dir.empty? ? "#{section.paginate_path}/" : "#{dir}/#{section.paginate_path}/"
+      next unless file_key.starts_with?(base) && (match = file_key[base.size..].match(/\A([1-9]\d*)\/index\.html\z/))
       number = match[1].to_i? || next
       next unless number >= 2 && paginated_section?(section, determine_template(section, templates, site))
       return section.path if number <= section_pagination(section, site).paginated_pages.size
