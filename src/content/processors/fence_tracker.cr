@@ -171,6 +171,12 @@ module Hwaro
         # item CommonMark forbids from interrupting a paragraph (an empty one,
         # or an ordered one not starting at 1), which is continuation text.
         getter? list_item_line = false
+        # Content column of the list item holding the last line fed, when
+        # that line sits outside any blockquote (0 otherwise, and for a line
+        # `fence_line?` passed through verbatim). On a list marker line it is
+        # the item enclosing the one the marker opens. Markup a pass puts in
+        # place of the line starts there to stay inside that item.
+        getter line_container_column = 0
 
         # `raw_html_code: false` turns off raw-HTML code-block tracking and
         # generic HTML-block tracking.
@@ -205,6 +211,7 @@ module Hwaro
           @paragraph_open = false
           @html_block_line = false
           @list_item_line = false
+          @line_container_column = 0
 
           if @footnote_body
             # The collector's own rule: a blank or indented line continues
@@ -321,9 +328,11 @@ module Hwaro
           end
 
           in_paragraph = paragraph_open && depth == @paragraph_depth && column >= @paragraph_column
+          @line_container_column = list_content_column(depth, column) if depth.zero?
           marker_item = blank ? nil : track_list_item(content, depth, column, text_start, prefix)
           @list_item_line = !marker_item.nil? && (!in_paragraph || interrupting_item?(content, text_start))
           container_column = marker_item || list_content_column(depth, column)
+          @line_container_column = container_column if depth.zero? && !marker_item
           opened_html = !blank && !in_html_block && @track_html_blocks &&
                         open_html_block(content, depth, column, container_column, paragraph_open && depth == @paragraph_depth && column >= @paragraph_column)
 

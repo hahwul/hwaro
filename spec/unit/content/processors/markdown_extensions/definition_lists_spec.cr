@@ -21,6 +21,18 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should eq("<ul>\n<li>\n<p>item</p>\n<dl>\n<dt>Term</dt>\n<dd>def</dd>\n</dl>\n</li>\n<li>\n<p>item two</p>\n</li>\n</ul>\n")
     end
 
+    it "starts the list at the item's content column, not the term's indentation" do
+      # Keeping the term's own indentation put `    <dl>` after a paragraph,
+      # where it is paragraph continuation: a <dl> inside the <p>.
+      config = Hwaro::Models::MarkdownConfig.new
+      html, _ = Hwaro::Processor::Markdown.render("Para\n    Term\n: def\n", markdown_config: config)
+      html.should eq("<p>Para</p>\n<dl>\n<dt>Term</dt>\n<dd>def</dd>\n</dl>\n")
+      html, _ = Hwaro::Processor::Markdown.render("- item\n\n   Term\n  : def\n- two\n", markdown_config: config)
+      html.should eq("<ul>\n<li>\n<p>item</p>\n<dl>\n<dt>Term</dt>\n<dd>def</dd>\n</dl>\n</li>\n<li>\n<p>two</p>\n</li>\n</ul>\n")
+      html, _ = Hwaro::Processor::Markdown.render("- a\n  - Term\n    : def\n", markdown_config: config)
+      html.should contain("<li>a\n<dl>\n<dt>- Term</dt>")
+    end
+
     it "renders the line right after a definition list as Markdown" do
       # `<dl>` opens a raw HTML block that runs to the next blank line, so a
       # paragraph, list or fence directly after the list shipped unparsed.

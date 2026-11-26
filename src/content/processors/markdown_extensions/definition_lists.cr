@@ -29,7 +29,12 @@ module Hwaro
           # inside `<pre>`/`<script>`/`<style>`/`<textarea>` stay verbatim (a
           # multi-line JS ternary's `  : b` is not a definition).
           tracker = FenceTracker.new(html_blocks: false)
-          fenced = lines.map { |line| tracker.fence_line?(line) }
+          fenced = Array(Bool).new(lines.size)
+          columns = Array(Int32).new(lines.size)
+          lines.each do |line|
+            fenced << tracker.fence_line?(line)
+            columns << tracker.line_container_column
+          end
 
           result = [] of String
           i = 0
@@ -50,10 +55,13 @@ module Hwaro
             # ": " line through as literal text.
             if i + 1 < lines.size && !fenced[i + 1] && !line.strip.empty? && lines[i + 1].lstrip.starts_with?(": ")
               # This is a definition list
-              # The list keeps its first term's indentation, so one written in a
-              # list item stays in it: at column 0 the `<dl>` ended the item and
-              # the list, splitting it in two around the definition list.
-              indent = line[/\A[ \t]*/]
+              # The list starts at the content column of the list item its
+              # first term is written in, so it stays in that item: at column
+              # 0 the `<dl>` ended the item and the list, splitting it in two
+              # around the definition list. Not at the term's own indentation:
+              # four columns past its container that is indented code, or
+              # paragraph continuation (a `<dl>` inside a `<p>`).
+              indent = " " * columns[i]
               result << "#{indent}#{trust("<dl>", trusted)}"
               while i < lines.size && !fenced[i]
                 term = lines[i].strip
