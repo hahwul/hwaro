@@ -540,6 +540,24 @@ describe "Crinja autoescape" do
     end
   end
 
+  # `| e` of a list or mapping printed Crystal's debug form
+  # (`[Crinja::Value&lt;&quot;a&quot;&gt;, …]`); Jinja2 escapes `str(value)`,
+  # the text `{{ value }}` prints.
+  describe "| e on a list or mapping" do
+    it "escapes the printed form of the collection, in every mode" do
+      vars = {
+        "tags" => Crinja::Value.new([Crinja::Value.new("a"), Crinja::Value.new("<b>")]),
+        "d"    => Crinja::Value.new({"k" => Crinja::Value.new(1)}),
+      } of String => Crinja::Value
+      [true, false].each do |ae|
+        env = Hwaro::Content::Processors::TemplateEngine.new(ae).env
+        env.from_string("{{ tags | e }}").render(vars).should eq("[&#39;a&#39;, &#39;&lt;b&gt;&#39;]")
+        env.from_string("{{ d | escape }}|{{ [1, [2]] | e }}").render(vars).should eq("{&#39;k&#39; =&gt; 1}|[1, [2]]")
+        env.from_string("{{ tags | e }}").render(vars).should eq(env.from_string("{{ tags | forceescape }}").render(vars))
+      end
+    end
+  end
+
   # The mark means "a String in 0.x": what 0.x derived from `content` was a
   # String too, so `| e` on it escapes as it did there.
   describe "the rendered-HTML mark survives derivation" do

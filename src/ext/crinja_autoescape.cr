@@ -170,12 +170,15 @@ struct Crinja::Value
   end
 end
 
+# A list or mapping escapes the text `{{ value }}` prints for it
+# (`Value#to_s`, ext/crinja_value_to_s_fix.cr), as Jinja2's `escape(str(x))`
+# does; the raw Array/Hash's own `to_s` printed `[Crinja::Value<"a">, …]`.
 Crinja.filter(:escape) do
   raw = target.raw
   if raw.is_a?(Crinja::SafeString) && !raw.rendered_html?
     raw
   else
-    Crinja::SafeString.escape(raw.to_s)
+    Crinja::SafeString.escape(target.to_s)
   end
 end
 
