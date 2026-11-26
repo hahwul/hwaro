@@ -24,8 +24,9 @@ module Hwaro::Core::Build::Phases::ParseContent
       @translation_key_collisions.clear
       # A page that loses its URL to another page is never written, so it is
       # no one's translation or version counterpart (as it is no one's
-      # prev/next).
-      unwritten = output_losers(ctx.all_pages)
+      # prev/next). Only the two linkers read it, and both are no-ops on a
+      # site with neither languages nor versions.
+      unwritten = config.multilingual? || config.versions.enabled? ? output_losers(ctx.all_pages) : Set(String).new
       warn_translation_key_collisions(Content::Multilingual.link_translations!(ctx.all_pages, config, unwritten))
       Content::Versions.link!(ctx.all_pages, config, unwritten)
     end
