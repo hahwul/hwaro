@@ -32,9 +32,11 @@ module Hwaro
           return content unless Utils::ByteScan.includes?(content, ":::")
 
           open_count = 0
+          last_line_ended = true
           String.build do |io|
             tracker = FenceTracker.new
             content.each_line(chomp: false) do |line|
+              last_line_ended = line.ends_with?('\n')
               if tracker.fence_line?(line)
                 io << line
                 next
@@ -48,6 +50,7 @@ module Hwaro
                 open_count += 1
                 io << trust("<div class=\"admonition admonition-#{type}\">\n", trusted)
                 io << trust("<p class=\"admonition-title\">#{title}</p>\n\n", trusted)
+                last_line_ended = true
                 next
               end
               if open_count > 0 && CONTAINER_CLOSE_RE.matches?(stripped)
@@ -60,13 +63,18 @@ module Hwaro
                 # literal, so a container followed by a blank line renders
                 # byte-identically.
                 io << "\n</div>\n\n"
+                last_line_ended = true
                 next
               end
 
               io << line
             end
-            # Auto-close unclosed containers at EOF (markdown-it behavior).
-            open_count.times { io << "\n</div>\n\n" }
+            # Auto-close unclosed containers at EOF (markdown-it behavior),
+            # outside any fence the page left open.
+            if open_count > 0
+              io << document_end_separator(last_line_ended, tracker)
+              open_count.times { io << "\n</div>\n\n" }
+            end
           end
         end
       end
