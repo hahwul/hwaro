@@ -13,12 +13,14 @@ module Hwaro
             build_json(json, value.raw)
           end
 
+          # A tuple (a `dictsort` / `groupby` pair) is a JSON array, as in
+          # Jinja2; through `to_s` it was `"[Crinja::Value<\"k\">, …]"`.
           def self.build_json(json : JSON::Builder, raw)
             case raw
-            when Crinja::Value      then build_json(json, raw.raw)
-            when Crinja::SafeString then json.string(raw.to_s)
-            when Array              then json.array { raw.each { |v| build_json(json, v) } }
-            when Hash               then json.object { raw.each { |k, v| json.field(k.to_s) { build_json(json, v) } } }
+            when Crinja::Value        then build_json(json, raw.raw)
+            when Crinja::SafeString   then json.string(raw.to_s)
+            when Array, Crinja::Tuple then json.array { raw.each { |v| build_json(json, v) } }
+            when Hash                 then json.object { raw.each { |k, v| json.field(k.to_s) { build_json(json, v) } } }
             when String, Int32, Int64, Float64, Bool, Nil
               raw.to_json(json)
             else

@@ -533,6 +533,17 @@ describe "MiscFilters" do
       # Clamped to <= 16 spaces per level, not billions.
       result.should_not match(/ {17,}/)
     end
+
+    # A tuple was stringified: `d | dictsort | tojson` gave
+    # `["[Crinja::Value<\"a\">, Crinja::Value<1>]"]`. Jinja2 writes arrays.
+    it "writes a tuple (dictsort / groupby pairs) as a JSON array" do
+      vars = {"d" => Crinja::Value.new({"b" => Crinja::Value.new(2), "a" => Crinja::Value.new("x")})}
+      [true, false].each do |ae|
+        render_crinja("{{ d | dictsort | tojson }}", vars, autoescape: ae).should eq(%([["a","x"],["b",2]]))
+        render_crinja("{{ d | dictsort | jsonify }}", vars, autoescape: ae).should eq(%([["a","x"],["b",2]]))
+        render_crinja("{{ (1, [2, (3,)]) | tojson }}", vars, autoescape: ae).should eq("[1,[2,[3]]]")
+      end
+    end
   end
 
   describe "default" do
