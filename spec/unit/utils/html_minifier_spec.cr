@@ -232,6 +232,34 @@ describe Hwaro::Utils::HtmlMinifier do
           .should eq("<p><b>a</b> <track src=\"t.vtt\"/><b>c</b></p>")
       end
 
+      # The whitespace between two hidden tokens used to be stripped
+      # unconditionally, so when it was the only gap between the words
+      # around the run they joined ("ab").
+      it "keeps the only space between inline content around a run of hidden tokens" do
+        Hwaro::Utils::HtmlMinifier.minify("<p>a<script>x()</script>\n<script>y()</script>b</p>")
+          .should eq("<p>a<script>x()</script> <script>y()</script>b</p>")
+        Hwaro::Utils::HtmlMinifier.minify("<p><b>a</b><meta itemprop=\"x\" content=\"1\">\n<meta itemprop=\"y\" content=\"2\"><b>c</b></p>")
+          .should eq("<p><b>a</b><meta itemprop=\"x\" content=\"1\"> <meta itemprop=\"y\" content=\"2\"><b>c</b></p>")
+        Hwaro::Utils::HtmlMinifier.minify("<p>a<style>i{}</style> <link rel=\"x\" href=\"y\"> <script>z()</script>b</p>")
+          .should eq("<p>a<style>i{}</style> <link rel=\"x\" href=\"y\"><script>z()</script>b</p>")
+      end
+
+      it "decides a hidden run the same way in the regex fallback" do
+        # A non-ASCII tag name between two tokens sends the whole page
+        # through the regex version of the whitespace pass.
+        Hwaro::Utils::HtmlMinifier.minify("<x-é>q</x-é>\n<p>a<script>x()</script>\n<script>y()</script>b</p>\n<div>\n<script>z()</script>\n<script>w()</script>\n</div>")
+          .should eq("<x-é>q</x-é><p>a<script>x()</script> <script>y()</script>b</p><div><script>z()</script><script>w()</script></div>")
+      end
+
+      it "strips the space in a hidden run that already has one, or touches a block" do
+        Hwaro::Utils::HtmlMinifier.minify("<p>a <script>x()</script> <script>y()</script>b</p>")
+          .should eq("<p>a <script>x()</script><script>y()</script>b</p>")
+        Hwaro::Utils::HtmlMinifier.minify("<div><p>a</p><script>x()</script> <script>y()</script>b</div>")
+          .should eq("<div><p>a</p><script>x()</script><script>y()</script>b</div>")
+        Hwaro::Utils::HtmlMinifier.minify("<div>a<script>x()</script> <script>y()</script></div>")
+          .should eq("<div>a<script>x()</script><script>y()</script></div>")
+      end
+
       it "still strips whitespace between two hidden void elements" do
         Hwaro::Utils::HtmlMinifier.minify("<head>\n<base href=\"/\">\n<link rel=\"a\" href=\"b\">\n<meta name=\"x\">\n<script src=\"a.js\"></script>\n</head>")
           .should eq("<head><base href=\"/\"><link rel=\"a\" href=\"b\"><meta name=\"x\"><script src=\"a.js\"></script></head>")

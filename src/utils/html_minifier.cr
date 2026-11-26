@@ -509,11 +509,11 @@ module Hwaro
       #   * keep a single space only when both neighbours are inline,
       #     preserving the visible gap between adjacent inline elements
       #     like `<a>x</a> <a>y</a>`.
-      # A hidden placeholder (script/style/noscript) is neither: next to
-      # an inline neighbour its space is kept, between two hidden ones
-      # (the usual run of tags in `<head>`) it is stripped.
-      # ponytail: decided per pair, so `<b>a</b><script/> <script/><b>c</b>`
-      # still loses its one space; look past hidden runs if that shows up.
+      # A hidden token (script/style/noscript placeholder, HIDDEN_TAGS) is
+      # neither: next to an inline neighbour its space is kept, and between
+      # two hidden ones (the usual run of tags in `<head>`) it is stripped —
+      # unless it is the only gap between the inline content on either side
+      # of the hidden run (see hidden_run_gap?).
       private def collapse_inter_token_whitespace(html : String) : String
         # A byte scan that makes REGEX_INTERTOKEN_WS's choices (same start
         # positions, same token extents, same retry on a failed start)
@@ -563,9 +563,12 @@ module Hwaro
             next_block = intertoken_block?(bytes, ws_end, next_end)
             return collapse_inter_token_whitespace_regex(html) if prior_block.nil? || next_block.nil?
             io.write(bytes[copied, prior_end - copied])
-            unless prior_block || next_block || (intertoken_hidden?(bytes, i, prior_end) && intertoken_hidden?(bytes, ws_end, next_end))
-              io << ' '
-            end
+            # One space survives unless a block neighbour, or a hidden pair
+            # that is not the run's only gap, makes it invisible.
+            stripped = prior_block || next_block ||
+                       (intertoken_hidden?(bytes, i, prior_end) && intertoken_hidden?(bytes, ws_end, next_end) &&
+                        !hidden_run_gap?(bytes, i, next_end, last_gt))
+            io << ' ' unless stripped
             copied = ws_end
             i = ws_end
           end
@@ -637,6 +640,52 @@ module Hwaro
         key
       end
 
+      # True when the whitespace between two hidden tokens — the left one
+      # starting at `start`, the right one ending at `stop` — is the only
+      # gap between the inline content around their run. The run renders
+      # nothing, so `a<script>…</script> <script>…</script>b` reads "a b",
+      # and stripping that space joined the words. It is not the only gap
+      # when whitespace sits right before the run (that one is kept, or a
+      # block makes the gap invisible), and it is invisible when the run
+      # starts or ends at a block boundary. A neighbour the byte scan cannot
+      # classify counts as inline content, which keeps the space.
+      private def hidden_run_gap?(bytes : Bytes, start : Int32, stop : Int32, last_gt : Int32) : Bool
+        n = bytes.size
+        k = start
+        loop do
+          return false if k == 0
+          b = bytes[k - 1]
+          return false if intertoken_ws?(b)
+          # The token ending at `k`: a placeholder closes with NUL, a tag
+          # with `>` (a `>` of text or of a quoted value fails the check).
+          token = if b == 0_u8
+                    k >= 2 ? bytes.rindex(0_u8, k - 2) : nil
+                  elsif b == '>'.ord
+                    bytes.rindex('<'.ord.to_u8, k - 1)
+                  end
+          break unless token && intertoken_end(bytes, token, n, last_gt) == k
+          block = intertoken_block?(bytes, token, k)
+          break if block.nil?
+          return false if block
+          break unless intertoken_hidden?(bytes, token, k)
+          k = token
+        end
+        k = stop
+        loop do
+          while k < n && intertoken_ws?(bytes[k])
+            k += 1
+          end
+          return false if k >= n
+          token_end = intertoken_end(bytes, k, n, last_gt)
+          return true if token_end < 0
+          block = intertoken_block?(bytes, k, token_end)
+          return true if block.nil?
+          return false if block
+          return true unless intertoken_hidden?(bytes, k, token_end)
+          k = token_end
+        end
+      end
+
       # A hidden placeholder, or a HIDDEN_TAGS tag. Only asked once
       # `intertoken_block?` has classified the token, so a tag's name is
       # ASCII here.
@@ -658,6 +707,8 @@ module Hwaro
 
       private def collapse_inter_token_whitespace_regex(html : String) : String
         values = tagged_value_spans(html)
+        bytes = html.to_slice
+        last_gt = bytes.rindex('>'.ord.to_u8) || -1
         html.gsub(REGEX_INTERTOKEN_WS) do
           # Tag-shaped text inside a quoted value (`data-x='<div>  <p>'`)
           # is the value's own bytes, not markup.
@@ -665,7 +716,8 @@ module Hwaro
           prior = $1
           # $2 = whitespace run (discarded except when we re-emit one space)
           nxt = $3
-          if block_token?(prior) || block_token?(nxt) || (hidden_token?(prior) && hidden_token?(nxt))
+          if block_token?(prior) || block_token?(nxt) ||
+             (hidden_token?(prior) && hidden_token?(nxt) && !hidden_run_gap?(bytes, $~.byte_begin(1), $~.byte_end(3), last_gt))
             prior
           else
             "#{prior} "
