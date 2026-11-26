@@ -104,7 +104,16 @@ module Hwaro
           return false unless usable?
           return false if relative.empty?
 
-          info = File.info?(File.join(@base, relative))
+          info = begin
+            File.info?(File.join(@base, relative))
+          rescue File::Error
+            # `File.info?` answers nil only for a missing path: a symlink
+            # loop (ELOOP) or an unreadable directory (EACCES) on the way
+            # RAISED, and one such entry in the output tree aborted
+            # `tool check-links` with HWARO_E_IO instead of reporting the
+            # link. The bare `File.exists?` this replaced answered false.
+            nil
+          end
           return false unless info
 
           @consulted = true

@@ -158,4 +158,28 @@ describe Hwaro::Utils::BuildOutput do
       oracle.hint.should be_nil
     end
   end
+
+  # `File.info?` raises (rather than answering nil) for a symlink loop or an
+  # unreadable directory on the path: one such entry in public/ aborted the
+  # whole `tool check-links` run with HWARO_E_IO.
+  it "answers false for a path it cannot stat instead of raising" do
+    posix_only!("chmod / symlink loop")
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "public", "locked"))
+      File.write(File.join(dir, "public", "index.html"), "<html></html>")
+      File.write(File.join(dir, "public", "locked", "index.html"), "<html></html>")
+      File.symlink("loop", File.join(dir, "public", "loop"))
+
+      oracle = Hwaro::Utils::BuildOutput.oracle("public", root: dir, sources: [] of String)
+      oracle.exists?("loop/").should be_false
+      oracle.exists?("loop/index.html").should be_false
+      File.chmod(File.join(dir, "public", "locked"), 0o000)
+      begin
+        oracle.exists?("locked/index.html").should be_false
+      ensure
+        File.chmod(File.join(dir, "public", "locked"), 0o755)
+      end
+      oracle.exists?("index.html").should be_true
+    end
+  end
 end
