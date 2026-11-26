@@ -18,6 +18,27 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should end_with("<pre><code>code\n</code></pre>\n</div>\n")
     end
 
+    it "keeps a container written in a list item inside that item" do
+      # The <div> was emitted at column 0, which ended the item and the list:
+      # the list split in two around a hoisted container.
+      html, _ = Hwaro::Processor::Markdown.render("- item\n\n  :::note\n  inside\n  :::\n- item two\n", markdown_config: containers_config)
+      html.should eq(<<-HTML)
+        <ul>
+        <li>
+        <p>item</p>
+        <div class="admonition admonition-note">
+        <p class="admonition-title">Note</p>
+        <p>inside</p>
+        </div>
+        </li>
+        <li>
+        <p>item two</p>
+        </li>
+        </ul>
+
+        HTML
+    end
+
     it "auto-closes a container in safe mode when the page ends with raw HTML and no newline" do
       # The `</div>` joined the raw HTML block on the last line, which safe
       # mode omits whole.

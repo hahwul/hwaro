@@ -31,7 +31,10 @@ module Hwaro
         def preprocess_containers(content : String, *, flags : InlineMarkdown::Flags = InlineMarkdown::Flags.new, trusted : Bool = false) : String
           return content unless Utils::ByteScan.includes?(content, ":::")
 
-          open_count = 0
+          # Indentation of each open container's opener, innermost last: the
+          # markup keeps it, so a container written in a list item stays in
+          # the item (at column 0 the `<div>` ended the item and the list).
+          open_indents = [] of String
           last_line_ended = true
           String.build do |io|
             tracker = FenceTracker.new
@@ -47,14 +50,15 @@ module Hwaro
                 type = m[1].downcase
                 # Inline-rendered like an admonition's `> [!NOTE] *Title*`.
                 title = m[2].presence.try { |t| render_inline_md(t, flags) } || m[1].capitalize
-                open_count += 1
-                io << trust("<div class=\"admonition admonition-#{type}\">\n", trusted)
-                io << trust("<p class=\"admonition-title\">#{title}</p>\n\n", trusted)
+                indent = line[/\A[ \t]*/]
+                open_indents << indent
+                io << indent << trust("<div class=\"admonition admonition-#{type}\">\n", trusted)
+                io << indent << trust("<p class=\"admonition-title\">#{title}</p>\n\n", trusted)
                 last_line_ended = true
                 next
               end
-              if open_count > 0 && CONTAINER_CLOSE_RE.matches?(stripped)
-                open_count -= 1
+              if !open_indents.empty? && CONTAINER_CLOSE_RE.matches?(stripped)
+                indent = open_indents.pop
                 # Trailing blank line: `</div>` opens a type-6 HTML block that
                 # runs until the next blank line, so without one the FIRST line
                 # after the container (`- item`, `## Heading`, a paragraph) was
@@ -62,7 +66,7 @@ module Hwaro
                 # markdown. Markd drops the trailing blank from the block's
                 # literal, so a container followed by a blank line renders
                 # byte-identically.
-                io << "\n</div>\n\n"
+                io << "\n" << indent << "</div>\n\n"
                 last_line_ended = true
                 next
               end
@@ -71,9 +75,9 @@ module Hwaro
             end
             # Auto-close unclosed containers at EOF (markdown-it behavior),
             # outside any fence the page left open.
-            if open_count > 0
+            unless open_indents.empty?
               io << document_end_separator(last_line_ended, tracker)
-              open_count.times { io << "\n</div>\n\n" }
+              open_indents.reverse_each { |indent| io << "\n" << indent << "</div>\n\n" }
             end
           end
         end
