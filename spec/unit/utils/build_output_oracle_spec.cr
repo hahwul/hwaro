@@ -173,13 +173,16 @@ describe Hwaro::Utils::BuildOutput do
       oracle = Hwaro::Utils::BuildOutput.oracle("public", root: dir, sources: [] of String)
       oracle.exists?("loop/").should be_false
       oracle.exists?("loop/index.html").should be_false
-      File.chmod(File.join(dir, "public", "locked"), 0o000)
+      oracle.exists?("index.html").should be_true
+
+      locked = File.join(dir, "public", "locked")
+      File.chmod(locked, 0o000)
       begin
+        pending!("a 0o000 directory is still readable (root)") if File::Info.readable?(locked)
         oracle.exists?("locked/index.html").should be_false
       ensure
-        File.chmod(File.join(dir, "public", "locked"), 0o755)
+        File.chmod(locked, 0o755)
       end
-      oracle.exists?("index.html").should be_true
     end
   end
 end
