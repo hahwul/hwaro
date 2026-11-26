@@ -65,6 +65,16 @@ module Hwaro
         String.build do |io|
           i = 0
           len = chars.size
+          # The last significant source character before `i` — whitespace
+          # and comments skipped — and whether it closed a string, template
+          # or regex literal. What precedes a `/` tells a regex literal from
+          # a division (see regex_context?); looking back from the slash
+          # over spaces alone misread `n\n  / 2`, `8 /* half */ / 2` and
+          # `'6' / 2` as a regex, and that "regex" could end inside a later
+          # string, which then opened where it closed and stripped its
+          # `//` text (`'http://x'`) as a comment.
+          last_sig = -1
+          after_value = false
 
           while i < len
             c = chars[i]
@@ -85,6 +95,8 @@ module Hwaro
                 end
                 i += 1
               end
+              last_sig = i
+              after_value = true
               i += 1
               next
             end
@@ -102,6 +114,8 @@ module Hwaro
               end
               protected_spans << lit
               io << "\x00JSPL#{protected_spans.size - 1}\x00"
+              last_sig = i - 1
+              after_value = true
               next
             end
 
@@ -159,24 +173,32 @@ module Hwaro
               # Check if this slash starts a regex literal.
               # A `/` is a regex when preceded by a token that expects an expression:
               # operators, punctuation, or keywords like return/typeof/in/etc.
-              if regex_context?(chars, i)
+              if regex_context?(chars, last_sig, after_value)
                 # Regex literal — pass through unchanged
                 i = scan_regex(chars, i, len, io)
+                last_sig = i - 1
+                after_value = true
                 next
               end
             end
 
             io << c
+            unless c.whitespace?
+              last_sig = i
+              after_value = false
+            end
             i += 1
           end
         end
       end
 
-      # Determine whether a `/` at position `pos` in `chars` is likely a regex
-      # literal rather than a division operator. We look at the last
-      # non-whitespace character before the slash: if it could end an
-      # expression (identifier char, digit, `)`, `]`), it's division;
-      # otherwise (operator, `(`, `[`, `{`, `,`, `;`, `!`, line start) it's regex.
+      # Determine whether a `/` is likely a regex literal rather than a
+      # division operator, from the last significant character before it
+      # (`last`, -1 at the start of input) and whether that character closed
+      # a string, template or regex literal (`after_value`). A literal, or a
+      # token that can end an expression (identifier char, digit, `)`,
+      # `]`), means division; otherwise (operator, `(`, `[`, `{`, `,`, `;`,
+      # `!`, start of input) it's a regex.
       #
       # A word ending right before the slash is normally an identifier (so
       # division), except for the keywords after which an expression — and so
@@ -188,32 +210,46 @@ module Hwaro
       # Known limitation: a regex right after a statement's closing paren
       # (`if (x) /re/.test(y)`) is still read as division — telling that `)`
       # apart from a call's needs paren matching.
-      private def regex_context?(chars, pos : Int32) : Bool
-        j = pos - 1
-        while j >= 0 && (chars[j] == ' ' || chars[j] == '\t')
-          j -= 1
-        end
-        return true if j < 0 # start of input
+      private def regex_context?(chars, last : Int32, after_value : Bool) : Bool
+        return true if last < 0 # start of input
+        return false if after_value
 
-        prev = chars[j]
+        prev = chars[last]
         return false if prev == ')' || prev == ']'
         # A postfix `i++ / 2` ends an expression; `++` can never precede a
         # regex literal (a literal is not incrementable). Read as a regex,
         # the "literal" swallowed a template's opening backtick on the same
         # line and the template body was then stripped as code.
-        return false if (prev == '+' || prev == '-') && j > 0 && chars[j - 1] == prev
+        return false if (prev == '+' || prev == '-') && last > 0 && chars[last - 1] == prev
         if prev.alphanumeric? || prev == '_' || prev == '$'
-          return regex_keyword_before?(chars, j)
+          return regex_keyword_before?(chars, last)
         end
         # Everything else (operators, punctuation) → regex
         true
       end
 
-      # Reserved words only: `of`, `yield` and `await` are valid identifiers
-      # outside their special contexts, so `of / 2` must stay a division.
+      # `regex_context?` for a `/` at `pos` inside a template interpolation,
+      # where the scan copies strings and nested templates verbatim instead
+      # of tracking them: the last significant character is found by
+      # looking back over whitespace, and a quote or backtick there can only
+      # be the end of a literal.
+      private def interpolation_regex_context?(chars, pos : Int32) : Bool
+        j = pos - 1
+        while j >= 0 && chars[j].whitespace?
+          j -= 1
+        end
+        regex_context?(chars, j, j >= 0 && (chars[j] == '"' || chars[j] == '\'' || chars[j] == '`'))
+      end
+
+      # `of` is a valid identifier outside `for … of`, so `of / 2` must stay
+      # a division. `yield` and `await` are too, but only in sloppy code
+      # outside a generator / async function, where nobody names a variable
+      # after them; inside one (and anywhere in a module) a regex follows
+      # them (`yield /a'/`), and reading that as division let the quote in
+      # its body open a string that ran on through the file.
       REGEX_PRECEDING_KEYWORDS = Set{
         "return", "typeof", "instanceof", "in", "new", "delete", "void",
-        "throw", "case", "do", "else",
+        "throw", "case", "do", "else", "yield", "await",
       }
 
       # True when the identifier-like word ending at chars[last] is one of
@@ -303,7 +339,7 @@ module Hwaro
               lb << chars[i]
               i += 1
             end
-          elsif c == '/' && regex_context?(chars, i)
+          elsif c == '/' && interpolation_regex_context?(chars, i)
             i = scan_regex(chars, i, len, lb)
           elsif c == '{'
             depth += 1
