@@ -705,9 +705,6 @@ describe Hwaro::Utils::HtmlMinifier do
       end
     end
 
-    # Regression: ` />` after an UNQUOTED attribute value was tightened to
-    # `/>`, which makes the slash part of the value — `href=/favicon.ico/`
-    # (a 404) and `content=width=device-width/`.
     # Regression: every quote in a tag toggled the quoted state, so the
     # apostrophe of an unquoted `alt=Bob's` paired with the next apostrophe
     # in the page; the "tag" ran on over the following markup, and the real
@@ -726,12 +723,29 @@ describe Hwaro::Utils::HtmlMinifier do
       Hwaro::Utils::HtmlMinifier.minify(html).should eq("<a title = 'x  >  y' href=\"/z\">w</a>")
     end
 
+    # Regression: ` />` after an UNQUOTED attribute value was tightened to
+    # `/>`, which makes the slash part of the value — `href=/favicon.ico/`
+    # (a 404) and `content=width=device-width/`.
     it "keeps the space before a self-closing slash after an unquoted value" do
       Hwaro::Utils::HtmlMinifier.minify("<link rel=icon href=/favicon.ico />").should eq("<link rel=icon href=/favicon.ico />")
       Hwaro::Utils::HtmlMinifier.minify("<img src=a.png alt=x />").should eq("<img src=a.png alt=x />")
       Hwaro::Utils::HtmlMinifier.minify("<img alt=\"a b\" />").should eq("<img alt=\"a b\"/>")
       Hwaro::Utils::HtmlMinifier.minify("<input disabled />").should eq("<input disabled/>")
       Hwaro::Utils::HtmlMinifier.minify("<br />").should eq("<br/>")
+    end
+
+    # Regression: whether the value before ` /` was quoted was read from its
+    # last character, so an unquoted value ending in a quote char
+    # (`alt=x''`, `href=/a/b'`) counted as quoted and the slash joined it.
+    it "keeps the space before a self-closing slash after an unquoted value ending in a quote" do
+      Hwaro::Utils::HtmlMinifier.minify("<img src=a.png alt=x' />").should eq("<img src=a.png alt=x' />")
+      Hwaro::Utils::HtmlMinifier.minify("<a href=/a/b' />").should eq("<a href=/a/b' />")
+      Hwaro::Utils::HtmlMinifier.minify("<img alt=x'' />").should eq("<img alt=x'' />")
+      Hwaro::Utils::HtmlMinifier.minify("<img alt=x\"  />").should eq("<img alt=x\" />")
+      # A quoted value holding `=` and spaces is still ended by its quote.
+      Hwaro::Utils::HtmlMinifier.minify("<img alt=\"a b=c\"  />").should eq("<img alt=\"a b=c\"/>")
+      Hwaro::Utils::HtmlMinifier.minify("<img title='k=v x' alt=y  />").should eq("<img title='k=v x' alt=y />")
+      Hwaro::Utils::HtmlMinifier.minify("<img alt='x' \n />").should eq("<img alt='x'/>")
     end
 
     # Regression: the comment and trailing-space passes were plain regexes

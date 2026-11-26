@@ -842,7 +842,8 @@ module Hwaro
 
       # Walk the tag opening at `bytes[start]` (`<`) the way an HTML
       # tokenizer reads its attributes, yielding each index after the `<`
-      # with whether that byte is part of a quoted value, and return the
+      # with whether that byte is part of a quoted value and whether it is
+      # part of an unquoted one, and return the
       # index of the closing `>` (-1 when unterminated). As in HTML, a quote
       # opens a value only where a value starts, right after `=`: the
       # apostrophe in `alt=Bob's` or `title=it's` is part of an unquoted
@@ -858,7 +859,7 @@ module Hwaro
         while i < n
           b = bytes[i]
           if quote != 0_u8
-            yield i, true
+            yield i, true, false
             quote = 0_u8 if b == quote
           elsif b == '>'.ord
             return i
@@ -876,26 +877,11 @@ module Hwaro
             elsif b == '='.ord
               after_eq = true
             end
-            yield i, quote != 0_u8
+            yield i, quote != 0_u8, unquoted
           end
           i += 1
         end
         -1
-      end
-
-      # True when the attribute right before a trailing ` /` has an
-      # UNQUOTED value (`<link href=/favicon.ico />`). There the space is what
-      # ends the value: `href=/favicon.ico/` makes the slash part of the URL
-      # (`/favicon.ico/`, a 404). A quoted value, a bare attribute name or the
-      # tag name itself is ended by its own syntax, so `<br />` → `<br/>` and
-      # `alt="x" />` → `alt="x"/>` stay safe.
-      private def unquoted_value_before_slash?(body : String) : Bool
-        rest = body.rchop(" /")
-        last = rest.split(' ').last? || ""
-        eq = last.index('=')
-        return false unless eq
-        value = last[(eq + 1)..]
-        !value.empty? && !value.ends_with?('"') && !value.ends_with?('\'')
       end
 
       # True when `emit_collapsed_tag` would copy the tag unchanged, as most
@@ -930,13 +916,15 @@ module Hwaro
         # we can collapse and trim, then emit `>` at the end.
         # We can't easily trim trailing whitespace from an already-
         # written IO, so do it in a local buffer.
+        slash_ends_unquoted = false
         body = String.build(tag_end - start + 1) do |buf|
           # `<` and the tag name are copied as they are (neither holds
           # whitespace); in the attribute area whitespace collapses outside
           # quoted values.
           buf.write_byte(bytes[start])
           last_was_space = false
-          scan_tag(bytes, start, tag_end + 1) do |i, quoted|
+          last_unquoted = false
+          scan_tag(bytes, start, tag_end + 1) do |i, quoted, unquoted|
             b = bytes[i]
             if !quoted && (b == ' '.ord || b == '\t'.ord || b == '\n'.ord || b == '\r'.ord)
               unless last_was_space
@@ -944,6 +932,12 @@ module Hwaro
                 last_was_space = true
               end
             else
+              if b == '/'.ord && !quoted
+                # The tokenizer's own state, not the value's last character:
+                # `alt=x'` is unquoted although it ends in a quote.
+                slash_ends_unquoted = last_unquoted && !unquoted
+              end
+              last_unquoted = unquoted
               buf.write_byte(b)
               last_was_space = false
             end
@@ -956,8 +950,13 @@ module Hwaro
         # is suffix-equality (byte-safe), so it works even when
         # the byte preceding the `" /"` is part of a multi-byte
         # UTF-8 sequence inside a quoted attribute value.
+        # The space is kept when it is what ends an UNQUOTED value
+        # (`<link href=/favicon.ico />`): `href=/favicon.ico/` makes the
+        # slash part of the URL (a 404). A quoted value, a bare attribute
+        # name or the tag name is ended by its own syntax, so `<br />` →
+        # `<br/>` and `alt="x" />` → `alt="x"/>` stay safe.
         body = body.rstrip
-        if body.ends_with?(" /") && !unquoted_value_before_slash?(body)
+        if body.ends_with?(" /") && !slash_ends_unquoted
           body = body.rchop(" /") + "/"
         end
         io << body
