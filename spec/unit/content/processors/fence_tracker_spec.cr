@@ -327,4 +327,21 @@ describe Hwaro::Content::Processors::FenceTracker do
       feed(["text", "2. ```", "x"]).should eq [false, false, false]
     end
   end
+
+  describe "footnote bodies" do
+    it "reads a footnote's indented continuation as text with footnote_bodies: true" do
+      lines = ["[^1]: note\n", "\n", "    Second paragraph\n", "\tthird\n", "after\n", "\n", "    code\n"]
+      tracker = Hwaro::Content::Processors::FenceTracker.new(footnote_bodies: true)
+      lines.map { |line| tracker.fence_line?(line) }.should eq [false, false, false, false, false, false, true]
+      # Block-level walkers keep the old reading: an indented-code run.
+      feed(lines).should eq [false, false, true, true, false, false, true]
+    end
+
+    it "only starts a footnote body on a definition line outside code" do
+      tracker = Hwaro::Content::Processors::FenceTracker.new(footnote_bodies: true)
+      ["```\n", "[^1]: in fence\n", "```\n", "\n", "    code\n"].map { |line| tracker.fence_line?(line) }.should eq [true, true, true, false, true]
+      tracker = Hwaro::Content::Processors::FenceTracker.new(footnote_bodies: true)
+      ["> [^1]: quoted\n", "\n", "    code\n"].map { |line| tracker.fence_line?(line) }.should eq [false, false, true]
+    end
+  end
 end

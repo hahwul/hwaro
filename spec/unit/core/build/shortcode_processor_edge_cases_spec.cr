@@ -67,6 +67,21 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
     end
   end
 
+  describe "footnote bodies" do
+    it "expands a shortcode in a footnote's blank-line-separated paragraph" do
+      # The indented paragraph read as indented code, so the call stayed
+      # literal while the paragraph still rendered as footnote text.
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/badge" => %(<b>{{ text }}</b>)}
+      content = %([^1]: first {{ badge(text="a") }}\n\n    second {{ badge(text="b") }}\n)
+      builder.test_content_may_contain_shortcodes?("[^1]: first\n\n    second {{ badge() }}\n").should be_true
+      builder.test_sc_process(content, templates).should eq(%([^1]: first <b>a</b>\n\n    second <b>b</b>\n))
+      # After the note ends, an indented run is code again.
+      code = %([^1]: first\nafter\n\n    code {{ badge(text="c") }}\n)
+      builder.test_sc_process(code, templates).should eq(code)
+    end
+  end
+
   describe "long quoted argument values" do
     # The patterns before their quoted-value loops became possessive: one
     # backtracking frame per character, so a 50 KB value (a base64 data

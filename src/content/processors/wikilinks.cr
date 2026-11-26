@@ -457,7 +457,7 @@ module Hwaro
         # row, a footnote body, or a chunk holding a `: definition` line
         # (assumed to be a definition list).
         private def walk(content : String, re : Regex, & : Regex::MatchData, Bool -> String?) : String
-          tracker = FenceTracker.new
+          tracker = FenceTracker.new(footnote_bodies: true)
           chunk = String::Builder.new
           lines = content.lines(chomp: false)
           in_table = false

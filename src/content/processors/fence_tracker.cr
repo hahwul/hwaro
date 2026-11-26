@@ -102,6 +102,10 @@ module Hwaro
         # only keeps today's under-protective behavior.
         ATX_HEADING_RE = /\A {0,3}\#{1,6}(?:[ \t]|\r?\n?\z)/
 
+        # A footnote definition line, in the shape
+        # `MarkdownExtensions.preprocess_footnotes` extracts.
+        FOOTNOTE_DEF_RE = /\A {0,3}\[\^[^\]]+\]:[^\n]/
+
         @in_fence = false
         @fence_char = '`'
         @fence_len = 0
@@ -148,6 +152,17 @@ module Hwaro
         @paragraph_open = false
         @paragraph_depth = 0
         @paragraph_column = 0
+        # Inside a footnote definition's body (`footnote_bodies: true` only):
+        # the lines after a `[^label]: text` line that
+        # `MarkdownExtensions.preprocess_footnotes` collects into the note —
+        # blank lines and 4-space/tab-indented ones, up to the first other
+        # line. They are footnote text, not
+        # indented code: the collector consumes them before Markd runs, so a
+        # blank-line-separated second paragraph (`    More text.`) must not
+        # read as an indented-code run. Treating it as code kept shortcodes
+        # and wikilinks there literal while the paragraph still rendered as
+        # footnote text.
+        @footnote_body = false
         # The last line fed was raw HTML to Markd: it opened or continued a
         # generic HTML block (no inline parsing happens there).
         getter? html_block_line = false
@@ -165,9 +180,16 @@ module Hwaro
         # behaviour of seeing inside. `html_blocks: false` keeps the raw
         # code blocks opaque but turns generic HTML-block tracking off
         # (definition-list extraction, which escapes raw-HTML term lines).
-        def initialize(raw_html_code : Bool = true, html_blocks : Bool = raw_html_code)
+        # `footnote_bodies: true` reads a footnote definition's indented
+        # continuation lines as text instead of indented code (see
+        # `@footnote_body`), for the walkers whose rewrite also applies on a
+        # footnote's first line — shortcodes and wikilinks. Block-level
+        # walkers (tables, transclusion) keep reading them as code: a
+        # footnote body holds no block elements.
+        def initialize(raw_html_code : Bool = true, html_blocks : Bool = raw_html_code, footnote_bodies : Bool = false)
           @track_raw_html_code = raw_html_code
           @track_html_blocks = raw_html_code && html_blocks
+          @track_footnote_bodies = footnote_bodies
         end
 
         # Feed the next line (with or without its trailing newline).
@@ -183,6 +205,17 @@ module Hwaro
           @paragraph_open = false
           @html_block_line = false
           @list_item_line = false
+
+          if @footnote_body
+            # The collector's own rule: a blank or indented line continues
+            # the note, any other line ends it. Markd sees each consumed line
+            # as a blank one.
+            if line.blank? || line.starts_with?("    ") || line.starts_with?('\t')
+              @prev_blank = true
+              return false
+            end
+            @footnote_body = false
+          end
 
           if @in_fence
             content, depth = strip_blockquote_markers(line, @fence_bq_depth)
@@ -320,6 +353,7 @@ module Hwaro
             @prev_blank = false
             true
           else
+            @footnote_body = @track_footnote_bodies && !blank && line.includes?("[^") && FOOTNOTE_DEF_RE.matches?(line)
             @prev_blank = blank
             @prev_atx_heading = heading
             unless blank || heading || in_html_block || opened_html || @empty_item_open

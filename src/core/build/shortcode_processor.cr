@@ -98,7 +98,7 @@ module Hwaro
           # Every shortcode walker passes `raw_html_code: false`: shortcodes
           # expand inside raw <pre>/<script>/<textarea> blocks, which only
           # the Markdown extensions treat as opaque.
-          tracker = Content::Processors::FenceTracker.new(raw_html_code: false)
+          tracker = Content::Processors::FenceTracker.new(raw_html_code: false, footnote_bodies: true)
 
           content.each_line(chomp: false) do |line|
             next if tracker.fence_line?(line)
@@ -163,7 +163,7 @@ module Hwaro
         # is replaced by the block's result.
         private def map_shortcode_chunks(content : String, & : String -> String) : String
           String.build do |io|
-            tracker = Content::Processors::FenceTracker.new(raw_html_code: false)
+            tracker = Content::Processors::FenceTracker.new(raw_html_code: false, footnote_bodies: true)
             buffer = String::Builder.new
             # Lines that live inside a block-shortcode body. While inside one
             # we must NOT treat a fence line as a buffer boundary, otherwise a
@@ -232,7 +232,7 @@ module Hwaro
 
           open_lines = [] of Int32
           pairs = [] of Tuple(Int32, Int32)
-          line_count = each_block_tag(content, Content::Processors::FenceTracker.new(raw_html_code: false)) do |line_no, opener|
+          line_count = each_block_tag(content, Content::Processors::FenceTracker.new(raw_html_code: false, footnote_bodies: true)) do |line_no, opener|
             if opener
               open_lines << line_no
             elsif opened = open_lines.pop?
@@ -301,7 +301,7 @@ module Hwaro
         # that many closers, or the openers ship as literal text.
         private def blocks_open_across(head : String, tail : String) : Int32
           return 0 unless Utils::ByteScan.includes?(head, "{%")
-          tracker = Content::Processors::FenceTracker.new(raw_html_code: false)
+          tracker = Content::Processors::FenceTracker.new(raw_html_code: false, footnote_bodies: true)
           open = 0
           each_block_tag(head, tracker) { |_, opener| open = opener ? open + 1 : Math.max(open - 1, 0) }
           inner = 0
@@ -327,7 +327,7 @@ module Hwaro
         private def raw_block_lines(content : String) : Array(Bool)
           return [] of Bool unless Utils::ByteScan.includes?(content, "{%")
 
-          tracker = Content::Processors::FenceTracker.new
+          tracker = Content::Processors::FenceTracker.new(footnote_bodies: true)
           open_line : Int32? = nil
           pairs = [] of Tuple(Int32, Int32)
           line_count = 0
@@ -418,7 +418,7 @@ module Hwaro
           return content unless content.includes?("```") || content.includes?("~~~")
           body_lines = block_body_lines(content)
           return content if body_lines.empty?
-          tracker = Content::Processors::FenceTracker.new(raw_html_code: false)
+          tracker = Content::Processors::FenceTracker.new(raw_html_code: false, footnote_bodies: true)
           String.build(content.bytesize) do |io|
             content.each_line(chomp: false).with_index do |line, i|
               unless (body_lines[i]? || false) && tracker.fence_line?(line)
