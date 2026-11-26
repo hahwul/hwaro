@@ -124,6 +124,45 @@ describe "generated files replacing other outputs" do
     log.should_not contain("notes.txt")
   end
 
+  # The static copy refuses a symlink aimed outside the project, so nothing
+  # of the user's is replaced and there is nothing to warn about.
+  it "keeps quiet about a static symlink the copy does not publish" do
+    posix_only!("needs a symlink")
+    Dir.mktmpdir do |outside|
+      secret = File.join(outside, "robots.txt")
+      File.write(secret, "User-agent: *\nDisallow: /\n")
+      build_site(
+        %(title = "T"\nbase_url = "https://example.com"\n),
+        content_files: {"post.md" => "+++\ntitle = \"P\"\n+++\nbody"},
+        template_files: {"page.html" => "{{ content }}", "section.html" => "{{ content }}"},
+      ) do
+        FileUtils.mkdir_p("static")
+        File.symlink(secret, "static/robots.txt")
+        builder = Hwaro::Core::Build::Builder.new
+        Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+        log = with_captured_log do
+          builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "./public/"))
+        end
+        log.should contain("Skipping static symlink pointing outside the project")
+        log.should_not contain("is replaced by the generated")
+        File.read("public/robots.txt").should_not contain("Disallow: /\n")
+      end
+    end
+  end
+
+  it "names the static file whatever form the output directory takes" do
+    log = with_captured_log do
+      build_site(
+        %(title = "T"\nbase_url = "https://example.com"\n[llms]\nenabled = true\n),
+        content_files: {"post.md" => "+++\ntitle = \"P\"\n+++\nbody"},
+        template_files: {"page.html" => "{{ content }}", "section.html" => "{{ content }}"},
+        static_files: {"llms.txt" => "mine"},
+        output_dir: "./pub/",
+      ) { }
+    end
+    log.should contain("static/llms.txt is replaced by the generated llms.txt; set [llms] enabled = false to publish your own file")
+  end
+
   it "keeps quiet when the generator is off" do
     log = with_captured_log do
       build_site(

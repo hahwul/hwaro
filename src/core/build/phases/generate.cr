@@ -180,31 +180,46 @@ module Hwaro::Core::Build::Phases::Generate
   # with that setting.
   private def warn_replaced_outputs(outputs : Array({String, String}), pages : Array(Models::Page), output_dir : String) : Nil
     return if outputs.empty?
-    config = @site.try(&.config)
+    root = File.expand_path(output_dir)
+    # Output-relative and slash-separated (`File.join` writes `\` on
+    # Windows, so a hand-built `"public/"` prefix matched nothing there).
+    replaced = outputs.compact_map do |(path, setting)|
+      relative = Utils::PathUtils.relative_path(File.expand_path(path), root)
+      {relative, setting} if relative && !relative.empty?
+    end
+
+    # A format file is always `<page dir>/index.<fmt>`, so the page scan is
+    # skipped unless a generated file carries such a name.
     format_files = {} of String => {String, String}
-    if config
+    config = @site.try(&.config)
+    if config && replaced.any? { |(relative, _)| File.basename(relative).starts_with?("index.") }
       pages.each do |page|
         next unless page.render
         formats = effective_output_formats(page, config)
         next if formats.empty?
         format_output_paths(page, output_dir, formats).each do |path|
-          format_files[File.expand_path(path)] ||= {page.path, File.extname(path).lchop('.')}
+          next unless relative = Utils::PathUtils.relative_path(File.expand_path(path), root)
+          format_files[relative] ||= {page.path, File.extname(path).lchop('.')}
         end
       end
     end
 
     static = static_publish_config
-    prefix = output_dir.ends_with?('/') ? output_dir : "#{output_dir}/"
-    outputs.each do |(path, setting)|
-      next unless path.starts_with?(prefix)
-      relative = path[prefix.size..]
-      if owner = format_files[File.expand_path(path)]?
+    replaced.each do |(relative, setting)|
+      if owner = format_files[relative]?
         Logger.warn "#{relative}: the #{owner[1]} output of '#{owner[0]}' is replaced by a generated file at the same path; #{setting}, or drop that output format, to keep it"
       end
-      source = File.join("static", relative)
-      if File.file?(source) && !static.excluded?(relative)
-        Logger.warn "#{source} is replaced by the generated #{relative}; #{setting} to publish your own file"
+      if static_published?(File.join("static", relative), relative, static)
+        Logger.warn "static/#{relative} is replaced by the generated #{relative}; #{setting} to publish your own file"
       end
     end
+  end
+
+  # Whether the static copy would publish `source`: a regular file the
+  # `[static]` excludes keep, and no symlink the copy refuses to follow
+  # (one aimed outside the project or at a protected target).
+  private def static_published?(source : String, relative : String, static : Models::StaticConfig) : Bool
+    return false if !File.file?(source) || static.excluded?(relative)
+    !File.symlink?(source) || Utils::PathUtils.publishable_project_source?(source, Dir.current)
   end
 end
