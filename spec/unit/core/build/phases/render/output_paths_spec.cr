@@ -94,6 +94,40 @@ describe "Render output paths: authored vs generated collisions" do
     log.should contain("collides with a pagination page of 'blog/_index.md'")
   end
 
+  # The pager URL escapes paginate_path (`/blog/p%23x/2/`) while its
+  # directory keeps the raw name (`blog/p#x/2/`); an alias naming the pager
+  # by its URL claims the same file and must lose to it the same way.
+  it "keeps a pagination page over an alias naming its escaped URL, cold and on --cache" do
+    rebuild = -> {
+      builder = Hwaro::Core::Build::Builder.new
+      Hwaro::Content::Hooks.all.each { |hookable| builder.register(hookable) }
+      builder.run(Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false, cache: true, highlight: false))
+    }
+    about = "+++\ntitle = \"About\"\naliases = [\"/blog/p%23x/2/\"]\n+++\nAbout"
+    log = with_captured_log do
+      build_site(
+        "title = \"T\"\nbase_url = \"http://localhost\"\n",
+        content_files: {
+          "blog/_index.md" => "+++\ntitle = \"Blog\"\npaginate = 1\npaginate_path = \"p#x\"\n+++\n",
+          "blog/p1.md"     => "+++\ntitle = \"P1\"\ndate = 2024-01-01\n+++\nP1",
+          "blog/p2.md"     => "+++\ntitle = \"P2\"\ndate = 2024-01-02\n+++\nP2",
+          "about.md"       => about,
+        },
+        template_files: {
+          "page.html"    => "{{ content }}",
+          "section.html" => "PAGER={{ paginator.current_index }}",
+        },
+        cache: true,
+      ) do
+        File.read("public/blog/p#x/2/index.html").should contain("PAGER=2")
+        File.write("content/about.md", about + " edited")
+        rebuild.call
+        File.read("public/blog/p#x/2/index.html").should contain("PAGER=2")
+      end
+    end
+    log.should contain("Duplicate alias output path '/blog/p%23x/2/' — alias on 'about.md' collides with a pagination page of 'blog/_index.md'")
+  end
+
   it "replaces a removed page's directory with the alias stub file that now wins its path on --cache" do
     rebuild = -> {
       builder = Hwaro::Core::Build::Builder.new

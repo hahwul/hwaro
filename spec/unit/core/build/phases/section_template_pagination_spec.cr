@@ -34,6 +34,35 @@ describe "section pagination with a custom template" do
     end
   end
 
+  it "paginates a root _index.md that names its own template and sets paginate" do
+    content = {"_index.md" => "+++\ntitle = \"Home\"\ntemplate = \"home\"\npaginate = 2\n+++\n"}
+    (1..5).each { |i| content["p#{i}.md"] = "+++\ntitle = \"P#{i}\"\ndate = 2024-01-0#{i}\n+++\nbody" }
+    templates = {
+      "page.html"    => "{{ content }}",
+      "section.html" => "DEFAULT",
+      "home.html"    => "HOME pagers={{ paginator.number_pagers }} n={{ section.pages | length }}",
+    }
+    build_site(BASIC_CONFIG, content_files: content, template_files: templates) do |dir|
+      File.read(File.join(dir, "public/index.html")).should eq("HOME pagers=3 n=2")
+      File.read(File.join(dir, "public/page/3/index.html")).should eq("HOME pagers=3 n=1")
+    end
+  end
+
+  it "leaves a custom-template root _index.md alone under the site-wide [pagination] default" do
+    content = {"_index.md" => "+++\ntitle = \"Home\"\ntemplate = \"home\"\n+++\n"}
+    (1..5).each { |i| content["p#{i}.md"] = "+++\ntitle = \"P#{i}\"\ndate = 2024-01-0#{i}\n+++\nbody" }
+    templates = {
+      "page.html"    => "{{ content }}",
+      "section.html" => "DEFAULT",
+      "home.html"    => "HOME count={{ section.pages_count }}",
+    }
+    config = BASIC_CONFIG + "\n[pagination]\nenabled = true\nper_page = 2\n"
+    build_site(config, content_files: content, template_files: templates) do |dir|
+      File.read(File.join(dir, "public/index.html")).should eq("HOME count=5")
+      File.exists?(File.join(dir, "public/page/2/index.html")).should be_false
+    end
+  end
+
   it "leaves a custom-template section alone under the site-wide [pagination] default" do
     content = {"posts/_index.md" => "+++\ntitle = \"Posts\"\ntemplate = \"blogindex\"\n+++\n"}
     (1..5).each { |i| content["posts/p#{i}.md"] = "+++\ntitle = \"P#{i}\"\ndate = 2024-01-0#{i}\n+++\nbody" }

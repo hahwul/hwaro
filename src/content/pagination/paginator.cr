@@ -87,7 +87,7 @@ module Hwaro
               next_url: nil,
               first_url: section.url,
               last_url: section.url,
-              base_url: "#{section.url.rstrip("/")}/#{section.paginate_path}/"
+              base_url: "#{section.url.rstrip("/")}/#{section.paginate_url_path}/"
             )
             return PaginationResult.new(
               paginated_pages: [single_page],
@@ -106,8 +106,9 @@ module Hwaro
 
           paginated_pages = [] of PaginatedPage
 
-          # Get custom paginate_path from section (defaults to "page")
-          paginate_path = section.paginate_path
+          # Get custom paginate_path from section (defaults to "page"), as it
+          # appears in a URL
+          paginate_path = section.paginate_url_path
           paginator_base_url = "#{base_url.rstrip("/")}/#{paginate_path}/"
 
           (1..total_pages).each do |page_num|

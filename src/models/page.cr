@@ -616,14 +616,20 @@ module Hwaro
       # request for that URL reaches. Either way the URL then names the
       # literal file name.
       def url=(value : String)
+        @url = Page.url_form(value)
+      end
+
+      # The escaping `url=` applies, for any string that becomes part of a
+      # site URL (a section's `paginate_path` in its pager URLs, say).
+      def self.url_form(value : String) : String
         if value.includes?('%')
           value = URI.decode(value).valid_encoding? ? value.gsub(/%(?![0-9A-Fa-f]{2})/, "%25") : value.gsub('%', "%25")
         end
-        @url = if value.includes?('#') || value.includes?('?') || value.includes?('"') || value.includes?('<') || value.includes?('>')
-                 value.gsub(URL_DELIMITER_ESCAPES)
-               else
-                 value
-               end
+        if value.includes?('#') || value.includes?('?') || value.includes?('"') || value.includes?('<') || value.includes?('>')
+          value.gsub(URL_DELIMITER_ESCAPES)
+        else
+          value
+        end
       end
 
       URL_DELIMITER_ESCAPES = {'#' => "%23", '?' => "%3F", '"' => "%22", '<' => "%3C", '>' => "%3E"}

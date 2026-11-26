@@ -512,15 +512,19 @@ module Hwaro
           page.version = config.versions.for_path(relative) # scopes `translation_key`
           {page, file}
         end
-        apply_render_state(entries, generated)
+        apply_render_state(entries, generated, config)
         # A file that describes a term page is headless in the build, which
         # is what link_translations! pairs on: a matched `_index.md` is then
         # nobody's original, and each language's term page exists anyway.
         term_files = term_metadata(config).files
         entries.each { |page, _| page.render = false if term_files.includes?(page.path) } unless term_files.empty?
         files = entries.to_h { |page, file| {page.path, file} }
+        pages = entries.map(&.[0])
+        # A page that loses its output path to another page is never written,
+        # so the build links it as no one's translation (ParseContent).
+        unwritten = Core::Build::Builder.new.output_losers(pages)
         losers = Set(String).new
-        Content::Multilingual.link_translations!(entries.map(&.[0]), config).each do |c|
+        Content::Multilingual.link_translations!(pages, config, unwritten).each do |c|
           losers << c.loser.path
           issues << Issue.new(id: "translation-key-collision", level: :warning, category: "i18n", file: files[c.loser.path],
             message: "translation_key #{c.key.inspect} is already used by the '#{c.code}' page #{files[c.winner.path]} — not linked as a translation", language: c.code)
@@ -531,7 +535,7 @@ module Hwaro
           entries.each do |page, file|
             # A page the build never writes (or that only redirects) needs no
             # translation, and is no one's missing counterpart.
-            next if !page.render || page.has_redirect?
+            next if !page.render || page.has_redirect? || unwritten.includes?(page.path)
             # A collision loser is reported once, as the collision.
             next if losers.includes?(page.path)
             code = Content::Multilingual.language_code(page, config)
@@ -551,7 +555,10 @@ module Hwaro
       # Fill in what `link_translations!` reads besides the path: `render`
       # (front matter, or a section `[cascade]`, as the build resolves it) and
       # `redirect_to`. Without them every page looks renderable and linkable.
-      private def apply_render_state(entries : Array({Models::Page, String}), sources : Hash(String, String)) : Nil
+      # Also the URL the build gives the page (ParseContent#calculate_page_url)
+      # and whether it is generated (generated pages claim URLs after authored
+      # ones), which decide the pages that lose their output path.
+      private def apply_render_state(entries : Array({Models::Page, String}), sources : Hash(String, String), config : Models::Config) : Nil
         previous = Logger.level
         Logger.level = Logger::Level::Error # the build reports front-matter warnings
         begin
@@ -563,6 +570,10 @@ module Hwaro
             end
             page.render = data[:render]
             page.redirect_to = data[:redirect_to]
+            page.url = Utils::PermalinkResolver.resolve_url_lenient(page.path, config,
+              slug: data[:slug], custom_path: data[:custom_path], language: page.language,
+              date: data[:date], title: data[:title], version: page.version)[0]
+            sources[file]?.try { |markdown| page.synthesis = Models::Page::Synthesis.new(markdown, Crinja::Value.new(nil), "doctor") }
             page.translation_key = data[:translation_key]
             page.front_matter_keys = data[:front_matter_keys]
             {page, data[:cascade]}

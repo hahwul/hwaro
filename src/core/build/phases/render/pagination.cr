@@ -34,7 +34,7 @@ module Hwaro::Core::Build::Phases::Render
       current_url = if paginated_page.page_number == 1
                       "#{base}/"
                     else
-                      "#{base}/#{section.paginate_path}/#{paginated_page.page_number}/"
+                      "#{base}/#{section.paginate_url_path}/#{paginated_page.page_number}/"
                     end
 
       final_html = if template_content
