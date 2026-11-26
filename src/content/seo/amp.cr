@@ -356,16 +356,21 @@ module Hwaro
                 end
                 %(<amp-img#{attrs}></amp-img>)
               else
-                # No dimensions: use fill layout inside a positioned container
+                # No dimensions: use fill layout inside a positioned container.
+                # The container is a <span> (made a block by the amp-custom
+                # CSS): an image sits in phrasing content (a paragraph with
+                # text, a link, a heading), where a <div> would close the
+                # enclosing <p> early and leave the rest of it mis-nested.
                 attrs += %( layout="fill") unless attrs.includes?("layout=")
-                %(<div class="amp-img-container"><amp-img#{attrs}></amp-img></div>)
+                %(<span class="amp-img-container"><amp-img#{attrs}></amp-img></span>)
               end
             end
 
-            # A block-level <div class="amp-img-container"> placed directly inside
-            # a <p> (Markdown wraps a standalone image in a paragraph) is invalid
-            # HTML. Unwrap any <p> whose sole child is that container div.
-            chunk = chunk.gsub(/<p>(\s*<div class="amp-img-container">[\s\S]*?<\/div>\s*)<\/p>/mi) { $1 }
+            # Unwrap a <p> whose sole child is that container (Markdown wraps a
+            # standalone image in a paragraph), so the image block carries no
+            # paragraph margins. The container body never holds `</span>`, so
+            # the match cannot run on into a later paragraph's container.
+            chunk = chunk.gsub(/<p>(\s*<span class="amp-img-container">(?:(?!<\/span>)[\s\S])*+<\/span>\s*)<\/p>/mi) { $1 }
 
             # Convert <video> to <amp-video>
             chunk = chunk.gsub(AMP_VIDEO_RE) do
@@ -451,7 +456,7 @@ module Hwaro
 
             amp_boilerplate = <<-HTML
               <style amp-boilerplate>body{-webkit-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-moz-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-ms-animation:-amp-start 8s steps(1,end) 0s 1 normal both;animation:-amp-start 8s steps(1,end) 0s 1 normal both}@-webkit-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-moz-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-ms-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-o-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}</style><noscript><style amp-boilerplate>body{-webkit-animation:none;-moz-animation:none;-ms-animation:none;animation:none}</style></noscript>
-              <style amp-custom>.amp-img-container{position:relative;width:100%;min-height:200px}#{extracted_css}</style>
+              <style amp-custom>.amp-img-container{display:block;position:relative;width:100%;min-height:200px}#{extracted_css}</style>
               <script async src="https://cdn.ampproject.org/v0.js"></script>#{extension_scripts}
               HTML
             # The AMP runtime/boilerplate is mandatory. If the theme rendered no

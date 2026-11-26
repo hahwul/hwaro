@@ -36,7 +36,7 @@ AMP 변환기는 다음 변환을 자동으로 적용합니다:
 | 원본 | AMP 버전 |
 |----------|-------------|
 | `<html>` | `<html amp>` |
-| `<img>` | `width`와 `height`가 있으면 `<amp-img layout="responsive">`, 없으면 `<div class="amp-img-container">` 안의 `<amp-img layout="fill">` |
+| `<img>` | `width`와 `height`가 있으면 `<amp-img layout="responsive">`, 없으면 `<span class="amp-img-container">` 안의 `<amp-img layout="fill">` (블록으로 표시되는 span이라 문단이나 링크 안에서도 유효) |
 | `<video>` | `<amp-video layout="responsive">` |
 | `<iframe>` | `<amp-iframe layout="responsive">` (`height`만 있으면 `layout="fixed-height"`). `sandbox`가 없으면 기본값을 추가 |
 | `<picture>` | `<img>`만 남기고(`<source>` 요소는 제거) 위와 같이 변환 |
