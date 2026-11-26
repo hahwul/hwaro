@@ -224,4 +224,22 @@ describe "Hwaro::Services::Doctor translation_key" do
     })
     summarize(issues).should be_empty
   end
+
+  # The build writes one page per output path and links no translation to
+  # the page that loses it (`blog/zz-about.md`, slug "news", loses
+  # /blog/news/ to `blog/news.md`): its `.ko` file has no original, and
+  # the loser itself needs no translation.
+  it "pairs like the build when a page loses its output path to another page" do
+    issues = translation_issues({
+      "blog/_index.md"      => PAGE,
+      "blog/_index.ko.md"   => PAGE,
+      "blog/_index.ja.md"   => PAGE,
+      "blog/news.md"        => PAGE,
+      "blog/news.ko.md"     => PAGE,
+      "blog/news.ja.md"     => PAGE,
+      "blog/zz-about.md"    => "+++\ntitle = \"About\"\nslug = \"news\"\n+++\nbody\n",
+      "blog/zz-about.ko.md" => PAGE,
+    })
+    summarize(issues).should eq(["ko translation-orphan blog/zz-about.ko.md"])
+  end
 end

@@ -356,8 +356,9 @@ module Hwaro::Core::Build::Phases::Render
   end
 
   # The writers that would lose their URL to another page; no warnings, no
-  # page state touched.
-  private def output_losers(pages : Array(Models::Page)) : Set(String)
+  # page state touched. Public for the doctor, which pairs translations the
+  # way the build does and so must drop the same pages.
+  def output_losers(pages : Array(Models::Page)) : Set(String)
     claim_page_urls(output_writers(pages), {} of String => String, {} of String => String, {} of String => String, quiet: true)[0]
   end
 
