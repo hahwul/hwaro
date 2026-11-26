@@ -27,6 +27,13 @@ describe "YAML front matter with non-string keys" do
     result[:taxonomies]["2024"].should eq(["a"])
   end
 
+  it "keeps a numeric menu name in the table form, like TOML" do
+    yaml = processor.parse("---\ntitle: y\nmenus:\n  2024:\n    weight: 2\n---\nbody\n", "content/y.md")
+    toml = processor.parse(%(+++\ntitle = "y"\n[menus.2024]\nweight = 2\n+++\nbody\n), "content/t.md")
+    yaml[:menus].keys.should eq(["2024"])
+    yaml[:menus]["2024"].weight.should eq(toml[:menus]["2024"].weight)
+  end
+
   it "lets a [[content.schema]] field see the key page.extra has" do
     rule = load_config("[[content.schema]]\nsections = [\"**\"]\n[content.schema.fields.\"2024\"]\ntype = \"string\"\nrequired = true\n").content_schema.first
     source = "---\ntitle: y\n2024: year\n---\nbody\n"

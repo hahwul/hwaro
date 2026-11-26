@@ -89,7 +89,10 @@ module Hwaro
           end
 
           # Table form. TOML/JSON hashes keep String keys; YAML hashes are
-          # keyed by YAML::Any (mirrors `extract_taxonomies` below).
+          # keyed by YAML::Any, and an unquoted `2024:` is an Int key that
+          # `[menus.2024]` in TOML names as "2024" — so it goes through the
+          # same `key_string` as every other YAML key (mirrors
+          # `extract_taxonomies` below) instead of being dropped.
           case value
           when TOML::Any, JSON::Any
             value.as_h?.try &.each do |menu_name, entry|
@@ -97,8 +100,7 @@ module Hwaro
             end
           when YAML::Any
             value.as_h?.try &.each do |menu_name_any, entry|
-              next unless menu_name = menu_name_any.as_s?
-              registrations[menu_name] = menu_registration_from(entry)
+              registrations[Utils::FrontmatterWriter.key_string(menu_name_any)] = menu_registration_from(entry)
             end
           end
 
