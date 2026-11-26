@@ -54,16 +54,26 @@ module Hwaro
       # deliberately NOT listed: whitespace adjacent to them renders as a
       # visible space and must be preserved.
       BLOCK_TAGS = Set{
-        "address", "article", "aside", "base", "blockquote", "body",
+        "address", "article", "aside", "blockquote", "body",
         "caption", "col", "colgroup", "dd", "details", "dialog",
         "div", "dl", "dt", "fieldset", "figcaption", "figure",
         "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6",
         "head", "header", "hgroup", "hr", "html",
-        "li", "link", "main", "menu", "meta", "nav", "noscript",
+        "li", "main", "menu", "nav", "noscript",
         "ol", "p", "pre", "script", "section",
-        "source", "style", "summary", "table", "tbody", "td",
-        "tfoot", "th", "thead", "title", "tr", "track", "ul",
+        "style", "summary", "table", "tbody", "td",
+        "tfoot", "th", "thead", "title", "tr", "ul",
       }
+
+      # Void elements that render nothing (display:none). Like a hidden
+      # placeholder (PROTECTED_HIDDEN) they are no block boundary: a
+      # microdata `<meta itemprop>` between two inline siblings
+      # (`<span>Jane</span> <meta …> <span>wrote</span>`), or the `<source>`
+      # opening an inline `<picture>`, leaves the space around it visible,
+      # and classing them as block deleted it ("Janewrote"). Between two
+      # hidden neighbours — the run of `<meta>`/`<link>` tags in `<head>` —
+      # the whitespace is still stripped.
+      HIDDEN_TAGS = Set{"base", "link", "meta", "source", "track"}
 
       # Tags whose content must be preserved verbatim. Extracted into
       # placeholders before any whitespace pass and restored afterward.
@@ -582,7 +592,7 @@ module Hwaro
             next_block = intertoken_block?(bytes, ws_end, next_end)
             return collapse_inter_token_whitespace_regex(html) if prior_block.nil? || next_block.nil?
             io.write(bytes[copied, prior_end - copied])
-            unless prior_block || next_block || (intertoken_hidden?(bytes, i) && intertoken_hidden?(bytes, ws_end))
+            unless prior_block || next_block || (intertoken_hidden?(bytes, i, prior_end) && intertoken_hidden?(bytes, ws_end, next_end))
               io << ' '
             end
             copied = ws_end
@@ -632,6 +642,15 @@ module Hwaro
         if bytes[start] == 0_u8
           return prefix_at?(bytes, start, PRESERVE_PREFIX_BLOCK)
         end
+        return unless key = tag_name_key(bytes, start, stop)
+        BLOCK_TAG_KEYS.includes?(key)
+      end
+
+      # The lowercased name of the tag at `bytes[start...stop]` packed into
+      # an integer the way BLOCK_TAG_KEYS / HIDDEN_TAG_KEYS are (0 when it is
+      # longer than any name in either set), or nil when a non-ASCII byte
+      # ends the ASCII run of the name.
+      private def tag_name_key(bytes : Bytes, start : Int32, stop : Int32) : UInt128?
         j = start + 1
         j += 1 if bytes[j] == '/'.ord
         name_start = j
@@ -641,14 +660,18 @@ module Hwaro
           j += 1
         end
         return if j < stop && bytes[j] >= 0x80
-        return false if j - name_start > BLOCK_TAG_MAX
+        return 0_u128 if j - name_start > BLOCK_TAG_MAX
         key = 0_u128
         (name_start...j).each { |k| key = (key << 8) | bytes[k].unsafe_chr.downcase.ord }
-        BLOCK_TAG_KEYS.includes?(key)
+        key
       end
 
-      private def intertoken_hidden?(bytes : Bytes, start : Int32) : Bool
-        prefix_at?(bytes, start, PRESERVE_PREFIX_HIDDEN)
+      # A hidden placeholder, or a HIDDEN_TAGS tag. Only asked once
+      # `intertoken_block?` has classified the token, so a tag's name is
+      # ASCII here.
+      private def intertoken_hidden?(bytes : Bytes, start : Int32, stop : Int32) : Bool
+        return prefix_at?(bytes, start, PRESERVE_PREFIX_HIDDEN) if bytes[start] == 0_u8
+        HIDDEN_TAG_KEYS.includes?(tag_name_key(bytes, start, stop) || 0_u128)
       end
 
       private def prefix_at?(bytes : Bytes, start : Int32, prefix : String) : Bool
@@ -658,8 +681,9 @@ module Hwaro
       # BLOCK_TAGS names packed one byte each into an integer (they are at
       # most BLOCK_TAG_MAX ASCII bytes), so a token's name is looked up
       # without building a String.
-      private BLOCK_TAG_MAX  = BLOCK_TAGS.max_of(&.bytesize)
-      private BLOCK_TAG_KEYS = BLOCK_TAGS.map { |tag| tag.each_byte.reduce(0_u128) { |key, b| (key << 8) | b } }.to_set
+      private BLOCK_TAG_MAX   = BLOCK_TAGS.max_of(&.bytesize)
+      private BLOCK_TAG_KEYS  = BLOCK_TAGS.map { |tag| tag.each_byte.reduce(0_u128) { |key, b| (key << 8) | b } }.to_set
+      private HIDDEN_TAG_KEYS = HIDDEN_TAGS.map { |tag| tag.each_byte.reduce(0_u128) { |key, b| (key << 8) | b } }.to_set
 
       private def collapse_inter_token_whitespace_regex(html : String) : String
         values = tagged_value_spans(html)
@@ -729,7 +753,12 @@ module Hwaro
       end
 
       private def hidden_token?(token : String) : Bool
-        token.starts_with?(PRESERVE_PREFIX_HIDDEN)
+        return true if token.starts_with?(PRESERVE_PREFIX_HIDDEN)
+        if m = REGEX_TAG_NAME.match(token)
+          HIDDEN_TAGS.includes?(m[1].downcase)
+        else
+          false
+        end
       end
 
       # Collapse whitespace runs *inside* tag openings to a single

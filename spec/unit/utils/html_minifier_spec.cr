@@ -202,7 +202,7 @@ describe Hwaro::Utils::HtmlMinifier do
       end
     end
 
-    describe "hidden elements (script, style, noscript)" do
+    describe "hidden elements (script, style, noscript, meta, link, …)" do
       # They render nothing, so the whitespace beside one still separates
       # the inline content around it.
       it "keeps the space between inline siblings around a script" do
@@ -213,6 +213,28 @@ describe Hwaro::Utils::HtmlMinifier do
       it "keeps the space before a noscript between inline siblings" do
         Hwaro::Utils::HtmlMinifier.minify("<p><b>a</b> <noscript><i>n</i></noscript><b>c</b></p>")
           .should eq("<p><b>a</b> <noscript><i>n</i></noscript><b>c</b></p>")
+      end
+
+      it "keeps the space around a microdata <meta> between inline siblings" do
+        Hwaro::Utils::HtmlMinifier.minify("<p><span itemprop=\"author\">Jane</span>\n<meta itemprop=\"datePublished\" content=\"2024-01-01\">\n<span>wrote</span></p>")
+          .should eq("<p><span itemprop=\"author\">Jane</span> <meta itemprop=\"datePublished\" content=\"2024-01-01\"> <span>wrote</span></p>")
+      end
+
+      it "keeps the space before a <picture> whose first child is a <source>" do
+        Hwaro::Utils::HtmlMinifier.minify("<p>see<picture>\n<source srcset=\"a.webp\" type=\"image/webp\">\n<img src=\"a.jpg\" alt=\"a\">\n</picture>here</p>")
+          .should eq("<p>see<picture> <source srcset=\"a.webp\" type=\"image/webp\"> <img src=\"a.jpg\" alt=\"a\"> </picture>here</p>")
+      end
+
+      it "keeps the space around a <link> or <track> between inline siblings" do
+        Hwaro::Utils::HtmlMinifier.minify("<p><b>a</b> <link rel=\"x\" href=\"y\"> <b>c</b></p>")
+          .should eq("<p><b>a</b> <link rel=\"x\" href=\"y\"> <b>c</b></p>")
+        Hwaro::Utils::HtmlMinifier.minify("<p><b>a</b> <track src=\"t.vtt\"/><b>c</b></p>")
+          .should eq("<p><b>a</b> <track src=\"t.vtt\"/><b>c</b></p>")
+      end
+
+      it "still strips whitespace between two hidden void elements" do
+        Hwaro::Utils::HtmlMinifier.minify("<head>\n<base href=\"/\">\n<link rel=\"a\" href=\"b\">\n<meta name=\"x\">\n<script src=\"a.js\"></script>\n</head>")
+          .should eq("<head><base href=\"/\"><link rel=\"a\" href=\"b\"><meta name=\"x\"><script src=\"a.js\"></script></head>")
       end
 
       it "still strips whitespace between hidden and block neighbours" do
@@ -439,11 +461,14 @@ describe Hwaro::Utils::HtmlMinifier do
       end
 
       # The byte-level passes defer to the Unicode-aware regex rules here:
-      # KELVIN SIGN downcases to `k` (so the name is `link`, a block tag) and
-      # LONG S matches `s` case-insensitively (so the tag is protected).
+      # KELVIN SIGN downcases to `k` (so the name is `blockquote`, a block
+      # tag, or `link`, a hidden one) and LONG S matches `s`
+      # case-insensitively (so the tag is protected).
       it "classifies a tag name with a non-ASCII letter by its Unicode downcase" do
+        html = "<b>x</b>\n<blocKquote>\n<b>y</b>"
+        Hwaro::Utils::HtmlMinifier.minify(html).should eq("<b>x</b><blocKquote><b>y</b>")
         html = "<b>x</b>\n<linK rel=\"a\">\n<b>y</b>"
-        Hwaro::Utils::HtmlMinifier.minify(html).should eq("<b>x</b><linK rel=\"a\"><b>y</b>")
+        Hwaro::Utils::HtmlMinifier.minify(html).should eq("<b>x</b> <linK rel=\"a\"> <b>y</b>")
       end
 
       it "protects a script tag spelled with LONG S" do
