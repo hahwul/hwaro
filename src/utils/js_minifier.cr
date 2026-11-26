@@ -65,6 +65,22 @@ module Hwaro
         String.build do |io|
           i = 0
           len = chars.size
+          # The last significant source character before `i` — whitespace
+          # and comments skipped — and whether it closed a string, template
+          # or regex literal. What precedes a `/` tells a regex literal from
+          # a division (see regex_context?); looking back from the slash
+          # over spaces alone misread `n\n  / 2`, `8 /* half */ / 2` and
+          # `'6' / 2` as a regex, and that "regex" could end inside a later
+          # string, which then opened where it closed and stripped its
+          # `//` text (`'http://x'`) as a comment.
+          last_sig = -1
+          after_value = false
+          # One entry per open `(`: whether it opens the head of an `if`,
+          # `while`, `for` or `with` statement. A `)` closing such a head
+          # ends no expression, so a `/` after it starts a regex literal
+          # (`if (x) /re/.test(y)`); after any other `)` it is a division.
+          parens = [] of Bool
+          after_head = false
 
           while i < len
             c = chars[i]
@@ -85,6 +101,9 @@ module Hwaro
                 end
                 i += 1
               end
+              last_sig = i
+              after_value = true
+              after_head = false
               i += 1
               next
             end
@@ -102,6 +121,9 @@ module Hwaro
               end
               protected_spans << lit
               io << "\x00JSPL#{protected_spans.size - 1}\x00"
+              last_sig = i - 1
+              after_value = true
+              after_head = false
               next
             end
 
@@ -159,24 +181,39 @@ module Hwaro
               # Check if this slash starts a regex literal.
               # A `/` is a regex when preceded by a token that expects an expression:
               # operators, punctuation, or keywords like return/typeof/in/etc.
-              if regex_context?(chars, i)
+              if after_head || regex_context?(chars, last_sig, after_value)
                 # Regex literal — pass through unchanged
                 i = scan_regex(chars, i, len, io)
+                last_sig = i - 1
+                after_value = true
+                after_head = false
                 next
               end
             end
 
             io << c
+            unless c.whitespace?
+              after_head = false
+              if c == '('
+                parens << statement_head?(chars, last_sig)
+              elsif c == ')'
+                after_head = parens.pop? || false
+              end
+              last_sig = i
+              after_value = false
+            end
             i += 1
           end
         end
       end
 
-      # Determine whether a `/` at position `pos` in `chars` is likely a regex
-      # literal rather than a division operator. We look at the last
-      # non-whitespace character before the slash: if it could end an
-      # expression (identifier char, digit, `)`, `]`), it's division;
-      # otherwise (operator, `(`, `[`, `{`, `,`, `;`, `!`, line start) it's regex.
+      # Determine whether a `/` is likely a regex literal rather than a
+      # division operator, from the last significant character before it
+      # (`last`, -1 at the start of input) and whether that character closed
+      # a string, template or regex literal (`after_value`). A literal, or a
+      # token that can end an expression (identifier char, digit, `)`,
+      # `]`), means division; otherwise (operator, `(`, `[`, `{`, `,`, `;`,
+      # `!`, start of input) it's a regex.
       #
       # A word ending right before the slash is normally an identifier (so
       # division), except for the keywords after which an expression — and so
@@ -185,41 +222,75 @@ module Hwaro
       # it (the rest of the file and every later bundle entry). A keyword used
       # as a property name (`obj.return / 2`) is still division.
       #
-      # Known limitation: a regex right after a statement's closing paren
-      # (`if (x) /re/.test(y)`) is still read as division — telling that `)`
-      # apart from a call's needs paren matching.
-      private def regex_context?(chars, pos : Int32) : Bool
-        j = pos - 1
-        while j >= 0 && (chars[j] == ' ' || chars[j] == '\t')
-          j -= 1
-        end
-        return true if j < 0 # start of input
+      # A `)` reads as the end of an expression here; the scanner itself
+      # tells a statement head's `)` (`if (x) /re/`) from a call's.
+      private def regex_context?(chars, last : Int32, after_value : Bool) : Bool
+        return true if last < 0 # start of input
+        return false if after_value
 
-        prev = chars[j]
+        prev = chars[last]
         return false if prev == ')' || prev == ']'
         # A postfix `i++ / 2` ends an expression; `++` can never precede a
         # regex literal (a literal is not incrementable). Read as a regex,
         # the "literal" swallowed a template's opening backtick on the same
         # line and the template body was then stripped as code.
-        return false if (prev == '+' || prev == '-') && j > 0 && chars[j - 1] == prev
+        return false if (prev == '+' || prev == '-') && last > 0 && chars[last - 1] == prev
         if prev.alphanumeric? || prev == '_' || prev == '$'
-          return regex_keyword_before?(chars, j)
+          return regex_keyword_before?(chars, last)
         end
         # Everything else (operators, punctuation) → regex
         true
       end
 
-      # Reserved words only: `of`, `yield` and `await` are valid identifiers
-      # outside their special contexts, so `of / 2` must stay a division.
+      # `regex_context?` for a `/` at `pos` inside a template interpolation,
+      # where the scan copies strings and nested templates verbatim instead
+      # of tracking them: the last significant character is found by
+      # looking back over whitespace, and a quote or backtick there can only
+      # be the end of a literal.
+      private def interpolation_regex_context?(chars, pos : Int32) : Bool
+        j = pos - 1
+        while j >= 0 && chars[j].whitespace?
+          j -= 1
+        end
+        regex_context?(chars, j, j >= 0 && (chars[j] == '"' || chars[j] == '\'' || chars[j] == '`'))
+      end
+
+      # `of` is a valid identifier outside `for … of`, so `of / 2` must stay
+      # a division. `yield` and `await` are too, but only in sloppy code
+      # outside a generator / async function, where nobody names a variable
+      # after them; inside one (and anywhere in a module) a regex follows
+      # them (`yield /a'/`), and reading that as division let the quote in
+      # its body open a string that ran on through the file.
       REGEX_PRECEDING_KEYWORDS = Set{
         "return", "typeof", "instanceof", "in", "new", "delete", "void",
-        "throw", "case", "do", "else",
+        "throw", "case", "do", "else", "yield", "await",
       }
+
+      # Keywords whose parenthesised head is followed by a statement.
+      STATEMENT_HEAD_KEYWORDS = Set{"if", "while", "for", "with"}
+
+      # True when the `(` after chars[last] opens a statement head.
+      private def statement_head?(chars, last : Int32) : Bool
+        return false if last < 0
+        prev = chars[last]
+        # The last letters of `if`, `while`, `for`, `with`: most calls
+        # (`f(`, `log(`) stop here without walking back over their name.
+        return false unless prev == 'f' || prev == 'e' || prev == 'r' || prev == 'h'
+        keyword_before?(chars, last, STATEMENT_HEAD_KEYWORDS)
+      end
 
       # True when the identifier-like word ending at chars[last] is one of
       # REGEX_PRECEDING_KEYWORDS and not a member name (`a.return`) or a
       # private class member (`this.#in`, `#new`).
       private def regex_keyword_before?(chars, last : Int32) : Bool
+        keyword_before?(chars, last, REGEX_PRECEDING_KEYWORDS)
+      end
+
+      # True when the identifier-like word ending at chars[last] is one of
+      # `keywords` and not a member name or a private class member. The word
+      # is compared in place: this runs for every `(` after an identifier
+      # (every call), so building a String per lookup was measurable.
+      private def keyword_before?(chars, last : Int32, keywords : Set(String)) : Bool
         start = last
         while start > 0 && (chars[start - 1].alphanumeric? || chars[start - 1] == '_' || chars[start - 1] == '$')
           start -= 1
@@ -227,13 +298,21 @@ module Hwaro
         return false if start > 0 && chars[start - 1] == '#'
         size = last - start + 1
         return false if size > 10 # longer than any keyword above
-        word = String.build(size) { |w| (start..last).each { |k| w << chars[k] } }
-        return false unless REGEX_PRECEDING_KEYWORDS.includes?(word)
+        return false unless keywords.any? { |kw| word_at?(chars, start, size, kw) }
         k = start - 1
         while k >= 0 && chars[k].whitespace?
           k -= 1
         end
         !(k >= 0 && chars[k] == '.')
+      end
+
+      # True when chars[start, size] spells the ASCII word `kw`.
+      private def word_at?(chars, start : Int32, size : Int32, kw : String) : Bool
+        return false unless kw.bytesize == size
+        size.times do |k|
+          return false unless chars[start + k].ord == kw.byte_at(k)
+        end
+        true
       end
 
       # Scan a template literal beginning at chars[i] == '`'. Appends the whole
@@ -303,7 +382,7 @@ module Hwaro
               lb << chars[i]
               i += 1
             end
-          elsif c == '/' && regex_context?(chars, i)
+          elsif c == '/' && interpolation_regex_context?(chars, i)
             i = scan_regex(chars, i, len, lb)
           elsif c == '{'
             depth += 1

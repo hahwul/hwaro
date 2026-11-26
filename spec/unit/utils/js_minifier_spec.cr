@@ -663,6 +663,51 @@ describe Hwaro::Utils::JsMinifier do
       Hwaro::Utils::JsMinifier.minify("v = of / 2 // note\nw = 1").should eq("v = of / 2\nw = 1")
     end
 
+    # Regression: the regex-or-division call looked back from the slash over
+    # spaces and tabs only, so a division after a line break, a comment or a
+    # string literal read as a regex. That "regex" ended at the first `/`
+    # inside a later string, the string's closing quote then opened a new
+    # one, and the next real string's `//` was stripped as a comment.
+    it "reads a slash after a line break, comment or literal as division" do
+      src = "var z = n\n  / m; var s = 'a/b';\nvar u = 'http://x';"
+      Hwaro::Utils::JsMinifier.minify(src).should eq(src)
+      Hwaro::Utils::JsMinifier.minify("var h = 8 /* half */ / 2; var u = 'a/b'; var v = 'http://y';")
+        .should eq("var h = 8  / 2; var u = 'a/b'; var v = 'http://y';")
+      ["'6'", %("6"), "`6`"].each do |lit|
+        src = "var d = #{lit} / 2; var s = 'a/b';\nvar u = 'http://z';"
+        Hwaro::Utils::JsMinifier.minify(src).should eq(src)
+      end
+    end
+
+    it "still reads a slash after return on the previous line as a regex" do
+      src = "function f(s) { return\n/'/.test(s) }\nvar u = 'http://x';"
+      Hwaro::Utils::JsMinifier.minify(src).should eq(src)
+    end
+
+    # Regression: every `)` read as the end of an expression, so a regex
+    # opening the body of an `if`/`while`/`for`/`with` was taken for a
+    # division and the quote in its body opened a string that ran on.
+    it "reads a slash after a statement head's closing paren as a regex" do
+      src = "if (ok) /'/.test(s) && go()\nvar u = 'http://x';"
+      Hwaro::Utils::JsMinifier.minify(src).should eq(src)
+      src = "while (i--) /\"/.exec(s)\nfor (;;) /'/g.exec(t)\nvar u = 'http://y';"
+      Hwaro::Utils::JsMinifier.minify(src).should eq(src)
+    end
+
+    it "still reads a slash after a call's or member's closing paren as division" do
+      src = "var a = f(x) / 2, b = o.if(y) / 3, c = (if_ok) / 4; var u = 'a/b';\nvar v = 'http://z';"
+      Hwaro::Utils::JsMinifier.minify(src).should eq(src)
+      src = "if ((n) / 2 > 1) go() // c\nvar w = 'p/q';"
+      Hwaro::Utils::JsMinifier.minify(src).should eq("if ((n) / 2 > 1) go()\nvar w = 'p/q';")
+    end
+
+    it "reads a slash after yield or await as a regex" do
+      src = "function* g() { yield /a'/ }\nvar u = 'http://x';"
+      Hwaro::Utils::JsMinifier.minify(src).should eq(src)
+      src = "async function h() { return await /b'/ }\nvar u = 'http://x';"
+      Hwaro::Utils::JsMinifier.minify(src).should eq(src)
+    end
+
     # Regression: an unescaped `/` inside a regex character class ended the
     # literal early, and its real closing `\//` then read as a `//` comment
     # that dropped the rest of the line (npm's own `/^[^\\/]*\//` broke).
