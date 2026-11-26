@@ -150,4 +150,20 @@ describe "Crinja built-in filter fixes" do
       end
     end
   end
+
+  # The printer was never flushed (`{"a" => 1, …}` printed `{"b" =>`), and an
+  # undefined value printed its object address.
+  describe "pprint" do
+    it "prints the whole value" do
+      render_filter("{{ d | pprint }}").should eq(%({"b" => 2, "a" => 1, "C" => 3}))
+      render_filter("{{ [1, [2, 3], 'x'] | pprint }}").should eq(%([1, [2, 3], "x"]))
+      long = render_filter("{{ range(40) | list | pprint }}")
+      long.should start_with("[0,\n 1,\n")
+      long.should end_with("\n 39]")
+    end
+
+    it "prints an undefined value as Jinja2 does, the same every time" do
+      render_filter("{{ missing | pprint }}|{{ d.missing | pprint }}").should eq("Undefined|Undefined")
+    end
+  end
 end

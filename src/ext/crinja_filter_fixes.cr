@@ -190,6 +190,23 @@ Crinja.filter({case_sensitive: false, attribute: nil}, :max) do
   Crinja::Filter.__extreme(target, arguments, 1)
 end
 
+# `pprint` prints the whole value. Upstream never flushed its PrettyPrint,
+# which holds back everything after the first group break, so
+# `{{ {"k": "v", "n": 2} | pprint }}` printed `{"k" =>`; and an undefined
+# value printed its object address (`#<Crinja::Undefined:0x…`), which
+# differs between builds. It prints `Undefined`, as Jinja2's does.
+Crinja.filter({verbose: false}, :pprint) do
+  if target.undefined?
+    "Undefined"
+  else
+    String.build do |io|
+      printer = Crinja::PrettyPrint.new(io, verbose: arguments["verbose"].truthy?)
+      target.pretty_print(printer)
+      printer.flush
+    end
+  end
+end
+
 # An undefined value is an empty sequence (and empty text) to `join`,
 # `reverse`, `list`, `batch`, `slice` and `replace`, as in Jinja2. They
 # raised instead, so `{{ page.extra.authors | join(", ") }}` failed the
