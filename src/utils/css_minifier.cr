@@ -39,6 +39,8 @@ module Hwaro
       private PAREN_GROUP   = /\(([^)]*)\)/
       private SELECTOR_TEST = /(?<![\w-])selector\(/i
       private RESTORE_TOKEN = /\x00PRESERVE_(\d{1,9})\x00/
+      # Bytes the passes after extract_tokens treat as structure.
+      private STRUCTURAL_ESCAPES = {'{'.ord.to_u8, '}'.ord.to_u8, ';'.ord.to_u8, ','.ord.to_u8}
 
       # Perform conservative CSS minification
       def minify(css : String) : String
@@ -116,6 +118,21 @@ module Hwaro
               # `\'`, `\"`, `\/*`, `\{` outside a string are escaped
               # identifier characters (Tailwind `before:content-['']`), never
               # a string/comment opener or a statement boundary.
+              #
+              # An escaped `{`, `}`, `;` or `,` is stashed, so the later
+              # passes, which split on those bytes, cannot read it as
+              # structure: `.a\, .b` lost its descendant combinator to the
+              # whitespace pass (`.a\,.b`), and `.a\;` ended a "declaration"
+              # whose colon was then tightened (`.card :hover` became the
+              # different selector `.card:hover`).
+              if i + 1 < n && STRUCTURAL_ESCAPES.includes?(bytes[i + 1])
+                io.write_byte(b)
+                stash(io, preserves, bytes[i + 1].unsafe_chr.to_s)
+                last = bytes[i + 1]
+                stmt_start = false
+                i += 2
+                next
+              end
               if i + 1 < n
                 io.write_byte(b)
                 i += 1
