@@ -597,6 +597,10 @@ module Hwaro::Core::Build::Phases::ParseContent
       spans = [] of String
       masked, spans = mask_inline_code(mask_body_fences(chunk, spans), spans)
       masked = mask_raw_blocks(masked, spans)
+      # A commented-out include stays literal, as a commented-out shortcode
+      # does: an included file's own comments (`<!-- #region -->`) ended the
+      # author's comment early.
+      masked = mask_html_comments(masked, spans)
       # With `[markdown] math`, math is stashed out first, as the wikilink
       # walk does, so an embed inside display math stays literal.
       expanded = if math && masked.includes?('$')

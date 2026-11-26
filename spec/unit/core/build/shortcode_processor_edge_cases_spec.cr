@@ -67,6 +67,25 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
     end
   end
 
+  describe "HTML comments" do
+    it "leaves a commented-out call literal" do
+      # The placeholder's own `-->` ended the author's comment early: the
+      # rest of the comment rendered as text, and its closer as `--&gt;`.
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/badge" => %(<b>{{ text }}</b>), "shortcodes/note" => %(<i>{{ body }}</i>)}
+      content = %(<!--\n{{ badge(text="a") }}\nTODO\n-->\n\nText <!-- {{ badge(text="b") }} --> {{ badge(text="c") }}\n\n<!-- {% note() %}x{% end %} -->\n)
+      builder.test_sc_process(content, templates).should eq(
+        %(<!--\n{{ badge(text="a") }}\nTODO\n-->\n\nText <!-- {{ badge(text="b") }} --> <b>c</b>\n\n<!-- {% note() %}x{% end %} -->\n))
+    end
+
+    it "still drops a literal placeholder hidden in a comment" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/badge" => %(<b>{{ text }}</b>)}
+      result = builder.test_sc_process(%(<!-- <!--HWARO-SHORTCODE-PLACEHOLDER-0--> -->\n{{ badge(text="x") }}\n), templates)
+      result.should_not contain("<!--HWARO-SHORTCODE-PLACEHOLDER-0--> -->")
+    end
+  end
+
   describe "footnote bodies" do
     it "expands a shortcode in a footnote's blank-line-separated paragraph" do
       # The indented paragraph read as indented code, so the call stayed

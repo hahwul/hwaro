@@ -42,6 +42,9 @@ To keep shortcode syntax literal in a Markdown page outside a code fence, wrap
 it in a raw block. The `{% raw %}` and `{% endraw %}` markers remain visible in
 Markdown output; fenced blocks inside the region do not split it.
 
+A shortcode call inside an HTML comment (`<!-- {{ youtube(id="x") }} -->`) is
+commented out: it does not expand, and the comment stays hidden.
+
 ## Built-in Shortcodes
 
 Hwaro ships with built-in shortcodes that work out of the box, with no template files needed.
@@ -236,7 +239,7 @@ Error [HWARO_E_TEMPLATE]: {{ include_code(path="examples/app.cr", region="srv") 
 
 An included file is a dependency of the page that includes it. A warm `--cache` build and `hwaro serve` both re-render the page when the file changes, including files outside `content/`.
 
-A call inside a code span, a fenced code block or a `{% raw %}` region stays literal.
+A call inside a code span, a fenced code block, a `{% raw %}` region or an HTML comment stays literal.
 
 > To override any built-in shortcode, create a file with the same name in `templates/shortcodes/` (e.g., `templates/shortcodes/youtube.html`). User templates always take priority — and define their own contract, so the warning above does not apply to them.
 

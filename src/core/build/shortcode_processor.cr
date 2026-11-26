@@ -388,6 +388,7 @@ module Hwaro
           # they are the construct an author uses to SHOW shortcode syntax
           # outside a code fence (see `mask_raw_blocks`).
           masked = mask_raw_blocks(masked, spans)
+          masked = mask_html_comments(masked, spans)
           processed = process_shortcodes_in_chunk(masked, templates, context, shortcode_results, crinja_env_override, template_cache_override, depth, spans, warnings)
           unmask_inline_code(processed, spans)
         end
@@ -496,6 +497,28 @@ module Hwaro
             # Same token shape `mask_inline_code` emits, so INLINE_CODE_MASK_RE
             # restores both kinds through `unmask_inline_code`.
             spans << unmask_inline_code(region, spans)
+            "\x00HWARO-INLINE-CODE-#{spans.size - 1}\x00"
+          end
+        end
+
+        # An HTML comment, shortest match (`-` runs taken one at a time so the
+        # first `-->` ends it).
+        HTML_COMMENT_RE = /<!--(?:[^-]++|-(?!->))*+-->/
+
+        # HTML comments are opaque too, so a commented-out call stays literal
+        # (as a commented-out wikilink does). Expanding one put the
+        # placeholder comment, and its `-->`, inside the author's comment and
+        # ended it early: the rest of a multi-line `<!-- … -->` rendered as
+        # page text, and its closing `-->` as an escaped `--&gt;` no browser
+        # reads as a closer, so the comment swallowed the rest of the page.
+        # Same token and restore points as `mask_raw_blocks`. A comment
+        # holding a literal placeholder is left for `process_block_shortcodes`
+        # to drop.
+        private def mask_html_comments(content : String, spans : Array(String)) : String
+          return content unless content.includes?("<!--")
+          content.gsub(HTML_COMMENT_RE) do |comment|
+            next comment if comment.includes?(SHORTCODE_PLACEHOLDER_PREFIX)
+            spans << unmask_inline_code(comment, spans)
             "\x00HWARO-INLINE-CODE-#{spans.size - 1}\x00"
           end
         end
