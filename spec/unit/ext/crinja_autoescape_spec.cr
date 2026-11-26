@@ -318,6 +318,17 @@ describe "Crinja autoescape" do
       on(%({% set a %}ab{% endset %}{{ a | replace("a", "aX", -1) }})).should eq("aXb")
     end
 
+    # Plain text re-ran `sub` on the partly-replaced string (Jinja2 3.1's
+    # output, which is Python's `str.replace`, in every mode).
+    it "replace with a count replaces the first matches of the original text" do
+      {true, false}.each do |ae|
+        render = ->(src : String) { ae_render(src, autoescape: ae) }
+        render.call(%({{ "aaa" | replace("a", "ab", 2) }}|{{ "abc" | replace("b", "bb", 2) }})).should eq("ababa|abbc")
+        render.call(%({{ "abc" | replace("", "-", 2) }}|{{ "ab" | replace("", "-", 5) }})).should eq("-a-bc|-a-b-")
+        render.call(%({{ "xyxy" | replace("x", "yx", -1) }}|{{ 1212 | replace("1", "11", 2) }})).should eq("yxyyxy|112112")
+      end
+    end
+
     it "r2#7 a safe truncation suffix stays safe, with any target" do
       on(%({% set t %}<i/>{% endset %}{{ "abcdef" | truncate(5, true, t, 0) }})).should eq("a<i/>")
       on(%({% set t %}<i/>{% endset %}{{ "a b" | safe | truncate_words(1, end=t) }})).should eq("a<i/>")

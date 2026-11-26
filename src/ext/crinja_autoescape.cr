@@ -710,13 +710,7 @@ Crinja.filter({old: Crinja::UNDEFINED, new: Crinja::UNDEFINED, count: nil}, :rep
       source = target.raw.is_a?(String | Crinja::SafeString | Crinja::Undefined) ? target.as_s_or_safe : target.to_s
       source.gsub(search, new_arg)
     else
-      string = target.to_s
-      count.to_i.times do
-        running = false
-        string = string.sub(search) { running = true; new_arg }
-        break unless running
-      end
-      string
+      Crinja::Filter.__replace_n(target.to_s, search, new_arg.to_s, count.to_i)
     end
   end
 end
@@ -724,12 +718,31 @@ end
 module Crinja::Filter
   # Replace up to `limit` occurrences of `search` in `source` (nil/negative =
   # all), counting matches in the ORIGINAL string, not in the partly-replaced
-  # result. Mirrors Python `str.replace(old, new, count)`. Byte offsets, not
-  # char offsets: on non-ASCII text a char `index`/slice rescans from the
-  # start, making the loop quadratic.
+  # result. Mirrors Python `str.replace(old, new, count)`, where an empty
+  # `search` matches before each character. Byte offsets, not char offsets:
+  # on non-ASCII text a char `index`/slice rescans from the start, making the
+  # loop quadratic.
+  #
+  # Plain text used to take another path that re-ran `sub` `count` times on
+  # the partly-replaced string: `"aaa" | replace("a", "ab", 2)` gave
+  # `abbaa` (the first `a` twice), `replace("", "-", 2)` gave `--abc`,
+  # and `count=-1` replaced nothing.
   def self.__replace_n(source : String, search : String, replacement : String, limit : Int32?) : String
     return source.gsub(search, replacement) if limit.nil? || limit < 0
-    return source if limit == 0 || search.empty?
+    return source if limit == 0
+    if search.empty?
+      return String.build(source.bytesize) do |io|
+        done = 0
+        source.each_char do |char|
+          if done < limit
+            io << replacement
+            done += 1
+          end
+          io << char
+        end
+        io << replacement if done < limit
+      end
+    end
     bytes = source.to_slice
     String.build(source.bytesize) do |io|
       pos = 0
