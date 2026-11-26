@@ -87,3 +87,22 @@ describe "links to bundle files the build does not publish" do
     warnings.first.should contain("[content.files] allow_extensions")
   end
 end
+
+describe "table of contents titles of headings holding a shortcode" do
+  it "show the shortcode output, as the heading does" do
+    # The shortcode was still its placeholder comment when the TOC was
+    # built, and tag stripping dropped it: `## API {{ badge() }} docs`
+    # was listed as "API  docs".
+    build_site(
+      %(title = "T"\nbase_url = "http://localhost"\n),
+      content_files: {"p.md" => %(+++\ntitle = "P"\ntoc = true\n+++\n## API {{ badge(text="beta & co") }} docs\n\n### Plain\n)},
+      template_files: {"page.html" => "<nav>{{ toc | safe }}</nav>{{ content | safe }}", "shortcodes/badge.html" => %(<span class="b">{{ text }}</span>)},
+    ) do
+      html = File.read("public/p/index.html")
+      html.should contain(%(<a href="#api-docs">API beta &amp; co docs</a>))
+      html.should contain(%(<a href="#plain">Plain</a>))
+      html.should contain(%(<h2 id="api-docs">API <span class="b">beta &amp; co</span> docs</h2>))
+      html.should_not contain("HWARO-SHORTCODE-PLACEHOLDER")
+    end
+  end
+end

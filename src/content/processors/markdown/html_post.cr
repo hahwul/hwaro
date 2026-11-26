@@ -179,7 +179,7 @@ module Hwaro
               toc_item = Models::TocHeader.new(
                 level: level,
                 id: id,
-                title: emoji ? heading_text(apply_emoji(inner_html)) : title,
+                title: toc_title(inner_html, emoji),
                 permalink: permalink
               )
 
@@ -221,10 +221,27 @@ module Hwaro
           {result, roots}
         end
 
+        # A TOC entry's title: what the heading shows, emoji included. A
+        # shortcode in the heading is still its placeholder comment here (its
+        # output replaces it after rendering), which tag stripping would drop
+        # — `## API {{ badge(text="beta") }}` listed as "API" — so the
+        # placeholder is kept for the render pass to fill in
+        # (`Builder#resolve_toc_shortcodes`).
+        private def toc_title(inner_html : String, emoji : Bool) : String
+          html = emoji ? apply_emoji(inner_html) : inner_html
+          return heading_text(html) unless Utils::ByteScan.includes?(html, "<!--HWARO-SHORTCODE-PLACEHOLDER-")
+          placeholders = [] of String
+          masked = html.gsub(InlineMarkdown::SHORTCODE_PLACEHOLDER_RE) do |placeholder|
+            placeholders << placeholder
+            "\0#{placeholders.size - 1}\0"
+          end
+          heading_text(masked).gsub(/\0(\d+)\0/) { placeholders[$1.to_i] }
+        end
+
         # Plain text of a heading's inner HTML (tags stripped). Quote-aware:
         # a `>` inside a quoted attribute value must not end the tag, or the
         # value's tail leaks into the title.
-        private def heading_text(inner_html : String) : String
+        def heading_text(inner_html : String) : String
           String.build(inner_html.bytesize) do |io|
             in_tag = false
             quote = nil.as(Char?)

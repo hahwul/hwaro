@@ -163,6 +163,18 @@ module Hwaro::Core::Build::Phases::Render
     end
   end
 
+  # TOC titles of headings holding a shortcode carry its placeholder (see
+  # `Markdown#toc_title`): fill in the shortcode's output as text, as the
+  # heading shows it.
+  private def resolve_toc_shortcodes(headers : Array(Models::TocHeader), shortcode_results : Hash(String, String)) : Nil
+    headers.each do |header|
+      if Utils::ByteScan.includes?(header.title, "<!--HWARO-SHORTCODE-PLACEHOLDER-")
+        header.title = Processor::Markdown.heading_text(replace_shortcode_placeholders(header.title, shortcode_results))
+      end
+      resolve_toc_shortcodes(header.children, shortcode_results)
+    end
+  end
+
   private def render_page_content(
     page : Models::Page,
     site : Models::Site,
@@ -237,6 +249,7 @@ module Hwaro::Core::Build::Phases::Render
 
       # Replace shortcode placeholders with their rendered HTML content
       html_content = replace_shortcode_placeholders(html_content, shortcode_results)
+      resolve_toc_shortcodes(toc_headers, shortcode_results) unless shortcode_results.empty?
       warn_unpublished_bundle_links(page, html_content)
 
       # Resolve internal @/ links to actual page URLs
