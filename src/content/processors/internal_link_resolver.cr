@@ -386,6 +386,23 @@ module Hwaro
           html
         end
 
+        # Point the same-page `#frag` links of a page summary at the page
+        # itself (`page_url`, site-relative). Listings and other pages print
+        # the summary out of its page, where `[see below](#details)` aimed at
+        # a heading past `<!-- more -->` names nothing. A fragment the summary
+        # carries itself (a footnote ref whose note it includes) keeps its
+        # bytes, and so does `#top`.
+        def anchor_links_to_page(html : String, page_url : String) : String
+          return html if page_url.empty? || !Utils::ByteScan.includes?(html, "#")
+          ids : Set(String)? = nil
+          rewrite_link_attrs(html) do |srcset, value|
+            next if srcset || value.size < 2 || !value.starts_with?('#')
+            found = ids ||= anchor_ids(html)
+            next if anchor_exists?(value[1..], found)
+            "#{HTML.escape(page_url)}#{value}"
+          end
+        end
+
         # Rewrites every href/src/srcset value in the opening tags of `html`
         # (any case; double-, single- or unquoted, the quote kept). The block
         # gets `(srcset?, value)` and returns the new value; nil or `value`
