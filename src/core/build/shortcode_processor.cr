@@ -501,10 +501,6 @@ module Hwaro
           end
         end
 
-        # An HTML comment, shortest match (`-` runs taken one at a time so the
-        # first `-->` ends it).
-        HTML_COMMENT_RE = /<!--(?:[^-]++|-(?!->))*+-->/
-
         # HTML comments are opaque too, so a commented-out call stays literal
         # (as a commented-out wikilink does). Expanding one put the
         # placeholder comment, and its `-->`, inside the author's comment and
@@ -514,12 +510,29 @@ module Hwaro
         # Same token and restore points as `mask_raw_blocks`. A comment
         # holding a literal placeholder is left for `process_block_shortcodes`
         # to drop.
+        #
+        # A comment runs from `<!--` to the first `-->` after it. Scanned by
+        # hand, and stopped at the first opener with no closer (no later one
+        # has a closer either): a regex retried from every unclosed `<!--`
+        # and scanned to the end of the page each time.
         private def mask_html_comments(content : String, spans : Array(String)) : String
-          return content unless content.includes?("<!--")
-          content.gsub(HTML_COMMENT_RE) do |comment|
-            next comment if comment.includes?(SHORTCODE_PLACEHOLDER_PREFIX)
-            spans << unmask_inline_code(comment, spans)
-            "\x00HWARO-INLINE-CODE-#{spans.size - 1}\x00"
+          return content unless start = content.byte_index("<!--")
+          last = 0
+          String.build(content.bytesize) do |io|
+            while start && (stop = content.byte_index("-->", start + 4))
+              stop += 3
+              comment = content.byte_slice(start, stop - start)
+              io.write(content.to_slice[last, start - last])
+              if comment.includes?(SHORTCODE_PLACEHOLDER_PREFIX)
+                io << comment
+              else
+                spans << unmask_inline_code(comment, spans)
+                io << "\x00HWARO-INLINE-CODE-" << spans.size - 1 << "\x00"
+              end
+              last = stop
+              start = content.byte_index("<!--", stop)
+            end
+            io.write(content.to_slice[last, content.bytesize - last])
           end
         end
 

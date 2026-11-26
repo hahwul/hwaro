@@ -84,6 +84,17 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
       result = builder.test_sc_process(%(<!-- <!--HWARO-SHORTCODE-PLACEHOLDER-0--> -->\n{{ badge(text="x") }}\n), templates)
       result.should_not contain("<!--HWARO-SHORTCODE-PLACEHOLDER-0--> -->")
     end
+
+    it "stays linear in unclosed comment openers" do
+      # Every `<!--` with no `-->` after it rescanned to the end of the page.
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/badge" => %(<b>{{ text }}</b>)}
+      tail = "<!-- a\n" * 160_000
+      t = Time.instant
+      result = builder.test_sc_process(%(<!-- c --> {{ badge(text="x") }}\n) + tail, templates)
+      (Time.instant - t).should be < 5.seconds # quadratic took 40s+
+      result.should eq(%(<!-- c --> <b>x</b>\n) + tail)
+    end
   end
 
   describe "footnote bodies" do
