@@ -150,8 +150,8 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 | 필터 | 설명 | 예시 |
 |--------|-------------|---------|
 | default | 정의되지 않았거나 none이거나 빈 값일 때의 폴백 값([기본값](#기본값) 참고) | {{ value \| default(value="N/A") }} |
-| jsonify | JSON 인코딩 | {{ data \| jsonify }} |
-| tojson | JSON 인코딩. `indent`를 주면 그만큼의 공백(0–16)으로 들여쓰기 | {{ data \| tojson(indent=2) }} |
+| jsonify | JSON 인코딩(`nan`·`inf` 숫자는 `null`이 됩니다) | {{ data \| jsonify }} |
+| tojson | JSON 인코딩(`nan`·`inf` 숫자는 `null`이 됩니다). `indent`를 주면 그만큼의 공백(0–16)으로 들여쓰기 | {{ data \| tojson(indent=2) }} |
 | date | 날짜 포맷(기본 포맷 `%Y-%m-%d`). `locale`을 주면 월·요일 이름을 번역([날짜 포맷](#날짜-포맷) 참고) | {{ page.date \| date(format="%B %-d", locale="ko") }} |
 
 ## 예시
