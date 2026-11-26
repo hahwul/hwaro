@@ -28,6 +28,20 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       end
     end
 
+    it "renders the footnotes of a page that ends inside an unclosed <pre> or <script>" do
+      # A raw <pre>/<script>/<style>/<textarea> block also runs to the end of
+      # the page, so the footnotes section was emitted inside it (as <pre>
+      # text, or as script source), and safe mode omitted it with the block.
+      config = Hwaro::Models::MarkdownConfig.new
+      html, _ = Hwaro::Processor::Markdown.render("Text[^1]\n\n[^1]: the note\n\n<pre>\ncode\n", markdown_config: config)
+      html.should contain(%(<pre>\ncode\n</pre><section class="footnotes">))
+      html, _ = Hwaro::Processor::Markdown.render("Text[^1]\n\n[^1]: the note\n\n<SCRIPT>\nlet a = 1", markdown_config: config)
+      html.should contain(%(<SCRIPT>\nlet a = 1\n</script><section class="footnotes">))
+      config.safe = true
+      html, _ = Hwaro::Processor::Markdown.render("Text[^1]\n\n[^1]: the note\n\n<pre>\ncode\n", safe: true, markdown_config: config)
+      html.should contain(%(<li id="fn-1">\n<p>the note))
+    end
+
     it "keeps the footnotes in safe mode when the page ends with raw HTML and no newline" do
       # The marker block joined the raw HTML block on the last line, which
       # safe mode omits whole, so the section silently disappeared.

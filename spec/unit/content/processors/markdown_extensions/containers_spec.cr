@@ -72,6 +72,11 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       html.should end_with("<pre><code>code\n</code></pre>\n</div>\n</li>\n</ul>\n<p>after</p>\n")
     end
 
+    it "auto-closes a container outside a <pre> block the page left open" do
+      html, _ = Hwaro::Processor::Markdown.render(":::note\n<pre>\ncode\n", markdown_config: containers_config)
+      html.should end_with("<pre>\ncode\n</pre>\n</div>\n")
+    end
+
     it "auto-closes a container in safe mode when the page ends with raw HTML and no newline" do
       # The `</div>` joined the raw HTML block on the last line, which safe
       # mode omits whole.

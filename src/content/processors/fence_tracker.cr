@@ -75,7 +75,7 @@ module Hwaro
         # line end — `<style-guide>` or `<pre-view>` is an ordinary element —
         # and the block ends at the first line containing ANY of the closing
         # tags, whichever element opened it.
-        RAW_HTML_CODE_OPEN_RE  = /\A {0,3}<(?:pre|script|style|textarea)(?:[\s>]|\z)/i
+        RAW_HTML_CODE_OPEN_RE  = /\A {0,3}<(pre|script|style|textarea)(?:[\s>]|\z)/i
         RAW_HTML_CODE_CLOSE_RE = /<\/(?:pre|script|style|textarea)\s*>/i
 
         # Starts of CommonMark HTML blocks that run to a blank line (Markd's
@@ -115,6 +115,9 @@ module Hwaro
         @fence_base = 0
         @in_raw_html_code = false
         @raw_html_code_bq_depth = 0
+        # The open raw-HTML code block's tag (`pre`, `script`…), when it
+        # opened at the top level, outside any blockquote or list item.
+        @raw_html_code_top_tag : String? = nil
         @in_indented_code = false
         @indented_code_column = 4
         @indented_code_bq_depth = 0
@@ -284,9 +287,13 @@ module Hwaro
               end
             end
 
-            if content.includes?('<') && RAW_HTML_CODE_OPEN_RE.matches?(content)
+            if content.includes?('<') && (raw = RAW_HTML_CODE_OPEN_RE.match(content))
               @in_raw_html_code = !RAW_HTML_CODE_CLOSE_RE.matches?(content)
               @raw_html_code_bq_depth = depth
+              # The opener sits at column 0-3, so it is in a list item only
+              # if one has its content there; a line opening an HTML block
+              # is never a lazy continuation, so an item further right ends.
+              @raw_html_code_top_tag = (raw[1].downcase if depth.zero? && list_item_at(0, content.size - content.lstrip.size).nil?)
               @prev_blank = false
               return true
             end
@@ -387,14 +394,21 @@ module Hwaro
         # The line that closes a block still open after the last line fed,
         # so markup a pass appends after it (a container's `</div>`, the
         # footnote block) does not land inside it; nil when none is open.
-        # CommonMark runs an unclosed fence to the end of the document. A
-        # fence in a list item is closed at the item's content column, so
-        # markup emitted there is still in the item. One inside a blockquote
-        # needs no closer: the appended marker-less line ends the quote and
-        # the fence with it.
+        # CommonMark runs an unclosed fence, and a `<pre>`/`<script>`/
+        # `<style>`/`<textarea>` block, to the end of the document. A fence
+        # in a list item is closed at the item's content column, so markup
+        # emitted there is still in the item. One inside a blockquote needs
+        # no closer: the appended marker-less line ends the quote and the
+        # fence with it. Only a raw-HTML block opened at the top level gets
+        # its end tag: the tracker does not follow one in a list item to
+        # the item's end.
         def open_block_closer : String?
-          return unless @in_fence && @fence_bq_depth.zero?
-          " " * @fence_base + @fence_char.to_s * @fence_len
+          if @in_fence
+            return unless @fence_bq_depth.zero?
+            " " * @fence_base + @fence_char.to_s * @fence_len
+          elsif @in_raw_html_code && (tag = @raw_html_code_top_tag)
+            "</#{tag}>"
+          end
         end
 
         # Whether the list item with this serial (`line_container_item`) is
