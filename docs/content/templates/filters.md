@@ -95,6 +95,8 @@ same text renders in page bodies. The rest of the extension pipeline
 | sort_by | Sort objects by field | {{ posts \| sort_by(attribute="date", reverse=true) }} |
 | group_by | Group objects by field | {{ posts \| group_by(attribute="section") }} |
 
+`where`, `sort_by` and `group_by` read `attribute=` as a field name or, when no field has that exact name, a dotted path such as `"extra.weight"` (`{{ posts | sort_by(attribute="extra.weight") }}`).
+
 `min` and `max` work as in Jinja2: they compare like `sort` (strings case-insensitively unless `case_sensitive=true`), `attribute=` takes a dotted path such as `"extra.weight"` and the whole item is returned, the first one wins a tie, a mapping compares its keys, and an empty list gives an undefined value. An undefined `attribute=` is ignored, as with `sort`. A string compared with a number compares as text, which is not a consistent order for a whole list (`10 < "1a" < 2 < 10`), so a list mixing numbers and strings has no reliable `sort`, `min` or `max`: convert the items to one type first.
 
 ## Collection Filters
