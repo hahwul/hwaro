@@ -51,3 +51,14 @@ describe "Crinja number tests" do
     expect_raises(Crinja::RuntimeError, /Division by 0/) { render_test("{{ 1 is divisibleby(0) }}") }
   end
 end
+
+describe "Crinja lower / upper tests" do
+  # Every character had to be a letter of that case, so a space made
+  # "hello world" not lower, and "" was both.
+  it "reads only the cased characters, as Python's islower/isupper" do
+    render_test("{{ 'hello world' is lower }}|{{ 'a-b 1' is lower }}|{{ 'ß straße' is lower }}|{{ 'Hello' is lower }}|{{ '' is lower }}|{{ '12' is lower }}")
+      .should eq("true|true|true|false|false|false")
+    render_test("{{ 'HELLO WORLD!' is upper }}|{{ 'A1' is upper }}|{{ 'HeLLO' is upper }}|{{ '' is upper }}|{{ 'ǅ' is upper }}|{{ 'ǅ' is lower }}")
+      .should eq("true|true|false|false|false|false")
+  end
+end

@@ -71,3 +71,25 @@ Crinja.test(:odd) { Crinja::Test.__modulo(Crinja::Test.__number(target), 2_i64) 
 Crinja.test({num: Crinja::UNDEFINED}, :divisibleby) do
   Crinja::Test.__modulo(Crinja::Test.__number(target), Crinja::Test.__number(arguments["num"])) == 0
 end
+
+# `lower` / `upper` are Python's `str.islower()` / `str.isupper()`: at least
+# one cased character, and none of the other case. Upstream required EVERY
+# character to be a lowercase (uppercase) letter, so a space, digit or
+# punctuation mark made `"hello world" is lower` false, and the empty
+# string was both lower and upper.
+module Crinja::Test
+  def self.__cased?(text : String, upper : Bool) : Bool
+    cased = false
+    text.each_char do |char|
+      if upper ? char.uppercase? : char.lowercase?
+        cased = true
+      elsif char.titlecase? || (upper ? char.lowercase? : char.uppercase?)
+        return false
+      end
+    end
+    cased
+  end
+end
+
+Crinja.test(:lower) { Crinja::Test.__cased?(target.to_s, upper: false) }
+Crinja.test(:upper) { Crinja::Test.__cased?(target.to_s, upper: true) }
