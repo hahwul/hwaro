@@ -294,6 +294,17 @@ describe "Crinja autoescape" do
       on(%({{ "http://example.com/" | urlize }})).should contain(%(<a href="http://example.com/"))
     end
 
+    # Jinja2 3.1's output: the trailing `.`/`,`/`)`/`&gt;` was linked too
+    # (`href="https://example.com."`), and a `www.` href was relative.
+    it "urlize leaves trailing punctuation out of the link and gives www. a scheme" do
+      a = ->(url : String, text : String) { %(<a href="#{url}" rel="noopener">#{text}</a>) }
+      on(%({{ "Visit https://example.com. Or https://x.com/, too" | urlize }})).should eq("Visit #{a.call("https://example.com", "https://example.com")}. Or #{a.call("https://x.com/", "https://x.com/")}, too")
+      on(%({{ "(see https://x.com/a) and https://w.org/Foo_(bar)." | urlize }})).should eq("(see #{a.call("https://x.com/a", "https://x.com/a")}) and #{a.call("https://w.org/Foo_(bar)", "https://w.org/Foo_(bar)")}.")
+      on(%({{ "<https://x.com/> http://x.com/..." | urlize }})).should eq("&lt;#{a.call("https://x.com/", "https://x.com/")}&gt; #{a.call("http://x.com/", "http://x.com/")}...")
+      on(%({{ "go to www.example.com/a." | urlize }})).should eq("go to #{a.call("https://www.example.com/a", "www.example.com/a")}.")
+      off(%({{ "Visit https://example.com." | urlize }})).should eq("Visit #{a.call("https://example.com", "https://example.com")}.")
+    end
+
     # Each line lost its terminator: "one\ntwo" printed "onetwo".
     it "urlize keeps the text's line breaks (both modes)" do
       link = %(<a href="http://x.com/" rel="noopener">http://x.com/</a>)

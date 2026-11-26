@@ -64,7 +64,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 | `e` / `escape` | 텍스트를 이스케이프하고, 안전 값은 그대로 돌려줍니다. 단, hwaro가 렌더링한 HTML(`content`, `page.summary` 등)은 1.0 이전처럼 이스케이프합니다. 결과는 어느 쪽이든 안전 값이라 두 번 이스케이프되지 않습니다 |
 | `forceescape`, `xml_escape` | 안전 값이어도 이스케이프하며, 결과는 안전 값입니다 |
 | `safe` | 값을 안전 값(그대로 출력)으로 표시합니다 |
-| `markdownify`, `tojson`, `jsonify`, `urlize`, `xmlattr` | 안전한 HTML(또는 스크립트에 넣어도 되는 JSON)을 돌려줍니다. `urlize`는 링크로 바꾸는 텍스트를 이스케이프하고 `www.`와 `scheme://` 형태의 URL을 링크로 만듭니다. 안전하지 않은 스킴 `javascript:`, `vbscript:`, `file:`, `data:`만 일반 텍스트로 남습니다(그래서 `ftp://example.com/a`는 링크가 됩니다). 자동 이스케이프에서 `xmlattr`는 공백·`/`·`>`·`=`가 든 속성 이름을 거부합니다 |
+| `markdownify`, `tojson`, `jsonify`, `urlize`, `xmlattr` | 안전한 HTML(또는 스크립트에 넣어도 되는 JSON)을 돌려줍니다. `urlize`는 링크로 바꾸는 텍스트를 이스케이프하고 `www.`와 `scheme://` 형태의 URL을 링크로 만듭니다. 안전하지 않은 스킴 `javascript:`, `vbscript:`, `file:`, `data:`만 일반 텍스트로 남습니다(그래서 `ftp://example.com/a`는 링크가 됩니다). URL 끝에 붙은 `.`, `,`, `)`는 링크에 넣지 않으며(URL 안의 `(`를 닫는 `)`는 넣습니다), `www.` URL은 `https://www.…`로 연결됩니다. 자동 이스케이프에서 `xmlattr`는 공백·`/`·`>`·`=`가 든 속성 이름을 거부합니다 |
 | `upper`, `lower`, `capitalize`, `center`, `indent`, `trim`, `truncate`, `truncate_words`, `replace`, `regex_replace`, `format`, `string`, `default` | 안전 값을 넣으면 결과도 안전 값이고, 필터가 덧붙이는 텍스트(`truncate`의 `end`, `replace`의 새 텍스트, `format`의 인자)는 이스케이프됩니다. 일반 텍스트를 넣으면 결과도 일반 텍스트입니다 |
 | `join` | 안전 값이 아닌 항목과 구분자를 이스케이프하며, 결과는 안전 값입니다 |
 | `strip_html`, `striptags` | 엔티티를 디코딩한 일반 텍스트를 돌려주므로 출력할 때 정확히 한 번 이스케이프됩니다 |

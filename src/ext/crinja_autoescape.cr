@@ -477,7 +477,16 @@ end
 # The text is linked whole: the vendored body went line by line through
 # `each_line`, which drops each line's terminator, so `"one\ntwo" | urlize`
 # printed `onetwo` (a URL never spans whitespace, so lines need no split).
+#
+# As in Jinja2, punctuation that ends a URL's run of text is the sentence's,
+# not the URL's: trailing `.`, `,`, `)` and `>` (`&gt;` once escaped) stay
+# outside the link, except a `)` (or `&gt;`) that closes a `(` (`&lt;`) in
+# the URL. `Visit https://example.com.` linked `https://example.com.` and
+# `(see https://x.com/a)` linked `https://x.com/a)`. A `www.` URL links to
+# `https://www.…`; its bare href was relative and opened a page of this site.
 module Crinja::Util
+  URLIZE_PAIRS = { {"(", ")"}, {"&lt;", "&gt;"} }
+
   def self.urlize(text, trim_url_limit, rel, target)
     rel_attr = ""
     rel_attr = %( rel="%s") % HTML.escape(rel.join(' ')) unless rel.empty?
@@ -488,15 +497,47 @@ module Crinja::Util
     SafeString.build do |io|
       io << text.gsub(AUTO_LINK_RE) do
         all = $~
-        url = all[0]
-        next url unless Hwaro::Content::Processors::InlineMarkdown.safe_url?(url)
+        url, tail = urlize_split_tail(all[0])
+        next all[0] unless AUTO_LINK_RE.match(url).try(&.[0]) == url
+        next all[0] unless Hwaro::Content::Processors::InlineMarkdown.safe_url?(url)
+        href = url.starts_with?("www.") ? "https://#{url}" : url
         display = url
         unless trim_url_limit.nil? || display.size < trim_url_limit
           display = display[0..(trim_url_limit - 3)] + "..."
         end
-        %(<a href="#{url}"#{rel_attr}#{target_attr}>#{display}</a>)
+        %(<a href="#{href}"#{rel_attr}#{target_attr}>#{display}</a>#{tail})
       end
     end
+  end
+
+  # `url` split into the link and the trailing punctuation after it.
+  # A backward byte scan (the marks are ASCII): an end-anchored regex retried
+  # from every position of a long punctuation run.
+  def self.urlize_split_tail(url : String) : {String, String}
+    stop = url.bytesize
+    loop do
+      if stop > 0 && url.byte_at(stop - 1).unsafe_chr.in?(')', '.', ',', '>')
+        stop -= 1
+      elsif stop >= 4 && url.byte_slice(stop - 4, 4) == "&gt;"
+        stop -= 4
+      else
+        break
+      end
+    end
+    return {url, ""} if stop == url.bytesize
+    tail = url.byte_slice(stop)
+    url = url.byte_slice(0, stop)
+    URLIZE_PAIRS.each do |open, close|
+      opens = url.scan(open).size
+      next if opens <= url.scan(close).size
+      opens.times do
+        break unless index = tail.index(close)
+        cut = index + close.size
+        url += tail[0, cut]
+        tail = tail[cut..]
+      end
+    end
+    {url, tail}
   end
 end
 
