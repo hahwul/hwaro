@@ -384,10 +384,14 @@ module Hwaro
         return if files.empty?
 
         menus = MenuScope.new(config)
+        # Both sets, as the build's parse passes them: the declared keys
+        # silence the typo hint, the taxonomy names decide which lists'
+        # non-string members are reported as dropped terms.
         declared = config.try { |c| Content::FrontMatterSchema.declared_keys(c) }
+        taxonomy_names = config.try { |c| Content::FrontMatterSchema.taxonomy_names(c).to_set }
 
         per_file = Hwaro::Core::Build::ParallelHelper.map(files) do |path|
-          scan_content_file_for_frontmatter(path, menus, templates, declared)
+          scan_content_file_for_frontmatter(path, menus, templates, declared, taxonomy_names)
         end
         per_file.each { |arr| arr.each { |i| issues << i } }
       end
@@ -639,7 +643,7 @@ module Hwaro
       # Pure function: read + parse one markdown file, return any issue
       # produced as a small array. Fiber-safe because it touches no
       # shared state (`menus` and `templates` are read-only).
-      private def scan_content_file_for_frontmatter(path : String, menus : MenuScope, templates : Set(String)?, declared : Set(String)?) : Array(Issue)
+      private def scan_content_file_for_frontmatter(path : String, menus : MenuScope, templates : Set(String)?, declared : Set(String)?, taxonomy_names : Set(String)?) : Array(Issue)
         raw = begin
           File.read(path)
         rescue ex : IO::Error | File::Error
@@ -648,7 +652,7 @@ module Hwaro
         end
 
         data = begin
-          Processor::Markdown.parse(raw, path, declared)
+          Processor::Markdown.parse(raw, path, declared, taxonomy_names)
         rescue ex : Hwaro::HwaroError
           first_line = (ex.message || "Invalid front matter").lines.first?.to_s.strip
           return [Issue.new(id: "content-frontmatter-invalid", level: :error, category: "content", file: path,

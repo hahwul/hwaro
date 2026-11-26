@@ -931,15 +931,22 @@ module Hwaro
       end
 
       private def build_json_front_matter(title : String, date : String, is_draft : Bool, tags : Array(String), extra : Array({String, String, Bool})) : String
+        # Newlines fold to spaces, as `escape_string` folds them for TOML and
+        # YAML: the same `hwaro new --title` must not give a JSON page a
+        # different title than a TOML or YAML one.
         fields = {} of String => JSON::Any
-        fields["title"] = JSON::Any.new(title)
-        fields["date"] = JSON::Any.new(date)
-        extra.each { |(f, v, literal)| fields[f] = literal ? JSON.parse(v) : JSON::Any.new(v) }
+        fields["title"] = JSON::Any.new(single_line(title))
+        fields["date"] = JSON::Any.new(single_line(date))
+        extra.each { |(f, v, literal)| fields[f] = literal ? JSON.parse(v) : JSON::Any.new(single_line(v)) }
         fields["draft"] = JSON::Any.new(true) if is_draft
         unless tags.empty?
-          fields["tags"] = JSON::Any.new(tags.map { |t| JSON::Any.new(t) })
+          fields["tags"] = JSON::Any.new(tags.map { |t| JSON::Any.new(single_line(t)) })
         end
         "#{JSON::Any.new(fields).to_pretty_json}\n\n"
+      end
+
+      private def single_line(value : String) : String
+        value.gsub("\n", " ")
       end
 
       private def escape_string(value : String) : String
@@ -948,7 +955,7 @@ module Hwaro
         # trailing `\"` escapes the closing quote).
         # Control characters (a pasted `\r`, ESC, DEL) are escaped too: a raw
         # one makes the quoted scalar invalid TOML/YAML for every other reader.
-        Utils::FrontmatterWriter.escape_toml_string(value.gsub("\n", " "))
+        Utils::FrontmatterWriter.escape_toml_string(single_line(value))
       end
     end
   end

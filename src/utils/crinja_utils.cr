@@ -9,6 +9,7 @@ require "yaml"
 require "json"
 require "toml"
 require "crinja"
+require "./frontmatter_writer"
 
 module Hwaro
   module Utils
@@ -114,7 +115,12 @@ module Hwaro
         elsif h = value.as_h?
           converted = {} of String => Crinja::Value
           h.each do |k, v|
-            converted[k.to_s] = from_yaml(v, depth + 1)
+            # `key_string`, not `to_s`: an unquoted `2024-01-15:` key is a
+            # timestamp to the YAML reader, and its `to_s` named the entry
+            # "2024-01-15 00:00:00 +09:00" — a different key in every
+            # machine zone, and never the "2024-01-15" the same data in TOML
+            # or JSON is keyed by.
+            converted[FrontmatterWriter.key_string(k)] = from_yaml(v, depth + 1)
           end
           Crinja::Value.new(converted)
         elsif s = value.as_s?

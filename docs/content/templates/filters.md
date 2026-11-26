@@ -152,8 +152,8 @@ Both sides are normalized to one trailing slash before comparing, so `/posts` an
 | Filter | Description | Example |
 |--------|-------------|---------|
 | default | Fallback for an undefined, none, or empty value (see [Default Values](#default-values)) | {{ value \| default(value="N/A") }} |
-| jsonify | JSON encode | {{ data \| jsonify }} |
-| tojson | JSON encode; `indent` pretty-prints with that many spaces (0–16) | {{ data \| tojson(indent=2) }} |
+| jsonify | JSON encode (a `nan` or `inf` number becomes `null`) | {{ data \| jsonify }} |
+| tojson | JSON encode (a `nan` or `inf` number becomes `null`); `indent` pretty-prints with that many spaces (0–16) | {{ data \| tojson(indent=2) }} |
 | date | Format date (default format `%Y-%m-%d`); `locale` translates month and weekday names (see [Date Formatting](#date-formatting)) | {{ page.date \| date(format="%B %-d", locale="ko") }} |
 
 ## Examples

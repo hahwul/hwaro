@@ -426,7 +426,12 @@ module Hwaro
 
       private def extract_aliases_from_file(path : String, redirects : Array(Tuple(String, String)))
         raw_content = File.read(path)
-        data = Processor::Markdown.parse(raw_content, path)
+        # Same declared keys and taxonomy names as the build's parse, so the
+        # front-matter warnings this re-parse prints are the build's own (a
+        # `[[content.schema]]` field is not a typo of a known key).
+        data = Processor::Markdown.parse(raw_content, path,
+          Content::FrontMatterSchema.declared_keys(@config),
+          Content::FrontMatterSchema.taxonomy_names(@config).to_set)
         # Mirror the build's publish filter: drafts, headless pages, and
         # outside-window (future/expired) content write no output and must
         # not fail platform generation over a date-token permalink they

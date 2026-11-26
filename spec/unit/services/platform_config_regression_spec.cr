@@ -204,4 +204,20 @@ describe "PlatformConfig alias publish state" do
       end
     end
   end
+
+  # The alias scan re-parses every page; with the config's declared keys,
+  # as the build passes them, a `[[content.schema]]` field is no typo.
+  it "warns about front matter the way the build does" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        FileUtils.mkdir_p("content/posts")
+        File.write("content/posts/p.md", "+++\ntitle = \"P\"\nauthor = \"me\"\naliases = [\"/old/\"]\n+++\nBody\n")
+        config = load_config("[[content.schema]]\nsections = [\"**\"]\n[content.schema.fields.author]\ntype = \"string\"\n")
+        result = ""
+        log = with_captured_log { result = Hwaro::Services::PlatformConfig.new(config).generate("netlify") }
+        result.should contain("from = \"/old/\"")
+        log.should_not contain("'author'")
+      end
+    end
+  end
 end

@@ -103,8 +103,13 @@ class TOML::Lexer
     month = consume_datetime_component 2, "expected month digit"
     raise "expected '-'" unless next_char == '-'
     day = consume_datetime_component 2, "expected day digit"
+    # `t` / `z` are as valid as `T` / `Z` (TOML's ABNF: `time-delim = "T" /
+    # %x20 ; T, t, or space`, and ABNF literals are case-insensitive).
+    # Upstream only knew the uppercase forms, so `date = 2024-03-05t10:20:30z`
+    # was a build-aborting syntax error — while the same value as a YAML
+    # timestamp or a quoted/JSON date string parsed fine.
     case next_char
-    when 'T'
+    when 'T', 't'
     when ' '
       t_delimiter_with_space = true
     else
@@ -129,7 +134,7 @@ class TOML::Lexer
 
     negative = false
     case current_char
-    when 'Z'
+    when 'Z', 'z'
       next_char
     when '+', '-'
       negative = current_char == '-'
