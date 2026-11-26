@@ -455,3 +455,15 @@ describe Hwaro::Utils::CrinjaUtils do
     end
   end
 end
+
+# Regression: a YAML data key that the YAML reader types as a timestamp
+# (`2024-01-15:`) was named by `Time#to_s` — "2024-01-15 00:00:00 +09:00",
+# a different key in every machine zone — so `site.data.releases["2024-01-15"]`
+# never matched, while the same data in TOML or JSON was keyed "2024-01-15".
+describe "Hwaro::Utils::CrinjaUtils.from_yaml timestamp keys" do
+  it "keys a date like TOML and JSON do, in any zone" do
+    yaml = YAML.parse("2024-01-15:\n  v: 1\n2024-01-15T10:00:00Z: x\n404: nf\n")
+    toml = Hwaro::Utils::CrinjaUtils.from_toml(TOML.parse(%("2024-01-15" = { v = 1 }\n"2024-01-15T10:00:00Z" = "x"\n"404" = "nf"\n)))
+    Hwaro::Utils::CrinjaUtils.from_yaml(yaml).as_h.keys.map(&.to_s).should eq(toml.as_h.keys.map(&.to_s))
+  end
+end
