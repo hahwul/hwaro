@@ -40,4 +40,19 @@ describe "TOML multi-line string lexing (ext/toml_multiline_string_fix)" do
       TOML.parse(%(a = """\r\nx\r\n"""\r\nb = 1))["b"].as_i.should eq(1)
     end
   end
+
+  # Regression: whitespace between a line-ending backslash and the newline
+  # (trailing spaces an editor does not show) was "unknown escape: \ ".
+  describe "line-ending backslash followed by whitespace" do
+    it "trims the trailing whitespace with the newline" do
+      TOML.parse(%(a = """one \\  \n    two"""))["a"].as_s.should eq("one two")
+      TOML.parse(%(a = """one \\\t\n\n  two"""))["a"].as_s.should eq("one two")
+      TOML.parse(%(a = """one \\ \r\n  two"""\r\nb = 1))["a"].as_s.should eq("one two")
+    end
+
+    it "still rejects a backslash-space that does not end the line" do
+      expect_raises(TOML::ParseException) { TOML.parse(%(a = """one \\ two""")) }
+      expect_raises(TOML::ParseException) { TOML.parse(%(a = """one \\  )) }
+    end
+  end
 end

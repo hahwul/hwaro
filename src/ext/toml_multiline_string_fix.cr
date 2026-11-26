@@ -17,6 +17,10 @@
 # was "unknown escape: \". Both consumers now read `\r\n` as one newline and
 # store it as `\n`, like the LF twin of the file (and Python's tomllib).
 #
+# A line-ending backslash followed by trailing spaces or tabs (`"""a \  ⏎`,
+# invisible in most editors) was "unknown escape: \ " too; TOML trims that
+# whitespace with the newline.
+#
 # Remove when: upstream lexes quote runs and CRLF inside multi-line strings
 # correctly.
 
@@ -72,6 +76,22 @@ class TOML::Lexer
           when '\r'
             raise "unknown escape: \\\r" unless next_char == '\n'
             continuation = true
+          when ' ', '\t'
+            # Whitespace may sit between a line-ending backslash and the
+            # newline ("the last non-whitespace character on a line is an
+            # unescaped \"). `\ ` is no escape, so anything else is an error.
+            while current_char.in?(' ', '\t')
+              next_char
+            end
+            case current_char
+            when '\n'
+              continuation = true
+            when '\r'
+              raise "unknown escape: \\ " unless next_char == '\n'
+              continuation = true
+            else
+              raise "unknown escape: \\ "
+            end
           end
           if continuation
             newline
