@@ -313,6 +313,26 @@ describe "ContentGenerate.authored_twin_exists?" do
   end
 end
 
+describe "ContentGenerate.authored_twin_exists? front-matter warnings" do
+  # The subsection-index probe re-parses `_index.md` before the parse phase
+  # does; it must read it with the config's declared keys, or a
+  # `[[content.schema]]` field drew a typo hint the build never gives.
+  it "does not call a declared schema field a typo" do
+    Dir.mktmpdir do |dir|
+      FileUtils.cd(dir) do
+        FileUtils.mkdir_p("content/products/red")
+        File.write("content/products/red/_index.md", "+++\ntitle = \"Red\"\nauthor = \"me\"\ntitel = \"x\"\n+++\n")
+        config = load_config(%(base_url = "https://e.com"\n[permalinks]\nproducts = "/shop/:slug/"\n[[content.schema]]\nsections = ["zzz"]\n[content.schema.fields.author]\ntype = "string"\n))
+        log = with_captured_log do
+          ContentGenerate.authored_twin_exists?("products/red.md", config: config, page_url: "/shop/red/").should be_false
+        end
+        log.should_not contain("'author'")
+        log.should contain("unknown front-matter key 'titel'")
+      end
+    end
+  end
+end
+
 describe "ContentLister with generated entries" do
   it "applies a section's cascade draft to generated rows (publish-state parity)" do
     Dir.mktmpdir do |dir|

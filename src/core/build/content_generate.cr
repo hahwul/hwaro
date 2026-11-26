@@ -469,7 +469,14 @@ module Hwaro
         # A subsection index's URL, front matter `slug`/`path` included
         # (`path = "shop/red"` moves it onto the generated page's URL).
         private def section_url(path : String, file : String, config : Models::Config) : String
-          data = Processor::Markdown.parse(File.read(file), file)
+          # The config's declared keys and taxonomy names, as the parse phase
+          # passes them: this re-parse runs first, and without them a
+          # `[[content.schema]]` field drew a false typo hint and a taxonomy's
+          # non-string term went unreported here while the parse phase said
+          # the opposite.
+          data = Processor::Markdown.parse(File.read(file), file,
+            Content::FrontMatterSchema.declared_keys(config),
+            Content::FrontMatterSchema.taxonomy_names(config).to_set)
           url_for(path, config, data[:title], data[:date], data[:slug], data[:custom_path])
         rescue File::Error | IO::Error | Hwaro::HwaroError
           # Unreadable or malformed: the parse phase reports it.
