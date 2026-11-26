@@ -190,6 +190,33 @@ Crinja.filter({case_sensitive: false, attribute: nil}, :max) do
   Crinja::Filter.__extreme(target, arguments, 1)
 end
 
+# `filesizeformat` as Jinja2 writes it: `1 Byte` (not `1 Bytes`), and the
+# exa-, zetta- and yotta- units. Upstream's table stopped at peta-, so a size
+# of a thousand petabytes or more (`1000000000000000000 | filesizeformat`)
+# fell off the end and printed `none`.
+module Crinja::Filter
+  FILESIZE_PREFIXES        = {"kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"}
+  FILESIZE_BINARY_PREFIXES = {"KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"}
+
+  def self.__filesizeformat(bytes : Float64, binary : Bool) : String
+    base = binary ? 1024.0 : 1000.0
+    return "1 Byte" if bytes == 1
+    # Python's int(): truncated, and no sign on zero (`-0.5` is `0 Bytes`).
+    return "#{sprintf("%.0f", bytes.trunc.abs < 1 ? 0.0 : bytes.trunc)} Bytes" if bytes < base
+    prefixes = binary ? FILESIZE_BINARY_PREFIXES : FILESIZE_PREFIXES
+    unit = base
+    prefixes.each do |prefix|
+      unit *= base
+      return "#{sprintf("%.1f", base * bytes / unit)} #{prefix}" if bytes < unit
+    end
+    "#{sprintf("%.1f", base * bytes / unit)} #{prefixes.last}"
+  end
+end
+
+Crinja.filter({binary: false}, :filesizeformat) do
+  Crinja::Filter.__filesizeformat(target.to_f.to_f64, arguments["binary"].truthy?)
+end
+
 # `groupby` gives Jinja2's groups: a list of (grouper, list) pairs whose
 # `grouper` and `list` attributes name the two halves. Upstream returned a
 # mapping, so the documented Jinja2 loop `{% for group in posts |

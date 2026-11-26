@@ -151,6 +151,18 @@ describe "Crinja built-in filter fixes" do
     end
   end
 
+  # `1 Bytes`, and anything from a thousand petabytes up printed `none`.
+  describe "filesizeformat" do
+    it "writes one byte in the singular and sizes past a petabyte" do
+      render_filter("{{ 1 | filesizeformat }}|{{ 0 | filesizeformat }}|{{ -0.5 | filesizeformat }}|{{ 999 | filesizeformat }}|{{ 1000 | filesizeformat(true) }}")
+        .should eq("1 Byte|0 Bytes|0 Bytes|999 Bytes|1000 Bytes")
+      render_filter("{{ 1000000000000000000 | filesizeformat }}|{{ 2000000000000000000 | filesizeformat(true) }}|{{ (1000000000000000000.0 * 1000) | filesizeformat }}")
+        .should eq("1.0 EB|1.7 EiB|1.0 ZB")
+      render_filter("{{ 1500 | filesizeformat }}|{{ 1500 | filesizeformat(true) }}|{{ '1024' | filesizeformat }}")
+        .should eq("1.5 kB|1.5 KiB|1.0 kB")
+    end
+  end
+
   # A mapping came back, so `group.grouper` (the Jinja2 idiom) failed with
   # "group.grouper is undefined" and `[0]` was empty.
   describe "groupby" do
