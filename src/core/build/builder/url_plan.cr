@@ -157,7 +157,7 @@ module Hwaro
         # `rss.xml` are themselves. The characters of a file name that a URL
         # cannot hold raw are escaped as `Page#url=` escapes them.
         private def output_file_url(file : String) : String
-          url = "/#{file.gsub('\\', '/').gsub('%', "%25").gsub(Models::Page::URL_DELIMITER_ESCAPES)}"
+          url = "/#{Models::Page.escape_url_chars(file.gsub('\\', '/').gsub('%', "%25"))}"
           url.ends_with?("/index.html") ? url.rchop("index.html") : url
         end
       end

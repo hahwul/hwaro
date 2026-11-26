@@ -359,6 +359,17 @@ describe Hwaro::Models::Page do
       page.url.should eq("/posts/tab%09x/a%0Ab%0Dc/")
     end
 
+    # The XML escaper drops C0 bytes, so `c\x01x.md`'s sitemap `<loc>` named
+    # `/posts/cx/`; a raw DEL is no URI character either.
+    it "percent-encodes every other C0 control and DEL" do
+      page = Hwaro::Models::Page.new("posts/a.md")
+      page.url = "/posts/c\u0001x/d\u007Fy/e\u001Fz/f\u0085g/"
+      page.url.should eq("/posts/c%01x/d%7Fy/e%1Fz/f\u0085g/")
+      Hwaro::Utils::PathUtils.split_safe_segments(page.url.lchop("/"))[0].should eq(["posts", "c\u0001x", "d\u007Fy", "e\u001Fz", "f\u0085g"])
+      page.url = page.url
+      page.url.should eq("/posts/c%01x/d%7Fy/e%1Fz/f\u0085g/")
+    end
+
     # `%de` decodes to a lone 0xDE byte, which the output path scrubbed to
     # U+FFFD: the page was written where its URL could never reach.
     it "escapes a % whose run does not decode to UTF-8" do
