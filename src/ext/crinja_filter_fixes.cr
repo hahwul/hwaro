@@ -190,6 +190,34 @@ Crinja.filter({case_sensitive: false, attribute: nil}, :max) do
   Crinja::Filter.__extreme(target, arguments, 1)
 end
 
+# `groupby` gives Jinja2's groups: a list of (grouper, list) pairs whose
+# `grouper` and `list` attributes name the two halves. Upstream returned a
+# mapping, so the documented Jinja2 loop `{% for group in posts |
+# groupby("year") %}{{ group.grouper }}` failed the build ("group.grouper is
+# undefined") and `(posts | groupby("year"))[0]` was empty. Groups keep the
+# order their first item appears in (hwaro's, not sorted as in Jinja2: a
+# sort would fail on a field some items lack), and `for key, items in …`
+# unpacks a group as before.
+class Crinja::GroupTuple < Crinja::Tuple
+  def crinja_attribute(attr : Crinja::Value) : Crinja::Value
+    case attr.to_s
+    when "grouper" then self[0]
+    when "list"    then self[1]
+    else                Crinja::Value.new(Crinja::Undefined.new(attr.to_s))
+    end
+  end
+end
+
+Crinja.filter({attribute: Crinja::UNDEFINED}, :groupby) do
+  attribute = arguments["attribute"]
+  groups = Crinja::Dictionary.new
+  target.each do |item|
+    key = Crinja::Value.new(Crinja::Resolver.resolve_dig(attribute, item))
+    (groups[key] ||= Crinja::Value.new([] of Crinja::Value)).as_a << item
+  end
+  groups.map { |key, list| Crinja::Value.new(Crinja::GroupTuple.new([key, list] of Crinja::Value)) }
+end
+
 # `pprint` prints the whole value. Upstream never flushed its PrettyPrint,
 # which holds back everything after the first group break, so
 # `{{ {"k": "v", "n": 2} | pprint }}` printed `{"k" =>`; and an undefined

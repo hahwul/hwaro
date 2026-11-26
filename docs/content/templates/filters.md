@@ -9,7 +9,7 @@ Filters transform values in templates. Apply with the pipe `|` operator.
 
 Hwaro ships its own filters on top of the standard Crinja (Jinja2) built-ins (`upper`, `lower`, `join`, `map`, `select`, `batch`, and friends), so both kinds work anywhere below.
 
-Besides the built-ins in the tables below, these Jinja2 filters are available: `abs`, `attr`, `batch`, `center`, `dictsort`, `escape` (`e`), `filesizeformat`, `float`, `format`, `groupby`, `indent`, `int`, `list`, `map`, `random`, `reject`, `rejectattr`, `round`, `select`, `selectattr`, `slice`, `string`, `striptags`, `sum`, `title`, `truncate`, `urlencode`, `urlize`, `wordcount`, `wordwrap` and `xmlattr`.
+Besides the built-ins in the tables below, these Jinja2 filters are available: `abs`, `attr`, `batch`, `center`, `dictsort`, `escape` (`e`), `filesizeformat`, `float`, `format`, `groupby`, `indent`, `int`, `list`, `map`, `random`, `reject`, `rejectattr`, `round`, `select`, `selectattr`, `slice`, `string`, `striptags`, `sum`, `title`, `truncate`, `urlencode`, `urlize`, `wordcount`, `wordwrap` and `xmlattr`. `groupby` gives a list of groups with `grouper` and `list` attributes (`{% for g in posts | groupby("extra.year") %}{{ g.grouper }}`), in the order each group's first item appears rather than sorted as in Jinja2.
 
 ## Syntax
 

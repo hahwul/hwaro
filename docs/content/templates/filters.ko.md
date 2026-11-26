@@ -9,7 +9,7 @@ toc = true
 
 Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `select`, `batch` 등) 위에 자체 필터를 얹어 제공하므로, 아래 어디서든 두 종류 모두 사용할 수 있습니다.
 
-아래 표에 나온 내장 필터 외에 다음 Jinja2 필터도 사용할 수 있습니다: `abs`, `attr`, `batch`, `center`, `dictsort`, `escape`(`e`), `filesizeformat`, `float`, `format`, `groupby`, `indent`, `int`, `list`, `map`, `random`, `reject`, `rejectattr`, `round`, `select`, `selectattr`, `slice`, `string`, `striptags`, `sum`, `title`, `truncate`, `urlencode`, `urlize`, `wordcount`, `wordwrap`, `xmlattr`.
+아래 표에 나온 내장 필터 외에 다음 Jinja2 필터도 사용할 수 있습니다: `abs`, `attr`, `batch`, `center`, `dictsort`, `escape`(`e`), `filesizeformat`, `float`, `format`, `groupby`, `indent`, `int`, `list`, `map`, `random`, `reject`, `rejectattr`, `round`, `select`, `selectattr`, `slice`, `string`, `striptags`, `sum`, `title`, `truncate`, `urlencode`, `urlize`, `wordcount`, `wordwrap`, `xmlattr`. `groupby`는 `grouper`와 `list` 속성을 가진 그룹 목록을 돌려주며(`{% for g in posts | groupby("extra.year") %}{{ g.grouper }}`), 그룹 순서는 Jinja2처럼 정렬하지 않고 각 그룹의 첫 항목이 나온 순서를 따릅니다.
 
 ## 문법
 

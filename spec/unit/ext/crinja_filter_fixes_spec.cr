@@ -151,6 +151,24 @@ describe "Crinja built-in filter fixes" do
     end
   end
 
+  # A mapping came back, so `group.grouper` (the Jinja2 idiom) failed with
+  # "group.grouper is undefined" and `[0]` was empty.
+  describe "groupby" do
+    it "gives (grouper, list) groups with Jinja2's attribute names" do
+      items = %([{'y': 2024, 't': 'a'}, {'y': 2023, 't': 'b'}, {'y': 2024, 't': 'c'}])
+      render_filter("{% for g in #{items} | groupby('y') %}{{ g.grouper }}={{ g.list | map(attribute='t') | join }};{% endfor %}")
+        .should eq("2024=ac;2023=b;")
+      render_filter("{{ (#{items} | groupby('y'))[0].grouper }}|{{ #{items} | groupby('y') | map(attribute='grouper') | join(',') }}")
+        .should eq("2024|2024,2023")
+    end
+
+    it "still unpacks a group into key and items, in first-seen order" do
+      render_filter("{% for k, v in [{'a': 'x'}, {'a': 'y'}, {'a': 'x'}] | groupby('a') %}{{ k }}{{ v | length }};{% endfor %}")
+        .should eq("x2;y1;")
+      render_filter("{{ [] | groupby('a') | length }}|{{ missing | groupby('a') | length }}").should eq("0|0")
+    end
+  end
+
   # The printer was never flushed (`{"a" => 1, …}` printed `{"b" =>`), and an
   # undefined value printed its object address.
   describe "pprint" do
