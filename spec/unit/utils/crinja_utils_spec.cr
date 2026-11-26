@@ -408,6 +408,24 @@ describe Hwaro::Utils::CrinjaUtils do
     end
   end
 
+  # Crystal's CSV lexer read a NUL byte as end of input: `load_data()`, a
+  # remote CSV and every other caller silently lost the rows after it.
+  describe ".parse_data_string CSV with a NUL byte" do
+    it "raises a MalformedCSVError naming the line instead of dropping rows" do
+      err = expect_raises(CSV::MalformedCSVError) do
+        Hwaro::Utils::CrinjaUtils.parse_data_string("a,b\n1,2\nx\0y\n3,4\n", "csv")
+      end
+      err.message.to_s.should contain("NUL")
+      err.line_number.should eq(3)
+      err.column_number.should eq(2)
+    end
+
+    it "still parses ordinary CSV" do
+      rows = Hwaro::Utils::CrinjaUtils.parse_data_string("a,b\n1,2\n3,4\n", "csv").not_nil!
+      rows.raw.as(Array).size.should eq(3)
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Cyclic YAML (self-referencing anchor)
   # ---------------------------------------------------------------------------

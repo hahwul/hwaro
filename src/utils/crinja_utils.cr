@@ -259,6 +259,15 @@ module Hwaro
         when "toml"        then from_toml(TOML.parse(content))
         when "yaml", "yml" then from_yaml(YAML.parse(content))
         when "csv"
+          # Crystal's CSV lexer reads a NUL byte as end of input, so every
+          # row after one vanished without an error. Reject it the way the
+          # JSON, YAML and TOML parsers do.
+          if nul = content.index('\0')
+            before = content[0, nul]
+            line = before.count('\n') + 1
+            column = nul - (before.rindex('\n') || -1)
+            raise CSV::MalformedCSVError.new("NUL byte (U+0000) is not allowed in CSV", line, column)
+          end
           rows = CSV.parse(content).map do |row|
             Crinja::Value.new(row.map { |cell| Crinja::Value.new(cell.strip) })
           end

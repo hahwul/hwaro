@@ -49,6 +49,33 @@ describe Hwaro::Models::Config do
       end
     end
 
+    # The env-placeholder regex ran over the raw bytes first and raised a
+    # bare "Regex match error: UTF-8 error" that named no file. The invalid
+    # byte follows a `$` on its line, the shape that reached the regex.
+    it "raises HwaroError(HWARO_E_CONFIG) naming the file and line for invalid UTF-8" do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "config.toml")
+        File.write(path, "title = \"x\"\nx = \"$HOME caf\xE9\"\n".to_slice)
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Models::Config.load(path) }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain(path)
+        (err.message || "").should contain("UTF-8")
+        (err.message || "").should contain("line 2")
+      end
+    end
+
+    it "raises HwaroError(HWARO_E_CONFIG) naming an environment config with invalid UTF-8" do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "config.toml")
+        env_path = File.join(dir, "config.production.toml")
+        File.write(path, %(title = "x"\n))
+        File.write(env_path, "$\x80".to_slice)
+        err = expect_raises(Hwaro::HwaroError) { Hwaro::Models::Config.load(path, env: "production") }
+        err.code.should eq(Hwaro::Errors::HWARO_E_CONFIG)
+        (err.message || "").should contain(env_path)
+      end
+    end
+
     it "raises HwaroError(HWARO_E_CONFIG) for an invalid base_url in config.toml" do
       Dir.mktmpdir do |dir|
         path = File.join(dir, "config.toml")

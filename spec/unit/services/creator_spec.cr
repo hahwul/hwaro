@@ -179,6 +179,24 @@ describe Hwaro::Services::Creator do
       end
     end
 
+    # Regression: the placeholder regex raised a bare "Regex match error:
+    # UTF-8 error" (unclassified exit 1, no file named) on a latin-1 archetype.
+    it "rejects a non-UTF-8 archetype with a classified error naming it" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("archetypes")
+          File.write("archetypes/default.md", "+++\ntitle = \"{{ title }}\"\n+++\ncaf\xE9\n".to_slice)
+
+          options = Hwaro::Config::Options::NewOptions.new(path: "post.md", title: "T")
+          err = expect_raises(Hwaro::HwaroError) { Hwaro::Services::Creator.new.run(options) }
+          err.code.should eq(Hwaro::Errors::HWARO_E_IO)
+          err.message.to_s.should contain("archetypes/default.md")
+          File.exists?("content/post.md").should be_false
+        end
+      end
+    end
+
     # Regression: archetype substitution injected the raw title/date, so a
     # title containing a double quote (`My "Quoted" Post`) produced invalid
     # TOML (`title = "My "Quoted" Post"`) and the generated file failed to

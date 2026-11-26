@@ -712,7 +712,7 @@ module Hwaro
           archetype_path = File.join(ARCHETYPES_DIR, "#{explicit_archetype}.md")
           if File.file?(archetype_path)
             Logger.debug "Using archetype: #{archetype_path}"
-            return File.read(archetype_path)
+            return read_archetype(archetype_path)
           else
             raise Hwaro::HwaroError.new(
               code: Hwaro::Errors::HWARO_E_USAGE,
@@ -739,7 +739,7 @@ module Hwaro
 
             if File.file?(archetype_path)
               Logger.debug "Using archetype: #{archetype_path}"
-              return File.read(archetype_path)
+              return read_archetype(archetype_path)
             end
           end
         end
@@ -748,7 +748,7 @@ module Hwaro
         default_archetype = File.join(ARCHETYPES_DIR, "default.md")
         if File.file?(default_archetype)
           Logger.debug "Using default archetype: #{default_archetype}"
-          return File.read(default_archetype)
+          return read_archetype(default_archetype)
         end
 
         # 4. No archetype found
@@ -762,6 +762,19 @@ module Hwaro
           code: Hwaro::Errors::HWARO_E_IO,
           message: "Cannot read archetype: #{ex.message}",
           hint: "Check the file permissions under #{ARCHETYPES_DIR}/.",
+        )
+      end
+
+      # Placeholder filling and directive parsing are regex passes, and PCRE2
+      # raises on invalid UTF-8: a latin-1 archetype failed `hwaro new` with a
+      # bare "Regex match error: UTF-8 error" naming no file.
+      private def read_archetype(path : String) : String
+        content = File.read(path)
+        return content if content.valid_encoding?
+        raise Hwaro::HwaroError.new(
+          code: Hwaro::Errors::HWARO_E_IO,
+          message: "Archetype #{path} is not valid UTF-8.",
+          hint: "Save #{path} as UTF-8.",
         )
       end
 

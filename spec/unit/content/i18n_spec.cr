@@ -145,6 +145,31 @@ describe Hwaro::Content::I18n do
       end
     end
 
+    # `File.file?` raised ELOOP for a self-referencing symlink, failing the
+    # whole build (HWARO_E_IO) where an unreadable file only warns.
+    it "skips a translation symlink that loops onto itself with a warning" do
+      posix_only!("symlink loop")
+      Dir.mktmpdir do |dir|
+        i18n_dir = File.join(dir, "i18n")
+        FileUtils.mkdir_p(i18n_dir)
+        File.write(File.join(i18n_dir, "en.toml"), %(greeting = "Hi"\n))
+        File.symlink("ko.toml", File.join(i18n_dir, "ko.toml"))
+
+        config = Hwaro::Models::Config.new
+        config.default_language = "en"
+        config.languages = {"ko" => Hwaro::Models::LanguageConfig.new("ko")}
+
+        translations = Hwaro::Content::I18n::TranslationData.new
+        log = with_captured_log do
+          translations = Hwaro::Content::I18n.load_translations(i18n_dir, config)
+        end
+
+        log.should contain("i18n/ko.toml")
+        translations["en"]["greeting"].should eq("Hi")
+        translations.has_key?("ko").should be_false
+      end
+    end
+
     # The Array branch of flatten_toml indexes list items as key.0, key.1, etc.
     # List-valued i18n keys (e.g. nav menus) are a plausible multilingual
     # pattern; a cast regression would silently drop them. Covers string items,

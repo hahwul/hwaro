@@ -134,7 +134,7 @@ module Hwaro
                     hint: "Example: --ignore-url twitter.com or --ignore-url 'https://example.com/*'.",
                   )
                 end
-                ignore_patterns << ignore_pattern_to_regex(v)
+                ignore_patterns << ignore_pattern_to_regex(CLI.utf8_flag!("--ignore-url", v))
               end
               parser.on("--allow-status CODES", "Treat these HTTP status codes as healthy (comma-separated)") do |v|
                 segments = v.split(',')

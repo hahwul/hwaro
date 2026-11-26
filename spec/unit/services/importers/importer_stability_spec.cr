@@ -211,6 +211,33 @@ describe "importer stability" do
     end
   end
 
+  # `File.directory?` on a symlink that cannot resolve (a self-loop) raised
+  # ELOOP out of the walk: the whole import failed with HWARO_E_IO.
+  describe "self-referencing symlink in the source tree" do
+    it "skips it and imports the other files" do
+      posix_only!("symlink loop")
+      Dir.mktmpdir do |dir|
+        posts_dir = File.join(dir, "_posts")
+        FileUtils.mkdir_p(posts_dir)
+        File.write(File.join(posts_dir, "2024-01-02-open.md"), "---\ntitle: Open\n---\nBody.\n")
+        File.symlink("2024-01-03-loop.md", File.join(posts_dir, "2024-01-03-loop.md"))
+
+        output_dir = File.join(dir, "out")
+        result = nil
+        log = with_captured_log do
+          result = Hwaro::Services::Importers::JekyllImporter.new.run(
+            Hwaro::Config::Options::ImportOptions.new(
+              source_type: "jekyll", path: dir, output_dir: output_dir,
+            ))
+        end
+
+        result.not_nil!.imported_count.should eq(1)
+        File.exists?(File.join(output_dir, "posts", "open.md")).should be_true
+        log.should contain("2024-01-03-loop.md")
+      end
+    end
+  end
+
   # (8) An 11ty data-file path that turns out to be a directory raised a bare
   # IO::Error ("Is a directory") past the `File::Error` rescue, aborting the
   # whole import before a single file was read.

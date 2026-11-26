@@ -23,8 +23,17 @@ module Hwaro
         codes = [config.default_language] + config.languages.keys
         codes.uniq.each do |code|
           path = File.join(i18n_dir, "#{code}.toml")
-          # `File.file?`: a FIFO here would block `File.read` forever.
-          next unless File.file?(path)
+          # `File.file?`: a FIFO here would block `File.read` forever. It
+          # follows a symlink and RAISES when it cannot resolve one (a
+          # self-loop: ELOOP), which failed the whole build with HWARO_E_IO;
+          # warn and skip it like an unreadable file.
+          is_file = begin
+            File.file?(path)
+          rescue ex : File::Error
+            Logger.warn "Failed to read i18n file #{path}: #{ex.message}"
+            next
+          end
+          next unless is_file
           unless Utils::PathUtils.resolves_within?(path, project_root)
             Logger.warn "Skipping i18n file outside the project: #{path}"
             next
