@@ -684,6 +684,23 @@ describe Hwaro::Utils::JsMinifier do
       Hwaro::Utils::JsMinifier.minify(src).should eq(src)
     end
 
+    # Regression: every `)` read as the end of an expression, so a regex
+    # opening the body of an `if`/`while`/`for`/`with` was taken for a
+    # division and the quote in its body opened a string that ran on.
+    it "reads a slash after a statement head's closing paren as a regex" do
+      src = "if (ok) /'/.test(s) && go()\nvar u = 'http://x';"
+      Hwaro::Utils::JsMinifier.minify(src).should eq(src)
+      src = "while (i--) /\"/.exec(s)\nfor (;;) /'/g.exec(t)\nvar u = 'http://y';"
+      Hwaro::Utils::JsMinifier.minify(src).should eq(src)
+    end
+
+    it "still reads a slash after a call's or member's closing paren as division" do
+      src = "var a = f(x) / 2, b = o.if(y) / 3, c = (if_ok) / 4; var u = 'a/b';\nvar v = 'http://z';"
+      Hwaro::Utils::JsMinifier.minify(src).should eq(src)
+      src = "if ((n) / 2 > 1) go() // c\nvar w = 'p/q';"
+      Hwaro::Utils::JsMinifier.minify(src).should eq("if ((n) / 2 > 1) go()\nvar w = 'p/q';")
+    end
+
     it "reads a slash after yield or await as a regex" do
       src = "function* g() { yield /a'/ }\nvar u = 'http://x';"
       Hwaro::Utils::JsMinifier.minify(src).should eq(src)

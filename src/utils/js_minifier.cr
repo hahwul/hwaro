@@ -75,6 +75,12 @@ module Hwaro
           # `//` text (`'http://x'`) as a comment.
           last_sig = -1
           after_value = false
+          # One entry per open `(`: whether it opens the head of an `if`,
+          # `while`, `for` or `with` statement. A `)` closing such a head
+          # ends no expression, so a `/` after it starts a regex literal
+          # (`if (x) /re/.test(y)`); after any other `)` it is a division.
+          parens = [] of Bool
+          after_head = false
 
           while i < len
             c = chars[i]
@@ -97,6 +103,7 @@ module Hwaro
               end
               last_sig = i
               after_value = true
+              after_head = false
               i += 1
               next
             end
@@ -116,6 +123,7 @@ module Hwaro
               io << "\x00JSPL#{protected_spans.size - 1}\x00"
               last_sig = i - 1
               after_value = true
+              after_head = false
               next
             end
 
@@ -173,17 +181,24 @@ module Hwaro
               # Check if this slash starts a regex literal.
               # A `/` is a regex when preceded by a token that expects an expression:
               # operators, punctuation, or keywords like return/typeof/in/etc.
-              if regex_context?(chars, last_sig, after_value)
+              if after_head || regex_context?(chars, last_sig, after_value)
                 # Regex literal — pass through unchanged
                 i = scan_regex(chars, i, len, io)
                 last_sig = i - 1
                 after_value = true
+                after_head = false
                 next
               end
             end
 
             io << c
             unless c.whitespace?
+              after_head = false
+              if c == '('
+                parens << statement_head?(chars, last_sig)
+              elsif c == ')'
+                after_head = parens.pop? || false
+              end
               last_sig = i
               after_value = false
             end
@@ -207,9 +222,8 @@ module Hwaro
       # it (the rest of the file and every later bundle entry). A keyword used
       # as a property name (`obj.return / 2`) is still division.
       #
-      # Known limitation: a regex right after a statement's closing paren
-      # (`if (x) /re/.test(y)`) is still read as division — telling that `)`
-      # apart from a call's needs paren matching.
+      # A `)` reads as the end of an expression here; the scanner itself
+      # tells a statement head's `)` (`if (x) /re/`) from a call's.
       private def regex_context?(chars, last : Int32, after_value : Bool) : Bool
         return true if last < 0 # start of input
         return false if after_value
@@ -252,10 +266,27 @@ module Hwaro
         "throw", "case", "do", "else", "yield", "await",
       }
 
+      # Keywords whose parenthesised head is followed by a statement.
+      STATEMENT_HEAD_KEYWORDS = Set{"if", "while", "for", "with"}
+
+      # True when the `(` after chars[last] opens a statement head.
+      private def statement_head?(chars, last : Int32) : Bool
+        return false if last < 0
+        prev = chars[last]
+        return false unless prev.alphanumeric? || prev == '_' || prev == '$'
+        keyword_before?(chars, last, STATEMENT_HEAD_KEYWORDS)
+      end
+
       # True when the identifier-like word ending at chars[last] is one of
       # REGEX_PRECEDING_KEYWORDS and not a member name (`a.return`) or a
       # private class member (`this.#in`, `#new`).
       private def regex_keyword_before?(chars, last : Int32) : Bool
+        keyword_before?(chars, last, REGEX_PRECEDING_KEYWORDS)
+      end
+
+      # True when the identifier-like word ending at chars[last] is one of
+      # `keywords` and not a member name or a private class member.
+      private def keyword_before?(chars, last : Int32, keywords : Set(String)) : Bool
         start = last
         while start > 0 && (chars[start - 1].alphanumeric? || chars[start - 1] == '_' || chars[start - 1] == '$')
           start -= 1
@@ -264,7 +295,7 @@ module Hwaro
         size = last - start + 1
         return false if size > 10 # longer than any keyword above
         word = String.build(size) { |w| (start..last).each { |k| w << chars[k] } }
-        return false unless REGEX_PRECEDING_KEYWORDS.includes?(word)
+        return false unless keywords.includes?(word)
         k = start - 1
         while k >= 0 && chars[k].whitespace?
           k -= 1
