@@ -47,7 +47,7 @@ class TOML::Lexer
       @peeked = nil
       return @current_char = peeked
     end
-    @current_char = @input.read_char || '\0'
+    @current_char = read_source_char # ext/toml_nul_byte_fix.cr
   end
 
   # Reads the digits after a `.` (already consumed) and leaves
