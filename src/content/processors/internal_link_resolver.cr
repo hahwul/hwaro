@@ -89,6 +89,10 @@ module Hwaro
         # loaders) in.
         LINK_ATTR_REGEX = /=\s*+"[^"]*+"|=\s*+'[^']*+'|\b((srcset|href|src)=)(?|(")([^"]*+)"|(')([^']*+)'|()([^\s"'`>\\][^\s>]*+))/i
 
+        # The start of an `<a>` or `<area>` opening tag, the elements whose
+        # `href` is a navigation link.
+        HYPERLINK_TAG_REGEX = /\A<(?:a|area)(?=[\s\/>])/i
+
         # Cheap any-case probe for a link attribute, behind the byte probes.
         LINK_ATTR_PROBE = /(?:href|src|srcset)=/i
 
@@ -392,10 +396,14 @@ module Hwaro
         # a heading past `<!-- more -->` names nothing. A fragment the summary
         # carries itself (a footnote ref whose note it includes) keeps its
         # bytes, and so does `#top`.
+        #
+        # Only the `href` of an `<a>`/`<area>` navigates: an inline SVG
+        # sprite's `<use href="#icon">` names a symbol the layout defines on
+        # every page, and pointed at the post it showed no icon.
         def anchor_links_to_page(html : String, page_url : String) : String
           return html if page_url.empty? || !Utils::ByteScan.includes?(html, "#")
           ids : Set(String)? = nil
-          rewrite_link_attrs(html) do |srcset, value|
+          rewrite_link_attrs(html, hyperlinks_only: true) do |srcset, value|
             next if srcset || value.size < 2 || !value.starts_with?('#')
             found = ids ||= anchor_ids(html)
             next if anchor_exists?(value[1..], found)
@@ -406,7 +414,8 @@ module Hwaro
         # Rewrites every href/src/srcset value in the opening tags of `html`
         # (any case; double-, single- or unquoted, the quote kept). The block
         # gets `(srcset?, value)` and returns the new value; nil or `value`
-        # keeps the attribute's bytes.
+        # keeps the attribute's bytes. `hyperlinks_only` limits it to the
+        # `href` of `<a>` and `<area>` tags.
         #
         # `<style>`/`<textarea>` bodies are text, not markup: a textarea's
         # sample HTML is visible and stays as written. A `<script>` body is
@@ -414,11 +423,13 @@ module Hwaro
         # (`el.innerHTML = '<a href="/x/">'`), which needs the same prefix.
         # Each body is scanned on its own, so a quote opened in one never
         # swallows the markup after it.
-        private def rewrite_link_attrs(html : String, & : Bool, String -> String?) : String
+        private def rewrite_link_attrs(html : String, hyperlinks_only : Bool = false, & : Bool, String -> String?) : String
           MarkdownExtensions.outside_raw_text(html, scripts: true) do |chunk|
             chunk.gsub(LINK_TAG_REGEX) do |tag|
+              next tag if hyperlinks_only && !tag.matches?(HYPERLINK_TAG_REGEX)
               tag.gsub(LINK_ATTR_REGEX) do |attr, am|
                 next attr unless name = am[2]?
+                next attr if hyperlinks_only && name.size != 4 # 4: href
                 value = am[4]
                 new_value = yield name.size == 6, value # 6: srcset
                 next attr if new_value.nil? || new_value == value

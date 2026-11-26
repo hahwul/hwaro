@@ -139,6 +139,22 @@ describe "marker summary relative links" do
       html.should contain(%(href="#fnref-1"))
     end
   end
+
+  # Only navigation links name the page: an inline SVG sprite's
+  # `<use href="#icon">` points at a symbol the layout defines everywhere.
+  it "keeps the fragment of a non-hyperlink attribute" do
+    build_site(
+      "title = \"T\"\nbase_url = \"http://x.test/sub\"\n",
+      content_files: {"blog/_index.md" => "+++\ntitle = \"B\"\n+++\n",
+                      "blog/post.md"   => "+++\ntitle = \"P\"\n+++\n<p><svg><use href=\"#icon-x\"></use><use xlink:href=\"#icon-y\"></use></svg><img src=\"#img\"> <AREA HREF=\"#map\"> <a class=\"x\" href=\"#more\">more</a></p>\n\n<!-- more -->\n\n## More\n\nRest.\n"},
+      template_files: {"page.html" => "{{ content }}", "section.html" => "{% for p in section.pages %}L[{{ p.summary }}]{% endfor %}"},
+    ) do |dir|
+      html = File.read(File.join(dir, "public", "blog", "index.html"))
+      html.should contain(%(<svg><use href="#icon-x"></use><use xlink:href="#icon-y"></use></svg><img src="#img">))
+      html.should contain(%(<AREA HREF="/sub/blog/post/#map">))
+      html.should contain(%(<a class="x" href="/sub/blog/post/#more">))
+    end
+  end
 end
 
 describe "marker summary inside a raw HTML block" do
