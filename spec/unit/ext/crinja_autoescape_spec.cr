@@ -294,6 +294,13 @@ describe "Crinja autoescape" do
       on(%({{ "http://example.com/" | urlize }})).should contain(%(<a href="http://example.com/"))
     end
 
+    # Each line lost its terminator: "one\ntwo" printed "onetwo".
+    it "urlize keeps the text's line breaks (both modes)" do
+      link = %(<a href="http://x.com/" rel="noopener">http://x.com/</a>)
+      on(%({{ "one\\ntwo\\r\\n\\nhttp://x.com/\\nend" | urlize }})).should eq("one\ntwo\r\n\n#{link}\nend")
+      off(%({{ "one\\ntwo\\nhttp://x.com/\\n" | urlize }})).should eq("one\ntwo\n#{link}\n")
+    end
+
     it "r2#6 replace does not escape the search, and counts matches in the source" do
       on(%({{ s | replace("<i>", "") }})).should eq("s&amp;</i>")
       on(%({% set a %}ab{% endset %}{{ a | replace("a", "aX", 2) }})).should eq("aXb")

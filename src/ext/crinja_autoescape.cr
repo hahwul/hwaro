@@ -472,7 +472,11 @@ end
 # hwaro's single unsafe-scheme policy (InlineMarkdown.safe_url?, which refuses
 # javascript/vbscript/file and non-image data:) so a refused scheme stays as
 # plain (escaped) text, unlinked. Applies in both modes — a pre-existing util
-# defect. The rest is the vendored `urlize` body unchanged.
+# defect.
+#
+# The text is linked whole: the vendored body went line by line through
+# `each_line`, which drops each line's terminator, so `"one\ntwo" | urlize`
+# printed `onetwo` (a URL never spans whitespace, so lines need no split).
 module Crinja::Util
   def self.urlize(text, trim_url_limit, rel, target)
     rel_attr = ""
@@ -482,17 +486,15 @@ module Crinja::Util
     target_attr = %( target="%s") % HTML.escape(target) unless target.nil? || target.empty?
 
     SafeString.build do |io|
-      text.each_line do |line|
-        io << line.gsub(AUTO_LINK_RE) do
-          all = $~
-          url = all[0]
-          next url unless Hwaro::Content::Processors::InlineMarkdown.safe_url?(url)
-          display = url
-          unless trim_url_limit.nil? || display.size < trim_url_limit
-            display = display[0..(trim_url_limit - 3)] + "..."
-          end
-          %(<a href="#{url}"#{rel_attr}#{target_attr}>#{display}</a>)
+      io << text.gsub(AUTO_LINK_RE) do
+        all = $~
+        url = all[0]
+        next url unless Hwaro::Content::Processors::InlineMarkdown.safe_url?(url)
+        display = url
+        unless trim_url_limit.nil? || display.size < trim_url_limit
+          display = display[0..(trim_url_limit - 3)] + "..."
         end
+        %(<a href="#{url}"#{rel_attr}#{target_attr}>#{display}</a>)
       end
     end
   end
