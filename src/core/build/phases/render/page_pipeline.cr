@@ -475,12 +475,15 @@ module Hwaro::Core::Build::Phases::Render
   # same — gating on the literal "section" silently dropped its
   # `section_list` and `paginator`. Only that explicit opt-in counts: a
   # custom template under the site-wide `[pagination]` default keeps listing
-  # every page, as it always has. The homepage keeps its own `index`
-  # template, and a section on the plain `page` fallback is left alone.
+  # every page, as it always has. A root `_index.md` opts in the same way,
+  # whether it renders with `template = "home"` or the `index` template: it
+  # is a section, and leaving it out lost the `paginate` it set (and the
+  # `paginator` its template reads). A section on the plain `page` fallback
+  # is left alone.
   private def paginated_section?(page : Models::Page, template_name : String) : Bool
     page.is_a?(Models::Section) && !page.has_redirect? &&
       (template_name == "section" || page.template == "section" ||
-        (template_name != "page" && !page.home? && (page.pagination_enabled == true || (page.paginate || 0) > 0)))
+        (template_name != "page" && (page.pagination_enabled == true || (page.paginate || 0) > 0)))
   end
 
   # Only `render_page` passes `warn: true`. Every other caller is a lookup
