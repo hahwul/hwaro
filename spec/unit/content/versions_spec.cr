@@ -156,4 +156,32 @@ describe Hwaro::Content::Versions do
       v1.version_links.find!(&.latest).exists.should be_false
     end
   end
+
+  # The object printed and serialized as `#<…VersionList:0x10916ed00>`, an
+  # address that changed on every build.
+  describe "the versions variable in filters" do
+    it "prints and serializes as the list of its entries" do
+      config = load_config(<<-TOML)
+        title = "T"
+        base_url = "https://example.com"
+        [[versions.list]]
+        name = "v2"
+        path = "docs/v2"
+        latest = true
+        [[versions.list]]
+        name = "v1"
+        path = "docs/v1"
+        TOML
+      vars = {"versions" => Hwaro::Content::Versions.versions_value(config, "")}
+      {true, false}.each do |ae|
+        json = render_crinja("{{ versions | tojson }}", vars, autoescape: ae)
+        JSON.parse(json).as_a.map(&.["name"].as_s).should eq(["v2", "v1"])
+        listed = "[{'name' => 'v2', 'label' => 'v2', 'latest' => true, 'url' => '/docs/'}, " \
+                 "{'name' => 'v1', 'label' => 'v1', 'latest' => false, 'url' => '/docs/v1/'}]"
+        escaped = HTML.escape(listed)
+        render_crinja("{{ versions }}|{{ versions | e }}|{{ versions | string }}", vars, autoescape: ae)
+          .should eq(ae ? "#{escaped}|#{escaped}|#{escaped}" : "#{listed}|#{escaped}|#{listed}")
+      end
+    end
+  end
 end

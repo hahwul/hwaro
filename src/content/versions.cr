@@ -173,6 +173,13 @@ module Hwaro
           @items.size
         end
 
+        # Printed as the list it is (`{{ versions }}`, `| e`, `| string`).
+        # The object default printed `#<…VersionList:0x10916ed00>`, an
+        # address that differs on every build.
+        def to_s(io : IO) : Nil
+          Crinja::Finalizer.stringify(io, @items)
+        end
+
         def unsafe_fetch(index : Int) : Crinja::Value
           @items.unsafe_fetch(index)
         end
