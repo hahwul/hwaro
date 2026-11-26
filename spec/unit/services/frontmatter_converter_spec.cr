@@ -1104,12 +1104,9 @@ describe Hwaro::Services::ConversionResult do
     end
 
     # This in-place rewrite must never hand the next build front matter hwaro
-    # can no longer read. Int64::MIN is legal TOML but the only in-range
-    # integer toml.cr overflows on (it accumulates the digits positively and
-    # applies the sign last), and it used to be emitted verbatim: the draft
-    # below was correctly skipped by the build, then `convert to-toml`
-    # reported success and left a file whose whole front matter — `draft`
-    # included — no longer parsed.
+    # can no longer read: Int64::MIN once failed to reparse (and the whole
+    # front matter, `draft` included, with it). The reader takes it now, so it
+    # is written as the integer it is.
     it "keeps a draft readable after converting an Int64::MIN value" do
       Dir.mktmpdir do |dir|
         converter = Hwaro::Services::FrontmatterConverter.new(dir)
@@ -1122,38 +1119,26 @@ describe Hwaro::Services::ConversionResult do
         fm = converted.match!(/\A\+\+\+\n(.*?)\+\+\+/m)[1]
         parsed = TOML.parse(fm)
         parsed["draft"].raw.should be_true
-        parsed["offset"].raw.should eq("-9223372036854775808")
+        parsed["offset"].raw.should eq(Int64::MIN)
       end
     end
 
-    it "keeps a large int promoted into a float array reparseable" do
-      Dir.mktmpdir do |dir|
-        converter = Hwaro::Services::FrontmatterConverter.new(dir)
-        file_path = File.join(dir, "promoted.md")
-        File.write(file_path, "---\ntitle: P\nratio:\n  - 9223372036854775807\n  - 2.5\n---\n\nBody")
-
-        converter.convert_to_toml.converted_count.should eq(1)
-
-        converted = File.read(file_path)
-        fm = converted.match!(/\A\+\+\+\n(.*?)\+\+\+/m)[1]
-        TOML.parse(fm)["ratio"].raw.as(Array).map(&.as(TOML::Any).raw)
-          .should eq([Int64::MAX.to_f64, 2.5])
-      end
-    end
-
-    it "coerces mixed-type arrays so toml.cr can reparse the file" do
+    # Regression: mixed arrays were coerced to one type (toml.cr once refused
+    # them), so the converted page rendered differently: `[1, 2.5]` became
+    # `[1.0, 2.5]` and `[1, "two"]` became strings.
+    it "keeps mixed-type arrays as written" do
       Dir.mktmpdir do |dir|
         converter = Hwaro::Services::FrontmatterConverter.new(dir)
         file_path = File.join(dir, "mixed.md")
-        File.write(file_path, "---\ntitle: M\nstuff:\n  - 1\n  - two\nratio:\n  - 1\n  - 2.5\n---\n\nBody")
+        File.write(file_path, "---\ntitle: M\nstuff:\n  - 1\n  - two\nratio:\n  - 9223372036854775807\n  - 2.5\n---\n\nBody")
 
         converter.convert_to_toml.converted_count.should eq(1)
 
         converted = File.read(file_path)
         fm = converted.match!(/\A\+\+\+\n(.*?)\+\+\+/m)[1]
         parsed = TOML.parse(fm)
-        parsed["stuff"].raw.as(Array).map(&.as(TOML::Any).raw).should eq(["1", "two"])
-        parsed["ratio"].raw.as(Array).map(&.as(TOML::Any).raw).should eq([1.0, 2.5])
+        parsed["stuff"].raw.as(Array).map(&.as(TOML::Any).raw).should eq([1_i64, "two"])
+        parsed["ratio"].raw.as(Array).map(&.as(TOML::Any).raw).should eq([Int64::MAX, 2.5])
       end
     end
 
@@ -1174,11 +1159,9 @@ describe Hwaro::Services::ConversionResult do
       end
     end
 
-    # Regression: a map mixed with a scalar used to keep its inline-table form,
-    # producing `["plain", {name = "home"}]` — the mixed array toml.cr refuses.
-    # The converted file then failed the very next build with "cannot mix types
-    # in array", so `tool convert to-toml` corrupted its own output.
-    it "keeps a map mixed with a scalar parseable rather than inline" do
+    # A map mixed with a scalar stays an inline table: `["plain", {…}]` is
+    # valid TOML 1.0, and the bundled reader takes it back.
+    it "keeps a map mixed with a scalar as an inline table" do
       Dir.mktmpdir do |dir|
         converter = Hwaro::Services::FrontmatterConverter.new(dir)
         file_path = File.join(dir, "mixed_inline.md")
@@ -1190,7 +1173,7 @@ describe Hwaro::Services::ConversionResult do
         links = TOML.parse(fm)["links"].as_a
         links.size.should eq(2)
         links.last.should eq("plain")
-        links.first.as_s.should contain(%q("name":"home"))
+        links.first.as_h["name"].should eq("home")
       end
     end
 
