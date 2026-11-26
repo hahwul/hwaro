@@ -586,11 +586,16 @@ module Hwaro
         index_page : Models::Section,
       ) : Array(Content::Pagination::PaginatedPage)
         per_page = taxonomy.paginate_by || pages.size
+        # A term that fits on one pager still reports the configured page
+        # size (`paginator.paginate_by`, `pagination_obj.per_page`), as a
+        # section with `paginate` does; it reported the term's page count.
+        # Without a usable `paginate_by` the term is not paginated, and the
+        # whole list is its one page.
         return [Content::Pagination::PaginatedPage.new(
           pages: pages,
           page_number: 1,
           total_pages: 1,
-          per_page: pages.size,
+          per_page: per_page > 0 ? per_page : pages.size,
           total_items: pages.size,
           has_prev: false,
           has_next: false,
