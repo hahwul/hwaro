@@ -6,9 +6,8 @@
 #   1. Whitespace-sensitive elements (<pre>, <textarea>, <script>,
 #      <style>, <code>, <svg>, <math>, <noscript>) are extracted as
 #      opaque, typed placeholders before any whitespace pass touches
-#      the document and restored verbatim at the end. Each tag is
-#      handled in its own pass so a stray alternation in non-greedy
-#      matching can't pair an open <pre> with a close </script>.
+#      the document and restored verbatim at the end, in document
+#      order, each open tag paired only with a close tag of its own name.
 #      Placeholders carry the element's default display classification
 #      (block or inline) so the whitespace collapse can treat the
 #      sealed block as if it were still its original tag for the
@@ -79,11 +78,6 @@ module Hwaro
       # placeholders before any whitespace pass and restored afterward.
       # `code` is included because inline-code snippets often carry
       # whitespace that authors expect to ship unchanged.
-      #
-      # Order matters: a `<style>` body may legitimately contain the
-      # literal string `<script>` (e.g. `content: "<script>"`), so
-      # `style` is extracted first to remove that text from view
-      # before the `script` pass runs.
       PROTECTED_TAGS = %w[pre textarea style script code svg math noscript]
 
       # Classification of protected tags by default HTML display so
@@ -98,37 +92,23 @@ module Hwaro
       # treating the script as block deleted that gap ("ac").
       PROTECTED_HIDDEN = Set{"script", "style", "noscript"}
 
-      # Per-tag extraction patterns, compiled once at load time. minify()
-      # runs once per rendered page, so building these eight Regex objects
-      # inside protect_sensitive_blocks paid a PCRE2 compile per tag per
-      # page. Array (not Hash) to preserve PROTECTED_TAGS order — `style`
-      # must be extracted before `script` (see comment above).
-      private PROTECTED_PATTERNS = PROTECTED_TAGS.map do |tag|
-        {tag,
-        # Cheap presence probe: most pages carry no <textarea>, <math>,
-        # <noscript>, …, and the heavy `.*?` extraction pattern below has
-        # no fast no-match path (every '<' in the document is a candidate
-        # start). The lowercase literal decides via `ByteScan`'s memchr scan
-        # for the markdown-rendered common case; the case-insensitive probe
-        # covers author-written uppercase tags.
-         "<#{tag}",
-         Regex.new("<#{tag}", Regex::Options::IGNORE_CASE),
-         # `(?![\w-])`, not `\b`: a custom element such as `<pre-view>`
-         # or `<math-field>` is not the protected tag, and `\b` matched it
-         # and sealed everything up to the next real `</pre>` as one block.
-         Regex.new(
-           "<#{tag}(?![\\w-])[^>]*>.*?</#{tag}\\s*>",
-           Regex::Options::IGNORE_CASE | Regex::Options::MULTILINE
-         )}
-      end
-
-      # Every protected tag's probe in one caseless pass, one capture group
-      # per tag in PROTECTED_TAGS order. Eight separate probes each walked
-      # every `<` of the page; a tag this pass does not see cannot appear
-      # later either (extraction only replaces text with `<`-free tokens).
-      private PROTECTED_OPEN_ANY = Regex.new(
-        "<(?:#{PROTECTED_TAGS.map { |tag| "(#{tag})" }.join('|')})",
-        Regex::Options::IGNORE_CASE
+      # One extraction pattern for every protected tag. The backreference
+      # pairs each open tag with a close tag of the same name, and a single
+      # left-to-right gsub takes the blocks in document order: the first
+      # protected element to open wins, so the body of a `<script>` or
+      # `<style>` is never searched for another protected tag. One pass per
+      # tag (pre, textarea, style, script, …) did not have that property —
+      # a `'<pre'` string inside a script was paired with the next real
+      # `</pre>` further down the page, the script's own `</script>` went
+      # into that block, and the script source before the string was left
+      # to the whitespace passes (a template literal lost its blank lines).
+      #
+      # `(?![\w-])`, not `\b`: a custom element such as `<pre-view>` or
+      # `<math-field>` is not the protected tag, and `\b` matched it and
+      # sealed everything up to the next real `</pre>` as one block.
+      private PROTECTED_BLOCK = Regex.new(
+        "<(#{PROTECTED_TAGS.join('|')})(?![\\w-])[^>]*>.*?</\\1\\s*>",
+        Regex::Options::IGNORE_CASE | Regex::Options::MULTILINE
       )
 
       # Only protected tag candidates inside removable HTML comments are
@@ -253,22 +233,14 @@ module Hwaro
         result.strip
       end
 
-      # Extract whitespace-sensitive elements one tag at a time. A
-      # single regex with alternation in the open/close tag (e.g.
-      # `<(pre|script)>...</(pre|script)>`) does not enforce that both
-      # sides reference the same tag, which let prior implementations
-      # pair `<pre>` openers with `</script>` closers when the document
-      # mixed both. One pass per tag avoids that whole class of bug.
+      # Extract whitespace-sensitive elements into placeholders, in
+      # document order (see PROTECTED_BLOCK).
       private def protect_sensitive_blocks(html : String, preserves : Array(String), opts : Regex::MatchOptions) : String
         result = mask_comment_tag_candidates(html, opts)
         masked = !result.same?(html)
-        opened = Array.new(PROTECTED_TAGS.size, false)
-        result.scan(PROTECTED_OPEN_ANY, options: opts) do |m|
-          PROTECTED_TAGS.size.times { |i| opened[i] = true if m[i + 1]? }
-        end
-        PROTECTED_PATTERNS.each_with_index do |(tag, open_literal, probe, pattern), i|
-          next unless opened[i]
-          next unless ByteScan.includes?(result, open_literal) || result.matches?(probe, options: opts)
+        result = result.gsub(PROTECTED_BLOCK, options: opts) do |match, m|
+          # `:fold`, so a LONG S `<ſcript>` is the script it matched as.
+          tag = m[1].downcase(:fold)
           prefix = if PROTECTED_INLINE.includes?(tag)
                      PRESERVE_PREFIX_INLINE
                    elsif PROTECTED_HIDDEN.includes?(tag)
@@ -276,11 +248,9 @@ module Hwaro
                    else
                      PRESERVE_PREFIX_BLOCK
                    end
-          result = result.gsub(pattern, options: opts) do |match|
-            idx = preserves.size
-            preserves << (masked ? match.gsub(COMMENT_TAG_LT, "<") : match)
-            "#{prefix}#{idx}#{PRESERVE_SUFFIX}"
-          end
+          idx = preserves.size
+          preserves << (masked ? match.gsub(COMMENT_TAG_LT, "<") : match)
+          "#{prefix}#{idx}#{PRESERVE_SUFFIX}"
         end
         masked ? result.gsub(COMMENT_TAG_LT, "<") : result
       end
@@ -376,10 +346,11 @@ module Hwaro
         !after_eq && !unquoted
       end
 
-      # Restore in a fixed-point loop: a protected block (e.g. a `<style>`
-      # extracted before `<script>`) can be captured *inside* a later block, so
-      # the first restore leaves an inner placeholder behind. Re-scan until no
-      # token remains; a dangling index returns $0 unchanged. The original
+      # Restore in a fixed-point loop: a caller's preserved block may hold
+      # another block's placeholder, which the first restore leaves behind.
+      # (`minify` itself extracts in one non-overlapping pass, so its blocks
+      # never nest.) Re-scan until no token remains; a dangling index returns
+      # $0 unchanged. The original
       # termination argument — "restored content is author HTML, which cannot
       # contain a valid \x00-delimited token because NUL is illegal in author
       # input" — turned out to be false (NUL reaches the rendered page through

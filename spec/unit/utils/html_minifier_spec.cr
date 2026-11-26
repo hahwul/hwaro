@@ -329,14 +329,31 @@ describe Hwaro::Utils::HtmlMinifier do
       end
 
       it "does not let a literal <script> string inside <style> derail extraction" do
-        # `<style>` is extracted before `<script>` precisely so the
-        # script pass cannot mis-pair a real `</script>` elsewhere
-        # with a `<script>` text fragment that lived inside CSS.
+        # The style opens first, so its body is one block and the
+        # `<script>` text inside it is never paired with a real
+        # `</script>` elsewhere.
         html = "<style>p::before { content: \"<script>\" }</style>\n<p>hi</p>\n<script>real()</script>"
         result = Hwaro::Utils::HtmlMinifier.minify(html)
         result.should contain("<style>p::before { content: \"<script>\" }</style>")
         result.should contain("<script>real()</script>")
         result.should contain("<p>hi</p>")
+      end
+
+      it "does not pair a '<pre' string inside a script with a later real </pre>" do
+        # Each protected tag used to be extracted in its own pass, `pre`
+        # first: the `'<pre'` in the script opened a block that ran to the
+        # code block's `</pre>`, taking the script's own `</script>` with it,
+        # and the script source before the string was minified as markup.
+        script = "<script>\nconst tpl = `\n  <p>a</p>\n\n  <p>b</p>  \n`;\nif (html.startsWith('<pre')) wrap();\n</script>"
+        html = "<div>#{script}</div>\n<p>Code:</p>\n<pre><code>x = 1\n\ny = 2</code></pre>"
+        Hwaro::Utils::HtmlMinifier.minify(html)
+          .should eq("<div>#{script}</div><p>Code:</p><pre><code>x = 1\n\ny = 2</code></pre>")
+      end
+
+      it "does not pair a '<textarea' string inside a style with a later real </textarea>" do
+        style = "<style>\n.note::before { content: \"<textarea\" }\n\n.a  .b { color: red }\n</style>"
+        html = "#{style}\n<form><textarea>a\n\n b </textarea></form>"
+        Hwaro::Utils::HtmlMinifier.minify(html).should eq("#{style}<form><textarea>a\n\n b </textarea></form>")
       end
 
       it "preserves XML comments inside <svg>" do
@@ -651,10 +668,9 @@ describe Hwaro::Utils::HtmlMinifier do
         result.should eq("<script>HW_HTML_PB_0</script>")
       end
 
-      it "still restores legitimately nested protected blocks" do
-        # `style` is extracted before `script`, so the script's preserved body
-        # holds a style placeholder that only a second restore pass resolves.
-        # The pass cap must stay wide enough for that (depth <= preserves.size).
+      it "keeps a protected block quoted inside another one intact" do
+        # The script opens first, so its body (with the `<style>` string) is
+        # one block; nothing inside it is extracted separately.
         html = "<div> <script>var x = \"<style>body{}</style>\";</script> </div>"
         result = Hwaro::Utils::HtmlMinifier.minify(html)
         result.should eq("<div><script>var x = \"<style>body{}</style>\";</script></div>")
