@@ -269,7 +269,7 @@ A value that isn't a number (text, `true`, an undefined value, NaN) comes back u
   <h3>{{ group.grouper }}</h3>
   <ul>
   {% for p in group.list %}
-    <li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
+    <li><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></li>
   {% endfor %}
   </ul>
 {% endfor %}

@@ -269,7 +269,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
   <h3>{{ group.grouper }}</h3>
   <ul>
   {% for p in group.list %}
-    <li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
+    <li><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></li>
   {% endfor %}
   </ul>
 {% endfor %}

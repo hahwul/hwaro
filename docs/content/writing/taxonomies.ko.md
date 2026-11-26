@@ -193,7 +193,7 @@ Crystal은 Ruby와 닮은 문법의 컴파일 언어입니다.
 {% for term in tax.items if term.name == taxonomy_term %}
 <ul>
 {% for p in term.pages %}
-  <li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
+  <li><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></li>
 {% endfor %}
 </ul>
 {% endfor %}

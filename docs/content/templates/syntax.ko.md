@@ -101,7 +101,7 @@ elif와 함께:
 표현식 안에서 인라인으로 쓸 수도 있습니다(`else` 부분은 생략할 수 있으며, 생략하면 빈 값으로 렌더링됩니다).
 
 ```jinja
-<a href="{{ item.url }}" class="{{ 'active' if item.url == page.url else '' }}">{{ item.name | e }}</a>
+<a href="{{ item.href }}" class="{{ 'active' if item.url == page.url else '' }}">{{ item.name | e }}</a>
 {% set label = page.title if page.title else "Untitled" %}
 ```
 
@@ -111,7 +111,7 @@ elif와 함께:
 
 ```jinja
 {% for p in section.pages %}
-<li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
+<li><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></li>
 {% endfor %}
 ```
 
@@ -145,7 +145,7 @@ Jinja2처럼 `[start:stop:step]`으로 리스트나 문자열의 일부를 꺼�
 
 ```jinja
 {% for p in section.pages[:5] %}
-<li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
+<li><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></li>
 {% endfor %}
 
 {{ page.title[:40] | e }}
@@ -213,7 +213,7 @@ include한 파일은 페이지가 아니라 자기 이름에 따라 이스케이
 
 ```jinja
 {% macro card(p, show_date=true) %}
-<a href="{{ p.url }}">{{ p.title | e }}</a>
+<a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a>
 {% if show_date and p.date %}<time>{{ p.date }}</time>{% endif %}
 {% endmacro %}
 ```
@@ -363,7 +363,7 @@ Jinja 문법을 그대로 출력합니다.
 {% if section.pages %}
 <ul>
 {% for p in section.pages %}
-  <li><a href="{{ p.url }}">{{ p.title | e }}</a></li>
+  <li><a href="{{ base_url }}{{ p.url }}">{{ p.title | e }}</a></li>
 {% endfor %}
 </ul>
 {% else %}

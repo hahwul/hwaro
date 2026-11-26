@@ -117,7 +117,7 @@ ignore = ["_templates", "README.md", "**/*.excalidraw.md"]
   <h2>이 페이지를 링크한 글</h2>
   <ul>
   {% for p in page.backlinks %}
-    <li><a href="{{ p.url }}">{{ p.title }}</a></li>
+    <li><a href="{{ base_url }}{{ p.url }}">{{ p.title }}</a></li>
   {% endfor %}
   </ul>
 </aside>

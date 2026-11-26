@@ -347,7 +347,7 @@ Use the `t` filter to translate keys:
   <a href="/about/">{{ "nav.about" | t }}</a>
 </nav>
 
-<a href="{{ page.url }}">{{ "common.read_more" | t }}</a>
+<a href="{{ base_url }}{{ page.url }}">{{ "common.read_more" | t }}</a>
 ```
 
 ### Fallback Behavior

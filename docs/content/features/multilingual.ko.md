@@ -347,7 +347,7 @@ back = "뒤로"
   <a href="/about/">{{ "nav.about" | t }}</a>
 </nav>
 
-<a href="{{ page.url }}">{{ "common.read_more" | t }}</a>
+<a href="{{ base_url }}{{ page.url }}">{{ "common.read_more" | t }}</a>
 ```
 
 ### 폴백 동작
