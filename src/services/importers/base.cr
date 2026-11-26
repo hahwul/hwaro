@@ -119,7 +119,16 @@ module Hwaro
 
           entries.each do |entry|
             full_path = File.join(dir, entry)
-            if File.directory?(full_path)
+            # `File.directory?` follows a symlink and RAISES when it cannot
+            # resolve one (a self-loop `ln -s a.md a.md`: ELOOP), which
+            # aborted the whole import with HWARO_E_IO over one entry.
+            is_dir = begin
+              File.directory?(full_path)
+            rescue ex : File::Error
+              Logger.warn "Skipped unresolvable entry: #{full_path} (#{ex.message})"
+              next
+            end
+            if is_dir
               # A symlinked directory can close a cycle (`ln -s .. sub`), and
               # following it raises ELOOP straight out of this walk — killing
               # the whole import before a single file is read. It can also
