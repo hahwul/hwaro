@@ -1107,3 +1107,49 @@ describe "Builder#render_deferred" do
     end
   end
 end
+
+describe "Builder#run_incremental translation links and output collisions" do
+  # An edit gives `blog/aa.md` the slug "zz-about": it takes
+  # /blog/zz-about/, so `blog/zz-about.md` is no longer written and the
+  # untouched Korean page must stop linking it (and link it again once the
+  # collision is gone), as a cold build does. Only `aa.md` is edited.
+  it "relinks an untouched translation when its original loses or regains its output path" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        File.write("config.toml", <<-TOML)
+          title = "T"
+          base_url = "http://localhost"
+          default_language = "en"
+          [languages.en]
+          language_name = "English"
+          [languages.ko]
+          language_name = "Korean"
+          TOML
+        FileUtils.mkdir_p("content/blog")
+        FileUtils.mkdir_p("templates")
+        File.write("templates/page.html", "{{ page.title }}|{% for t in page.translations %}{{ t.code }}:{{ t.url }};{% endfor %}")
+        File.write("templates/section.html", "S")
+        File.write("content/blog/zz-about.md", "+++\ntitle = \"About\"\n+++\n")
+        File.write("content/blog/zz-about.ko.md", "+++\ntitle = \"About ko\"\n+++\n")
+        File.write("content/blog/aa.md", "+++\ntitle = \"AA\"\n+++\n")
+
+        builder = Hwaro::Core::Build::Builder.new
+        options = Hwaro::Config::Options::BuildOptions.new(output_dir: "public", parallel: false)
+        options.serve_mode = true
+        options.preserve_output = true
+        builder.run_incremental(["content/blog/aa.md"], options)
+        File.read("public/ko/blog/zz-about/index.html").should contain("en:/blog/zz-about/;")
+
+        File.write("content/blog/aa.md", "+++\ntitle = \"AA\"\nslug = \"zz-about\"\n+++\n")
+        builder.run_incremental(["content/blog/aa.md"], options)
+        File.read("public/blog/zz-about/index.html").should start_with("AA|")
+        File.read("public/ko/blog/zz-about/index.html").should_not contain("en:")
+
+        File.write("content/blog/aa.md", "+++\ntitle = \"AA\"\n+++\n")
+        builder.run_incremental(["content/blog/aa.md"], options)
+        File.read("public/blog/zz-about/index.html").should start_with("About|")
+        File.read("public/ko/blog/zz-about/index.html").should contain("en:/blog/zz-about/;")
+      end
+    end
+  end
+end
