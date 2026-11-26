@@ -254,11 +254,11 @@ module Hwaro
         # given whether that line ended with a newline and the tracker that
         # walked the document. A last line with no newline gets one, so the
         # markup cannot join a raw HTML block ending there (safe mode omits
-        # that block whole, appended markup included). A top-level fence the
-        # document left open gets its closer, or the markup would render as
-        # text of that code block.
+        # that block whole, appended markup included). A fence the document
+        # left open gets its closer (`FenceTracker#open_block_closer`), or
+        # the markup would render as text of that code block.
         private def document_end_separator(last_line_ended : Bool, tracker : FenceTracker) : String
-          closer = tracker.open_fence_closer
+          closer = tracker.open_block_closer
           return "" if last_line_ended && closer.nil?
           String.build do |io|
             io << '\n' unless last_line_ended

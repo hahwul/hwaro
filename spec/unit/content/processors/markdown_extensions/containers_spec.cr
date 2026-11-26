@@ -39,6 +39,39 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
         HTML
     end
 
+    it "closes an unclosed container in a list item when the item ends" do
+      # The `</div>` was emitted at the end of the page: after the list, so
+      # the div opened in the <li> and closed outside the <ul>.
+      html, _ = Hwaro::Processor::Markdown.render("- item\n  ::: tip\n  body\n\nafter para\n", markdown_config: containers_config)
+      html.should eq(<<-HTML)
+        <ul>
+        <li>
+        <p>item</p>
+        <div class="admonition admonition-tip">
+        <p class="admonition-title">Tip</p>
+        <p>body</p>
+        </div>
+        </li>
+        </ul>
+        <p>after para</p>
+
+        HTML
+      # A sibling item at the same column ends it too.
+      html, _ = Hwaro::Processor::Markdown.render("- a\n  ::: tip\n  body\n- b\n", markdown_config: containers_config)
+      html.should contain("<p>body</p>\n</div>\n</li>\n<li>\n<p>b</p>\n</li>\n</ul>")
+    end
+
+    it "closes a fence left open in a list item's container before the container" do
+      # The fence closer was only emitted for top-level fences, so the
+      # indented `</div>` became code text and the admonition stayed open.
+      html, _ = Hwaro::Processor::Markdown.render("- item\n  ::: tip\n  ```\n  code\n", markdown_config: containers_config)
+      html.should_not contain("&lt;/div&gt;")
+      html.should end_with("<pre><code>code\n</code></pre>\n</div>\n</li>\n</ul>\n")
+      html, _ = Hwaro::Processor::Markdown.render("- item\n  ::: tip\n  ```\n  code\nafter\n", markdown_config: containers_config)
+      html.should_not contain("&lt;/div&gt;")
+      html.should end_with("<pre><code>code\n</code></pre>\n</div>\n</li>\n</ul>\n<p>after</p>\n")
+    end
+
     it "auto-closes a container in safe mode when the page ends with raw HTML and no newline" do
       # The `</div>` joined the raw HTML block on the last line, which safe
       # mode omits whole.

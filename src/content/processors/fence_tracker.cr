@@ -118,9 +118,11 @@ module Hwaro
         @in_indented_code = false
         @indented_code_column = 4
         @indented_code_bq_depth = 0
-        # Open list items as {blockquote depth, content column}, outermost
-        # first.
-        @list_items = [] of {Int32, Int32}
+        # Open list items as {blockquote depth, content column, serial},
+        # outermost first. The serial (never reused) tells an item apart
+        # from a sibling that later opens at the same column.
+        @list_items = [] of {Int32, Int32, Int32}
+        @item_serial = 0
         @prev_blank = true
         @prev_atx_heading = false
         # Byte offset of the innermost item's text on the last marker line
@@ -171,12 +173,14 @@ module Hwaro
         # item CommonMark forbids from interrupting a paragraph (an empty one,
         # or an ordered one not starting at 1), which is continuation text.
         getter? list_item_line = false
-        # Content column of the list item holding the last line fed, when
-        # that line sits outside any blockquote (0 otherwise, and for a line
-        # `fence_line?` passed through verbatim). On a list marker line it is
-        # the item enclosing the one the marker opens. Markup a pass puts in
-        # place of the line starts there to stay inside that item.
+        # Content column and serial (see `item_open?`) of the list item
+        # holding the last line fed, when that line sits outside any
+        # blockquote (0 and nil otherwise, and for a line `fence_line?`
+        # passed through verbatim). On a list marker line it is the item
+        # enclosing the one the marker opens. Markup a pass puts in place of
+        # the line starts at that column to stay inside that item.
         getter line_container_column = 0
+        getter line_container_item : Int32? = nil
 
         # `raw_html_code: false` turns off raw-HTML code-block tracking and
         # generic HTML-block tracking.
@@ -212,6 +216,7 @@ module Hwaro
           @html_block_line = false
           @list_item_line = false
           @line_container_column = 0
+          @line_container_item = nil
 
           if @footnote_body
             # The collector's own rule: a blank or indented line continues
@@ -328,11 +333,16 @@ module Hwaro
           end
 
           in_paragraph = paragraph_open && depth == @paragraph_depth && column >= @paragraph_column
-          @line_container_column = list_content_column(depth, column) if depth.zero?
+          if depth.zero? && (holder = list_item_at(depth, column))
+            @line_container_column, @line_container_item = holder[1], holder[2]
+          end
           marker_item = blank ? nil : track_list_item(content, depth, column, text_start, prefix)
           @list_item_line = !marker_item.nil? && (!in_paragraph || interrupting_item?(content, text_start))
           container_column = marker_item || list_content_column(depth, column)
-          @line_container_column = container_column if depth.zero? && !marker_item
+          if depth.zero? && !marker_item
+            holder = list_item_at(depth, column)
+            @line_container_column, @line_container_item = holder ? {holder[1], holder[2]} : {0, nil}
+          end
           opened_html = !blank && !in_html_block && @track_html_blocks &&
                         open_html_block(content, depth, column, container_column, paragraph_open && depth == @paragraph_depth && column >= @paragraph_column)
 
@@ -374,17 +384,23 @@ module Hwaro
           end
         end
 
-        # The delimiter that closes a fence still open after the last line
-        # fed, when that fence sits at the top level (outside any blockquote
-        # or list item); nil otherwise. CommonMark runs an unclosed fence to
-        # the end of the document, so markup a pass appends after the last
-        # line (a container's `</div>`, the footnote block) would land inside
-        # the code block unless the fence is closed first. A fence inside a
-        # quote or list item needs no closer: the appended unindented,
-        # marker-less line ends the container and the fence with it.
-        def open_fence_closer : String?
-          return unless @in_fence && @fence_bq_depth.zero? && @fence_base.zero?
-          @fence_char.to_s * @fence_len
+        # The line that closes a block still open after the last line fed,
+        # so markup a pass appends after it (a container's `</div>`, the
+        # footnote block) does not land inside it; nil when none is open.
+        # CommonMark runs an unclosed fence to the end of the document. A
+        # fence in a list item is closed at the item's content column, so
+        # markup emitted there is still in the item. One inside a blockquote
+        # needs no closer: the appended marker-less line ends the quote and
+        # the fence with it.
+        def open_block_closer : String?
+          return unless @in_fence && @fence_bq_depth.zero?
+          " " * @fence_base + @fence_char.to_s * @fence_len
+        end
+
+        # Whether the list item with this serial (`line_container_item`) is
+        # still open after the last line fed.
+        def item_open?(serial : Int32) : Bool
+          @list_items.any? { |item| item[2] == serial }
         end
 
         private def indented?(content : String) : Bool
@@ -586,10 +602,16 @@ module Hwaro
         # The content column of the innermost open item (at this blockquote
         # depth) that a line starting at `column` sits inside; 0 outside any.
         private def list_content_column(depth : Int32, column : Int32) : Int32
+          list_item_at(depth, column).try(&.[1]) || 0
+        end
+
+        # The innermost open item (at this blockquote depth) that a line
+        # starting at `column` sits inside.
+        private def list_item_at(depth : Int32, column : Int32) : {Int32, Int32, Int32}?
           @list_items.reverse_each do |item|
-            return item[1] if item[0] == depth && item[1] <= column
+            return item if item[0] == depth && item[1] <= column
           end
-          0
+          nil
         end
 
         # A list marker less than 4 columns right of its container's content
@@ -644,7 +666,7 @@ module Hwaro
             content_column = column + marker_size + (simple ? width : 1)
 
             @list_items.reject! { |item| item[0] == depth && item[1] > column } if first
-            @list_items << {depth, content_column}
+            @list_items << {depth, content_column, @item_serial += 1}
             pushed = content_column
             @empty_item_open = rest.byte_slice(marker_size).blank?
             break unless simple
