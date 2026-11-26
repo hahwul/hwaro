@@ -221,3 +221,26 @@ describe "version counterparts that lose their output path" do
     end
   end
 end
+
+describe "version root sections that lose their output path" do
+  # `docs/v1/_index.ko.md` loses `/ko/docs/v1/` to `a.ko.md`, so it is no
+  # v1 Korean root: a Korean page with no v1 counterpart must not link its
+  # v1 row to `a.ko.md`.
+  it "does not take a collision-losing section as the version root" do
+    build_site(
+      %(title = "T"\nbase_url = "https://example.com"\ndefault_language = "en"\n[languages.en]\nlanguage_name = "English"\n[languages.ko]\nlanguage_name = "Korean"\n[[versions.list]]\nname = "v2"\npath = "docs/v2"\nlatest = true\n[[versions.list]]\nname = "v1"\npath = "docs/v1"\n),
+      content_files: {
+        "docs/v1/_index.md"    => "+++\ntitle = \"V1\"\n+++\n",
+        "docs/v1/_index.ko.md" => "+++\ntitle = \"V1\"\n+++\n",
+        "docs/v2/_index.md"    => "+++\ntitle = \"V2\"\n+++\n",
+        "docs/v2/_index.ko.md" => "+++\ntitle = \"V2\"\n+++\n",
+        "a.ko.md"              => "+++\ntitle = \"Other\"\npath = \"docs/v1\"\n+++\n",
+        "docs/v2/b.ko.md"      => "+++\ntitle = \"B2\"\n+++\n",
+      },
+      template_files: {"page.html"    => "{% for v in page.version_links %}[{{ v.name }} {{ v.url }} {{ v.exists }}]{% endfor %}",
+                       "section.html" => ""},
+    ) do |dir|
+      File.read(File.join(dir, "public", "ko", "docs", "b", "index.html")).should eq("[v2 /ko/docs/b/ true][v1 /docs/v1/ false]")
+    end
+  end
+end
