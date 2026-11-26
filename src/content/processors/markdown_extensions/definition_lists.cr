@@ -89,6 +89,13 @@ module Hwaro
                 break
               end
               result << "</dl>"
+              # `<dl>` opens a type-6 HTML block that runs to the next blank
+              # line, so a line right after the list (a paragraph, `- item`,
+              # a fence) was swallowed into it and shipped as raw, unparsed
+              # Markdown. The blank line ends the block; Markd drops it from
+              # the block's literal, so a list followed by a blank line (or
+              # the end of the page) renders as before.
+              result << "" if i < lines.size && !lines[i].strip.empty?
             else
               result << line
               i += 1
