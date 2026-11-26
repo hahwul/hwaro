@@ -58,26 +58,52 @@ module Hwaro
         ADMONITION_OPEN_RE = /<blockquote>\s*<p>\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\](?<fold>[+-]?)([^\n]*?)(?:\n|(?=<\/p>))\s*/i
         BLOCKQUOTE_TAG_RE  = /<(\/?)blockquote(?=[\s>\/])[^>]*+>/i
 
-        # Byte offset of the `</blockquote>` closing the blockquote whose
-        # content starts at `from`, counting nested blockquotes (a render
-        # hook's `<blockquote class=…>` included). Unbalanced raw HTML that
-        # never returns to depth zero falls back to the first closer, as the
-        # lazy match did; nil when there is no closer at all.
-        private def matching_blockquote_close(html : String, from : Int32, options : Regex::MatchOptions) : Int32?
-          depth = 1
-          first = nil
-          pos = from
+        # Every blockquote tag on the page, paired once: `begins[i]` is the
+        # i-th tag's offset, `closes[i]` the `</blockquote>` that returns a
+        # quote whose content starts just before tag i to depth zero
+        # (nested blockquotes counted, a render hook's
+        # `<blockquote class=…>` included), and `firsts[i]` the first closer
+        # at or after tag i. Unbalanced raw HTML that never returns to depth
+        # zero falls back to that first closer, as the lazy match did; -1
+        # when there is none. Scanning to the end of the page per admonition
+        # instead was quadratic when every body held an unclosed raw
+        # `<blockquote>`.
+        private def pair_blockquote_tags(html : String, options : Regex::MatchOptions) : {Array(Int32), Array(Int32), Array(Int32)}
+          begins = [] of Int32
+          closing = [] of Bool
+          pos = 0
           while m = BLOCKQUOTE_TAG_RE.match_at_byte_index(html, pos, options)
+            begins << m.byte_begin(0)
+            closing << !m[1].empty?
             pos = m.byte_end(0)
-            if m[1].empty?
-              depth += 1
-            else
-              first ||= m.byte_begin(0)
-              depth -= 1
-              return m.byte_begin(0) if depth.zero?
-            end
           end
-          first
+          n = begins.size
+          # level[k]: opens minus closes before tag k. A quote whose content
+          # starts before tag i closes at the first k > i with
+          # level[k] < level[i] (steps are ±1), i.e. at tag k - 1.
+          level = Array(Int32).new(n + 1, 0)
+          n.times { |k| level[k + 1] = level[k] + (closing[k] ? -1 : 1) }
+          closes = Array(Int32).new(n + 1, -1)
+          pending = [] of Int32
+          (0..n).each do |k|
+            while (top = pending.last?) && level[k] < level[top]
+              closes[pending.pop] = begins[k - 1]
+            end
+            pending << k
+          end
+          firsts = Array(Int32).new(n + 1, -1)
+          (n - 1).downto(0) { |k| firsts[k] = closing[k] ? begins[k] : firsts[k + 1] }
+          {begins, closes, firsts}
+        end
+
+        # Byte offset of the `</blockquote>` closing the blockquote whose
+        # content starts at `from` (see `pair_blockquote_tags`); nil when
+        # there is no closer at all.
+        private def matching_blockquote_close(tags : {Array(Int32), Array(Int32), Array(Int32)}, from : Int32) : Int32?
+          begins, closes, firsts = tags
+          i = begins.bsearch_index { |b| b >= from } || begins.size
+          close = closes[i] >= 0 ? closes[i] : firsts[i]
+          close >= 0 ? close : nil
         end
 
         # Post-processing: rewrite GitHub `> [!TYPE]` blockquotes as admonition
@@ -96,10 +122,11 @@ module Hwaro
           options = html.valid_encoding? ? Regex::MatchOptions::NO_UTF_CHECK : Regex::MatchOptions::None
           return html unless m = ADMONITION_OPEN_RE.match_at_byte_index(html, 0, options)
 
+          tags = pair_blockquote_tags(html, options)
           String.build(html.bytesize) do |io|
             pos = 0
             while m
-              break unless close = matching_blockquote_close(html, m.byte_end(0), options)
+              break unless close = matching_blockquote_close(tags, m.byte_end(0))
               io.write(html.to_slice[pos, m.byte_begin(0) - pos])
               body = html.byte_slice(m.byte_end(0), close - m.byte_end(0))
               body = postprocess_admonitions(body, foldable, depth + 1) if depth + 1 < MAX_ADMONITION_NESTING

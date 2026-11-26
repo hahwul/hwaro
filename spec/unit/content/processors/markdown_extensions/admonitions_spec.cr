@@ -51,6 +51,17 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       out.scan("admonition-note").size.should eq(Hwaro::Content::Processors::MarkdownExtensions::MAX_ADMONITION_NESTING)
     end
 
+    it "stays linear when raw HTML leaves every admonition body unbalanced" do
+      # Each admonition's close search ran to the end of the page looking
+      # for depth zero before falling back to the first closer.
+      html = "<blockquote>\n<p>[!NOTE]</p>\n<blockquote>\n</blockquote>\n" * 20_000
+      t = Time.instant
+      out = Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html)
+      (Time.instant - t).should be < 5.seconds # quadratic took 60s+
+      out.scan(%(<div class="admonition admonition-note">)).size.should eq(20_000)
+      out.should_not contain("</blockquote>")
+    end
+
     it "falls back to the first closer when raw HTML leaves the quote unbalanced" do
       html = "<blockquote>\n<p>[!NOTE]</p>\n<blockquote>\n<p>x</p>\n</blockquote>\nrest"
       Hwaro::Content::Processors::MarkdownExtensions.postprocess_admonitions(html).should eq(
