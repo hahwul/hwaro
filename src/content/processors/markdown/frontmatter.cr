@@ -354,15 +354,18 @@ module Hwaro
           extra = {} of String => Models::ExtraValue
           unknown_keys = [] of String
           if fm_hash = yaml_fm.as_h?
+            # Keys go through `key_string`, as nested keys already did (see
+            # `extract_extra_value`): an unquoted `2024:` or `404:` key is an
+            # integer to the YAML reader, and `as_s?` dropped it — from the
+            # top level and from `extra` alike — while the same key in TOML
+            # or JSON front matter (always a string there) reached
+            # `page.extra`.
             fm_hash.each do |key_any, value|
-              key = key_any.as_s?
-              next unless key
+              key = Utils::FrontmatterWriter.key_string(key_any)
               next if KNOWN_FRONT_MATTER_KEYS.includes?(key)
               if key == "extra" && (inner = value.as_h?)
                 inner.each do |inner_key_any, inner_value|
-                  inner_key = inner_key_any.as_s?
-                  next unless inner_key
-                  extra[inner_key] = extract_extra_value(inner_value)
+                  extra[Utils::FrontmatterWriter.key_string(inner_key_any)] = extract_extra_value(inner_value)
                 end
                 next
               end
@@ -372,7 +375,7 @@ module Hwaro
           end
           warn_typo_keys(unknown_keys, file_path, declared_keys)
 
-          front_matter_keys = yaml_fm.as_h?.try(&.keys).try(&.compact_map(&.as_s?)) || [] of String
+          front_matter_keys = yaml_fm.as_h?.try(&.keys).try(&.map { |k| Utils::FrontmatterWriter.key_string(k) }) || [] of String
           taxonomies = extract_taxonomies(yaml_fm, front_matter_keys, file_path)
           tags = fm_string_array(yaml_fm, "tags", file_path)
           tags = taxonomies["tags"]? || tags if tags.empty?

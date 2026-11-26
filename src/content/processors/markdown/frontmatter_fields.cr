@@ -177,7 +177,7 @@ module Hwaro
               end
             when YAML::Any
               table.as_h?.try &.each do |k, v|
-                next unless key_str = k.as_s?
+                key_str = Utils::FrontmatterWriter.key_string(k)
                 if arr = v.as_a?
                   taxonomies[key_str] = fm_terms(arr, key_str, file_path)
                 else
