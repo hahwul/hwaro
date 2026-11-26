@@ -331,6 +331,19 @@ module Hwaro
           end
         end
 
+        # The delimiter that closes a fence still open after the last line
+        # fed, when that fence sits at the top level (outside any blockquote
+        # or list item); nil otherwise. CommonMark runs an unclosed fence to
+        # the end of the document, so markup a pass appends after the last
+        # line (a container's `</div>`, the footnote block) would land inside
+        # the code block unless the fence is closed first. A fence inside a
+        # quote or list item needs no closer: the appended unindented,
+        # marker-less line ends the container and the fence with it.
+        def open_fence_closer : String?
+          return unless @in_fence && @fence_bq_depth.zero? && @fence_base.zero?
+          @fence_char.to_s * @fence_len
+        end
+
         private def indented?(content : String) : Bool
           content.starts_with?("    ") || content.starts_with?('\t')
         end

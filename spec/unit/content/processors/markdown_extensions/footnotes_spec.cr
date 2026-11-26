@@ -14,5 +14,29 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result.should contain("<!--HWARO-FN:n0:1.1:Note 0-->\n<!--HWARO-FN:n1:2.1:Note 1-->\n")
       result.should end_with("<!--HWARO-FN:n39999:40000.1:Note 39999-->\n<!--HWARO-FOOTNOTES-END-->\n")
     end
+
+    it "renders the footnotes of a page that ends inside an unclosed fence" do
+      # CommonMark runs an unclosed fence to the end of the page, so the
+      # appended marker block became code text: the engine comments showed
+      # on the page and the footnotes section was never built.
+      config = Hwaro::Models::MarkdownConfig.new
+      %w[``` ~~~~].each do |fence|
+        html, _ = Hwaro::Processor::Markdown.render("Text[^1]\n\n[^1]: the note\n\n#{fence}\ncode\n", markdown_config: config)
+        html.should_not contain("HWARO-")
+        html.should contain(%(<pre><code>code\n</code></pre>))
+        html.should contain(%(<li id="fn-1">\n<p>the note))
+      end
+    end
+
+    it "keeps the footnotes in safe mode when the page ends with raw HTML and no newline" do
+      # The marker block joined the raw HTML block on the last line, which
+      # safe mode omits whole, so the section silently disappeared.
+      config = Hwaro::Models::MarkdownConfig.new
+      config.safe = true
+      html, _ = Hwaro::Processor::Markdown.render("Text[^1]\n\n[^1]: the note\n\n<div>raw</div>", safe: true, markdown_config: config)
+      html.should contain(%(<li id="fn-1">\n<p>the note))
+      with_newline, _ = Hwaro::Processor::Markdown.render("Text[^1]\n\n[^1]: the note\n\n<div>raw</div>\n", safe: true, markdown_config: config)
+      html.should eq(with_newline)
+    end
   end
 end
