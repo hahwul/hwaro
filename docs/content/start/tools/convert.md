@@ -59,9 +59,11 @@ The three formats do not share a type system, so a conversion can change a
 value's type while keeping its text. Nothing is silently dropped, but these
 mappings are lossy:
 
-- Dates and datetimes are written as date strings (`date = "2024-01-15"`),
-  which is how the build reads them. A re-read with another tool sees a string,
-  not a native date.
+- `to-toml` writes dates and datetimes as native TOML values
+  (`date = 2024-01-15`, also inside arrays). JSON has no date type, so
+  `to-json` writes them as strings (`"date": "2024-01-15"`), and `to-yaml`
+  quotes them (`date: "2024-01-15"`). The build reads both the same way, but
+  another tool re-reading a JSON or YAML file sees a string, not a native date.
 - `inf`/`nan` have no JSON spelling: `to-json` refuses such a file and names it.
 - Keys that are not plain words (digits first, a leading `-`, `inf`, `nan`,
   spaces, dots) are quoted in TOML, and an unquoted YAML date key
