@@ -102,3 +102,13 @@ class Crinja::Parser::ExpressionParser
     end
   end
 end
+
+# The `in` test is the operator: `x is in(seq)` is `x in seq`, as Jinja2's
+# `test_in` is. Upstream compared raw values in a list and, for an
+# undefined, none or number `seq`, raised a bare `Exception` whose message
+# was the argument's debug form (`Crinja::Value<#<Crinja::Undefined …>>`),
+# so `{% if tag is in(page.extra.featured) %}` failed the build on a page
+# without the key, where `tag in page.extra.featured` is false.
+Crinja.test({seq: Array(Crinja::Value).new}, :in) do
+  Crinja::Operator.member?(target, arguments["seq"])
+end

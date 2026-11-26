@@ -22,7 +22,11 @@
 #      down with it). Reject a zero step up front, the way Crystal's own
 #      `Int#step(by: 0)` and Python's `range()` do.
 #
-# Patch order matters for nothing here; all three are independent of the
+#   4. An integer literal past Int64 and a tag whose arguments end early
+#      (`{% for %}`) failed with an unlocated `Invalid Int64` /
+#      `Unexpected EOF`.
+#
+# Patch order matters for nothing here; all of them are independent of the
 # other Crinja patches under src/ext/ (crinja_render_perf reopens Renderer
 # for PrintStatement/FixedString only, so `previous_def` on TagNode binds to
 # the upstream visitor).
@@ -118,5 +122,37 @@ class Crinja::Function::RangeIterator(B, N)
     raise ArgumentError.new("range() step must be a non-zero integer") if step == 0
     @step = step.abs
     @direction_reversed = step < 0
+  end
+end
+
+# === 4. A literal too large and a tag cut short point at the template =======
+#
+# Two parse failures were plain Crystal exceptions raised outside any node,
+# so the build reported `Render failed for p.md: …` with no template, line
+# or excerpt:
+#
+#   * an integer literal past Int64 (`{{ 99999999999999999999 }}`) failed in
+#     `String#to_i64` with `Invalid Int64: "…"`;
+#   * a tag whose arguments end early (`{% for %}`, `{% macro %}`,
+#     `{% for x in %}`) ran off its token stream with `Unexpected EOF`.
+#
+# Both now raise a TemplateSyntaxError at the offending token (the tag's
+# last token for the second), as every other syntax error does.
+class Crinja::Parser::ExpressionParser
+  private def parse_literal
+    if current_token.kind == Kind::INTEGER && current_token.value.to_i64?.nil?
+      raise TemplateSyntaxError.new(current_token, "integer literal #{current_token.value} is out of range (the largest is #{Int64::MAX})")
+    end
+    previous_def
+  end
+end
+
+class Crinja::Parser::TokenStream
+  def at(pos)
+    if token = at?(pos)
+      return token
+    end
+    last = @buffer.last?
+    raise last ? TemplateSyntaxError.new(last, "Unexpected end of tag") : TemplateSyntaxError.new("Unexpected end of tag")
   end
 end

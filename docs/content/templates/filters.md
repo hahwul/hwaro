@@ -9,7 +9,7 @@ Filters transform values in templates. Apply with the pipe `|` operator.
 
 Hwaro ships its own filters on top of the standard Crinja (Jinja2) built-ins (`upper`, `lower`, `join`, `map`, `select`, `batch`, and friends), so both kinds work anywhere below.
 
-Besides the built-ins in the tables below, these Jinja2 filters are available: `abs`, `attr`, `batch`, `center`, `dictsort`, `escape` (`e`), `filesizeformat`, `float`, `format`, `groupby`, `indent`, `int`, `list`, `map`, `random`, `reject`, `rejectattr`, `round`, `select`, `selectattr`, `slice`, `string`, `striptags`, `sum`, `title`, `truncate`, `urlencode`, `urlize`, `wordcount`, `wordwrap` and `xmlattr`.
+Besides the built-ins in the tables below, these Jinja2 filters are available: `abs`, `attr`, `batch`, `center`, `dictsort`, `escape` (`e`), `filesizeformat`, `float`, `format`, `groupby`, `indent`, `int`, `list`, `map`, `random`, `reject`, `rejectattr`, `round`, `select`, `selectattr`, `slice`, `string`, `striptags`, `sum`, `title`, `truncate`, `urlencode`, `urlize`, `wordcount`, `wordwrap` and `xmlattr`. `groupby` gives a list of groups with `grouper` and `list` attributes (`{% for g in posts | groupby("extra.year") %}{{ g.grouper }}`), in the order each group's first item appears rather than sorted as in Jinja2.
 
 ## Syntax
 
@@ -64,7 +64,7 @@ Under [`[templates] autoescape`](/templates/syntax/#html-escaping) (on by defaul
 | `e` / `escape` | Escapes text; a safe value is returned unchanged, except HTML hwaro rendered (`content`, `page.summary`, …), which is still escaped as before 1.0. Safe either way, so it never escapes twice |
 | `forceescape`, `xml_escape` | Escape the value even when it is safe; the result is safe |
 | `safe` | Marks the value safe (prints as is) |
-| `markdownify`, `tojson`, `jsonify`, `urlize`, `xmlattr` | Return safe HTML (or script-safe JSON). `urlize` escapes the text it links and links `www.` and `scheme://` URLs, except the unsafe schemes `javascript:`, `vbscript:`, `file:` and `data:`, which stay plain text (so `ftp://example.com/a` is linked). Under autoescape, `xmlattr` rejects an attribute name containing a space, `/`, `>` or `=` |
+| `markdownify`, `tojson`, `jsonify`, `urlize`, `xmlattr` | Return safe HTML (or script-safe JSON). `urlize` escapes the text it links and links `www.` and `scheme://` URLs, except the unsafe schemes `javascript:`, `vbscript:`, `file:` and `data:`, which stay plain text (so `ftp://example.com/a` is linked). A `.`, `,` or `)` that ends a URL stays outside the link (unless the `)` closes a `(` in the URL), and a `www.` URL links to `https://www.…`. Under autoescape, `xmlattr` rejects an attribute name containing a space, `/`, `>` or `=` |
 | `upper`, `lower`, `capitalize`, `center`, `indent`, `trim`, `truncate`, `truncate_words`, `replace`, `regex_replace`, `format`, `string`, `default` | A safe input stays safe; text the filter adds (`truncate`'s `end`, `replace`'s new text, `format`'s arguments) is escaped. A plain input stays plain |
 | `join` | Escapes each item and the separator unless they are safe; the result is safe |
 | `strip_html`, `striptags` | Return plain text with entities decoded, so it prints escaped exactly once |
@@ -94,6 +94,8 @@ same text renders in page bodies. The rest of the extension pipeline
 | where | Filter objects by field value | {{ posts \| where(attribute="draft", value=false) }} |
 | sort_by | Sort objects by field | {{ posts \| sort_by(attribute="date", reverse=true) }} |
 | group_by | Group objects by field | {{ posts \| group_by(attribute="section") }} |
+
+`where`, `sort_by` and `group_by` read `attribute=` as a field name or, when no field has that exact name, a dotted path such as `"extra.weight"` (`{{ posts | sort_by(attribute="extra.weight") }}`).
 
 `min` and `max` work as in Jinja2: they compare like `sort` (strings case-insensitively unless `case_sensitive=true`), `attribute=` takes a dotted path such as `"extra.weight"` and the whole item is returned, the first one wins a tie, a mapping compares its keys, and an empty list gives an undefined value. An undefined `attribute=` is ignored, as with `sort`. A string compared with a number compares as text, which is not a consistent order for a whole list (`10 < "1a" < 2 < 10`), so a list mixing numbers and strings has no reliable `sort`, `min` or `max`: convert the items to one type first.
 

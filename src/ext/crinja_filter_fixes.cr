@@ -146,16 +146,83 @@ Crinja.filter({default: 0.0}, :float) do
   end
 end
 
+# `int` converts to Int64 (as Crinja's integers are) and, like Python, reads
+# a string as an integer first and as a float after (`"1e3"` is 1000). It
+# went through Int32: `"3000000000" | int` gave the default 0, and
+# `3000000000.0 | int` (a large float from front matter or data) failed the
+# build with "Arithmetic overflow", as did NaN, which Python turns into the
+# default. A float outside Int64 (or infinite) also gives the default, and
+# the default is returned as given, as in Jinja2 (`int(3000000000)` went
+# through Int32 too and raised "Arithmetic overflow").
+#
+# A string is read with Python's int(string, base) rules: a `0b`/`0o`/`0x`
+# prefix only in its own base (or base 0, which picks the base from it),
+# single underscores between digits (`"1_000"`, also in the float reading),
+# and a base outside 0 and 2..36 falls through to the float reading. Crystal's
+# `to_i64?(base, prefix: true)` read any prefix in any base (`"0x10" | int`
+# gave 16, Jinja2 0), refused underscores, and raised on `base=0`.
+module Crinja::Filter
+  def self.__float_to_int(float : Float64) : Int64?
+    float.to_i64 if float.finite? && float > Int64::MIN.to_f64 && float < Int64::MAX.to_f64
+  end
+
+  def self.__py_int(string : String, base : Int) : Int64?
+    return unless base == 0 || 2 <= base <= 36
+    digits = string.strip
+    sign = ""
+    if digits.starts_with?('-') || digits.starts_with?('+')
+      sign = "-" if digits.starts_with?('-')
+      digits = digits[1..]
+    end
+    radix = case digits.starts_with?('0') && digits[1]?.try(&.downcase)
+            when 'x' then 16
+            when 'o' then 8
+            when 'b' then 2
+            end
+    if radix && (base == 0 || base == radix)
+      base = radix
+      # An underscore may follow the prefix itself (`0x_ff`).
+      digits = digits[2..].lchop('_')
+    elsif base == 0
+      base = 10
+      # Base 0 reads an unprefixed number as decimal, without leading zeros.
+      return if digits.starts_with?('0') && digits.each_char.any? { |char| char != '0' && char != '_' }
+    end
+    return if digits.empty? || !digits.each_char.all? { |char| char.ascii_alphanumeric? || char == '_' }
+    return unless __underscores_between?(digits, &.ascii_alphanumeric?)
+    "#{sign}#{digits.delete('_')}".to_i64?(base, whitespace: false)
+  end
+
+  # Python's float(): underscores only between two digits.
+  def self.__py_float(string : String) : Float64?
+    text = string.strip
+    return text.to_f? unless text.includes?('_')
+    text.delete('_').to_f? if __underscores_between?(text, &.ascii_number?)
+  end
+
+  # Every `_` in *text* sits between two characters that pass the block
+  # (so never first, last, or next to another `_`).
+  private def self.__underscores_between?(text : String, & : Char -> Bool) : Bool
+    return true unless text.includes?('_')
+    chars = text.chars
+    chars.each_with_index do |char, i|
+      next unless char == '_'
+      return false unless 0 < i < chars.size - 1 && yield(chars[i - 1]) && yield(chars[i + 1])
+    end
+    true
+  end
+end
+
 Crinja.filter({default: 0, base: 10}, :int) do
   raw = target.raw
   raw = raw.to_s if raw.is_a?(Crinja::SafeString)
   result = case raw
            when Bool   then raw ? 1 : 0
-           when String then raw['.']? ? raw.to_f?.try(&.to_i) : raw.to_i?(arguments["base"].to_i, prefix: true)
+           when String then Crinja::Filter.__py_int(raw, arguments["base"].to_i) || Crinja::Filter.__py_float(raw).try { |float| Crinja::Filter.__float_to_int(float) }
            when Int    then raw
-           when Float  then raw.to_i
+           when Float  then Crinja::Filter.__float_to_int(raw.to_f64)
            end
-  result ? Crinja::Value.new(result) : arguments["default"].to_i
+  result ? Crinja::Value.new(result) : arguments["default"]
 end
 
 # `min` / `max` (Jinja2 built-ins Crinja lacks): the first smallest / largest
@@ -188,6 +255,78 @@ end
 
 Crinja.filter({case_sensitive: false, attribute: nil}, :max) do
   Crinja::Filter.__extreme(target, arguments, 1)
+end
+
+# `filesizeformat` as Jinja2 writes it: `1 Byte` (not `1 Bytes`), and the
+# exa-, zetta- and yotta- units. Upstream's table stopped at peta-, so a size
+# of a thousand petabytes or more (`1000000000000000000 | filesizeformat`)
+# fell off the end and printed `none`.
+module Crinja::Filter
+  FILESIZE_PREFIXES        = {"kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"}
+  FILESIZE_BINARY_PREFIXES = {"KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"}
+
+  def self.__filesizeformat(bytes : Float64, binary : Bool) : String
+    base = binary ? 1024.0 : 1000.0
+    return "1 Byte" if bytes == 1
+    # Python's int(): truncated, and no sign on zero (`-0.5` is `0 Bytes`).
+    return "#{sprintf("%.0f", bytes.trunc.abs < 1 ? 0.0 : bytes.trunc)} Bytes" if bytes < base
+    prefixes = binary ? FILESIZE_BINARY_PREFIXES : FILESIZE_PREFIXES
+    unit = base
+    prefixes.each do |prefix|
+      unit *= base
+      return "#{sprintf("%.1f", base * bytes / unit)} #{prefix}" if bytes < unit
+    end
+    "#{sprintf("%.1f", base * bytes / unit)} #{prefixes.last}"
+  end
+end
+
+Crinja.filter({binary: false}, :filesizeformat) do
+  Crinja::Filter.__filesizeformat(target.to_f.to_f64, arguments["binary"].truthy?)
+end
+
+# `groupby` gives Jinja2's groups: a list of (grouper, list) pairs whose
+# `grouper` and `list` attributes name the two halves. Upstream returned a
+# mapping, so the documented Jinja2 loop `{% for group in posts |
+# groupby("year") %}{{ group.grouper }}` failed the build ("group.grouper is
+# undefined") and `(posts | groupby("year"))[0]` was empty. Groups keep the
+# order their first item appears in (hwaro's, not sorted as in Jinja2: a
+# sort would fail on a field some items lack), and `for key, items in …`
+# unpacks a group as before.
+class Crinja::GroupTuple < Crinja::Tuple
+  def crinja_attribute(attr : Crinja::Value) : Crinja::Value
+    case attr.to_s
+    when "grouper" then self[0]
+    when "list"    then self[1]
+    else                Crinja::Value.new(Crinja::Undefined.new(attr.to_s))
+    end
+  end
+end
+
+Crinja.filter({attribute: Crinja::UNDEFINED}, :groupby) do
+  attribute = arguments["attribute"]
+  groups = Crinja::Dictionary.new
+  target.each do |item|
+    key = Crinja::Value.new(Crinja::Resolver.resolve_dig(attribute, item))
+    (groups[key] ||= Crinja::Value.new([] of Crinja::Value)).as_a << item
+  end
+  groups.map { |key, list| Crinja::Value.new(Crinja::GroupTuple.new([key, list] of Crinja::Value)) }
+end
+
+# `pprint` prints the whole value. Upstream never flushed its PrettyPrint,
+# which holds back everything after the first group break, so
+# `{{ {"k": "v", "n": 2} | pprint }}` printed `{"k" =>`; and an undefined
+# value printed its object address (`#<Crinja::Undefined:0x…`), which
+# differs between builds. It prints `Undefined`, as Jinja2's does.
+Crinja.filter({verbose: false}, :pprint) do
+  if target.undefined?
+    "Undefined"
+  else
+    String.build do |io|
+      printer = Crinja::PrettyPrint.new(io, verbose: arguments["verbose"].truthy?)
+      target.pretty_print(printer)
+      printer.flush
+    end
+  end
 end
 
 # An undefined value is an empty sequence (and empty text) to `join`,

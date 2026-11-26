@@ -39,3 +39,22 @@ describe "Crinja `in` / `not in` operators" do
     expect_raises(Crinja::TypeError) { render_in(%({{ 1 in 2 }})) }
   end
 end
+
+describe "Crinja `in` test" do
+  # `x is in(seq)` raised a bare Exception naming the argument's debug form
+  # for an undefined, none or numeric seq; Jinja2's test is `x in seq`.
+  it "is false for an undefined sequence, as the operator is" do
+    vars = {"page" => Crinja.value({"extra" => {} of String => String})}
+    render_in(%({{ "a" is in(page.extra.featured) }}|{{ "a" is in(missing) }}|{{ "a" is not in missing }}), vars).should eq("false|false|true")
+  end
+
+  it "rejects a non-iterable sequence with the operator's TypeError" do
+    expect_raises(Crinja::TypeError, "argument of `in` is not iterable") { render_in(%({{ "a" is in(none) }})) }
+    expect_raises(Crinja::TypeError, "argument of `in` is not iterable") { render_in(%({{ 1 is in(5) }})) }
+  end
+
+  it "keeps membership by element, substring and key" do
+    vars = {"tags" => Crinja.value(["a", "b"]), "m" => Crinja.value({"k" => 1})}
+    render_in(%({{ "a" is in(tags) }}|{{ "x" is in(tags) }}|{{ "b" is in("abc") }}|{{ "k" is in(m) }}|{{ tags | select("in", ["b"]) | join }}), vars).should eq("true|false|true|true|b")
+  end
+end

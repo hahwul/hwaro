@@ -9,7 +9,7 @@ toc = true
 
 Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `select`, `batch` 등) 위에 자체 필터를 얹어 제공하므로, 아래 어디서든 두 종류 모두 사용할 수 있습니다.
 
-아래 표에 나온 내장 필터 외에 다음 Jinja2 필터도 사용할 수 있습니다: `abs`, `attr`, `batch`, `center`, `dictsort`, `escape`(`e`), `filesizeformat`, `float`, `format`, `groupby`, `indent`, `int`, `list`, `map`, `random`, `reject`, `rejectattr`, `round`, `select`, `selectattr`, `slice`, `string`, `striptags`, `sum`, `title`, `truncate`, `urlencode`, `urlize`, `wordcount`, `wordwrap`, `xmlattr`.
+아래 표에 나온 내장 필터 외에 다음 Jinja2 필터도 사용할 수 있습니다: `abs`, `attr`, `batch`, `center`, `dictsort`, `escape`(`e`), `filesizeformat`, `float`, `format`, `groupby`, `indent`, `int`, `list`, `map`, `random`, `reject`, `rejectattr`, `round`, `select`, `selectattr`, `slice`, `string`, `striptags`, `sum`, `title`, `truncate`, `urlencode`, `urlize`, `wordcount`, `wordwrap`, `xmlattr`. `groupby`는 `grouper`와 `list` 속성을 가진 그룹 목록을 돌려주며(`{% for g in posts | groupby("extra.year") %}{{ g.grouper }}`), 그룹 순서는 Jinja2처럼 정렬하지 않고 각 그룹의 첫 항목이 나온 순서를 따릅니다.
 
 ## 문법
 
@@ -64,7 +64,7 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 | `e` / `escape` | 텍스트를 이스케이프하고, 안전 값은 그대로 돌려줍니다. 단, hwaro가 렌더링한 HTML(`content`, `page.summary` 등)은 1.0 이전처럼 이스케이프합니다. 결과는 어느 쪽이든 안전 값이라 두 번 이스케이프되지 않습니다 |
 | `forceescape`, `xml_escape` | 안전 값이어도 이스케이프하며, 결과는 안전 값입니다 |
 | `safe` | 값을 안전 값(그대로 출력)으로 표시합니다 |
-| `markdownify`, `tojson`, `jsonify`, `urlize`, `xmlattr` | 안전한 HTML(또는 스크립트에 넣어도 되는 JSON)을 돌려줍니다. `urlize`는 링크로 바꾸는 텍스트를 이스케이프하고 `www.`와 `scheme://` 형태의 URL을 링크로 만듭니다. 안전하지 않은 스킴 `javascript:`, `vbscript:`, `file:`, `data:`만 일반 텍스트로 남습니다(그래서 `ftp://example.com/a`는 링크가 됩니다). 자동 이스케이프에서 `xmlattr`는 공백·`/`·`>`·`=`가 든 속성 이름을 거부합니다 |
+| `markdownify`, `tojson`, `jsonify`, `urlize`, `xmlattr` | 안전한 HTML(또는 스크립트에 넣어도 되는 JSON)을 돌려줍니다. `urlize`는 링크로 바꾸는 텍스트를 이스케이프하고 `www.`와 `scheme://` 형태의 URL을 링크로 만듭니다. 안전하지 않은 스킴 `javascript:`, `vbscript:`, `file:`, `data:`만 일반 텍스트로 남습니다(그래서 `ftp://example.com/a`는 링크가 됩니다). URL 끝에 붙은 `.`, `,`, `)`는 링크에 넣지 않으며(URL 안의 `(`를 닫는 `)`는 넣습니다), `www.` URL은 `https://www.…`로 연결됩니다. 자동 이스케이프에서 `xmlattr`는 공백·`/`·`>`·`=`가 든 속성 이름을 거부합니다 |
 | `upper`, `lower`, `capitalize`, `center`, `indent`, `trim`, `truncate`, `truncate_words`, `replace`, `regex_replace`, `format`, `string`, `default` | 안전 값을 넣으면 결과도 안전 값이고, 필터가 덧붙이는 텍스트(`truncate`의 `end`, `replace`의 새 텍스트, `format`의 인자)는 이스케이프됩니다. 일반 텍스트를 넣으면 결과도 일반 텍스트입니다 |
 | `join` | 안전 값이 아닌 항목과 구분자를 이스케이프하며, 결과는 안전 값입니다 |
 | `strip_html`, `striptags` | 엔티티를 디코딩한 일반 텍스트를 돌려주므로 출력할 때 정확히 한 번 이스케이프됩니다 |
@@ -94,6 +94,8 @@ Hwaro는 표준 Crinja(Jinja2) 내장 필터(`upper`, `lower`, `join`, `map`, `s
 | where | 필드 값으로 객체 필터링 | {{ posts \| where(attribute="draft", value=false) }} |
 | sort_by | 필드로 객체 정렬 | {{ posts \| sort_by(attribute="date", reverse=true) }} |
 | group_by | 필드로 객체 그룹화 | {{ posts \| group_by(attribute="section") }} |
+
+`where`, `sort_by`, `group_by`의 `attribute=`는 필드 이름이며, 정확히 그 이름의 필드가 없으면 `"extra.weight"` 같은 점 경로로 읽습니다(`{{ posts | sort_by(attribute="extra.weight") }}`).
 
 `min`과 `max`는 Jinja2와 같이 동작합니다. 비교 방식은 `sort`와 같고(`case_sensitive=true`를 주지 않으면 문자열은 대소문자를 구분하지 않음), `attribute=`에는 `"extra.weight"` 같은 점 경로를 쓸 수 있으며 요소 전체를 돌려줍니다. 값이 같으면 앞의 요소가 선택됩니다. 매핑은 키를 비교하고, 빈 리스트는 정의되지 않은 값을 돌려줍니다. 정의되지 않은 `attribute=`는 `sort`처럼 무시합니다. 문자열과 숫자를 비교하면 텍스트로 비교하는데, 이는 리스트 전체에 일관된 순서가 아니므로(`10 < "1a" < 2 < 10`) 숫자와 문자열이 섞인 리스트의 `sort`, `min`, `max` 결과는 믿을 수 없습니다. 먼저 항목을 한 가지 타입으로 바꾸세요.
 

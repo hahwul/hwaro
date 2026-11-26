@@ -42,3 +42,19 @@ describe "Crinja conditional expression" do
     render_cond(%({% if t | lower in "xtx" %}yes{% endif %})).should eq("yes")
   end
 end
+
+describe "Crinja filter without parentheses inside a list, call or dict" do
+  # Each raised "Unexpected COMMA" / "Unexpected RIGHT_CURLY"; outputs are
+  # Jinja2 3.1's.
+  it "ends at the comma of a list item or call argument" do
+    render_cond("{{ [t | lower, 2] | join('-') }}").should eq("t-2")
+    render_cond("{{ '%s-%s' | format(t | lower, l | length) }}").should eq("t-3")
+    render_cond("{% macro m(a, b) %}{{ a }}/{{ b }}{% endmacro %}{{ m(t | lower, 2) }}").should eq("t/2")
+    render_cond("{{ range(l | length, 5) | join(',') }}").should eq("3,4")
+  end
+
+  it "ends at a dict entry's comma or closing brace and at a slice colon" do
+    render_cond("{{ {'a': t | lower, 'b': 2}['a'] }}|{{ {'a': t | lower}['a'] }}").should eq("t|t")
+    render_cond("{{ l[1 | abs:] | join(',') }}").should eq("1,2")
+  end
+end

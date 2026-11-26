@@ -16,6 +16,13 @@ describe "Crinja `wordwrap` filter" do
     render_wrap("{{ 'abcdefghijklmnop qr' | wordwrap(5) }}").should eq("abcde\nfghij\nklmno\np qr")
   end
 
+  # The line filled to the width just before a long word kept its trailing
+  # space ("two \nthre").
+  it "drops the space at the end of a full line before a split word" do
+    render_wrap("{{ 'one two three four' | wordwrap(4) }}").should eq("one\ntwo\nthre\ne\nfour")
+    render_wrap("{{ 'ab  cdefgh' | wordwrap(4, wrapstring='|') }}").should eq("ab|cdef|gh")
+  end
+
   it "terminates on a long word with break_long_words=false" do
     render_wrap("{{ 'abcdefghijklmnop qr' | wordwrap(5, false) }}").should eq("abcdefghijklmnop\nqr")
   end
