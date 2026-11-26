@@ -42,8 +42,13 @@ module Crinja::Util
           cut = Hwaro::Utils::TextUtils.cluster_cut(chunk, space_left)
           # A first cluster wider than the line stays whole on its own line.
           cut = Hwaro::Utils::TextUtils.cluster_cut(chunk, 1) if cut == 0 && current.empty?
-          current << chunk[0, cut]
-          chunks[-1] = chunk[cut..]
+          # Nothing fits on a full line: the word starts the next one. An
+          # empty piece here hid the line's trailing space from the strip
+          # below (`"two three" | wordwrap(4)` gave "two \nthre…").
+          if cut > 0
+            current << chunk[0, cut]
+            chunks[-1] = chunk[cut..]
+          end
         elsif current.empty?
           current << chunks.pop
         end
