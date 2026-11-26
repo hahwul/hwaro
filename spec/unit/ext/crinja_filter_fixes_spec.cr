@@ -99,6 +99,17 @@ describe "Crinja built-in filter fixes" do
       render_filter("{{ true | int }}|{{ false | int }}|{{ 4.7 | int }}|{{ '42' | int }}|{{ 'x' | int(5) }}")
         .should eq("1|0|4|42|5")
     end
+
+    # `int` went through Int32: a larger numeric string gave the default and
+    # a larger float (or NaN) raised "Arithmetic overflow".
+    it "converts integers past Int32, and NaN to the default" do
+      render_filter("{{ '3000000000' | int }}|{{ 3000000000.0 | int }}|{{ ('3000000000.5' | int) + 1 }}")
+        .should eq("3000000000|3000000000|3000000001")
+      render_filter("{{ '1e3' | int }}|{{ '12.5' | int }}|{{ -2.9 | int }}|{{ 'nan' | float | int(7) }}|{{ 'inf' | float | int }}")
+        .should eq("1000|12|-2|7|0")
+      render_filter("{{ 'x' | int(3000000000) }}|{{ 'x' | int(2.5) }}|{{ 'x' | int(default='n/a') }}")
+        .should eq("3000000000|2.5|n/a")
+    end
   end
 
   describe "min and max" do

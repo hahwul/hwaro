@@ -146,16 +146,30 @@ Crinja.filter({default: 0.0}, :float) do
   end
 end
 
+# `int` converts to Int64 (as Crinja's integers are) and, like Python, reads
+# a string as an integer first and as a float after (`"1e3"` is 1000). It
+# went through Int32: `"3000000000" | int` gave the default 0, and
+# `3000000000.0 | int` (a large float from front matter or data) failed the
+# build with "Arithmetic overflow", as did NaN, which Python turns into the
+# default. A float outside Int64 (or infinite) also gives the default, and
+# the default is returned as given, as in Jinja2 (`int(3000000000)` went
+# through Int32 too and raised "Arithmetic overflow").
+module Crinja::Filter
+  def self.__float_to_int(float : Float64) : Int64?
+    float.to_i64 if float.finite? && float > Int64::MIN.to_f64 && float < Int64::MAX.to_f64
+  end
+end
+
 Crinja.filter({default: 0, base: 10}, :int) do
   raw = target.raw
   raw = raw.to_s if raw.is_a?(Crinja::SafeString)
   result = case raw
            when Bool   then raw ? 1 : 0
-           when String then raw['.']? ? raw.to_f?.try(&.to_i) : raw.to_i?(arguments["base"].to_i, prefix: true)
+           when String then raw.to_i64?(arguments["base"].to_i, prefix: true) || raw.to_f?.try { |float| Crinja::Filter.__float_to_int(float) }
            when Int    then raw
-           when Float  then raw.to_i
+           when Float  then Crinja::Filter.__float_to_int(raw.to_f64)
            end
-  result ? Crinja::Value.new(result) : arguments["default"].to_i
+  result ? Crinja::Value.new(result) : arguments["default"]
 end
 
 # `min` / `max` (Jinja2 built-ins Crinja lacks): the first smallest / largest
