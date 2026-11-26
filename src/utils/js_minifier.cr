@@ -273,7 +273,9 @@ module Hwaro
       private def statement_head?(chars, last : Int32) : Bool
         return false if last < 0
         prev = chars[last]
-        return false unless prev.alphanumeric? || prev == '_' || prev == '$'
+        # The last letters of `if`, `while`, `for`, `with`: most calls
+        # (`f(`, `log(`) stop here without walking back over their name.
+        return false unless prev == 'f' || prev == 'e' || prev == 'r' || prev == 'h'
         keyword_before?(chars, last, STATEMENT_HEAD_KEYWORDS)
       end
 
@@ -285,7 +287,9 @@ module Hwaro
       end
 
       # True when the identifier-like word ending at chars[last] is one of
-      # `keywords` and not a member name or a private class member.
+      # `keywords` and not a member name or a private class member. The word
+      # is compared in place: this runs for every `(` after an identifier
+      # (every call), so building a String per lookup was measurable.
       private def keyword_before?(chars, last : Int32, keywords : Set(String)) : Bool
         start = last
         while start > 0 && (chars[start - 1].alphanumeric? || chars[start - 1] == '_' || chars[start - 1] == '$')
@@ -294,13 +298,21 @@ module Hwaro
         return false if start > 0 && chars[start - 1] == '#'
         size = last - start + 1
         return false if size > 10 # longer than any keyword above
-        word = String.build(size) { |w| (start..last).each { |k| w << chars[k] } }
-        return false unless keywords.includes?(word)
+        return false unless keywords.any? { |kw| word_at?(chars, start, size, kw) }
         k = start - 1
         while k >= 0 && chars[k].whitespace?
           k -= 1
         end
         !(k >= 0 && chars[k] == '.')
+      end
+
+      # True when chars[start, size] spells the ASCII word `kw`.
+      private def word_at?(chars, start : Int32, size : Int32, kw : String) : Bool
+        return false unless kw.bytesize == size
+        size.times do |k|
+          return false unless chars[start + k].ord == kw.byte_at(k)
+        end
+        true
       end
 
       # Scan a template literal beginning at chars[i] == '`'. Appends the whole
