@@ -1220,8 +1220,11 @@ module Hwaro
         # a `<…>` link or reference destination. Those forms restore to the
         # HTML-escaped output, so the token never ships. Inside `<code>` an
         # escaped token is one the author is displaying (shortcodes never
-        # expand in code), so it stays literal.
-        SHORTCODE_PLACEHOLDER_RESTORE_RE = /<!--(HWARO-SHORTCODE-PLACEHOLDER-\d+)-->|&lt;!--(HWARO-SHORTCODE-PLACEHOLDER-\d+)--&gt;|!--(HWARO-SHORTCODE-PLACEHOLDER-\d+)--|<(\/?)code\b/
+        # expand in code), so it stays literal. With `smart_punctuation` the
+        # escaped token is text to Markd's smart pass too, which turns each
+        # `--` into an en dash (`&lt;!–HWARO-…–&gt;`); that form restores the
+        # same way, or the token shipped.
+        SHORTCODE_PLACEHOLDER_RESTORE_RE = /<!--(HWARO-SHORTCODE-PLACEHOLDER-\d+)-->|&lt;!(?:--|–)(HWARO-SHORTCODE-PLACEHOLDER-\d+)(?:--|–)&gt;|!--(HWARO-SHORTCODE-PLACEHOLDER-\d+)--|<(\/?)code\b/
 
         private def replace_shortcode_placeholders(html : String, shortcode_results : Hash(String, String)) : String
           return html if shortcode_results.empty?
