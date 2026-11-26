@@ -412,3 +412,27 @@ describe "Astro import: unclosed multi-line MDX import" do
     end
   end
 end
+
+# `bundle_assets?` asked `File.file?` before `File.symlink?`: a self-loop
+# symlink beside a bundle's index.md raised ELOOP and failed that page.
+describe "Astro import: self-loop symlink in a page bundle" do
+  it "imports the bundle and skips the link" do
+    posix_only!("symlink loop")
+    Dir.mktmpdir do |dir|
+      bundle_dir = File.join(dir, "src", "content", "blog", "post")
+      FileUtils.mkdir_p(bundle_dir)
+      File.write(File.join(bundle_dir, "index.md"), "---\ntitle: Post\n---\nBody.\n")
+      File.symlink("loop.png", File.join(bundle_dir, "loop.png"))
+      output_dir = File.join(dir, "out")
+      result = nil
+      with_captured_log do
+        result = Hwaro::Services::Importers::AstroImporter.new.run(
+          Hwaro::Config::Options::ImportOptions.new(source_type: "astro", path: dir, output_dir: output_dir))
+      end
+
+      result.not_nil!.error_count.should eq(0)
+      result.not_nil!.imported_count.should eq(1)
+      File.exists?(File.join(output_dir, "blog", "post", "loop.png")).should be_false
+    end
+  end
+end
