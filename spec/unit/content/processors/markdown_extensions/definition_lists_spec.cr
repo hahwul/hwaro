@@ -13,6 +13,14 @@ describe Hwaro::Content::Processors::MarkdownExtensions do
       result.should contain("<dt>Term</dt>\n<dd>def</dd>")
     end
 
+    it "keeps a definition list written in a list item inside that item" do
+      # The <dl> was emitted at column 0, which ended the item and the list:
+      # the list split in two around a hoisted definition list.
+      config = Hwaro::Models::MarkdownConfig.new
+      html, _ = Hwaro::Processor::Markdown.render("- item\n\n  Term\n  : def\n- item two\n", markdown_config: config)
+      html.should eq("<ul>\n<li>\n<p>item</p>\n<dl>\n<dt>Term</dt>\n<dd>def</dd>\n</dl>\n</li>\n<li>\n<p>item two</p>\n</li>\n</ul>\n")
+    end
+
     it "renders the line right after a definition list as Markdown" do
       # `<dl>` opens a raw HTML block that runs to the next blank line, so a
       # paragraph, list or fence directly after the list shipped unparsed.

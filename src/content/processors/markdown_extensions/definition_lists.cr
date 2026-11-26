@@ -50,7 +50,11 @@ module Hwaro
             # ": " line through as literal text.
             if i + 1 < lines.size && !fenced[i + 1] && !line.strip.empty? && lines[i + 1].lstrip.starts_with?(": ")
               # This is a definition list
-              result << trust("<dl>", trusted)
+              # The list keeps its first term's indentation, so one written in a
+              # list item stays in it: at column 0 the `<dl>` ended the item and
+              # the list, splitting it in two around the definition list.
+              indent = line[/\A[ \t]*/]
+              result << "#{indent}#{trust("<dl>", trusted)}"
               while i < lines.size && !fenced[i]
                 term = lines[i].strip
                 if term.empty?
@@ -58,7 +62,7 @@ module Hwaro
                   break
                 end
 
-                result << trust("<dt>#{render_inline_md(term, flags)}</dt>", trusted)
+                result << "#{indent}#{trust("<dt>#{render_inline_md(term, flags)}</dt>", trusted)}"
                 i += 1
 
                 # Collect definitions for this term
@@ -74,7 +78,7 @@ module Hwaro
                     definition += " #{lines[i].strip}"
                     i += 1
                   end
-                  result << trust("<dd>#{render_inline_md(definition, flags)}</dd>", trusted)
+                  result << "#{indent}#{trust("<dd>#{render_inline_md(definition, flags)}</dd>", trusted)}"
                 end
 
                 # Skip one or more blank lines between term groups within the same dl
@@ -88,7 +92,7 @@ module Hwaro
                 end
                 break
               end
-              result << "</dl>"
+              result << "#{indent}</dl>"
               # `<dl>` opens a type-6 HTML block that runs to the next blank
               # line, so a line right after the list (a paragraph, `- item`,
               # a fence) was swallowed into it and shipped as raw, unparsed
