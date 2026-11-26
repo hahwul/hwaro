@@ -154,9 +154,62 @@ end
 # default. A float outside Int64 (or infinite) also gives the default, and
 # the default is returned as given, as in Jinja2 (`int(3000000000)` went
 # through Int32 too and raised "Arithmetic overflow").
+#
+# A string is read with Python's int(string, base) rules: a `0b`/`0o`/`0x`
+# prefix only in its own base (or base 0, which picks the base from it),
+# single underscores between digits (`"1_000"`, also in the float reading),
+# and a base outside 0 and 2..36 falls through to the float reading. Crystal's
+# `to_i64?(base, prefix: true)` read any prefix in any base (`"0x10" | int`
+# gave 16, Jinja2 0), refused underscores, and raised on `base=0`.
 module Crinja::Filter
   def self.__float_to_int(float : Float64) : Int64?
     float.to_i64 if float.finite? && float > Int64::MIN.to_f64 && float < Int64::MAX.to_f64
+  end
+
+  def self.__py_int(string : String, base : Int) : Int64?
+    return unless base == 0 || 2 <= base <= 36
+    digits = string.strip
+    sign = ""
+    if digits.starts_with?('-') || digits.starts_with?('+')
+      sign = "-" if digits.starts_with?('-')
+      digits = digits[1..]
+    end
+    radix = case digits.starts_with?('0') && digits[1]?.try(&.downcase)
+            when 'x' then 16
+            when 'o' then 8
+            when 'b' then 2
+            end
+    if radix && (base == 0 || base == radix)
+      base = radix
+      # An underscore may follow the prefix itself (`0x_ff`).
+      digits = digits[2..].lchop('_')
+    elsif base == 0
+      base = 10
+      # Base 0 reads an unprefixed number as decimal, without leading zeros.
+      return if digits.starts_with?('0') && digits.each_char.any? { |char| char != '0' && char != '_' }
+    end
+    return if digits.empty? || !digits.each_char.all? { |char| char.ascii_alphanumeric? || char == '_' }
+    return unless __underscores_between?(digits, &.ascii_alphanumeric?)
+    "#{sign}#{digits.delete('_')}".to_i64?(base, whitespace: false)
+  end
+
+  # Python's float(): underscores only between two digits.
+  def self.__py_float(string : String) : Float64?
+    text = string.strip
+    return text.to_f? unless text.includes?('_')
+    text.delete('_').to_f? if __underscores_between?(text, &.ascii_number?)
+  end
+
+  # Every `_` in *text* sits between two characters that pass the block
+  # (so never first, last, or next to another `_`).
+  private def self.__underscores_between?(text : String, & : Char -> Bool) : Bool
+    return true unless text.includes?('_')
+    chars = text.chars
+    chars.each_with_index do |char, i|
+      next unless char == '_'
+      return false unless 0 < i < chars.size - 1 && yield(chars[i - 1]) && yield(chars[i + 1])
+    end
+    true
   end
 end
 
@@ -165,7 +218,7 @@ Crinja.filter({default: 0, base: 10}, :int) do
   raw = raw.to_s if raw.is_a?(Crinja::SafeString)
   result = case raw
            when Bool   then raw ? 1 : 0
-           when String then raw.to_i64?(arguments["base"].to_i, prefix: true) || raw.to_f?.try { |float| Crinja::Filter.__float_to_int(float) }
+           when String then Crinja::Filter.__py_int(raw, arguments["base"].to_i) || Crinja::Filter.__py_float(raw).try { |float| Crinja::Filter.__float_to_int(float) }
            when Int    then raw
            when Float  then Crinja::Filter.__float_to_int(raw.to_f64)
            end

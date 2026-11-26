@@ -110,6 +110,18 @@ describe "Crinja built-in filter fixes" do
       render_filter("{{ 'x' | int(3000000000) }}|{{ 'x' | int(2.5) }}|{{ 'x' | int(default='n/a') }}")
         .should eq("3000000000|2.5|n/a")
     end
+
+    # Python's int(string, base): a prefix only in its own base (or base 0),
+    # underscores between digits. Crystal read `0x10` as 16 in base 10,
+    # refused `1_000`, and raised on `base=0`.
+    it "reads base prefixes and digit underscores as Python does" do
+      render_filter("{{ '0x10' | int }}|{{ '0b101' | int }}|{{ '0x10' | int(base=16) }}|{{ '0x_ff' | int(base=16) }}|{{ '0o17' | int(base=0) }}|{{ '010' | int(base=0) }}")
+        .should eq("0|0|16|255|15|10")
+      render_filter("{{ '1_000' | int }}|{{ ' 1_0 ' | int }}|{{ '1_000.5' | int }}|{{ '1__0' | int }}|{{ '_1' | int }}|{{ '1_' | int }}|{{ '1_e3' | int }}")
+        .should eq("1000|10|1000|0|0|0|0")
+      render_filter("{{ '-0x10' | int(base=16) }}|{{ '+-5' | int }}|{{ '10' | int(base=1) }}|{{ 'f_f' | int(base=16) }}")
+        .should eq("-16|0|10|255")
+    end
   end
 
   describe "min and max" do
