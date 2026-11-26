@@ -249,6 +249,24 @@ module Hwaro
           InlineMarkdown.render(text, flags: flags)
         end
 
+        # What goes between a document's last line and markup a pass appends
+        # after it (a container's auto-close `</div>`, the footnote block),
+        # given whether that line ended with a newline and the tracker that
+        # walked the document. A last line with no newline gets one, so the
+        # markup cannot join a raw HTML block ending there (safe mode omits
+        # that block whole, appended markup included). A fence or raw-HTML
+        # code block the document left open gets its closer
+        # (`FenceTracker#open_block_closer`), or the markup would render as
+        # text of that block.
+        private def document_end_separator(last_line_ended : Bool, tracker : FenceTracker) : String
+          closer = tracker.open_block_closer
+          return "" if last_line_ended && closer.nil?
+          String.build do |io|
+            io << '\n' unless last_line_ended
+            io << closer << '\n' if closer
+          end
+        end
+
         # Safe mode keeps hwaro's own markup through markd's raw-HTML
         # stripping by marking it: every open tag and comment a pass
         # generates carries this per-process secret (`<del MARK>`,

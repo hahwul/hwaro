@@ -98,7 +98,7 @@ module Hwaro
           # Every shortcode walker passes `raw_html_code: false`: shortcodes
           # expand inside raw <pre>/<script>/<textarea> blocks, which only
           # the Markdown extensions treat as opaque.
-          tracker = Content::Processors::FenceTracker.new(raw_html_code: false)
+          tracker = Content::Processors::FenceTracker.new(raw_html_code: false, footnote_bodies: true)
 
           content.each_line(chomp: false) do |line|
             next if tracker.fence_line?(line)
@@ -163,7 +163,7 @@ module Hwaro
         # is replaced by the block's result.
         private def map_shortcode_chunks(content : String, & : String -> String) : String
           String.build do |io|
-            tracker = Content::Processors::FenceTracker.new(raw_html_code: false)
+            tracker = Content::Processors::FenceTracker.new(raw_html_code: false, footnote_bodies: true)
             buffer = String::Builder.new
             # Lines that live inside a block-shortcode body. While inside one
             # we must NOT treat a fence line as a buffer boundary, otherwise a
@@ -232,7 +232,7 @@ module Hwaro
 
           open_lines = [] of Int32
           pairs = [] of Tuple(Int32, Int32)
-          line_count = each_block_tag(content, Content::Processors::FenceTracker.new(raw_html_code: false)) do |line_no, opener|
+          line_count = each_block_tag(content, Content::Processors::FenceTracker.new(raw_html_code: false, footnote_bodies: true)) do |line_no, opener|
             if opener
               open_lines << line_no
             elsif opened = open_lines.pop?
@@ -301,7 +301,7 @@ module Hwaro
         # that many closers, or the openers ship as literal text.
         private def blocks_open_across(head : String, tail : String) : Int32
           return 0 unless Utils::ByteScan.includes?(head, "{%")
-          tracker = Content::Processors::FenceTracker.new(raw_html_code: false)
+          tracker = Content::Processors::FenceTracker.new(raw_html_code: false, footnote_bodies: true)
           open = 0
           each_block_tag(head, tracker) { |_, opener| open = opener ? open + 1 : Math.max(open - 1, 0) }
           inner = 0
@@ -327,7 +327,7 @@ module Hwaro
         private def raw_block_lines(content : String) : Array(Bool)
           return [] of Bool unless Utils::ByteScan.includes?(content, "{%")
 
-          tracker = Content::Processors::FenceTracker.new
+          tracker = Content::Processors::FenceTracker.new(footnote_bodies: true)
           open_line : Int32? = nil
           pairs = [] of Tuple(Int32, Int32)
           line_count = 0
@@ -388,6 +388,7 @@ module Hwaro
           # they are the construct an author uses to SHOW shortcode syntax
           # outside a code fence (see `mask_raw_blocks`).
           masked = mask_raw_blocks(masked, spans)
+          masked = mask_html_comments(masked, spans)
           processed = process_shortcodes_in_chunk(masked, templates, context, shortcode_results, crinja_env_override, template_cache_override, depth, spans, warnings)
           unmask_inline_code(processed, spans)
         end
@@ -418,7 +419,7 @@ module Hwaro
           return content unless content.includes?("```") || content.includes?("~~~")
           body_lines = block_body_lines(content)
           return content if body_lines.empty?
-          tracker = Content::Processors::FenceTracker.new(raw_html_code: false)
+          tracker = Content::Processors::FenceTracker.new(raw_html_code: false, footnote_bodies: true)
           String.build(content.bytesize) do |io|
             content.each_line(chomp: false).with_index do |line, i|
               unless (body_lines[i]? || false) && tracker.fence_line?(line)
@@ -497,6 +498,41 @@ module Hwaro
             # restores both kinds through `unmask_inline_code`.
             spans << unmask_inline_code(region, spans)
             "\x00HWARO-INLINE-CODE-#{spans.size - 1}\x00"
+          end
+        end
+
+        # HTML comments are opaque too, so a commented-out call stays literal
+        # (as a commented-out wikilink does). Expanding one put the
+        # placeholder comment, and its `-->`, inside the author's comment and
+        # ended it early: the rest of a multi-line `<!-- … -->` rendered as
+        # page text, and its closing `-->` as an escaped `--&gt;` no browser
+        # reads as a closer, so the comment swallowed the rest of the page.
+        # Same token and restore points as `mask_raw_blocks`. A comment
+        # holding a literal placeholder is left for `process_block_shortcodes`
+        # to drop.
+        #
+        # A comment runs from `<!--` to the first `-->` after it. Scanned by
+        # hand, and stopped at the first opener with no closer (no later one
+        # has a closer either): a regex retried from every unclosed `<!--`
+        # and scanned to the end of the page each time.
+        private def mask_html_comments(content : String, spans : Array(String)) : String
+          return content unless start = content.byte_index("<!--")
+          last = 0
+          String.build(content.bytesize) do |io|
+            while start && (stop = content.byte_index("-->", start + 4))
+              stop += 3
+              comment = content.byte_slice(start, stop - start)
+              io.write(content.to_slice[last, start - last])
+              if comment.includes?(SHORTCODE_PLACEHOLDER_PREFIX)
+                io << comment
+              else
+                spans << unmask_inline_code(comment, spans)
+                io << "\x00HWARO-INLINE-CODE-" << spans.size - 1 << "\x00"
+              end
+              last = stop
+              start = content.byte_index("<!--", stop)
+            end
+            io.write(content.to_slice[last, content.bytesize - last])
           end
         end
 
@@ -1220,8 +1256,11 @@ module Hwaro
         # a `<…>` link or reference destination. Those forms restore to the
         # HTML-escaped output, so the token never ships. Inside `<code>` an
         # escaped token is one the author is displaying (shortcodes never
-        # expand in code), so it stays literal.
-        SHORTCODE_PLACEHOLDER_RESTORE_RE = /<!--(HWARO-SHORTCODE-PLACEHOLDER-\d+)-->|&lt;!--(HWARO-SHORTCODE-PLACEHOLDER-\d+)--&gt;|!--(HWARO-SHORTCODE-PLACEHOLDER-\d+)--|<(\/?)code\b/
+        # expand in code), so it stays literal. With `smart_punctuation` the
+        # escaped token is text to Markd's smart pass too, which turns each
+        # `--` into an en dash (`&lt;!–HWARO-…–&gt;`); that form restores the
+        # same way, or the token shipped.
+        SHORTCODE_PLACEHOLDER_RESTORE_RE = /<!--(HWARO-SHORTCODE-PLACEHOLDER-\d+)-->|&lt;!(?:--|–)(HWARO-SHORTCODE-PLACEHOLDER-\d+)(?:--|–)&gt;|!--(HWARO-SHORTCODE-PLACEHOLDER-\d+)--|<(\/?)code\b/
 
         private def replace_shortcode_placeholders(html : String, shortcode_results : Hash(String, String)) : String
           return html if shortcode_results.empty?

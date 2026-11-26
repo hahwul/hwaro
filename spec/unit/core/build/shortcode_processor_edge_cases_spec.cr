@@ -67,6 +67,51 @@ describe Hwaro::Core::Build::ShortcodeProcessor do
     end
   end
 
+  describe "HTML comments" do
+    it "leaves a commented-out call literal" do
+      # The placeholder's own `-->` ended the author's comment early: the
+      # rest of the comment rendered as text, and its closer as `--&gt;`.
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/badge" => %(<b>{{ text }}</b>), "shortcodes/note" => %(<i>{{ body }}</i>)}
+      content = %(<!--\n{{ badge(text="a") }}\nTODO\n-->\n\nText <!-- {{ badge(text="b") }} --> {{ badge(text="c") }}\n\n<!-- {% note() %}x{% end %} -->\n)
+      builder.test_sc_process(content, templates).should eq(
+        %(<!--\n{{ badge(text="a") }}\nTODO\n-->\n\nText <!-- {{ badge(text="b") }} --> <b>c</b>\n\n<!-- {% note() %}x{% end %} -->\n))
+    end
+
+    it "still drops a literal placeholder hidden in a comment" do
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/badge" => %(<b>{{ text }}</b>)}
+      result = builder.test_sc_process(%(<!-- <!--HWARO-SHORTCODE-PLACEHOLDER-0--> -->\n{{ badge(text="x") }}\n), templates)
+      result.should_not contain("<!--HWARO-SHORTCODE-PLACEHOLDER-0--> -->")
+    end
+
+    it "stays linear in unclosed comment openers" do
+      # Every `<!--` with no `-->` after it rescanned to the end of the page.
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/badge" => %(<b>{{ text }}</b>)}
+      tail = "<!-- a\n" * 160_000
+      t = Time.instant
+      result = builder.test_sc_process(%(<!-- c --> {{ badge(text="x") }}\n) + tail, templates)
+      (Time.instant - t).should be < 5.seconds # quadratic took 40s+
+      result.should eq(%(<!-- c --> <b>x</b>\n) + tail)
+    end
+  end
+
+  describe "footnote bodies" do
+    it "expands a shortcode in a footnote's blank-line-separated paragraph" do
+      # The indented paragraph read as indented code, so the call stayed
+      # literal while the paragraph still rendered as footnote text.
+      builder = Hwaro::Core::Build::Builder.new
+      templates = {"shortcodes/badge" => %(<b>{{ text }}</b>)}
+      content = %([^1]: first {{ badge(text="a") }}\n\n    second {{ badge(text="b") }}\n)
+      builder.test_content_may_contain_shortcodes?("[^1]: first\n\n    second {{ badge() }}\n").should be_true
+      builder.test_sc_process(content, templates).should eq(%([^1]: first <b>a</b>\n\n    second <b>b</b>\n))
+      # After the note ends, an indented run is code again.
+      code = %([^1]: first\nafter\n\n    code {{ badge(text="c") }}\n)
+      builder.test_sc_process(code, templates).should eq(code)
+    end
+  end
+
   describe "long quoted argument values" do
     # The patterns before their quoted-value loops became possessive: one
     # backtracking frame per character, so a 50 KB value (a base64 data

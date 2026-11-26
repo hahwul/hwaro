@@ -1101,7 +1101,7 @@ module Hwaro::Core::Build::Phases::Transform
   # its line with it (that text is body too).
   private def strip_shortcode_spans(raw : String) : String
     body = block_body_lines(raw)
-    tracker = Content::Processors::FenceTracker.new(raw_html_code: false)
+    tracker = Content::Processors::FenceTracker.new(raw_html_code: false, footnote_bodies: true)
     String.build(raw.bytesize) do |io|
       raw.each_line(chomp: false).each_with_index do |line, i|
         next if body[i]?

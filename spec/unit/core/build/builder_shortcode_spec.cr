@@ -748,6 +748,22 @@ describe Hwaro::Core::Build::Builder do
       output.scan("HWARO-SHORTCODE-PLACEHOLDER").size.should eq(1)
     end
 
+    it "restores an escaped placeholder that smart punctuation rewrote" do
+      # Smart punctuation turned the escaped token's `--` into en dashes, so
+      # `\{{ … }}` shipped `&lt;!–HWARO-SHORTCODE-PLACEHOLDER-0–&gt;`.
+      builder = Hwaro::Core::Build::Builder.new
+      env = Crinja.new
+      templates = {"shortcodes/val" => "<b>{{ v }}</b>"}
+      context = {} of String => Crinja::Value
+      results = {} of String => String
+      substituted = builder.test_process_shortcodes_jinja(%(Escaped \\{{ val(v="lit") }} -- "q"\n), templates, context, results, crinja_env_override: env)
+      md = Hwaro::Models::MarkdownConfig.new
+      md.smart_punctuation = true
+      rendered, _ = Hwaro::Processor::Markdown.render(substituted, markdown_config: md)
+      output = builder.test_replace_shortcode_placeholders(rendered, results)
+      output.should eq("<p>Escaped &lt;b&gt;lit&lt;/b&gt; – “q”</p>\n")
+    end
+
     it "does not wrap block-level shortcode output in <p> when on its own line" do
       # End-to-end pipe: shortcode substitution → Markdown → placeholder replace.
       # Regression test for https://github.com/hahwul/hwaro/issues/473.

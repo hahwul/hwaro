@@ -245,7 +245,22 @@ module Hwaro
           String.build do |io|
             tracker = FenceTracker.new
             in_html_block = false
+            # Set after a line that became a block-position math `<div>`: the
+            # div opens a type-6 HTML block that runs to the next blank line,
+            # so a non-blank line right after it (`$$…$$` then a paragraph,
+            # no blank line between) was swallowed into that block and
+            # shipped as raw, unparsed Markdown. The value is the blank line
+            # to insert first — the div line's quote markers, if any.
+            div_break : String? = nil
             content.each_line(chomp: false) do |line|
+              if separator = div_break
+                div_break = nil
+                # A line outside the div's quote ends the quote, and the
+                # block with it, on its own.
+                stripped = line.lstrip
+                same_container = separator == "\n" || stripped.starts_with?('>')
+                io << separator if same_container && !stripped.sub(BLOCKQUOTE_MARKERS_RE, "").blank?
+              end
               if tracker.fence_line?(line) || engine_marker_line?(line)
                 # Mirrors stash_math's chunk boundaries: block state resets.
                 in_html_block = false
@@ -287,6 +302,7 @@ module Hwaro
                 escaped = Utils::TextUtils.escape_xml(body)
                 escaped = escaped.gsub("\n", "\n#{quote}") if quote
                 math_html = if span.display && (raw_context || bare_display)
+                              div_break = quote ? "#{quote.rstrip}\n" : "\n" unless raw_context
                               "<div class=\"math math-display\">\\[#{escaped}\\]</div>"
                             elsif span.display
                               # Mid-paragraph display math (inline raw HTML): escape the

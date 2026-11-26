@@ -337,6 +337,16 @@ describe Hwaro::Content::Processors::Wikilinks do
         .should eq("[^1]: see [my-page](@/notes/my-page.md) nope-x\n    more [my-page](@/notes/my-page.md)\n\n[my\\-page](@/notes/my-page.md)")
     end
 
+    it "rewrites a link in a footnote's blank-line-separated paragraph" do
+      # The indented paragraph after the blank line read as indented code,
+      # so its link stayed `[[my-page]]` while the paragraph still rendered
+      # as footnote text.
+      wl_rewrite("[^1]: first\n\n    second [[my-page]]\n\n    code [[my-page]]", src, index)
+        .should eq("[^1]: first\n\n    second [my-page](@/notes/my-page.md)\n\n    code [my-page](@/notes/my-page.md)")
+      wl_rewrite("[^1]: first\nafter\n\n    code [[my-page]]", src, index)
+        .should eq("[^1]: first\nafter\n\n    code [[my-page]]")
+    end
+
     it "leaves the paragraph form alone" do
       wl_rewrite("[[my-page]] [[nope]]", src, index).should eq(%([my\\-page](@/notes/my-page.md) <span class="wikilink wikilink-missing">nope</span>))
     end

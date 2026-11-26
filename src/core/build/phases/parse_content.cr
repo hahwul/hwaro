@@ -602,6 +602,10 @@ module Hwaro::Core::Build::Phases::ParseContent
       spans = [] of String
       masked, spans = mask_inline_code(mask_body_fences(chunk, spans), spans)
       masked = mask_raw_blocks(masked, spans)
+      # A commented-out include stays literal, as a commented-out shortcode
+      # does: an included file's own comments (`<!-- #region -->`) ended the
+      # author's comment early.
+      masked = mask_html_comments(masked, spans)
       # With `[markdown] math`, math is stashed out first, as the wikilink
       # walk does, so an embed inside display math stays literal.
       expanded = if math && masked.includes?('$')
@@ -797,7 +801,12 @@ module Hwaro::Core::Build::Phases::ParseContent
     source = HTML.escape(site.config.with_base_path(target.url))
     # The closing blank line ends the `</div>` HTML block, so the next line
     # is Markdown again (otherwise it is raw HTML, dropped under `safe`).
-    %(<div class="transclusion" data-source="#{source}">\n\n#{body}\n\n</div>\n).gsub('\n', "\n#{prefix}").insert(0, prefix)
+    # The wrapper is hwaro's markup, marked like the extensions' so `safe`
+    # keeps it: unmarked, safe mode dropped the opening tag but kept the
+    # `</div>`, which then closed an enclosing container or admonition
+    # instead (mis-nested tags).
+    opener = Content::Processors::MarkdownExtensions.trust(%(<div class="transclusion" data-source="#{source}">), site.config.markdown.safe)
+    %(#{opener}\n\n#{body}\n\n</div>\n).gsub('\n', "\n#{prefix}").insert(0, prefix)
   end
 
   private def include_output_dir : String?

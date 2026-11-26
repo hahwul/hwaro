@@ -74,8 +74,8 @@ module Hwaro
           pending_key = nil.as(String?)
           pending_store = footnotes
           pending_blank = false
+          tracker = FenceTracker.new
           cleaned = String.build do |io|
-            tracker = FenceTracker.new
             content.each_line(chomp: false) do |line|
               # Collection takes precedence over fence tracking: an indented
               # continuation after a held blank would otherwise read as an
@@ -162,7 +162,9 @@ module Hwaro
           # page each time, quadratic in the footnote count.
           return result if ref_order.empty?
           String.build(result.bytesize + ref_order.size * 64) do |io|
-            io << result << trust("\n<!--HWARO-FOOTNOTES-START-->\n", trusted)
+            # Outside a fence the page left open, on a line of its own.
+            io << result << document_end_separator(result.ends_with?('\n'), tracker)
+            io << trust("\n<!--HWARO-FOOTNOTES-START-->\n", trusted)
             ref_order.each do |key, num|
               text = footnotes[key]? || ""
               occ = ref_occurrences[key]? || 1

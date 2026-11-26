@@ -29,7 +29,12 @@ module Hwaro
           # inside `<pre>`/`<script>`/`<style>`/`<textarea>` stay verbatim (a
           # multi-line JS ternary's `  : b` is not a definition).
           tracker = FenceTracker.new(html_blocks: false)
-          fenced = lines.map { |line| tracker.fence_line?(line) }
+          fenced = Array(Bool).new(lines.size)
+          columns = Array(Int32).new(lines.size)
+          lines.each do |line|
+            fenced << tracker.fence_line?(line)
+            columns << tracker.line_container_column
+          end
 
           result = [] of String
           i = 0
@@ -50,7 +55,14 @@ module Hwaro
             # ": " line through as literal text.
             if i + 1 < lines.size && !fenced[i + 1] && !line.strip.empty? && lines[i + 1].lstrip.starts_with?(": ")
               # This is a definition list
-              result << trust("<dl>", trusted)
+              # The list starts at the content column of the list item its
+              # first term is written in, so it stays in that item: at column
+              # 0 the `<dl>` ended the item and the list, splitting it in two
+              # around the definition list. Not at the term's own indentation:
+              # four columns past its container that is indented code, or
+              # paragraph continuation (a `<dl>` inside a `<p>`).
+              indent = " " * columns[i]
+              result << "#{indent}#{trust("<dl>", trusted)}"
               while i < lines.size && !fenced[i]
                 term = lines[i].strip
                 if term.empty?
@@ -58,7 +70,7 @@ module Hwaro
                   break
                 end
 
-                result << trust("<dt>#{render_inline_md(term, flags)}</dt>", trusted)
+                result << "#{indent}#{trust("<dt>#{render_inline_md(term, flags)}</dt>", trusted)}"
                 i += 1
 
                 # Collect definitions for this term
@@ -74,7 +86,7 @@ module Hwaro
                     definition += " #{lines[i].strip}"
                     i += 1
                   end
-                  result << trust("<dd>#{render_inline_md(definition, flags)}</dd>", trusted)
+                  result << "#{indent}#{trust("<dd>#{render_inline_md(definition, flags)}</dd>", trusted)}"
                 end
 
                 # Skip one or more blank lines between term groups within the same dl
@@ -88,7 +100,14 @@ module Hwaro
                 end
                 break
               end
-              result << "</dl>"
+              result << "#{indent}</dl>"
+              # `<dl>` opens a type-6 HTML block that runs to the next blank
+              # line, so a line right after the list (a paragraph, `- item`,
+              # a fence) was swallowed into it and shipped as raw, unparsed
+              # Markdown. The blank line ends the block; Markd drops it from
+              # the block's literal, so a list followed by a blank line (or
+              # the end of the page) renders as before.
+              result << "" if i < lines.size && !lines[i].strip.empty?
             else
               result << line
               i += 1

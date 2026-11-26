@@ -216,7 +216,8 @@ describe "Hwaro::Content::Processors::InlineMarkdown::DISPLAY_MATH_RE" do
   # character kept one JIT frame each, so a stray `$$` with 150 KB of
   # blank-line-free text after it (a long list or table) failed the build
   # with "JIT stack limit reached".
-  lazy = /\$\$((?:(?!\n[ \t\r]*\n).)*?)\$\$/m
+  # A `>`-only line is a blockquote's blank line and ends the span too.
+  lazy = /\$\$((?:(?!\n[ \t\r>]*\n).)*?)\$\$/m
   spans = ->(text : String, regex : Regex) { text.scan(regex).map { |m| {m.byte_begin, m.byte_end, m[1]} } }
 
   it "matches exactly what the lazy pattern matched" do
@@ -225,7 +226,7 @@ describe "Hwaro::Content::Processors::InlineMarkdown::DISPLAY_MATH_RE" do
       spans.call(text, display).should eq(spans.call(text, lazy)), text.inspect
     end
     rng = Random.new(20261111)
-    alphabet = ["$", "$", "$$", "a", "é", " ", "\t", "\r", "\n", "\n", "\\", "\n\n", "\r\n", "\n \n"]
+    alphabet = ["$", "$", "$$", "a", "é", " ", "\t", "\r", "\n", "\n", "\\", "\n\n", "\r\n", "\n \n", ">", "\n>\n", "> "]
     100_000.times do
       text = String.build { |io| rng.rand(0..14).times { io << alphabet.sample(rng) } }
       spans.call(text, display).should eq(spans.call(text, lazy)), text.inspect
@@ -240,6 +241,20 @@ describe "Hwaro::Content::Processors::InlineMarkdown::DISPLAY_MATH_RE" do
     formula = "$$\n" + "x^2 + y_1 \\\\\n" * 40_000 + "$$"
     display.match(formula).try(&.[0].bytesize).should eq(formula.bytesize)
     display.match("$$\n" + "x\n" * 200_000).should be_nil
+  end
+
+  it "does not cross the blank line of a blockquote" do
+    # The math pass re-quotes every line of a quoted formula's <div>, so a
+    # `>`-only line inside it split the div over two quote paragraphs: the
+    # tail rendered as text and the closing `\]` lost its backslash.
+    display.match("> $$\n> a\n>\n> b\n> $$").should be_nil
+    display.match("> $$\n> a\n> > \r\n> b\n> $$").should be_nil
+    display.match("> $$\n> a > b\n> $$").try(&.[1]).should eq("\n> a > b\n> ")
+    config = Hwaro::Models::MarkdownConfig.new
+    config.math = true
+    html, _ = Hwaro::Processor::Markdown.render("> $$\n> a\n>\n> b\n> $$\n", markdown_config: config)
+    html.should_not contain("math-display")
+    html.should eq("<blockquote>\n<p>$$\na</p>\n<p>b\n$$</p>\n</blockquote>\n")
   end
 end
 
