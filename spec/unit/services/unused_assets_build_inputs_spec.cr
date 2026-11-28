@@ -71,6 +71,45 @@ describe Hwaro::Services::UnusedAssets do
   end
 
   describe "environment config overrides" do
+    it "keeps assets used by base and merged environment settings" do
+      Dir.mktmpdir do |dir|
+        build_input_project(dir, <<-TOML)
+          [assets]
+          enabled = true
+          source_dir = "assets"
+
+          [[assets.bundles]]
+          name = "main.css"
+          files = ["main.css"]
+
+          [auto_includes]
+          enabled = true
+          dirs = ["base-css"]
+          TOML
+        File.write(File.join(dir, "config.staging.toml"), "[assets]\nsource_dir = \"staging-assets\"\n")
+        File.write(File.join(dir, "config.production.toml"), <<-TOML)
+          [auto_includes]
+          dirs = ["prod-css"]
+
+          [highlight]
+          enabled = true
+          use_cdn = false
+          theme = "github"
+          TOML
+        %w[assets staging-assets].each do |source|
+          FileUtils.mkdir_p(File.join(dir, source))
+          File.write(File.join(dir, source, "main.css"), "body{background:url(/images/#{source}.png)}")
+          write_static(dir, "images/#{source}.png")
+        end
+        write_static(dir, "base-css/site.css")
+        write_static(dir, "prod-css/site-production.css")
+        write_static(dir, "assets/css/highlight/github.min.css")
+        write_static(dir, "images/orphan.png")
+
+        build_input_unused(dir).should eq(["static/images/orphan.png"])
+      end
+    end
+
     it "reads config.<env>.toml for references" do
       Dir.mktmpdir do |dir|
         build_input_project(dir, "")

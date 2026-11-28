@@ -4,6 +4,7 @@
 # whether each asset is referenced by any content or template file.
 # Reports unreferenced files that may be candidates for removal.
 
+require "html"
 require "json"
 require "uri"
 require "./content_lister"
@@ -77,8 +78,6 @@ module Hwaro
       @static_dir : String
       @templates_dir : String
       @project_root : String
-      @site_config : Models::Config? = nil
-      @site_config_loaded = false
 
       def initialize(
         @content_dir : String = "content",
@@ -136,11 +135,15 @@ module Hwaro
         assets = collect_assets
         return UnusedAssetsResult.new if assets.empty?
 
+        overrides = Dir.glob(File.join(Utils::PathUtils.glob_escape(@project_root), "config.*.toml")).sort!
+        configs = site_configs(overrides)
+
         # Folded to NFC on both sides: a reference is typed precomposed while
         # macOS may store the file decomposed (NFD), and the two spellings
         # are one name — without the fold `--delete` removed images in use.
-        scanned_text = Utils::PathUtils.nfc(collect_scan_text)
+        scanned_text = Utils::PathUtils.nfc(collect_scan_text(overrides, configs))
         referenced = build_referenced_basenames(scanned_text)
+        configs.each { |config| add_config_references(referenced, config) }
 
         unused = [] of String
         assets.each do |asset_path|
@@ -245,7 +248,7 @@ module Hwaro
       # Concatenate every content/template file we scan for references into a
       # single blob, so both the regex pass and the literal-substring safety
       # net in `run` work off the same source text.
-      private def collect_scan_text : String
+      private def collect_scan_text(overrides : Array(String), configs : Array(Models::Config)) : String
         scan_files = [] of String
 
         if Dir.exists?(@content_dir)
@@ -256,7 +259,7 @@ module Hwaro
           # `[content.files]` html/css/js) name sibling assets as literally as
           # a static/ file does; only Markdown was read, so `--delete` removed
           # a bundle image only its HTML demo page used.
-          Dir.glob(File.join(Utils::PathUtils.glob_escape(@content_dir), "**", "*.{#{STATIC_SCAN_EXTENSIONS.join(",")}}")) { |f| scan_files << f }
+          collect_static_scan_sources(@content_dir, scan_files)
         end
 
         if Dir.exists?(@templates_dir)
@@ -269,21 +272,21 @@ module Hwaro
         # them, those fonts are misreported as unused — and `--delete` would
         # remove in-use files (data loss).
         if Dir.exists?(@static_dir)
-          Dir.glob(File.join(Utils::PathUtils.glob_escape(@static_dir), "**", "*.{#{STATIC_SCAN_EXTENSIONS.join(",")}}")) { |f| scan_files << f }
+          collect_static_scan_sources(@static_dir, scan_files, match_hidden: true)
         end
 
         # The asset pipeline's own source dir (`[assets] source_dir =
         # "assets"`): a bundled stylesheet's `url(/images/bg.png)` ships in
         # the compiled bundle, yet the file was never read, so `bg.png` was
         # reported unused and `--delete` removed it.
-        if source_dir = asset_source_dir
-          Dir.glob(File.join(Utils::PathUtils.glob_escape(source_dir), "**", "*.{#{STATIC_SCAN_EXTENSIONS.join(",")}}")) { |f| scan_files << f }
+        configs.compact_map { |config| asset_source_dir(config) }.uniq!.each do |source_dir|
+          collect_static_scan_sources(source_dir, scan_files, match_hidden: true)
         end
 
         # Environment overrides (`config.production.toml`, merged by
         # `hwaro build --env production`) are config too: an asset named only
         # there — a production `og.default_image`, say — is still in use.
-        Dir.glob(File.join(Utils::PathUtils.glob_escape(@project_root), "config.*.toml")).sort.each { |f| scan_files << f }
+        scan_files.concat(overrides)
 
         # `data/` and `i18n/` are build inputs too — templates read them as
         # `site.data.*` / translation strings, so an asset path that lives only
@@ -300,6 +303,10 @@ module Hwaro
           scan_files.each do |file|
             text = readable_scan_source(file) || next
             sb << text << '\n'
+            # The browser decodes entities in URLs such as /red&amp;blue.png.
+            # Keep the source spelling too, for literal references in CSS/JS.
+            decoded = HTML.unescape(text)
+            sb << decoded << '\n' if decoded != text
           end
 
           # config.toml goes through the same UTF-8 gate as every other scan
@@ -311,6 +318,16 @@ module Hwaro
               sb << text << '\n'
             end
           end
+        end
+      end
+
+      # The build copies static files regardless of extension case and
+      # includes directories such as .well-known.
+      private def collect_static_scan_sources(dir : String, files : Array(String), match_hidden : Bool = false) : Nil
+        match = File::MatchOptions.glob_default
+        match |= File::MatchOptions::DotFiles if match_hidden
+        Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "**", "*"), match: match) do |path|
+          files << path if STATIC_SCAN_EXTENSIONS.includes?(File.extname(path).lchop('.').downcase)
         end
       end
 
@@ -351,18 +368,10 @@ module Hwaro
           end
         end
 
-        # Files declared in `config.toml` (`[[assets.bundles]] files`,
-        # `[auto_includes] dirs`, …) are consumed by the build pipeline
-        # itself, not referenced from content/templates — without this
-        # the scan reported them as "Unused" even though the build
-        # actively reads them. See #488.
-        add_config_references(refs)
-
         refs
       end
 
-      private def add_config_references(refs : Set(String)) : Nil
-        return unless config = site_config
+      private def add_config_references(refs : Set(String), config : Models::Config) : Nil
         # `[highlight] use_cdn = false` makes the build itself link the
         # self-hosted highlight.js files (`highlight_css` / `highlight_js`
         # template variables, see `Render#missing_local_highlight_assets`).
@@ -383,28 +392,38 @@ module Hwaro
           dir = File.join(@static_dir, rel_dir)
           next unless Dir.exists?(dir)
           Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "**", "*")) do |path|
-            # `File.directory?` raises on a symlink cycle, and the blanket
-            # rescue below would have swallowed it — dropping EVERY
-            # config-declared reference, so `--delete` removed bundle and
-            # auto-include files the build still reads. Resolve the entry the
-            # way the asset walk does instead.
+            # Resolve entries like the asset walk so a symlink cycle does
+            # not interrupt the scan of the remaining files.
             next unless ContentWalk.readable_file?(path)
             refs << File.basename(path)
           end
+        rescue ex : File::Error
+          Logger.warn "Skipping auto-include directory #{dir}: #{ex.message}"
         end
-      rescue Exception
-        # Treat config-load failures as "no extra references" so the
-        # tool stays best-effort rather than crashing on a partial
-        # site.
       end
 
-      # The project's `config.toml`, loaded once; nil when absent or
-      # unloadable (the scan stays best-effort on a partial site).
-      private def site_config : Models::Config?
-        return @site_config if @site_config_loaded
-        @site_config_loaded = true
+      # Protect references from the default build and every environment.
+      # Load each overlay through Config so it inherits unchanged base values.
+      private def site_configs(overrides : Array(String)) : Array(Models::Config)
         config_path = File.join(@project_root, "config.toml")
-        @site_config = File.exists?(config_path) ? Models::Config.load(config_path) : nil
+        return [] of Models::Config unless ContentWalk.readable_file?(config_path)
+
+        configs = [] of Models::Config
+        if base = load_site_config(config_path)
+          configs << base
+        end
+        overrides.each do |path|
+          next unless ContentWalk.readable_file?(path)
+          env = File.basename(path).lchop("config.").rchop(".toml")
+          if config = load_site_config(config_path, env)
+            configs << config
+          end
+        end
+        configs
+      end
+
+      private def load_site_config(path : String, env : String? = nil) : Models::Config?
+        Models::Config.load(path, env: env)
       rescue Exception
         nil
       end
@@ -412,12 +431,14 @@ module Hwaro
       # `[assets] source_dir` when the pipeline reads its bundles from
       # somewhere other than the static dir: those stylesheets and scripts
       # ship (bundled) and reference static files like any other.
-      private def asset_source_dir : String?
-        return unless config = site_config
+      private def asset_source_dir(config : Models::Config) : String?
         return unless config.assets.enabled
-        dir = rooted(config.assets.source_dir)
-        return if File.expand_path(dir) == File.expand_path(@static_dir)
+        dir = File.expand_path(config.assets.source_dir, @project_root)
+        return if dir == File.expand_path(@static_dir)
         dir if Dir.exists?(dir)
+      rescue ex : File::Error
+        Logger.warn "Skipping asset source directory #{dir}: #{ex.message}"
+        nil
       end
     end
   end

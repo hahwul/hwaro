@@ -70,6 +70,8 @@ mappings are lossy:
   (`2024-01-01: v`) becomes the string key `"2024-01-01"`.
 - If distinct YAML keys such as `1` and `"1"` would become the same string
   in JSON or TOML, conversion reports the collision and leaves the file untouched.
+- When converting JSON to YAML or TOML, duplicate keys in any JSON object
+  cause a content error and leave the original file untouched.
 - A leading UTF-8 BOM is dropped.
 
 ## JSON Output

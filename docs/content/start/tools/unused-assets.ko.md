@@ -51,7 +51,12 @@ hwaro tool unused-assets --delete --force --json
 - 데이터·번역 파일 (`data/`, `i18n/`의 `.yml`, `.yaml`, `.json`, `.toml`)
 - 파일을 지정하는 `config.toml`과 환경별 덮어쓰기 파일(`config.production.toml`)의 값
 - 에셋 파이프라인의 `[assets] source_dir`(`static/`이 아닐 때) 아래 스타일시트와 스크립트
-- 빌드가 직접 연결하는 파일: `[highlight] use_cdn = false`일 때 자체 호스팅하는 highlight.js 테마와 스크립트
+- 빌드가 직접 연결하는 파일. `[auto_includes]` 에셋과 `[highlight] use_cdn = false`일 때 자체 호스팅하는 highlight.js 테마 및 스크립트가 포함됩니다.
+
+기본 설정과 각 `config.<env>.toml`을 병합한 설정을 모두 확인해, 어느 빌드
+환경에서든 사용하는 파일은 보존합니다. `/images/red&amp;blue.png`처럼 HTML
+문자 참조로 표기한 파일명도 인식합니다. `static/.well-known/` 같은 숨김
+디렉터리도 스캔하며, 정적 소스의 확장자는 대소문자를 구분하지 않습니다.
 
 템플릿이 `templates/` 밖에 있다면 `--templates-dir`로 스캔 위치를 알려주세요.
 그렇지 않으면 해당 템플릿의 에셋 참조가 보이지 않아, 실제로 쓰이는 에셋이
