@@ -30,8 +30,8 @@ module Hwaro
         detect_changes(old_mtimes, new_mtimes)
       end
 
-      def staleness_scan_mtimes : Hash(String, FileStamp)
-        scan_mtimes
+      def staleness_scan_mtimes(prev : Hash(String, FileStamp)? = nil) : Hash(String, FileStamp)
+        scan_mtimes(prev)
       end
 
       def staleness_resolve_extra_roots(env : String? = nil, output_dir : String = "public") : Array(String)
@@ -387,6 +387,77 @@ describe "serve incremental staleness" do
         )
 
         Hwaro::Services::Server.new.staleness_resolve_extra_roots.should be_empty
+      end
+    end
+  end
+end
+
+describe "serve watch parity: dependencies in an asset source directory" do
+  old_logo = %(<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10" fill="red"/></svg>)
+  new_logo = old_logo.sub("red", "blue")
+  old_data = %({"label":"before-settings"})
+  new_data = %({"label":"after-settings"})
+
+  {
+    {"settings.json", new_data, "public/about/index.html", "before-settings", "after-settings"},
+    {"logo.svg", new_logo, "public/og-images/about.svg", Base64.strict_encode(old_logo), Base64.strict_encode(new_logo)},
+  }.each do |filename, replacement, output, before_text, after_text|
+    it "refreshes the output that reads #{filename}" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          FileUtils.mkdir_p("content")
+          FileUtils.mkdir_p("templates")
+          File.write("content/about.md", "+++\ntitle = 'About'\n+++\nAbout")
+          File.write("config.toml", <<-TOML
+            title = "Listing Site"
+            base_url = "https://example.com"
+
+            [assets]
+            enabled = true
+            source_dir = "frontend"
+
+            [[assets.bundles]]
+            name = "app.js"
+            files = ["app.js"]
+
+            [og.auto_image]
+            enabled = true
+            format = "svg"
+            logo = "frontend/logo.svg"
+            TOML
+          )
+          FileUtils.mkdir_p("frontend")
+          File.write("frontend/app.js", "console.log('app')")
+          File.write("frontend/settings.json", old_data)
+          File.write("frontend/logo.svg", old_logo)
+          File.write("templates/page.html", %(<html><body>{{ load_data('frontend/settings.json').label }}</body></html>))
+
+          server = Hwaro::Services::Server.new
+          options = staleness_options
+          options.preserve_output = true
+          source = File.join("frontend", filename)
+          stable_mtime = Time.utc - 10.seconds
+          File.touch(source, stable_mtime)
+          server.staleness_resolve_extra_roots.should eq(["frontend"])
+          startup = server.staleness_scan_mtimes
+          server.staleness_builder.run(options).should be_true
+          File.read(output).should contain(before_text)
+
+          before = server.staleness_scan_mtimes(startup)
+          server.staleness_detect_changes(startup, before).empty?.should be_true
+          File.write(source, replacement)
+          File.touch(source, stable_mtime + 2.seconds)
+          after = server.staleness_scan_mtimes(before)
+          changes = server.staleness_detect_changes(before, after)
+          changes.all_changed_files.should eq([source])
+          server.staleness_apply_changeset(changes, options)
+
+          File.read(output).should contain(after_text)
+
+          # Pre-build hooks may rewrite the dependency with identical bytes.
+          File.touch(source, stable_mtime + 4.seconds)
+          server.staleness_detect_changes(after, server.staleness_scan_mtimes(after)).empty?.should be_true
+        end
       end
     end
   end

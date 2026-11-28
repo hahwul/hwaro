@@ -116,6 +116,7 @@ module Hwaro
         # Explicit read sources, listed once per diff and only when an ignored
         # path shows up (see content_ignored?).
         read_sources = [] of Set(String)
+        render_sources = watched_render_sources unless @extra_watch_roots.empty?
         hidden = ->(path : String) do
           if content_ignored?(path) && !colocated_bundle_source?(path)
             sources = read_sources.first? || explicit_read_sources.tap { |found| read_sources << found }
@@ -131,6 +132,7 @@ module Hwaro
           next if old_stamp == new_stamp # unchanged (cheapest test first)
           next if hidden.call(path)
           if old_stamp
+            render_dependency = !!render_sources.try(&.includes?(path)) && extra_watch_root?(path)
             if watched_config_file?(path)
               # A config stamp that moved only because OUR OWN last build
               # rewrote it byte-identically is the #760 config loop:
@@ -143,12 +145,16 @@ module Hwaro
               next if built_config_rewrite?(path, new_stamp)
               config_changed = true
               config_files << path
-            elsif identical_rewrite?(path, old_stamp, new_stamp)
+            elsif identical_rewrite?(path, old_stamp, new_stamp, render_dependency)
               # A stamp that moved without a byte changing — the
               # #755 hook loop: reporting it would force a full rebuild,
               # which re-runs build.hooks.pre, which rewrites the file
               # again. Dropping it lets the changeset settle to empty.
               next
+            elsif render_dependency
+              # A literal load_data() input or an OG image asset still needs a
+              # full rebuild when it shares a watch root with bundle inputs.
+              modified_data << path
             else
               classify_modified(path, modified_content, modified_content_files, modified_templates, modified_static, modified_data)
             end
@@ -201,6 +207,10 @@ module Hwaro
         sources = @builder.load_data_sources
         @builder.include_sources.each { |path| sources << Path.posix(path).normalize.to_s }
         sources
+      end
+
+      private def watched_render_sources : Set(String)
+        @builder.load_data_sources.concat(@builder.og_image_assets)
       end
 
       private def colocated_bundle_source?(path : String) : Bool
@@ -488,6 +498,7 @@ module Hwaro
         now_ms = Time.utc.to_unix_ms
         racy = Set(String).new
         dirs_to_watch = Server::WATCH_ROOTS + @extra_watch_roots
+        render_sources = watched_render_sources
 
         dirs_to_watch.each do |dir|
           next unless watchable_root?(dir)
@@ -524,7 +535,9 @@ module Hwaro
               info = File.info?(file, follow_symlinks: true) if symlink
               next if info.nil? || !info.type.file?
               target = symlink ? File.realpath(file) : nil
-              mtimes[file] = {info.modification_time, info.size.to_i64, watch_digest(file, info, prev, now_ms, racy, target), target}
+              render_dependency = render_sources.includes?(file) && extra_watch_root?(file)
+              digest = watch_digest(file, info, prev, now_ms, racy, target, render_dependency)
+              mtimes[file] = {info.modification_time, info.size.to_i64, digest, target}
             rescue ex
               Logger.debug "Failed to read file info for #{file}: #{ex.message}"
             end
@@ -536,7 +549,7 @@ module Hwaro
         # (`examples/site/config.toml`), learned from the last build. Stamped
         # one by one; a missing one gets MISSING_STAMP, so creating it later
         # registers as a change.
-        (@builder.include_sources + @builder.load_data_sources.to_a + @builder.og_image_assets).each do |path|
+        render_sources.concat(@builder.include_sources).each do |path|
           next if watched_root_path?(path) || Server.watcher_ignored?(path)
           next if Utils::PathUtils.absolute?(path) || Utils::PathUtils.escapes_parent?(path)
           begin
@@ -665,13 +678,16 @@ module Hwaro
       # more on the first scan after it settles (`@racy_watch_paths`), so the
       # second save shows up as a digest change. Afterwards the digest is
       # carried like any other, so a settled file is never read again.
-      private def watch_digest(file : String, info : File::Info, prev : Hash(String, FileStamp)?, now_ms : Int64, racy : Set(String), target : String? = nil) : String?
+      private def watch_digest(file : String, info : File::Info, prev : Hash(String, FileStamp)?, now_ms : Int64, racy : Set(String), target : String? = nil, render_dependency : Bool = false) : String?
         mtime_ms = info.modification_time.to_unix_ms
         racy_now = !Core::Build::Cache.stable_mtime?(mtime_ms, now_ms)
         racy << file if racy_now
         same = prev && (old = prev[file]?) && old[0] == info.modification_time && old[1] == info.size.to_i64 && old[3] == target
-        return old.try(&.[2]) if same && !racy_now && !@racy_watch_paths.includes?(file)
-        return unless racy_now || same || digest_watched?(file)
+        if same && !racy_now && !@racy_watch_paths.includes?(file)
+          digest = old.try(&.[2])
+          return digest if digest || !render_dependency
+        end
+        return unless racy_now || same || render_dependency || digest_watched?(file)
 
         file_digest(file)
       end
@@ -692,11 +708,17 @@ module Hwaro
       # no digest consulted) and equal non-nil digests. A nil digest — a
       # hash-read failure — never matches, so the event is reported and the
       # full rebuild runs, exactly as before the digests existed.
-      private def identical_rewrite?(path : String, old_stamp : FileStamp, new_stamp : FileStamp) : Bool
-        return false unless digest_watched?(path)
+      private def identical_rewrite?(path : String, old_stamp : FileStamp, new_stamp : FileStamp, render_dependency : Bool) : Bool
+        return false unless render_dependency || digest_watched?(path)
         return false unless old_stamp[1] == new_stamp[1] && old_stamp[3] == new_stamp[3]
 
         old_digest = old_stamp[2]
+        # A scan can start hashing an already watched file after the build
+        # discovers that a template or OG image reads it. Learning its digest
+        # alone leaves the file's modification time, size and target intact.
+        if render_dependency && old_digest.nil? && new_stamp[2]
+          return old_stamp[0] == new_stamp[0]
+        end
         !old_digest.nil? && old_digest == new_stamp[2]
       end
     end

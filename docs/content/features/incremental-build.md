@@ -151,7 +151,7 @@ Serve also watches an `[assets] source_dir` that lives outside `static/`, so
 bundle sources kept in their own directory rebuild on save like any other
 asset. A file a template reads through a literal `load_data()` path, and the
 `[og.auto_image]` logo and background image, are watched wherever they live;
-saving one runs a full rebuild.
+saving one runs a full rebuild, including inside the asset source directory.
 
 A file symlink in a watched directory triggers a rebuild when it resolves to a different target, even if both targets have the same modification time and size.
 
