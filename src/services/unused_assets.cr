@@ -324,7 +324,9 @@ module Hwaro
       # The build copies static files regardless of extension case and
       # includes directories such as .well-known.
       private def collect_static_scan_sources(dir : String, files : Array(String), match_hidden : Bool = false) : Nil
-        Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "**", "*"), match_hidden: match_hidden) do |path|
+        match = File::MatchOptions.glob_default
+        match |= File::MatchOptions::DotFiles if match_hidden
+        Dir.glob(File.join(Utils::PathUtils.glob_escape(dir), "**", "*"), match: match) do |path|
           files << path if STATIC_SCAN_EXTENSIONS.includes?(File.extname(path).lchop('.').downcase)
         end
       end
