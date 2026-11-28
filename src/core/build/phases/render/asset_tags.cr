@@ -16,10 +16,10 @@ module Hwaro::Core::Build::Phases::Render
     missing = [] of String
     css_rel = File.join("static", "assets", "css", "highlight", "#{config.highlight.theme}.min.css")
     js_rel = File.join("static", "assets", "js", "highlight.min.js")
-    missing << "/assets/css/highlight/#{config.highlight.theme}.min.css" unless File.exists?(css_rel)
+    missing << "/assets/css/highlight/#{config.highlight.theme}.min.css" unless Utils::PathUtils.file?(css_rel)
     # Server-side highlighting references no JS at all — only the theme CSS.
     unless config.highlight.server?
-      missing << "/assets/js/highlight.min.js" unless File.exists?(js_rel)
+      missing << "/assets/js/highlight.min.js" unless Utils::PathUtils.file?(js_rel)
     end
     missing
   end
@@ -173,10 +173,8 @@ module Hwaro::Core::Build::Phases::Render
     has_auto_includes = config.auto_includes.enabled && config.auto_includes.dirs.present?
 
     if has_local_highlight
-      css_path = File.join("static", "assets", "css", "highlight", "#{config.highlight.theme}.min.css")
-      files << css_path if File.exists?(css_path)
-      js_path = File.join("static", "assets", "js", "highlight.min.js")
-      files << js_path if File.exists?(js_path)
+      files << File.join("static", "assets", "css", "highlight", "#{config.highlight.theme}.min.css")
+      files << File.join("static", "assets", "js", "highlight.min.js")
     end
 
     if has_auto_includes
@@ -204,6 +202,7 @@ module Hwaro::Core::Build::Phases::Render
       end
     end
 
-    files
+    # Globs can match directories (e.g. a vendor checkout named mermaid.js).
+    files.select! { |path| Utils::PathUtils.file?(path) }
   end
 end

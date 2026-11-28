@@ -38,7 +38,7 @@ static/
 │       └── 02-app.js
 ```
 
-파일은 `static/{dir}/**/*.css`와 `static/{dir}/**/*.js` 패턴으로 재귀적으로 스캔됩니다. `[static] exclude`에 걸린 파일은 게시되지 않으므로 건너뜁니다.
+`static/{dir}/**/*.css`와 `static/{dir}/**/*.js` 패턴으로 파일을 재귀적으로 검색합니다. `theme.css`나 `vendor.js`라는 디렉터리 안에 패턴과 일치하는 파일이 있으면 그 파일에만 태그를 생성합니다. `[static] exclude`에 걸린 파일은 게시되지 않으므로 건너뜁니다.
 
 ## 파일 순서
 

@@ -98,6 +98,57 @@ describe "warm --cache builds and template inputs outside the tracked files" do
     end
   end
 
+  {true, false}.each do |cache_busting|
+    it "includes files inside extension-named directories (cache_busting=#{cache_busting})" do
+      config = <<-TOML
+        [auto_includes]
+        enabled = true
+        dirs = ["vendor"]
+
+        [sass]
+        enabled = true
+        TOML
+      with_render_inputs_site(config, "{{ auto_includes }}") do
+        assets = {
+          "theme.css/palette.css" => "body { color: red; }",
+          "mermaid.js/viewer.js"  => "console.log('viewer');",
+          "sass.scss/style.scss"  => ".notice { color: blue; }",
+        }
+        assets.each do |path, bytes|
+          source = File.join("static/vendor", path)
+          FileUtils.mkdir_p(File.dirname(source))
+          File.write(source, bytes)
+        end
+
+        render_inputs_build(cache_busting: cache_busting)
+        html = File.read("public/a/index.html")
+        suffix = cache_busting ? "\\?v=[0-9a-f]{8}" : ""
+        html.should match(Regex.new(%(href="http://localhost/vendor/theme\\.css/palette\\.css#{suffix}")))
+        html.should match(Regex.new(%(src="http://localhost/vendor/mermaid\\.js/viewer\\.js#{suffix}")))
+        html.should match(Regex.new(%(href="http://localhost/vendor/sass\\.scss/style\\.css#{suffix}")))
+        html.should_not match(%r{/vendor/(?:theme\.css|mermaid\.js|sass\.css)(?:\?|")})
+      end
+    end
+  end
+
+  it "warns about directories at self-hosted highlight asset paths without hashing them" do
+    config = <<-TOML
+      [highlight]
+      enabled = true
+      mode = "client"
+      use_cdn = false
+      theme = "github"
+      TOML
+    with_render_inputs_site(config, "{{ highlight_tags }}") do
+      FileUtils.mkdir_p("static/assets/css/highlight/github.min.css")
+      FileUtils.mkdir_p("static/assets/js/highlight.min.js")
+      logs = with_captured_log { render_inputs_build }
+
+      logs.should contain("missing: /assets/css/highlight/github.min.css, /assets/js/highlight.min.js")
+      File.exists?("public/a/index.html").should be_true
+    end
+  end
+
   it "re-renders cached pages and prunes the old variant when a resize_image() source is replaced" do
     config = "[image_processing]\nenabled = true\nwidths = [640, 1024]\n"
     head = %({% set im = resize_image(path="/img.png", width=1024) %}<img src="{{ im.url }}" width="{{ im.width }}">)
