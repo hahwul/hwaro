@@ -36,28 +36,16 @@ module Hwaro
 
         relative_path = page_path.gsub('\\', '/')
         dir = Path[relative_path].dirname.to_s
-        basename = Path[relative_path].basename
-
-        # Only strip the first matching language suffix to avoid over-stripping
-        # e.g., "post.en.ko.md" should strip ".ko" (if ko matches) but not both
-        # Uses string suffix check instead of per-call Regex compilation.
-        cleaned = basename
-        config.languages.each_key do |code|
-          suffix = ".#{code}#{ext}"
-          if cleaned.ends_with?(suffix)
-            cleaned = "#{cleaned[0, cleaned.size - suffix.size]}#{ext}"
-            break
-          end
+        stem = Path[relative_path].basename.rchop(ext)
+        code = Utils::PathUtils.language_suffix(stem) do |suffix|
+          config.languages.has_key?(suffix) || suffix == config.default_language
         end
-        # Also check default language if no match above
-        if cleaned == basename
-          suffix = ".#{config.default_language}#{ext}"
-          if cleaned.ends_with?(suffix)
-            cleaned = "#{cleaned[0, cleaned.size - suffix.size]}#{ext}"
-          end
-        end
+        stem = stem.rchop(".#{code}") if code
+        dir == "." ? "#{stem}#{ext}" : "#{dir}/#{stem}#{ext}"
+      end
 
-        dir == "." ? cleaned : "#{dir}/#{cleaned}"
+      def normalize_markdown_extension(path : String) : String
+        path.ends_with?(".markdown") ? path.rchop(".markdown") + ".md" : path
       end
 
       # A front matter `translation_key` displaced from its group by
@@ -97,6 +85,18 @@ module Hwaro
 
         order = ordered_language_codes(config)
         default = config.default_language
+
+        # Pair mixed extensions when there is one page per language.
+        # Keep exact-extension groups when both spellings have authored
+        # pages in the same language (they can have distinct custom URLs).
+        groups.reject! do |(version, key, keyed), variants|
+          next false if keyed || !key.ends_with?(".markdown")
+          next false unless matching = groups[{version, normalize_markdown_extension(key), false}]?
+          codes = matching.map { |p| language_code(p, config) }.to_set
+          next false if variants.any? { |p| codes.includes?(language_code(p, config)) }
+          matching.concat(variants)
+          true
+        end
 
         groups.each do |(_, key, keyed), group_pages|
           # A group of size 1 has no cross-language variants, just the

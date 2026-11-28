@@ -122,7 +122,7 @@ URL 세그먼트는 디렉터리 이름이 아니라 버전 **name**입니다. `
 | `.exists` | Bool | 대응 페이지 존재 여부 (`false`면 `url`은 버전 루트) |
 | `.current` | Bool | 이 행이 현재 페이지의 버전인지 |
 
-대응 페이지는 같은 언어에서 버전 루트 기준 상대 경로로 매칭됩니다: `docs/v1/install.md` ↔ `docs/v2/install.md`, `docs/v1/install.ko.md` ↔ `docs/v2/install.ko.md`. `render = false`인 대응 페이지와 다른 페이지에 URL을 빼앗긴 대응 페이지(빌드의 중복 출력 경로 경고)는 존재하지 않는 것으로 취급합니다.
+대응 페이지는 같은 언어에서 버전 루트 기준 상대 경로로 매칭됩니다. 예를 들어 `docs/v1/install.md`와 `docs/v2/install.markdown`, `docs/v1/install.ko.md`와 `docs/v2/install.ko.md`가 각각 짝을 이룹니다. `render = false`인 대응 페이지와 다른 페이지에 URL을 빼앗긴 대응 페이지(빌드의 중복 출력 경로 경고)는 존재하지 않는 것으로 취급합니다.
 
 ### versions (전역)
 

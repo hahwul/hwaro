@@ -63,6 +63,38 @@ private def read(path : String) : String
 end
 
 describe "Versioned docs: URL mapping (latest_at_root = true)" do
+  it "links counterparts whose Markdown extensions differ" do
+    content = versioned_content
+    content["docs/v2/install.markdown"] = content.delete("docs/v2/install.md").not_nil!
+    build_site(VERSIONS_CONFIG, content_files: content, template_files: {
+      "page.html" => SWITCHER_TEMPLATE,
+    }) do
+      File.read("public/docs/v1/install/index.html").should contain("v2:/docs/install/:true:false")
+      File.read("public/docs/install/index.html").should contain("v1:/docs/v1/install/:true:false")
+    end
+  end
+
+  it "keeps exact-extension pairs when both files publish distinct URLs" do
+    config = VERSIONS_CONFIG + "\n[languages.ko]\nweight = 1\n"
+    content = versioned_content
+    {"v1", "v2"}.each do |version|
+      {"", ".ko"}.each do |language|
+        content["docs/#{version}/topic#{language}.md"] = "+++\nslug = 'guide'\n+++\nGuide"
+        content["docs/#{version}/topic#{language}.markdown"] = "+++\nslug = 'notes'\n+++\nNotes"
+      end
+    end
+    build_site(config, content_files: content, template_files: {
+      "page.html" => SWITCHER_TEMPLATE + "{{ hreflang_tags }}",
+    }) do
+      guide = File.read("public/docs/guide/index.html")
+      guide.should contain("v1:/docs/v1/guide/:true:false")
+      guide.should contain(%(hreflang="ko" href="http://localhost/ko/docs/guide/"))
+      notes = File.read("public/docs/notes/index.html")
+      notes.should contain("v1:/docs/v1/notes/:true:false")
+      notes.should contain(%(hreflang="ko" href="http://localhost/ko/docs/notes/"))
+    end
+  end
+
   it "renders the latest version at the parent's natural URL and older versions under /<name>/" do
     build_site(VERSIONS_CONFIG, content_files: versioned_content, template_files: {
       "page.html"    => SWITCHER_TEMPLATE,

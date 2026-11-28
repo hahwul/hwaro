@@ -84,7 +84,7 @@ content/
 
 Hwaro는 파일 이름을 기준으로 번역된 페이지를 자동으로 연결합니다. 언어 접미사를 뺀 기본 이름이 같은 페이지들은 서로의 번역으로 간주됩니다.
 
-예를 들어 `hello.md`, `hello.ko.md`, `hello.ja.md`는 모두 번역 관계로 연결됩니다.
+예를 들어 `hello.md`, `hello.ko.md`, `hello.ja.markdown`은 모두 번역 관계로 연결됩니다. 번역을 짝지을 때 `.md`와 `.markdown`은 같은 확장자로 취급합니다.
 
 실제로 출력되지 않는 페이지는 번역 링크(`page.translations`, hreflang 태그, 사이트맵 대체 링크)에서 빠집니다. `render = false` 페이지, `redirect_to` 스텁, 그리고 다른 페이지에 URL을 빼앗긴 페이지(빌드의 중복 출력 경로 경고)가 그렇습니다. 그 URL에는 다른 페이지가 출력되기 때문입니다.
 
