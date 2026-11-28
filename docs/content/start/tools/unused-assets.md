@@ -51,7 +51,13 @@ hwaro tool unused-assets --delete --force --json
 - Data and translation files (`.yml`, `.yaml`, `.json`, `.toml` under `data/` and `i18n/`)
 - `config.toml` and environment overrides (`config.production.toml`) values that name files
 - Stylesheets and scripts under the asset pipeline's `[assets] source_dir`, when it is not `static/`
-- Files the build links on its own: the self-hosted highlight.js theme and script when `[highlight] use_cdn = false`
+- Files the build links on its own, including `[auto_includes]` assets and the self-hosted highlight.js theme and script when `[highlight] use_cdn = false`
+
+The scan combines the base configuration with each `config.<env>.toml`
+overlay so files used by any build environment are kept. It also recognizes
+HTML entities in references such as `/images/red&amp;blue.png`. Static reference
+sources are scanned regardless of extension case, including under
+directories such as `static/.well-known/`.
 
 If your templates live outside `templates/`, point the scan at them with
 `--templates-dir` — otherwise their asset references are invisible and the

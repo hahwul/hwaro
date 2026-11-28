@@ -109,6 +109,33 @@ describe Hwaro::Services::UnusedAssets do
       end
     end
 
+    it "keeps assets referenced with HTML entities in static pages" do
+      Dir.mktmpdir do |dir|
+        scaffold_project(dir)
+        File.write(File.join(dir, "static", "gallery.html"), %(<img src="/red&amp;blue.png"><img src="/x&#39;y.png">))
+        %w[red&blue.png x'y.png orphan.png].each do |name|
+          File.write(File.join(dir, "static", name), "png")
+        end
+
+        unused_basenames(dir).should eq(["orphan.png"])
+      end
+    end
+
+    it "scans static pages with uppercase extensions or under dot directories" do
+      Dir.mktmpdir do |dir|
+        scaffold_project(dir)
+        static = File.join(dir, "static")
+        FileUtils.mkdir_p(File.join(static, ".well-known"))
+        File.write(File.join(static, "gallery.HTML"), %(<img src="/gallery.png">))
+        File.write(File.join(static, ".well-known", "widget.html"), %(<img src="/widget.png">))
+        %w[gallery.png widget.png orphan.png].each do |name|
+          File.write(File.join(static, name), "png")
+        end
+
+        unused_basenames(dir).should eq(["orphan.png"])
+      end
+    end
+
     describe "unreadable reference sources (review finding 10)" do
       it "skips a file containing invalid UTF-8 instead of aborting the scan" do
         # The corpus is concatenated and regex-scanned, so one bad byte made
