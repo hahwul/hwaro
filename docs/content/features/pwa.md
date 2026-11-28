@@ -131,6 +131,8 @@ Unknown values log a warning and fall back to `cache-first`.
 
 If `offline_page` is set, create a static HTML page at that path (e.g., `content/offline.md` or `static/offline.html`) that will be shown when the user navigates while offline.
 
+A directory URL such as `/offline` or `/offline/` resolves to the built `offline/index.html` for both `offline_page` and `precache_urls`. The service worker uses `/offline/` to fetch the page directly.
+
 ## See Also
 
 - [Configuration](/start/config/) — Full config reference

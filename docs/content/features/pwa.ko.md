@@ -125,6 +125,8 @@ cache_strategy = "cache-first"
 
 `offline_page`를 설정했다면 해당 경로에 정적 HTML 페이지(예: `content/offline.md` 또는 `static/offline.html`)를 만들어 둡니다. 사용자가 오프라인 상태에서 페이지를 이동하면 이 페이지가 표시됩니다.
 
+`offline_page`와 `precache_urls`에서 `/offline`과 `/offline/`은 모두 빌드 결과의 `offline/index.html`을 가리킵니다. 서비스 워커는 `/offline/` 주소에서 페이지를 바로 가져옵니다.
+
 ## 함께 보기
 
 - [설정](/ko/start/config/) — 전체 설정 레퍼런스
