@@ -353,6 +353,24 @@ describe Hwaro::Services::FrontmatterConverter do
   end
 
   describe "#convert_to_toml" do
+    it "rejects duplicate JSON keys without rewriting the source" do
+      Dir.mktmpdir do |dir|
+        file_path = File.join(dir, "post.md")
+        content = %({"extra":[{"name":"first","na\\u006de":"second"}]}\n\nBody\n)
+        File.write(file_path, content)
+
+        converter = Hwaro::Services::FrontmatterConverter.new(dir)
+        log = with_captured_log do
+          {converter.convert_to_toml, converter.convert_to_yaml}.each do |result|
+            result.success.should be_false
+            result.content_error_count.should eq(1)
+            File.read(file_path).should eq(content)
+          end
+        end
+        log.should contain(%(Duplicate JSON key "name"))
+      end
+    end
+
     it "reports invalid JSON front matter as a content error" do
       Dir.mktmpdir do |dir|
         file_path = File.join(dir, "post.md")

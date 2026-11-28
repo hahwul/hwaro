@@ -533,7 +533,7 @@ module Hwaro
         return unless parts = split_json_frontmatter(content)
         json_str, body = parts
         begin
-          json_data = JSON.parse(json_str)
+          json_data = parse_json_for_conversion(JSON::PullParser.new(json_str))
           yaml_body = convert_json_to_yaml_string(json_data)
           "#{YAML_DELIMITER}\n#{yaml_body}#{YAML_DELIMITER}\n#{body}"
         rescue ex
@@ -545,13 +545,33 @@ module Hwaro
         return unless parts = split_json_frontmatter(content)
         json_str, body = parts
         begin
-          json_data = JSON.parse(json_str)
+          json_data = parse_json_for_conversion(JSON::PullParser.new(json_str))
           # Reuse the YAML→TOML builder by going through YAML::Any.
           yaml_any = json_to_yaml_any(json_data)
           toml_body = Utils::FrontmatterWriter::TomlBuilder.new(NULL_OMITTED_KEYS).build(yaml_any)
           "#{TOML_DELIMITER}\n#{toml_body}#{TOML_DELIMITER}\n#{body}"
         rescue ex
           record_error(ex, content)
+        end
+      end
+
+      # JSON.parse keeps only the last occurrence of a key. Detect duplicates
+      # while reading each object, before an in-place rewrite loses values.
+      private def parse_json_for_conversion(pull : JSON::PullParser) : JSON::Any
+        case pull.kind
+        when .begin_object?
+          fields = {} of String => JSON::Any
+          pull.read_object do |key|
+            raise ArgumentError.new("Duplicate JSON key #{key.inspect}") if fields.has_key?(key)
+            fields[key] = parse_json_for_conversion(pull)
+          end
+          JSON::Any.new(fields)
+        when .begin_array?
+          items = [] of JSON::Any
+          pull.read_array { items << parse_json_for_conversion(pull) }
+          JSON::Any.new(items)
+        else
+          JSON::Any.new(pull)
         end
       end
 
