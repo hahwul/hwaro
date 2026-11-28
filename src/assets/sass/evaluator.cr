@@ -748,7 +748,7 @@ module Hwaro
           children = node.children
           unless children
             text = prelude.empty? ? "@#{node.name};" : "@#{node.name} #{prelude};"
-            emit(Css::Raw.new(text))
+            emit(Css::Raw.new(node.name.downcase, text))
             return
           end
 

@@ -42,7 +42,7 @@ module Hwaro
         return 0 unless @config.enabled
         return 0 unless Dir.exists?(SOURCE_DIR)
 
-        count = 0
+        entries = [] of {String, String}
         glob_match = File::MatchOptions.glob_default | File::MatchOptions::DotFiles
         project_root = Dir.current
         Dir.glob(File.join(SOURCE_DIR, "**", "*.scss"), match: glob_match) do |src_path|
@@ -58,26 +58,27 @@ module Hwaro
             next
           end
 
-          # A hand-written sibling `.css` and this compiled output land on
-          # the same path: full builds copy the raw file first and clobber it
-          # here, while a serve session re-copies the raw file OVER the
-          # compiled one on edit — warn so the mixed state isn't silent.
-          raw_sibling = src_path.sub(/\.scss\z/i, ".css")
-          if File.exists?(raw_sibling)
-            Logger.warn "  Sass: #{relative} compiles to #{relative.sub(/\.scss\z/i, ".css")}, which also exists as a static source — remove one of the two."
+          css_path = relative.chomp(".scss") + ".css"
+          if File.exists?(File.join(SOURCE_DIR, css_path))
+            Logger.warn "  Sass: #{relative} compiles to #{css_path}, which also exists as a static source — remove one of the two."
           end
 
           css = SassCompiler.compile_source(File.read(src_path), src_path)
           css = Utils::CssMinifier.minify(css) if @config.minify
 
-          dest_path = File.join(output_dir, relative.sub(/\.scss\z/i, ".css"))
-          Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
-          File.write(dest_path, css)
-          @written_paths << dest_path
-          Logger.debug "  Sass: #{relative} → #{relative.sub(/\.scss\z/i, ".css")} (#{css.bytesize} bytes)"
-          count += 1
+          entries << {css_path, css}
         end
-        count
+
+        # A failed entry must leave the previous stylesheets in place during
+        # serve. Finish compilation before replacing any output files.
+        entries.each do |css_path, css|
+          dest_path = File.join(output_dir, css_path)
+          Hwaro::Utils::FileSafe.mkdir_p(File.dirname(dest_path))
+          Hwaro::Utils::FileSafe.atomic_write(dest_path, css)
+          @written_paths << dest_path
+          Logger.debug "  Sass: #{css_path.chomp(".css")}.scss → #{css_path} (#{css.bytesize} bytes)"
+        end
+        @written_paths.size
       end
 
       # Compiles one SCSS source, converting compiler errors into
