@@ -421,6 +421,8 @@ hwaro serve -i /path/to/my-site -p 8080
 
 파일 감시기는 연달아 일어난 저장을 한 번의 변경으로 묶어 최종 파일 상태를 기준으로 재빌드합니다. 같은 묶음 안에서 생성됐다가 삭제된 임시 파일은 재빌드를 일으키지 않습니다.
 
+`[build]`의 `drafts`, `cache`, `parallel` 변경은 다음 재빌드에 반영되며, 명시한 CLI 옵션이 우선합니다. `[serve]`의 `allowed_hosts`, `headers`, `fast` 변경을 적용하려면 서버를 재시작해야 합니다.
+
 게시된 `static/` 심볼릭 링크가 빌드에서 건너뛰는 대상을 가리키도록 바뀌면, 서버는 재빌드하여 이전 출력 파일을 제거합니다.
 
 **라이브 리로드:**
@@ -476,7 +478,7 @@ Referrer-Policy = "strict-origin-when-cross-origin"
 hwaro serve --header "X-Custom: foo" --header "Cache-Control: no-store"
 ```
 
-- CLI `--header` 값이 `config.toml`의 같은 키보다 우선합니다.
+- CLI `--header` 값이 `config.toml`의 같은 헤더보다 우선합니다. 헤더 이름은 대소문자를 구분하지 않으며, 같은 헤더를 CLI에서 여러 번 지정하면 마지막 값이 적용됩니다.
 - 헤더는 **모든** 개발 서버 응답(HTML, 에셋, 404, 리디렉션, 라이브 리로드가 주입된 페이지, CORS 프리플라이트(`OPTIONS`) 응답)에 붙습니다.
 - 이 기능은 `hwaro serve`에만 적용됩니다. 빌드가 디스크에 쓰는 파일은 그대로입니다.
 

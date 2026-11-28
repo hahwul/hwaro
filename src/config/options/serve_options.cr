@@ -142,10 +142,9 @@ module Hwaro
             fast_start_count: @fast_start_count,
           )
           # Pin the dev output dir the same way an explicit `-o` is pinned:
-          # `apply_build_config!` runs both in Server#run and inside
-          # Builder#run on EVERY watch rebuild, and without this flag a
-          # `[build] output_dir` in config.toml would pull serve right back
-          # into the deployable tree this directory exists to protect.
+          # The Builder applies [build] defaults on each rebuild. This flag
+          # keeps [build] output_dir from redirecting serve into the
+          # deployable tree.
           build.output_dir_explicit = true
           build
         end

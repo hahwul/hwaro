@@ -63,8 +63,8 @@ module Hwaro
       # otherwise. Watched alongside config.toml (both force full rebuilds).
       @env_config_file : String? = nil
       # [serve] table captured at startup — the baseline for warning that a
-      # config edit changed restart-only settings (headers, fast).
-      @startup_serve_config : Models::ServeConfig? = nil
+      # config edit changed restart-only settings.
+      @startup_serve_config = Models::ServeConfig.new
       # Mirrors --no-error-overlay. The flag used to reach only BuildOptions
       # (where it governs the per-page render-error HTML), so the full-screen
       # overlay the live-reload client draws from an `error:` push kept
@@ -208,18 +208,9 @@ module Hwaro
         run_with_options(options.host, options.port, options.open_browser, options.access_log, options.live_reload, serve_build_options(options), options.json, options.headers, options.allow_hosts)
       end
 
-      # The effective BuildOptions a serve session runs with. Extracted so
-      # specs can assert the serve/build output split (issue #756) without
-      # binding a socket.
-      #
-      # `[build]` is merged here as well as in the Builder: BuildOptions is a
-      # struct, and the copy the Builder mutates is not this one — without the
-      # merge, `[build] drafts`/`cache` would apply to rebuilds but not to the
-      # options the server derives its document root and mount point from.
-      # `output_dir` is the exception: serve always builds into its own
-      # `ServeOptions::DEV_OUTPUT_DIR` (never the configured output_dir, which
-      # stays untouched for deploys), enforced by `output_dir_explicit` in
-      # `to_build_options`.
+      # Keep the original flags for the lifetime of the session so each
+      # build pass can apply the current [build] defaults. The output directory
+      # is pinned by ServeOptions#to_build_options.
       #
       # A missing or invalid config is not fatal here — serve deliberately
       # starts on a broken site, and the Builder reports the error on the
@@ -228,9 +219,8 @@ module Hwaro
         build_options = options.to_build_options
         build_options.serve_mode = true
         # Kept for the watcher (see @startup_config) rather than loaded twice.
-        config = load_config_or_nil(build_options.env)
-        @startup_config = config
-        config.try { |cfg| build_options.apply_build_config!(cfg.build) }
+        @startup_config = load_config_or_nil(build_options.env)
+        @startup_serve_config = @startup_config.try(&.serve) || Models::ServeConfig.new
         build_options
       end
 
@@ -341,11 +331,6 @@ module Hwaro
         # (the dev pages under it carry dev base_urls and must never be
         # committed). No-op when the guard sees anything but `.hwaro` itself.
         Hwaro::Utils::HwaroDir.ensure_self_ignore(File.dirname(output_dir))
-
-        # Baseline for the restart-only [serve.*] warning after config edits.
-        # Nil when the initial build never loaded a config; established lazily
-        # by the first successful config-changed rebuild in that case.
-        @startup_serve_config = @builder.config.try(&.serve)
 
         # Replay a startup failure to the first live-reload client(s) so the
         # browser shows the overlay instead of a bare 404/stale page.

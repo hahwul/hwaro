@@ -125,6 +125,8 @@ module Hwaro
             return run(options)
           end
 
+          base_options = options
+          options.apply_build_config!(config.build)
           Logger.info "Incremental build for #{changed_content_files.size} changed file(s)..." if options.verbose
           start_time = Time.instant
           begin_serve_pass
@@ -148,7 +150,7 @@ module Hwaro
           pages_map = @pages_by_path || build_pages_by_path(site)
 
           reparsed = reparse_changed_pages(changed_content_files, site, config, output_dir, pages_map)
-          return run(options) unless reparsed
+          return run(base_options) unless reparsed
           restore_term_metadata(reparsed.changed_pages, term_state)
           changed_pages = reparsed.changed_pages
           affected_sections = reparsed.affected_sections
@@ -174,10 +176,10 @@ module Hwaro
           # would otherwise still show the drafted page in tag clouds and
           # term counts until the next full build.
           excluded_pages = apply_publication_exclusions!(changed_pages, options)
-          return run(options) if excluded_section?(excluded_pages) || bundle_variants_move?(changed_pages, excluded_pages, page_urls)
+          return run(base_options) if excluded_section?(excluded_pages) || bundle_variants_move?(changed_pages, excluded_pages, page_urls)
           unless refresh_term_metadata(site, config, changed_pages, excluded_pages, term_state)
             Logger.info "  Taxonomy term _index files changed role — running full rebuild."
-            return run(options)
+            return run(base_options)
           end
           excluded_paths = excluded_pages.map(&.path).to_set
 
@@ -386,7 +388,9 @@ module Hwaro
           Logger.info "Re-parsing #{changed_content_files.size} changed file(s) before full re-render..."
           begin_serve_pass
 
-          output_dir = options.output_dir
+          build_options = options
+          build_options.apply_build_config!(config.build)
+          output_dir = build_options.output_dir
           pages_map = @pages_by_path || build_pages_by_path(site)
 
           # Projection digests taken before the re-parse, exactly as in
@@ -413,7 +417,7 @@ module Hwaro
           # template edit used to leave it published — still in listings,
           # feeds, and on disk — because only the content-only strategy
           # applied the filters.
-          excluded_pages = apply_publication_exclusions!(changed_pages, options)
+          excluded_pages = apply_publication_exclusions!(changed_pages, build_options)
           return run(options) if excluded_section?(excluded_pages) || bundle_variants_move?(changed_pages, excluded_pages, page_urls)
           unless refresh_term_metadata(site, config, changed_pages, excluded_pages, term_state)
             Logger.info "  Taxonomy term _index files changed role — running full rebuild."
@@ -1228,6 +1232,7 @@ module Hwaro
             return run(options)
           end
 
+          options.apply_build_config!(config.build)
           start_time = Time.instant
           begin_serve_pass
           clear_broken_internal_links
@@ -1602,6 +1607,7 @@ module Hwaro
             return 0
           end
 
+          options.apply_build_config!(site.config.build)
           Logger.info "Fast-start: background-rendering #{pages.size} deferred page(s)..."
           start_time = Time.instant
           begin_serve_pass

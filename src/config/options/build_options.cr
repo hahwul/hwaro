@@ -69,9 +69,8 @@ module Hwaro
         # the same condition. `output_dir` is a string with no such property,
         # which is what `output_dir_explicit` above exists for.
         #
-        # Idempotent: applying the same config twice is a no-op, which matters
-        # because `hwaro serve` merges config into its options and the Builder
-        # then merges again on every rebuild.
+        # Start from the original options when applying a new config. Merged
+        # defaults otherwise look like explicit flags on the next pass.
         def apply_build_config!(build : Hwaro::Models::BuildConfig) : Nil
           # Nil checks rather than truthiness: `parallel = false` is a real
           # value to apply, and `if (v = build.parallel)` would skip it.

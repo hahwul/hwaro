@@ -415,6 +415,8 @@ A save that also touches `static/` alongside `templates/` or `content/` still ta
 
 The watcher groups rapid saves into a single batch and rebuilds from the final file state. A temporary file created and deleted within the same batch does not trigger a rebuild.
 
+Changes to `[build] drafts`, `cache`, and `parallel` take effect on the next rebuild, with explicit CLI flags still taking precedence. Changes to `[serve]` settings such as `allowed_hosts`, `headers`, and `fast` require a server restart.
+
 When a published `static/` symlink changes to a target the build skips, the server rebuilds to remove its previous output.
 
 **About live reload:**
@@ -470,7 +472,7 @@ Referrer-Policy = "strict-origin-when-cross-origin"
 hwaro serve --header "X-Custom: foo" --header "Cache-Control: no-store"
 ```
 
-- CLI `--header` values win over the same key in `config.toml`.
+- CLI `--header` values win over the same header in `config.toml`. Header names are case-insensitive, and the last CLI value for a repeated header wins.
 - Headers are injected on **every** dev-server response (HTML, assets, 404s, redirects, live-reload injected pages, CORS preflight (`OPTIONS`) responses).
 - This feature only affects `hwaro serve`. The files the build writes to disk are untouched.
 

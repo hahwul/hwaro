@@ -69,7 +69,10 @@ module Hwaro
         # A config edit rebuilt the site with the new values, but [serve.*]
         # keys were consumed at startup — warn instead of silently looking
         # like they applied.
-        warn_restart_only_serve_settings if changeset.config_changed
+        if changeset.config_changed || changeset.added_files.any? { |path| watched_config_file?(path) } ||
+           changeset.removed_files.any? { |path| watched_config_file?(path) }
+          warn_restart_only_serve_settings
+        end
 
         # Copy static files if they changed alongside content/template changes
         if strategy != :static && strategy != :full && !changeset.modified_static.empty?
@@ -125,15 +128,9 @@ module Hwaro
       # config edit triggers a full rebuild that LOOKS like it applied them —
       # say so instead of leaving the user chasing a phantom.
       private def warn_restart_only_serve_settings
-        current = @builder.config.try(&.serve)
-        return unless current
-        unless startup = @startup_serve_config
-          # Initial build never loaded a config (it failed) — this rebuild's
-          # values become the baseline.
-          @startup_serve_config = current
-          return
-        end
-        if startup.headers != current.headers || startup.fast != current.fast
+        return unless current = @builder.config.try(&.serve)
+        startup = @startup_serve_config
+        if startup.headers != current.headers || startup.fast != current.fast || startup.allowed_hosts != current.allowed_hosts
           Logger.warn "  [serve] settings changed in config — restart `hwaro serve` to apply them."
         end
       end
