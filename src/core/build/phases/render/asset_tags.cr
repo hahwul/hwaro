@@ -128,15 +128,18 @@ module Hwaro::Core::Build::Phases::Render
 
   # Absolute output paths of the `.css` the Sass hook compiles — the same
   # eligibility as `SassCompiler#compile_all` (non-partial, not excluded).
-  private def sass_entry_outputs(output_dir : String) : Array(String)
+  private def sass_entry_outputs(output_dir : String, dirs : Array(String)? = nil) : Array(String)
     config = @config
     source_dir = Assets::SassCompiler::SOURCE_DIR
     return [] of String unless config && config.sass.enabled && Dir.exists?(source_dir)
     glob_match = File::MatchOptions.glob_default | File::MatchOptions::DotFiles
+    cwd = Dir.current
+    roots = dirs.try &.map { |dir| File.expand_path(File.join(source_dir, dir), cwd) }
     Dir.glob(File.join(source_dir, "**", "*.scss"), match: glob_match).compact_map do |src_path|
-      next if File.basename(src_path).starts_with?("_") || !Utils::PathUtils.file?(src_path)
+      next if roots && roots.none? { |root| Utils::PathUtils.within?(File.expand_path(src_path, cwd), root) }
+      next unless Assets::SassCompiler.entry_source?(src_path, config.static)
+      next unless Utils::PathUtils.publishable_project_source?(src_path, cwd)
       relative = Path[src_path].relative_to(source_dir).to_s
-      next if config.static.excluded?(relative)
       File.expand_path(File.join(output_dir, relative.sub(/\.scss\z/, ".css")))
     end
   end
@@ -151,6 +154,13 @@ module Hwaro::Core::Build::Phases::Render
 
     digest = Digest::MD5.new
     cache_bust_inputs(config).each { |file| digest.file(file) }
+    if has_auto_includes && (ctx = @context)
+      # Sass can read partials elsewhere in the project. Fingerprint the
+      # emitted stylesheet too so their edits update the URL.
+      sass_entry_outputs(ctx.output_dir, config.auto_includes.dirs).sort!.each do |file|
+        digest.file(file) if Utils::PathUtils.file?(file)
+      end
+    end
     digest.hexfinal[0, 8]
   end
 
@@ -161,6 +171,11 @@ module Hwaro::Core::Build::Phases::Render
   def cache_bust_input_changed?(paths : Array(String)) : Bool
     config = @config
     return false if config.nil? || paths.empty?
+    # A changed Sass source in a watched root can change compiled CSS even
+    # when that source is outside the auto-include directories.
+    if config.auto_includes.enabled && config.auto_includes.dirs.present?
+      return true if paths.any? { |path| config.sass_source?(path) }
+    end
     inputs = cache_bust_inputs(config).map { |file| Path[file].normalize.to_s }.to_set
     return false if inputs.empty?
     paths.any? { |path| inputs.includes?(Path[path].normalize.to_s) }
