@@ -595,8 +595,9 @@ module Hwaro
           verbose : Bool = false,
           force : Bool = false,
           recursive : Bool = false,
+          markdown_extensions = BundleAssets::MARKDOWN_EXTENSIONS,
         ) : Int32
-          BundleAssets.copy(source_dir, dest_dir, output_dir, @dry_run, "copy", recursive) do |src, dest|
+          BundleAssets.copy(source_dir, dest_dir, output_dir, @dry_run, "copy", recursive, markdown_extensions) do |src, dest|
             if File.symlink?(dest)
               Logger.warn "Skipped (destination is a symlink): #{dest}"
               @file_actions << FileAction.new(dest, "skipped")

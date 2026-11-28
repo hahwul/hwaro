@@ -8,6 +8,7 @@ module Hwaro
       class AstroImporter < Base
         # Astro uses content collections in src/content/ directory
         # Frontmatter is YAML between --- delimiters
+        BUNDLE_MARKDOWN_EXTENSIONS = {".md", ".markdown", ".mdx"}
 
         # Keys `import_file` maps (or consumes) itself. Every other key
         # (`category`, `order`, `sidebar`, …) goes to `[extra]`.
@@ -204,7 +205,7 @@ module Hwaro
           # written as a bundle too: flattening it to `<dir>.md` would leave
           # its relative `./cover.png` references pointing at nothing, and
           # the images would never be copied. Asset-less bundles stay flat.
-          if bundle && bundle_assets?(source_dir)
+          if bundle && BundleAssets.has_assets?(source_dir, BUNDLE_MARKDOWN_EXTENSIONS)
             dir_slug = slug
             n = 1
             while (index_path = resolve_content_path(output_dir, "#{section}/#{dir_slug}", "index", quiet: true)) && destination_claimed?(index_path)
@@ -212,23 +213,15 @@ module Hwaro
               n += 1
             end
             written, dest_path = write_content_file_to(output_dir, "#{section}/#{dir_slug}", "index", frontmatter, body.strip, verbose, force)
-            copy_bundle_assets(source_dir, File.dirname(dest_path), output_dir, verbose, force) if dest_path
+            if dest_path
+              copy_bundle_assets(source_dir, File.dirname(dest_path), output_dir, verbose, force,
+                recursive: true, markdown_extensions: BUNDLE_MARKDOWN_EXTENSIONS)
+            end
           else
             written = write_content_file(output_dir, section, slug, frontmatter, body.strip, verbose, force)
           end
           return :skipped unless written
           has_mdx_components ? :imported_wrapped : :imported
-        end
-
-        # True when `dir` holds files besides its content pages — the
-        # resources `copy_bundle_assets` would carry along. Symlinks are
-        # ruled out before `File.file?`, which follows the link and raises
-        # on one that cannot resolve (a self-loop).
-        private def bundle_assets?(dir : String) : Bool
-          Dir.children(dir).any? do |entry|
-            path = File.join(dir, entry)
-            !File.symlink?(path) && File.file?(path) && !entry.ends_with?(".md") && !entry.ends_with?(".markdown") && !entry.ends_with?(".mdx")
-          end
         end
 
         # Drop MDX's top-level ESM `import` statements. Only lines outside
