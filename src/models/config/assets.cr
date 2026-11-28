@@ -50,7 +50,9 @@ module Hwaro
           next unless Dir.exists?(static_dir)
 
           files = Dir.glob(File.join(Utils::PathUtils.glob_escape(static_dir), "**", "*.#{extension}"))
-          files.reject! { |f| static_config.excluded?(Path[f].relative_to("static").to_s) } if static_config
+          files.select! do |file|
+            Utils::PathUtils.file?(file) && !static_config.try(&.excluded?(Path[file].relative_to("static").to_s))
+          end
           if extension == "css" && @sass_enabled
             # Compiled SCSS is written to the output tree, not `static/`,
             # so project each entry onto the `.css` it will produce.
@@ -58,6 +60,7 @@ module Hwaro
             # same name is already in `files`.
             Dir.glob(File.join(Utils::PathUtils.glob_escape(static_dir), "**", "*.scss")).each do |scss|
               next if File.basename(scss).starts_with?("_")
+              next unless Utils::PathUtils.file?(scss)
               next if static_config && static_config.excluded?(Path[scss].relative_to("static").to_s)
               compiled = scss.sub(/\.scss\z/, ".css")
               files << compiled unless files.includes?(compiled)
