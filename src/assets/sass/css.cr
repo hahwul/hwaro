@@ -53,9 +53,10 @@ module Hwaro
 
         # Statement at-rule kept verbatim (@charset, plain-CSS @import, ...).
         class Raw < Node
+          getter name : String
           getter text : String
 
-          def initialize(@text)
+          def initialize(@name, @text)
           end
         end
 
@@ -80,26 +81,25 @@ module Hwaro
           end
 
           private def charset?(node : Node) : Bool
-            node.is_a?(Raw) && node.text.lstrip.starts_with?("@charset")
+            node.is_a?(Raw) && node.name == "charset"
           end
 
-          # Plain-CSS `@import` (and `@charset`) are only honoured before any
-          # style rule — a browser ignores one that appears later. Partials
-          # routinely put an `@import url(fonts…)` in a file pulled in after
-          # other rules, which would silently never load. Lift them back to
-          # the top, preserving relative order (a stable partition).
+          # Move late CSS imports ahead of style rules, where browsers will
+          # load them. Keep the legal prefix in place: a leading @layer
+          # statement sets cascade priority before imports name any layers.
           private def hoist_statements(nodes : Array(Node)) : Array(Node)
-            return nodes unless nodes.any? { |n| hoistable?(n) }
-            hoisted = [] of Node
-            rest = [] of Node
-            nodes.each { |n| (hoistable?(n) ? hoisted : rest) << n }
-            hoisted + rest
+            return nodes unless nodes.any? { |node| import_statement?(node) }
+            boundary = nodes.index do |node|
+              emit?(node) && !node.is_a?(Comment) && !(node.is_a?(Raw) && node.name.in?("import", "layer"))
+            end
+            return nodes unless boundary
+
+            imports, rest = nodes[boundary..].partition { |node| import_statement?(node) }
+            nodes.first(boundary) + imports + rest
           end
 
-          private def hoistable?(node : Node) : Bool
-            return false unless node.is_a?(Raw)
-            text = node.text.lstrip
-            text.starts_with?("@import") || text.starts_with?("@charset")
+          private def import_statement?(node : Node) : Bool
+            node.is_a?(Raw) && node.name == "import"
           end
 
           # Empty rules and empty at-rule blocks are omitted (dart-sass

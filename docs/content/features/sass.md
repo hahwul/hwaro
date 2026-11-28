@@ -203,7 +203,8 @@ The compiler's first duty is the plain-CSS guarantee, so expressions follow a tw
 - At-rule preludes evaluate expressions only inside `(feature: value)` spans; the query structure itself stays verbatim.
 - `@media` nested inside `@media` merges the conditions with `and` (comma lists cross-multiply outer-major; type-conflicting pairs are dropped). Queries the merge can't express (`not …`) and nestings interrupted by another at-rule (`@supports`) keep the literal nested form (valid modern CSS) where dart-sass drops or rewrites them.
 - `&` substitution is textual, so `&__elem` concatenates without validating the compound selector.
-- Custom property values are verbatim: `$var` stays literal, only `#{...}` interpolates (dart-sass semantics), but leading/trailing whitespace is trimmed.
+- Custom property values keep `$var` literal and evaluate `#{...}`, including in brace-block values. Leading and trailing whitespace is trimmed.
+- Leading `@layer` order statements retain their position relative to CSS `@import` statements. Late CSS imports move before the first rule that would prevent browsers from loading them.
 - `@import` of the same file re-emits its CSS each time (classic Sass behavior); `@use` loads once.
 - Configuring a module that itself uses `@forward` (`@use "lib" with (...)`) is an error rather than silently ignored.
 - Output with non-ASCII content gets a single leading `@charset "UTF-8";`; source `@charset` declarations are dropped (dart-sass behavior).
@@ -218,10 +219,11 @@ Compile failures are classified content errors (exit code 5) with `path:line:col
 Error [HWARO_E_CONTENT]: Sass: static/css/_mixins.scss:7:12: undefined variable: "$primry"
 ```
 
-During `hwaro serve`, errors show in the browser overlay and the previous output stays on disk.
+During `hwaro serve`, errors show in the browser overlay. Hwaro compiles all standalone SCSS entries successfully before replacing any of their CSS files.
 
 ## Interplay with Other Features
 
 - **Asset pipeline** — compiled standalone entries keep stable (non-fingerprinted) URLs and resolve through `asset()`'s passthrough. For fingerprinting, reference the `.scss` file from a bundle instead.
+- **Auto-includes** — `[auto_includes]` can link the compiled `.css` for publishable SCSS entries in its configured directories.
 - **Build hooks** — Tailwind/PostCSS and full dart-sass projects can still run through `[build] hooks.pre` and point Hwaro at the compiled output.
 - **Cache** — Sass recompiles on every full build (it does not participate in the incremental page cache). Deleting or renaming an entry `.scss` removes its previously compiled `.css` on the next `--cache` build, like any other output.

@@ -2,6 +2,27 @@ require "../../../spec_helper"
 require "../../../support/build_helper"
 
 describe Hwaro::Models::AutoIncludesConfig do
+  it "only links Sass entries whose source can be published" do
+    posix_only!("symlinks")
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        Dir.mkdir_p("static/css")
+        File.write(".env", ".private { color: red; }")
+        File.symlink("../../.env", "static/css/private.scss")
+        File.write("theme.scss", ".theme { color: blue; }")
+        File.symlink("../../theme.scss", "static/css/theme.scss")
+
+        config = Hwaro::Models::AutoIncludesConfig.new
+        config.enabled = true
+        config.dirs = ["css"]
+        config.sass_enabled = true
+        tags = config.css_tags
+        tags.should contain("/css/theme.css")
+        tags.should_not contain("/css/private.css")
+      end
+    end
+  end
+
   it "skips files [static] exclude keeps out of the build" do
     config = <<-TOML
       title = "t"

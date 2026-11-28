@@ -58,10 +58,12 @@ module Hwaro
             # so project each entry onto the `.css` it will produce.
             # Partials never produce output; a hand-written sibling of the
             # same name is already in `files`.
+            project_root = Dir.current
             Dir.glob(File.join(Utils::PathUtils.glob_escape(static_dir), "**", "*.scss")).each do |scss|
               next if File.basename(scss).starts_with?("_")
               next unless Utils::PathUtils.file?(scss)
               next if static_config && static_config.excluded?(Path[scss].relative_to("static").to_s)
+              next unless Utils::PathUtils.publishable_project_source?(scss, project_root)
               compiled = scss.sub(/\.scss\z/, ".css")
               files << compiled unless files.includes?(compiled)
             end

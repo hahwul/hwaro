@@ -43,6 +43,30 @@ describe Hwaro::Assets::SassCompiler do
       end
     end
 
+    it "keeps previously compiled stylesheets when a later entry fails" do
+      Dir.mktmpdir do |dir|
+        compile_in(dir) do |compiler, output|
+          Dir.mkdir("static")
+          File.write("static/a.scss", "a { color: red; }")
+          File.write("static/z.scss", "z { color: red; }")
+          compiler.compile_all(output).should eq(2)
+          old_css = File.read("public/a.css")
+
+          File.write("static/a.scss", "a { color: blue; }")
+          File.write("static/b.scss", "b { color: blue; }")
+          File.write("static/z.scss", "@error 'failed';")
+          expect_raises(Hwaro::HwaroError, /failed/) { compiler.compile_all(output) }
+          File.read("public/a.css").should eq(old_css)
+          File.exists?("public/b.css").should be_false
+          compiler.written_paths.should be_empty
+
+          File.write("static/z.scss", "z { color: blue; }")
+          compiler.compile_all(output).should eq(3)
+          File.read("public/a.css").should contain("color: blue;")
+        end
+      end
+    end
+
     # `ln -s loop.scss loop.scss` cannot be resolved (ELOOP): the entry is
     # skipped, not the reason the whole build fails.
     it "skips an entry that is a looping symlink" do

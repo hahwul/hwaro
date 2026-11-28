@@ -10,6 +10,22 @@ end
 
 describe "Sass raw token passthrough" do
   describe "unquoted url() in @import" do
+    it "preserves leading layer order while moving late CSS imports before style rules" do
+      css = compile_source(<<-SCSS)
+        @layer reset, theme;
+        @import url(reset.css) layer(reset);
+        @layer addons;
+        .a { color: red; }
+        @import url(theme.css) layer(theme);
+        SCSS
+      css.lines.first(4).should eq([
+        "@layer reset, theme;",
+        "@import url(reset.css) layer(reset);",
+        "@layer addons;",
+        "@import url(theme.css) layer(theme);",
+      ])
+    end
+
     it "keeps a protocol-relative url and the rules after it" do
       css = compile_source("@import url(//fonts.googleapis.com/css?family=Lato);\n.a { x: y }")
       css.should contain("@import url(//fonts.googleapis.com/css?family=Lato);")
@@ -34,6 +50,20 @@ describe "Sass raw token passthrough" do
   end
 
   describe "custom properties" do
+    it "interpolates balanced brace values while preserving literal tokens and priority" do
+      css = compile_source(<<-'SCSS')
+        $size: 4px;
+        .a {
+          --tokens: { { width: #{$size}; } escaped\} "$size" } !important;
+          --map:{ $literal: (x; y); };
+          color: red;
+        }
+        SCSS
+      css.should contain(%(--tokens: { { width: 4px; } escaped\\} "$size" } !important;))
+      css.should contain("--map: { $literal: (x; y); };")
+      css.should contain("color: red;")
+    end
+
     it "keeps // in a value" do
       css = compile_source(".a { --u: http://a.b/c; x: y }")
       css.should contain("--u: http://a.b/c;")

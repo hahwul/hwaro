@@ -859,17 +859,12 @@ module Hwaro
               name_t = trim_template(name_t)
               if name_t.pieces[0]?.as?(String).try(&.starts_with?("--"))
                 if blank_after?(scan.template, colon)
-                  # `--x: { ... }` is a custom property whose value happens
-                  # to be a brace block — legal CSS, since custom-property
-                  # values are an almost free-form token stream. `--` names
-                  # must not be swept up by the nested-property handling
-                  # below. The block is kept fully verbatim.
-                  raw = read_raw_block
-                  @s.skip_ws { }
-                  @s.advance if @s.peek == ';'
-                  return Ast::DeclarationNode.new(
-                    name_t, Ast::TextTemplate.new(Array(Ast::Piece){raw}, line, column),
-                    false, true, line, column)
+                  # Treat a brace block as part of the custom property's
+                  # value. Only interpolation is evaluated, as in other
+                  # custom-property values.
+                  value = read_template(stops: ";}", value_vars: false, line_comments: false, brace_value: true)
+                  @s.advance if value.terminator == ';'
+                  return Ast::DeclarationNode.new(name_t, value.template, false, true, line, column)
                 end
               elsif !name_t.empty?
                 # `font: { family: x }` / `margin: auto { top: 1px }` —
@@ -920,51 +915,19 @@ module Hwaro
         # `ns.$var` references. A `)` listed in `stops` terminates at depth 0
         # before the unmatched-paren check, so callers that already consumed
         # an opening paren (arg/param lists) need no special casing.
-        # Reads a balanced `{ ... }` run verbatim, braces included, with the
-        # cursor on the opening brace. Quoted strings and comments are
-        # consumed as units so a `}` inside them does not close the block.
-        private def read_raw_block : String
-          start_line = @s.line
-          start_col = @s.column
-          depth = 0
-          String.build do |io|
-            loop do
-              c = @s.peek
-              @s.error("unterminated block", start_line, start_col) unless c
-              case c
-              when '"', '\'' then io << @s.read_quoted
-              when '/'
-                if @s.peek(1) == '*'
-                  io << @s.read_loud_comment
-                else
-                  io << @s.advance
-                end
-              when '{'
-                depth += 1
-                io << @s.advance
-              when '}'
-                depth -= 1
-                io << @s.advance
-                break if depth == 0
-              else
-                io << @s.advance
-              end
-            end
-          end
-        end
-
-        private def read_template(stops : String, value_vars : Bool, line_comments : Bool = true) : TemplateScan
+        private def read_template(stops : String, value_vars : Bool, line_comments : Bool = true, brace_value : Bool = false) : TemplateScan
           start_line = @s.line
           start_col = @s.column
           pieces = [] of Ast::Piece
           buf = Buf.new
           depth = 0
+          braces = 0
           terminator = nil
           first_colon = nil
           first_decl_colon = nil
 
           while c = @s.peek
-            if depth == 0 && stops.includes?(c)
+            if depth == 0 && braces == 0 && stops.includes?(c)
               terminator = c
               break
             end
@@ -980,8 +943,8 @@ module Hwaro
               read_string_into(buf, pieces)
             when '/'
               if @s.peek(1) == '*'
-                @s.read_loud_comment
-                buf << ' '
+                comment = @s.read_loud_comment
+                brace_value ? buf.append(comment) : buf << ' '
               elsif line_comments && @s.peek(1) == '/'
                 @s.advance
                 @s.advance
@@ -1024,6 +987,12 @@ module Hwaro
             when ']'
               @s.error("unmatched \"]\"") if depth == 0
               depth -= 1
+              buf << @s.advance
+            when '{'
+              braces += 1 if brace_value
+              buf << @s.advance
+            when '}'
+              braces -= 1 if brace_value && braces > 0
               buf << @s.advance
             when ':'
               if depth == 0
@@ -1071,6 +1040,7 @@ module Hwaro
             end
           end
 
+          @s.error("unterminated block", start_line, start_col) if braces > 0
           buf.flush_into(pieces)
           template = Ast::TextTemplate.new(pieces, start_line, start_col)
           TemplateScan.new(template, terminator, first_colon, first_decl_colon)
