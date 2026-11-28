@@ -83,6 +83,7 @@ describe Hwaro::Services::UnusedAssets do
           files = ["main.css"]
 
           [auto_includes]
+          enabled = true
           dirs = ["base-css"]
           TOML
         File.write(File.join(dir, "config.staging.toml"), "[assets]\nsource_dir = \"staging-assets\"\n")
