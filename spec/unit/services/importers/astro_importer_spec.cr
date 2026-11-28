@@ -3,6 +3,23 @@ require "../../../../src/services/importers/astro_importer"
 
 describe Hwaro::Services::Importers::AstroImporter do
   describe "#run" do
+    it "keeps nested assets with an MDX page bundle" do
+      Dir.mktmpdir do |dir|
+        bundle = File.join(dir, "src/content/blog/guide")
+        FileUtils.mkdir_p(File.join(bundle, "images"))
+        File.write(File.join(bundle, "index.mdx"), "![Cover](./images/cover.svg)")
+        File.write(File.join(bundle, "images/cover.svg"), "<svg/>")
+        output = File.join(dir, "output")
+        result = Hwaro::Services::Importers::AstroImporter.new.run(Hwaro::Config::Options::ImportOptions.new(
+          source_type: "astro", path: dir, output_dir: output))
+
+        result.imported_count.should eq(1)
+        File.read(File.join(output, "blog/guide/index.md")).should contain("./images/cover.svg")
+        File.read(File.join(output, "blog/guide/images/cover.svg")).should eq("<svg/>")
+        File.exists?(File.join(output, "blog/guide/index.mdx")).should be_false
+      end
+    end
+
     it "keeps a custom slug as the page's file name and carries unmapped keys into [extra]" do
       Dir.mktmpdir do |dir|
         blog_dir = File.join(dir, "src", "content", "blog")

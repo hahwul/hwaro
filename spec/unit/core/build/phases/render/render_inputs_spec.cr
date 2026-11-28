@@ -98,6 +98,27 @@ describe "warm --cache builds and template inputs outside the tracked files" do
     end
   end
 
+  it "refreshes an auto-included Sass URL when the compiled CSS changes" do
+    config = "[sass]\nenabled = true\n[auto_includes]\nenabled = true\ndirs = [\"css\"]\n"
+    with_render_inputs_site(config, "{{ auto_includes_css }}") do
+      FileUtils.mkdir_p("static/css")
+      FileUtils.mkdir_p("theme")
+      File.write("static/css/main.scss", %(@use "../../theme/colors";\nbody { color: colors.$accent; }))
+      File.write("theme/_colors.scss", "$accent: red;")
+      render_inputs_build
+      before = File.read("public/a/index.html")
+      before.should contain("/css/main.css?v=")
+
+      File.write("theme/_colors.scss", "$accent: blue;")
+      render_inputs_build
+      File.read("public/css/main.css").should contain("blue")
+      updated = File.read("public/a/index.html")
+      updated.should_not eq(before)
+      render_inputs_build
+      File.read("public/a/index.html").should eq(updated)
+    end
+  end
+
   {true, false}.each do |cache_busting|
     it "includes files inside extension-named directories (cache_busting=#{cache_busting})" do
       config = <<-TOML

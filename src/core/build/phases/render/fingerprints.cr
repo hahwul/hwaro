@@ -599,12 +599,16 @@ module Hwaro::Core::Build::Phases::Render
       fp_list(digest, p.taxonomies[k])
     end
     fp_menus(digest, p.menus)
-    # Version membership drives `version_links` on OTHER pages (a new
-    # counterpart flips `exists`), so it is part of the set identity.
-    # Only emitted on versioned sites — unversioned fingerprints stay
-    # byte-identical to previous releases.
+    # Version membership and resolved switcher links both affect the pages
+    # that render them. A change in counterpart matching can flip `exists`
+    # without changing either source path.
     if version = p.version
       fp_value(digest, "v:#{version.name}")
+      p.version_links.each do |link|
+        fp_value(digest, link.name)
+        fp_value(digest, link.url)
+        fp_value(digest, link.exists ? "1" : "0")
+      end
     end
     # Listings can read `p.translation_key`; folded only when set.
     p.translation_key.try { |key| fp_value(digest, "k:#{key}") }

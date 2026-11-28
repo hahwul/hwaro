@@ -18,6 +18,25 @@ module Hwaro
     end
 
     module BundleAssets
+      MARKDOWN_EXTENSIONS = {".md", ".markdown"}
+
+      # Detect a leaf bundle's assets before deciding whether it can be
+      # imported as a single file.
+      def self.has_assets?(dir : String, markdown_extensions = MARKDOWN_EXTENSIONS) : Bool
+        bundle_entries(dir).any? do |entry|
+          path = File.join(dir, entry)
+          next false if File.symlink?(path)
+          if File.directory?(path)
+            !bundle_dir?(path, markdown_extensions) && has_assets?(path, markdown_extensions)
+          else
+            asset_file?(path, markdown_extensions)
+          end
+        rescue ex : File::Error
+          Logger.warn "Could not inspect bundle asset #{path}: #{ex.message}"
+          false
+        end
+      end
+
       # Walk a page bundle's co-located assets — every non-Markdown, non-
       # symlink regular file beside its `index.md` — yielding `{src, dest}`
       # for each destination that stays inside `output_dir`. The block
@@ -29,7 +48,7 @@ module Hwaro
       # stopping at one with its own `index`/`_index` page, which is another
       # bundle (as `Page#collect_assets` does). Every destination directory
       # passes the same output-dir checks as `dest_dir`.
-      def self.copy(source_dir : String, dest_dir : String, output_dir : String, dry_run : Bool, verb : String, recursive : Bool = false, & : String, String -> Bool) : Int32
+      def self.copy(source_dir : String, dest_dir : String, output_dir : String, dry_run : Bool, verb : String, recursive : Bool = false, markdown_extensions = MARKDOWN_EXTENSIONS, & : String, String -> Bool) : Int32
         copied = 0
         dirs = [{source_dir, dest_dir}]
         while pair = dirs.shift?
@@ -37,14 +56,14 @@ module Hwaro
           # A subdirectory's destination may not exist yet, but an existing
           # ancestor can already point outside the output directory.
           next unless Dir.exists?(from) && dest_dir_ok?(to, output_dir, dry_run || to != dest_dir)
-          Dir.children(from).sort!.each do |entry|
+          bundle_entries(from).sort!.each do |entry|
             src = File.join(from, entry)
             next if File.symlink?(src)
             if File.directory?(src)
-              dirs << {src, File.join(to, entry)} if recursive && !bundle_dir?(src)
+              dirs << {src, File.join(to, entry)} if recursive && !bundle_dir?(src, markdown_extensions)
               next
             end
-            next if entry.ends_with?(".md") || entry.ends_with?(".markdown")
+            next unless asset_file?(src, markdown_extensions)
 
             # `entry` is a single directory component — it can never contain
             # `/`, `.` or `..`, so the guard below is the real protection.
@@ -72,10 +91,21 @@ module Hwaro
         Utils::PathUtils.resolves_within?(dest_dir, output_dir)
       end
 
-      private def self.bundle_dir?(dir : String) : Bool
+      private def self.asset_file?(path : String, markdown_extensions) : Bool
+        !markdown_extensions.any? { |ext| path.ends_with?(ext) } && Utils::PathUtils.file?(path)
+      end
+
+      private def self.bundle_dir?(dir : String, markdown_extensions) : Bool
         Dir.children(dir).any? do |entry|
-          (entry.starts_with?("index.") || entry.starts_with?("_index.")) && (entry.ends_with?(".md") || entry.ends_with?(".markdown"))
+          (entry.starts_with?("index.") || entry.starts_with?("_index.")) && markdown_extensions.includes?(File.extname(entry))
         end
+      end
+
+      private def self.bundle_entries(dir : String) : Array(String)
+        Dir.children(dir)
+      rescue ex : File::Error
+        Logger.warn "Could not read bundle asset directory #{dir}: #{ex.message}"
+        [] of String
       end
     end
   end

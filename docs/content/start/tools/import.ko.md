@@ -103,7 +103,8 @@ hwaro tool import hugo path/to/site --verbose
 - 비어 있는 `title:`은 제목이 없는 것으로 취급합니다. Obsidian은 파일 이름으로, Astro와 Eleventy는 파일 이름에서 만든 제목으로, Notion은 페이지의 첫 제목으로 대체합니다. 따옴표 없는 날짜 제목(`title: 2024-05-01`)은 작성한 그대로 유지됩니다.
 - 페이지 사이의 링크는 대상이 실제로 저장된 파일을 가리킵니다. 제목이 같은 페이지의 `-1` 사본도 마찬가지입니다(Notion 페이지 링크, Obsidian `[[위키링크]]`). 표 안에서 필요한 Obsidian `[[노트\|별칭]]` 링크는 `[[노트|별칭]]`과 똑같이 처리되고, HTML 태그와 수식 안의 `#태그`·`[[링크]]`는 건드리지 않습니다.
 - Jekyll·Hexo: `title`이 없는 글은 파일 이름에서 제목을 얻고, 날짜 접두사가 붙은 파일 이름도 다른 이름처럼 슬러그로 바뀝니다(`2024-01-01-Hello World.md` → `hello-world`).
-- Hugo: 번역 파일(`about.ko.md`, `index.ko.md`)은 `slug`가 있어도 언어 접미사를 유지하고, 번역된 번들은 기본 언어 번들의 디렉터리를 따릅니다. `index.<lang>.md`와 `_index.md` 옆의 에셋도 함께 복사하며, 리프 번들은 하위 디렉터리(`images/cover.png`)의 파일도 중첩된 번들 전까지 복사합니다. 에셋이 있는 Astro 번들은 파일과 함께 번들(`blog/<name>/index.md`)로 저장됩니다.
+- Hugo: 번역 파일(`about.ko.md`, `index.ko.md`)은 `slug`가 있어도 언어 접미사를 유지하고, 번역된 번들은 기본 언어 번들의 디렉터리를 따릅니다. `index.<lang>.md`와 `_index.md` 옆의 에셋도 함께 복사하며, 리프 번들은 하위 디렉터리(`images/cover.png`)의 파일도 중첩된 번들 전까지 복사합니다.
+- 에셋이 있는 Astro 번들은 `blog/<name>/index.md` 형태로 저장됩니다. `images/cover.png`처럼 하위 디렉터리에 있는 에셋도 상대 경로를 유지합니다.
 - Notion: 이모지 콜아웃(`> 💡 텍스트`)만 평탄화하고, 일반 인용문·코드 펜스·인라인 코드는 그대로 둡니다.
 - WordPress: `<script>`와 `<style>`은 내용과 함께 제거되고, `<iframe>`, `<video>`, `<audio>` 임베드는 `src`(와 숫자 크기)만 가진 HTML로 유지됩니다.
 - WordPress: 글의 원래 퍼머링크(`<link>`)가 새 주소와 다르면 별칭이 되어 기존 인바운드 링크가 계속 동작합니다. `<wp:post_modified>`는 작성일보다 늦을 때만 `updated`가 되고, `_thumbnail_id` 첨부 파일은 `image`가 되며, 제목, 요약(`description`으로 기록), 태그·카테고리 이름의 HTML 이스케이프는 풀려 일반 텍스트가 됩니다(`Tom &amp; Jerry`는 `Tom & Jerry`가 됩니다). `<wp:post_date>`를 해석할 수 없으면 `<pubDate>`를 이 비교에 사용할 작성일로 삼습니다. hwaro가 변환할 수 없는 숏코드(`[gallery …]`)는 글 제목을 알리는 경고와 함께 문자 그대로 남습니다. 페이지는 부모 페이지와 상관없이 평평하게 저장되고, 옛 중첩 주소는 별칭으로 유지됩니다.

@@ -580,6 +580,27 @@ describe Hwaro::Content::Seo::Pwa do
       end
     end
 
+    it "precaches directory routes without a trailing slash" do
+      Dir.mktmpdir do |dir|
+        FileUtils.mkdir_p(File.join(dir, "guide"))
+        File.write(File.join(dir, "index.html"), "home")
+        File.write(File.join(dir, "guide", "index.html"), "guide")
+        site = make_site(<<-TOML, base_url: "https://example.com/repo")
+          [pwa]
+          enabled = true
+          offline_page = "/guide"
+          precache_urls = ["/guide?v=2", "/guide/?v=2"]
+          TOML
+
+        Hwaro::Content::Seo::Pwa.generate(site, dir)
+
+        worker = File.read(File.join(dir, "sw.js"))
+        worker.scan(%r{"/repo/guide/\?v=2"}).size.should eq(1)
+        worker.should_not contain(%("/repo/guide?v=2"))
+        worker.should contain(%(caches.match("/repo/guide/")))
+      end
+    end
+
     # The launch URL is always kept even when its output file isn't present
     # in the dir we generate into (it's the navigation fallback target).
     it "keeps the start_url in precache even without a backing file" do

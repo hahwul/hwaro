@@ -84,7 +84,7 @@ content/
 
 Hwaro automatically links translated pages based on their filenames. Pages with the same base name (without the language suffix) are considered translations of each other.
 
-For example, `hello.md`, `hello.ko.md`, and `hello.ja.md` are all linked as translations.
+For example, `hello.md`, `hello.ko.md`, and `hello.ja.markdown` are all linked as translations. The `.md` and `.markdown` extensions are equivalent for pairing.
 
 A variant that is never written is left out of the links (`page.translations`, hreflang tags and sitemap alternates): a `render = false` page, a `redirect_to` stub, and a page that loses its URL to another page (the build's duplicate output path warning), whose URL serves that other page.
 

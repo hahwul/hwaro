@@ -79,14 +79,18 @@ module Hwaro
           # Resolve the launch URL against base_url's path so the precache key
           # and the navigation fallback match what the page actually loads from
           # on a subpath deployment (e.g. `/myrepo/` rather than `/`).
-          resolved_start = config.with_base_path(pwa.start_url)
+          base_path = config.base_path
+          resolved_start = canonical_precache_url(config.with_base_path(pwa.start_url), output_dir, base_path)
 
           # Build precache URL list (each entry is a site-internal root-relative
           # path that must carry the subpath prefix, same as start_url).
-          base_path = config.base_path
-          precache_urls = pwa.precache_urls.map { |u| localize.try(&.call(u)) || config.with_base_path(u) }
+          precache_urls = pwa.precache_urls.map do |url|
+            canonical_precache_url(localize.try(&.call(url)) || config.with_base_path(url), output_dir, base_path)
+          end.uniq!
           precache_urls << resolved_start unless precache_urls.includes?(resolved_start)
-          resolved_offline = pwa.offline_page.try { |offline| config.with_base_path(offline) }
+          resolved_offline = pwa.offline_page.try do |offline|
+            canonical_precache_url(config.with_base_path(offline), output_dir, base_path)
+          end
           if resolved_offline
             precache_urls << resolved_offline unless precache_urls.includes?(resolved_offline)
           end
@@ -282,18 +286,32 @@ module Hwaro
           url.starts_with?("http://") || url.starts_with?("https://")
         end
 
-        # Map a site-internal (possibly base_path-prefixed) URL to the output
-        # file it should resolve to: strip base_path, drop the leading slash,
-        # join under output_dir, and append index.html for directory-like URLs.
+        # Precache the final URL for a directory. Browsers cannot use a
+        # cached response that followed a redirect for offline navigation.
+        private def self.canonical_precache_url(url : String, output_dir : String, base_path : String) : String
+          return url if external_url?(url)
+          suffix_at = url.index(/[?#]/) || url.size
+          path = url[0, suffix_at]
+          return url if path.ends_with?('/')
+          dir = precache_relative_path(path, base_path)
+          return url unless File.file?(File.join(output_dir, dir, "index.html"))
+          "#{path}/#{url[suffix_at..]}"
+        end
+
+        # Map a site-internal URL to its output file.
         # The query/fragment never names a file, and a percent-encoded path
         # (the form a browser address bar copies) names the decoded file.
         private def self.precache_file_path(url : String, output_dir : String, base_path : String) : String
-          rel = URI.decode(url.split(/[?#]/, 2).first)
-          rel = rel[base_path.size..] if !base_path.empty? && rel.starts_with?(base_path)
-          rel = rel.lchop('/')
+          rel = precache_relative_path(url.split(/[?#]/, 2).first, base_path)
           fpath = File.join(output_dir, rel)
           fpath = File.join(fpath, "index.html") if rel.empty? || rel.ends_with?('/')
           fpath
+        end
+
+        private def self.precache_relative_path(url_path : String, base_path : String) : String
+          relative = URI.decode(url_path)
+          relative = relative[base_path.size..] if !base_path.empty? && relative.starts_with?(base_path)
+          relative.lchop('/')
         end
 
         # Extensions whose intrinsic size can be read from the file header.

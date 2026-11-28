@@ -122,7 +122,7 @@ One entry per configured version, in config order. These are the switcher rows. 
 | `.exists` | Bool | Whether the counterpart page exists (`false` → `url` is the version root) |
 | `.current` | Bool | Whether this row is the page's own version |
 
-Counterparts are matched by path relative to the version root, in the same language: `docs/v1/install.md` ↔ `docs/v2/install.md`, `docs/v1/install.ko.md` ↔ `docs/v2/install.ko.md`. A `render = false` counterpart does not count as existing, and neither does one that loses its URL to another page (the build's duplicate output path warning).
+Counterparts are matched by path relative to the version root, in the same language: `docs/v1/install.md` ↔ `docs/v2/install.markdown`, `docs/v1/install.ko.md` ↔ `docs/v2/install.ko.md`. A `render = false` counterpart does not count as existing, and neither does one that loses its URL to another page (the build's duplicate output path warning).
 
 ### versions (global)
 

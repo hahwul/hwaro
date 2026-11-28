@@ -49,6 +49,7 @@ module Hwaro
         return unless versions.enabled?
 
         by_key = {} of {String, String?, String} => Models::Page
+        by_stem = {} of {String, String?, String} => Models::Page?
         versions.written_roots.clear
         claimed = Set(String).new
         pages.each do |page|
@@ -59,8 +60,13 @@ module Hwaro
           next unless version
           rel = counterpart_path(version, page, config)
           next unless rel
+          next if !page.render || unwritten.includes?(page.path)
           by_key[{version.name, page.language, rel}] ||= page
-          if page.render && !unwritten.includes?(page.path) && page.is_a?(Models::Section) && page.section == version.path
+          stem_key = {version.name, page.language, Multilingual.normalize_markdown_extension(rel)}
+          # A stem is ambiguous when both filenames publish. Use exact
+          # counterparts for those pairs and leave the others unlinked.
+          by_stem[stem_key] = by_stem.has_key?(stem_key) ? nil : page
+          if page.is_a?(Models::Section) && page.section == version.path
             versions.written_roots[{version.name, lang_prefix(page, config)}] ||= page.url
           end
         end
@@ -72,9 +78,11 @@ module Hwaro
           next unless rel
 
           prefix = lang_prefix(page, config)
+          stem = Multilingual.normalize_markdown_extension(rel)
+          unique_stem = by_stem[{version.name, page.language, stem}]?.try(&.same?(page))
           page.version_links = versions.list.map do |other|
             target = by_key[{other.name, page.language, rel}]?
-            target = nil if target && (!target.render || unwritten.includes?(target.path))
+            target ||= by_stem[{other.name, page.language, stem}]? if unique_stem
             url = target ? target.url : root_url(config, other, prefix)
             Models::VersionLink.new(other.name, other.label, other.latest, url, !target.nil?, other.same?(version))
           end
@@ -104,8 +112,8 @@ module Hwaro
       # the counterpart key, and the default language's suffix is optional,
       # so `v1/install.md` and `v2/install.en.md` are the same page.
       private def counterpart_path(version : Models::VersionConfig, page : Models::Page, config : Models::Config) : String?
-        rel = version.relative_path(page.path)
-        rel && config.multilingual? ? Multilingual.translation_key(rel, config) : rel
+        return unless rel = version.relative_path(page.path)
+        config.multilingual? ? Multilingual.translation_key(rel, config) : rel
       end
 
       # `/docs/v2/` → `/docs/`, `/ko/v2/` → `/ko/`; nil when the URL was

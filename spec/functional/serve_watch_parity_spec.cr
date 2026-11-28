@@ -583,6 +583,26 @@ describe "serve watch parity: cache-busted assets" do
       end
     end
   end
+
+  it "updates hand-written CSS beside an excluded Sass entry" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_auto_includes_site
+        File.open("config.toml", "a") do |file|
+          file << "\n[sass]\nenabled = true\n[static]\nexclude = [\"inc/css/01.scss\"]\n"
+        end
+        File.write("static/inc/css/01.scss", "body { color: purple; }")
+        server = Hwaro::Services::Server.new
+        options = watch_parity_options
+        server.watch_parity_builder.run(options).should be_true
+        File.read("public/inc/css/01.css").should contain("red")
+
+        File.write("static/inc/css/01.css", "body { color: blue; }")
+        server.watch_parity_apply_changeset(watch_parity_changeset(static: ["static/inc/css/01.css"]), options)
+        File.read("public/inc/css/01.css").should contain("blue")
+      end
+    end
+  end
 end
 
 describe "serve watch parity: failed incremental passes" do

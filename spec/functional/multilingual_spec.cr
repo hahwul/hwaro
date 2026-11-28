@@ -66,6 +66,17 @@ describe "Multilingual: URL generation" do
 end
 
 describe "Multilingual: Translation links" do
+  it "pairs .md and .markdown translations of the same page" do
+    build_site(
+      MULTILINGUAL_CONFIG,
+      content_files: {"about.md" => "# About", "about.ko.markdown" => "# 소개"},
+      template_files: {"page.html" => "{{ hreflang_tags }}{{ content }}"},
+    ) do
+      File.read("public/about/index.html").should contain(%(hreflang="ko"))
+      File.read("public/ko/about/index.html").should contain(%(hreflang="en"))
+    end
+  end
+
   it "exposes page.translations for translated pages" do
     build_site(
       MULTILINGUAL_CONFIG,
