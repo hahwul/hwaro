@@ -53,6 +53,8 @@ Every non-partial `*.scss` compiles to a sibling `.css` in the output (`static/c
 - **Bundles** — `[[assets.bundles]]` `files` entries may name `.scss` files; while `[sass]` is enabled they compile before concatenation and then flow through the normal minify → fingerprint pipeline. With `[sass]` disabled, bundle entries concatenate verbatim (the escape hatch for pre-compiled or out-of-subset sources).
 - **Watch** — `hwaro serve` recompiles on `.scss` changes. Editing a partial recompiles every entry (there is no dependency graph; whole-tree recompilation is fast at static-site scale). Compile errors appear in the browser error overlay.
 
+If `[static] exclude` keeps a Sass entry out of the build, its sibling `.css` file is served and updated as a regular static asset.
+
 ## Configuration
 
 | Option | Type | Default | Description |

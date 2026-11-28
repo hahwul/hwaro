@@ -26,6 +26,13 @@ module Hwaro
       def initialize(@config : Models::SassConfig, @static_config : Models::StaticConfig)
       end
 
+      # Whether a .scss path under static/ is an entry rather than a partial
+      # or an excluded file. Callers apply the project source check separately.
+      def self.entry_source?(path : String, static_config : Models::StaticConfig) : Bool
+        !File.basename(path).starts_with?("_") && Utils::PathUtils.file?(path) &&
+          !static_config.excluded?(Path[path].relative_to(SOURCE_DIR).to_s)
+      end
+
       # Compiles every entry file and returns the compiled count. Partials
       # (`_*.scss`) and statically-excluded paths are skipped; the raw
       # sources themselves are excluded from the static copy separately
@@ -39,11 +46,9 @@ module Hwaro
         glob_match = File::MatchOptions.glob_default | File::MatchOptions::DotFiles
         project_root = Dir.current
         Dir.glob(File.join(SOURCE_DIR, "**", "*.scss"), match: glob_match) do |src_path|
-          next unless Utils::PathUtils.file?(src_path)
-          next if File.basename(src_path).starts_with?("_")
+          next unless SassCompiler.entry_source?(src_path, @static_config)
 
           relative = Path[src_path].relative_to(SOURCE_DIR).to_s
-          next if @static_config.excluded?(relative)
 
           # Entry paths used to skip the outside-symlink guard imports already
           # have: a `static/css/style.scss` → /etc/passwd symlink would publish

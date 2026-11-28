@@ -64,7 +64,8 @@ module Hwaro
             if sass_on && relative.ends_with?(".css")
               scss_sibling = relative.sub(/\.css\z/i, ".scss")
               scss_src = File.join("static", scss_sibling)
-              if File.exists?(scss_src) && !File.basename(scss_src).starts_with?("_")
+              if Assets::SassCompiler.entry_source?(scss_src, static_config) &&
+                 Utils::PathUtils.publishable_project_source?(scss_src, cwd)
                 Logger.warn "  Sass: skipping static copy of #{relative} — sibling #{scss_sibling} compiles to the same path."
                 next
               end
