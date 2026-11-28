@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="What changes for a site built with Hwaro 0.22, and how to check your own">
+  <title>Upgrading to 1.0 - Hwaro</title>
+  <meta property="og:title" content="Upgrading to 1.0">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://hwaro.hahwul.com/start/upgrading/">
+  <meta property="og:description" content="What changes for a site built with Hwaro 0.22, and how to check your own">
+  <meta property="og:image" content="https://hwaro.hahwul.com/og-images/start-upgrading.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Upgrading to 1.0">
+  <meta name="twitter:description" content="What changes for a site built with Hwaro 0.22, and how to check your own">
+  <meta name="twitter:image" content="https://hwaro.hahwul.com/og-images/start-upgrading.png">
+  <link rel="canonical" href="https://hwaro.hahwul.com/start/upgrading/">
+  <link rel="alternate" hreflang="en" href="https://hwaro.hahwul.com/start/upgrading/">
+<link rel="alternate" hreflang="ko" href="https://hwaro.hahwul.com/ko/start/upgrading/">
+<link rel="alternate" hreflang="x-default" href="https://hwaro.hahwul.com/start/upgrading/">
+  <link rel="icon" type="image/png" href="/icons/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="shortcut icon" href="/icons/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Hwaro" />
+  <link rel="manifest" href="/icons/site.webmanifest" />
+  <link rel="preload" href="/fonts/GeistVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/GeistMonoVF.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/Silkscreen-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <script>(function(){try{if(localStorage.getItem("hwaro-docs-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})()</script>
+  <link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/01-tokens.css?v=43d66727">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/02-base.css?v=43d66727">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/03-layout.css?v=43d66727">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/04-content.css?v=43d66727">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/05-components.css?v=43d66727">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/06-search.css?v=43d66727">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/07-landing.css?v=43d66727">
+<link rel="stylesheet" href="https://hwaro.hahwul.com/assets/css/08-shortcodes.css?v=43d66727">
+</head>
+<body data-section="start">
+<header class="docs-header">
+  <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg>
+  </button>
+  <a href="https://hwaro.hahwul.com/" class="logo">
+    <img src="/hwaro-wide.webp" alt="Hwaro">
+  </a>
+  <nav>
+    <a href="https://hwaro.hahwul.com/start/" class="active">Start</a>
+    <a href="https://hwaro.hahwul.com/writing/">Writing</a>
+    <a href="https://hwaro.hahwul.com/templates/">Templates</a>
+    <a href="https://hwaro.hahwul.com/features/">Features</a>
+    <a href="https://hwaro.hahwul.com/deploy/">Deploy</a>
+    <a href="https://hwaro.hahwul.com/integrations/">Integrations</a>
+  </nav>
+  <div class="header-right">
+    <button class="search-trigger" type="button" aria-label="Search documentation">
+      <svg class="search-trigger-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m13.5 13.5-3.2-3.2"/></svg>
+      <span class="search-trigger-label">Search</span>
+      <kbd class="search-trigger-kbd"><span class="search-trigger-mod">⌘</span>K</kbd>
+    </button>
+    <span class="header-divider" aria-hidden="true"></span>
+    <a href="https://examples.hwaro.hahwul.com" class="header-link" target="_blank" rel="noopener">Examples</a>
+    <a href="https://github.com/hahwul/hwaro" class="github-link" target="_blank" rel="noopener" aria-label="Hwaro on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <details class="lang-switch">
+      <summary class="lang-switch-btn" aria-label="Change language">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4.1 2.6 6.5s-.9 4.7-2.6 6.5M8 1.5C6.3 3.3 5.4 5.6 5.4 8s.9 4.7 2.6 6.5"/></svg>
+        <span class="lang-switch-code">EN</span>
+        <svg class="lang-switch-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+      </summary>
+      <ul class="lang-switch-menu">
+        
+        
+        <li><a href="https://hwaro.hahwul.com/start/upgrading/" lang="en" hreflang="en" class="current" aria-current="true">English</a></li>
+        
+        <li><a href="https://hwaro.hahwul.com/ko/start/upgrading/" lang="ko" hreflang="ko">한국어</a></li>
+        
+        
+      </ul>
+    </details>
+    <button class="theme-toggle" type="button" data-mode="dark" aria-label="Switch to light theme">
+      <svg class="tt-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.25"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M12.6 3.4l-1.06 1.06M4.46 11.54 3.4 12.6"/></svg>
+      <svg class="tt-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="docs-container">
+  <aside class="docs-sidebar">
+  
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Start</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/installation/">Installation</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/first-site/">First Site</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/cli/">CLI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/tools/">Tools &amp; Completion</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/upgrading/" class="active">Upgrading to 1.0</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/start/stability/">Stability</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Writing</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/pages/">Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/sections/">Sections</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/taxonomies/">Taxonomies</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/shortcodes/">Shortcodes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/archetypes/">Archetypes</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/schema/">Front Matter Schema</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/writing/obsidian/">Wikilinks &amp; Backlinks</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Templates</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/syntax/">Syntax</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/data-model/">Data Model</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/functions/">Functions</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/filters/">Filters</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/templates/render-hooks/">Render Hooks</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Features</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/features/">Overview</a></li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">SEO &amp; Discovery</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/seo/">SEO</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/structured-data/">Structured Data</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/og-images/">Auto OG Images</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/llms-txt/">LLMs.txt</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Content</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/search/">Search</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pagination/">Pagination</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/syntax-highlighting/">Syntax Highlighting</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/markdown-extensions/">Markdown Extensions</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/series/">Series</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/related-posts/">Related Posts</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/menus/">Menus</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/output-formats/">Output Formats</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/git-info/">Git Metadata</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Build &amp; Performance</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/incremental-build/">Incremental Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/streaming-build/">Streaming Build</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/build-hooks/">Build Hooks</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/asset-pipeline/">Asset Pipeline</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/cache-busting/">Cache Busting</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Files &amp; Environment</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-variables/">Environment Variables</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/env-config/">Env-Specific Config</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/auto-includes/">Auto Includes</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/content-files/">Content Files</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/remote-data/">Remote Data Sources</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/content-generation/">Content Generation</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/dated-report-pages/">Dated Report Pages</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+      
+      <li class="sidebar-group">
+        <details class="sidebar-subgroup">
+          <summary class="sidebar-group-title">
+            <span class="sidebar-title-text">Platform</span>
+            <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+          </summary>
+          <ul class="sidebar-sublinks">
+            
+            <li><a href="https://hwaro.hahwul.com/features/multilingual/">Multilingual</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/versioned-docs/">Versioned Docs</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/image-processing/">Image Processing</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/pwa/">PWA</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/amp/">AMP</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/deployment/">Deployment</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/privacy/">Privacy Mode</a></li>
+            
+            <li><a href="https://hwaro.hahwul.com/features/csp/">Content Security Policy</a></li>
+            
+          </ul>
+        </details>
+      </li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Deploy</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/config/">Configuration</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/github-pages/">GitHub Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/gitlab-ci/">GitLab CI</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/netlify/">Netlify</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/vercel/">Vercel</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/cloudflare-pages/">Cloudflare Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/codeberg-pages/">Codeberg Pages</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/deploy/docker/">Docker</a></li>
+      
+      
+    </ul>
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-title">
+      <span class="sidebar-title-text">Integrations</span>
+      <svg class="sidebar-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
+    </summary>
+    <ul class="sidebar-links">
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/">Overview</a></li>
+      
+      
+      
+      <li><a href="https://hwaro.hahwul.com/integrations/skills/">Agent Skills</a></li>
+      
+      
+    </ul>
+  </details>
+  
+</aside>
+<div class="sidebar-overlay"></div>
+  <main class="docs-main">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="https://hwaro.hahwul.com/">Home</a></li>
+    
+    <li><a href="https://hwaro.hahwul.com/start/">Start</a></li>
+    
+    <li aria-current="page">Upgrading to 1.0</li>
+  </ol>
+</nav>
+    <h1>Upgrading to 1.0</h1>
+    <p>This page lists what a site owner can observe when moving from 0.22 to 1.0. A site made by <code>hwaro init</code> whose templates you have not changed builds to the same output; the items below matter when you wrote your own templates, call hwaro from scripts, or rely on one of the behaviours named here.</p>
+<h2 id="check-your-site">Check your site</h2>
+<ol>
+<li><strong>Before upgrading</strong>, build with 0.22 into a directory you keep: <code>hwaro build -o /tmp/site-0.22</code>.</li>
+<li>Upgrade, then run <code>hwaro doctor</code>. <code>hwaro doctor --fix</code> removes the leftover <code>[plugins]</code> section.</li>
+<li>Build with 1.0 and read the warnings: <code>hwaro build -o /tmp/site-1.0</code>.</li>
+<li>Compare the two: <code>diff -r /tmp/site-0.22 /tmp/site-1.0</code>. Every difference should be one of the items on this page.</li>
+</ol>
+<p>To see only what template escaping changes, follow <a href="/templates/syntax/#coming-from-0x">Coming from 0.x</a>. What later 1.x releases keep working is on the <a href="/start/stability/">Stability</a> page.</p>
+<h2 id="changes-that-need-action">Changes that need action</h2>
+<h3 id="templates-escape-by-default">Templates escape by default</h3>
+<p>Templates whose output is HTML or XML now escape every printed value unless it is safe, as Jinja2 does. Text your templates printed raw (<code>{{ page.title }}</code> with <code>&amp;</code>, <code>&lt;</code> or a quote in it) is escaped, which is what you want. Author HTML you print as markup now shows as text:</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{{</span> <span class="hljs-variable">page.extra.banner</span> <span class="hljs-meta">}}</span>          <span class="hljs-comment">{# 0.22: markup    1.0: &amp;lt;b&amp;gt;…&amp;lt;/b&amp;gt; #}</span>
+<span class="hljs-meta">{{</span> <span class="hljs-variable">page.extra.banner</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>   <span class="hljs-comment">{# markup in both #}</span>
+</code></pre>
+<p>In practice this is most often a translated string or a data value that carries a tag, printed through <code>t</code>:</p>
+<pre><code class="language-toml hljs"><span class="hljs-comment"># i18n/en.toml</span>
+lede <span class="hljs-punctuation">=</span> <span class="hljs-string">&quot;Every request becomes a &lt;b&gt;flow&lt;/b&gt;.&quot;</span>
+</code></pre>
+<pre><code class="language-jinja hljs">&lt;p&gt;<span class="hljs-meta">{{</span> <span class="hljs-string">&quot;home.lede&quot;</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">t</span> <span class="hljs-meta">}}</span>&lt;/p&gt;          <span class="hljs-comment">{# 1.0: the &lt;b&gt; shows as text #}</span>
+&lt;p&gt;<span class="hljs-meta">{{</span> <span class="hljs-string">&quot;home.lede&quot;</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">t</span> <span class="hljs-operator">|</span> <span class="hljs-title function_">safe</span> <span class="hljs-meta">}}</span>&lt;/p&gt;   <span class="hljs-comment">{# markup, in 0.22 and in 1.0 #}</span>
+</code></pre>
+<p>Adding <code>| safe</code> does not change what 0.22 prints, so you can make the change before upgrading.</p>
+<p>The values Hwaro renders as HTML (<code>content</code>, <code>page.summary</code>, <code>toc</code>, the <code>*_tags</code> variables, pagination) print as before, and <code>| e</code> on them still escapes them, so <code>{{ p.summary | escape | xml_escape }}</code> in a feed template keeps working. JSON, text and CSV outputs do not change.</p>
+<p>To keep the 0.22 behaviour for the whole site:</p>
+<pre><code class="language-toml hljs"><span class="hljs-punctuation">[</span>templates<span class="hljs-punctuation">]</span>
+autoescape <span class="hljs-punctuation">=</span> <span class="hljs-literal">false</span>
+</code></pre>
+<p>With that setting a site renders byte for byte as it did in 0.22. See <a href="/templates/syntax/#html-escaping">HTML Escaping</a> for the rules and for a way to list every place the default changes on your site.</p>
+<h3 id="plugins-was-removed"><code>[plugins]</code> was removed</h3>
+<p>The section was read and never used, and every <code>config.toml</code> written by an older <code>hwaro init</code> has it. Each command now prints:</p>
+<pre><code>Key 'plugins' in config.toml was removed in 1.0 — hwaro does not read it; delete the [plugins] section to silence this warning.
+</code></pre>
+<p>Delete the section, or run <code>hwaro doctor --fix</code>.</p>
+<h3 id="removed-commands-and-flags">Removed commands and flags</h3>
+<p>Scripts and CI jobs that call these now stop with exit code 2.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>0.22</th>
+<th>1.0</th>
+<th>Use instead</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hwaro tool ci github-actions</code></td>
+<td><code>unknown command &#39;tool ci&#39;</code></td>
+<td><code>hwaro tool platform github-pages</code> (writes the same workflow file)</td>
+</tr>
+<tr>
+<td><code>hwaro tool doctor</code></td>
+<td><code>unknown command &#39;tool doctor&#39;</code></td>
+<td><code>hwaro doctor</code> (same flags)</td>
+</tr>
+<tr>
+<td><code>hwaro serve --live-reload</code></td>
+<td><code>Invalid option: --live-reload</code></td>
+<td>Drop the flag. Live reload is on by default; <code>--no-live-reload</code> turns it off.</td>
+</tr>
+</tbody>
+</table></div>
+<p>Regenerate shell completions with <code>hwaro completion &lt;shell&gt;</code>.</p>
+<h3 id="hwaro-serve-needs-a-configtoml"><code>hwaro serve</code> needs a <code>config.toml</code></h3>
+<p>Without one it used to warn and serve defaults. It now stops with <code>config.toml not found</code> and exit code 3, as <code>hwaro build</code> does. Run it from the project directory or pass <code>-i DIR</code>.</p>
+<h3 id="hwaro-serve-behind-a-tunnel-or-a-reverse-proxy"><code>hwaro serve</code> behind a tunnel or a reverse proxy</h3>
+<p>The dev server answers only <code>Host</code> names it recognises: loopback addresses, the machine name, the bind address and the host in <code>base_url</code>. Any other name gets <code>403</code>. Pass <code>--allow-host NAME</code> or set <code>allowed_hosts</code> under <code>[serve]</code> for the name your tunnel or proxy uses. See <a href="/start/cli/">CLI</a>.</p>
+<h3 id="template-tests-with-an-operator-after-the-argument">Template tests with an operator after the argument</h3>
+<p>A test argument written without parentheses is one value, as in Jinja2:</p>
+<pre><code class="language-jinja hljs"><span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page.url</span> <span class="hljs-keyword">is</span> <span class="hljs-title function_">startswith</span> <span class="hljs-string">&quot;/blog&quot;</span> <span class="hljs-operator">~</span> <span class="hljs-string">&quot;/&quot;</span> <span class="hljs-meta">%}</span>    <span class="hljs-comment">{# now: (page.url is startswith &quot;/blog&quot;) ~ &quot;/&quot; — always true #}</span>
+<span class="hljs-meta">{%</span> <span class="hljs-keyword">if</span> <span class="hljs-variable">page.url</span> <span class="hljs-keyword">is</span> <span class="hljs-title function_">startswith</span><span class="hljs-operator">(</span><span class="hljs-string">&quot;/blog&quot;</span> <span class="hljs-operator">~</span> <span class="hljs-string">&quot;/&quot;</span><span class="hljs-operator">)</span> <span class="hljs-meta">%}</span>   <span class="hljs-comment">{# what was meant #}</span>
+</code></pre>
+<p>The build warns at each such place and prints the parenthesised form to use. Output is not changed for you.</p>
+<h3 id="variables-from-include-without-context">Variables from <code>{% include … without context %}</code></h3>
+<p>A <code>{% set %}</code> or <code>{% macro %}</code> at the top level of a partial included <code>without context</code> used to stay visible to the including template, and to later pages built by the same worker, so the same sources could build differently from run to run. It now ends with the partial, as with any other include. A template that read such a variable finds it undefined; share variables and macros with <code>{% import %}</code> or <code>{% from %}</code>.</p>
+<h3 id="file-names-stored-in-decomposed-form-nfd">File names stored in decomposed form (NFD)</h3>
+<p>Page URLs and output file names are now in composed form (NFC) whatever form the file system stored. Names made by some macOS tools are stored decomposed, which affects Korean and accented names in particular. If such a site was published with decomposed URLs, those URLs no longer exist after a 1.0 build. Add each old spelling to the page's <a href="/writing/pages/#url-aliases"><code>aliases</code></a>, which are kept exactly as written, or redirect on the server.</p>
+<h3 id="include-code-and-include-md"><code>include_code</code> and <code>include_md</code></h3>
+<p>They refuse files under <code>.git/</code> and dotenv files (<code>.env</code> and <code>.env.*</code>, except <code>.env.example</code>, <code>.env.sample</code> and <code>.env.template</code>). A page that included one now fails the build.</p>
+<h3 id="hwaro-tool-unused-assets-delete-in-scripts"><code>hwaro tool unused-assets --delete</code> in scripts</h3>
+<p>Outside an interactive terminal it needs <code>--force</code>; it no longer accepts a piped <code>y</code>.</p>
+<h3 id="dates">Dates</h3>
+<p>A <code>date</code> outside the documented forms (<code>YYYY-MM-DD</code>, <code>YYYY-MM-DD HH:MM:SS</code>, RFC 3339), such as one with a two-digit year or an offset past ±23:59, gets the &quot;not a recognised date&quot; warning and the page is treated as undated. Some of these were read silently before. A written UTC offset is always honoured.</p>
+<h2 id="output-changes-you-may-notice">Output changes you may notice</h2>
+<ul>
+<li><strong>Redirect stubs leave listings.</strong> A page with <code>redirect_to</code> no longer appears in section listings, taxonomy pages, pagination counts or previous/next links, so a later page moves up one position.</li>
+<li><strong>RSS item descriptions.</strong> <code>&amp;</code>, <code>&lt;</code> and <code>&gt;</code> in a plain-text description are HTML-escaped before the XML escaping (<code>R&amp;D</code> becomes <code>R&amp;amp;amp;D</code>), because feed readers render the element as HTML.</li>
+<li><strong>Sites served under a path</strong> (<code>base_url = &quot;https://example.com/docs&quot;</code>) that also have a section or static folder named like that path: a link written <code>/docs/p/</code> that points at <code>content/docs/p.md</code> is now <code>/docs/docs/p/</code>, the address the page is published at. Check the links of such a site.</li>
+<li><strong>Language feeds without a language home page</strong> link to the site root instead of a URL that was never built.</li>
+<li><strong>Menus.</strong> <code>active_path(ancestor=true)</code> marks a language's home entry open only on the home page, not on every page of that language.</li>
+<li><strong>Render hooks.</strong> <code>absolute_url</code> and <code>get_url</code> return full URLs with <code>base_url</code> inside <code>templates/hooks/render-*.html</code>.</li>
+<li><strong>Pipe tables</strong> follow GFM: cells beyond the header's column count are dropped.</li>
+<li><strong>Images.</strong> Animated PNGs are published unchanged instead of being resized. Images are identified by content, not by extension, and a file that claims an impossible size is skipped instead of stopping the build.</li>
+<li><strong>Math, Mermaid and client-side highlighting tags</strong> reference exact versions and carry <code>integrity</code> and <code>crossorigin</code>.</li>
+<li><strong>Code blocks</strong> keep a non-ASCII character that the language's highlighter does not recognise (<code>→</code>, <code>✓</code>, a combining accent) instead of printing it as <code>���</code>.</li>
+<li><strong>Python, C++ and similar code blocks on the macOS release binaries.</strong> Docstrings are highlighted as doc strings and C++ raw strings keep their <code>R</code> prefix, as builds linked with a newer PCRE2 already did. Python, Python 2, C++, Arduino, GDScript 3, Hy and Mojo blocks can change classes.</li>
+<li><strong>Page URLs</strong> percent-encode <code>&lt;</code> and <code>&gt;</code>.</li>
+<li><strong><code>truncate</code>, excerpts and summaries</strong> never cut inside a character (Hangul written as jamo, combining marks, emoji sequences), so a cut may land one character earlier.</li>
+<li><strong>Sitemaps above 50,000 URLs</strong> are split into <code>sitemap-1.xml</code>, <code>sitemap-2.xml</code>, … behind a sitemap index.</li>
+<li><strong>Service worker (<code>[pwa]</code>).</strong> Non-GET requests are ignored and the cache name changes, so visitors' caches refresh once.</li>
+<li><strong>Blog scaffold.</strong> Undated posts no longer print an empty <code>&lt;time&gt;</code>, and the tag page link has text. Templates copied by an older <code>hwaro init</code> are your files and keep their own markup.</li>
+<li><strong><code>urlize</code></strong> does not link <code>javascript:</code>, <code>vbscript:</code>, <code>file:</code> or non-image <code>data:</code> URLs.</li>
+<li><strong>Filters and functions that now do what Jinja2 does:</strong> <code>default(default_value=&quot;x&quot;)</code>, <code>unique(case_sensitive=true)</code>, <code>trim(&quot;x&quot;)</code>, indexing a string (<code>&quot;héllo&quot;[1]</code>), <code>join</code>/<code>reverse</code>/<code>list</code>/<code>batch</code>/<code>slice</code>/<code>replace</code> on an undefined value (empty instead of a failed build), <code>replace</code> on numbers, and <code>{# {{ x }} #}</code> comments.</li>
+</ul>
+<h2 id="new-warnings-and-errors">New warnings and errors</h2>
+<ul>
+<li>A TOML front matter block that opens with <code>+++</code> and is never closed is reported. The file was always published as body text.</li>
+<li>A misspelled keyword argument on a filter or function (<code>get_page(pth=…)</code>) is reported once per build and ignored.</li>
+<li>Front matter errors name the line in the file.</li>
+<li>An unreadable <code>templates/</code> directory, or a template file a page needs, fails the build. Unreadable <code>content/</code>, <code>static/</code> or <code>data/</code> directories give a warning.</li>
+<li>Unknown command-line flags print <code>Invalid option: --x</code> with a pointer to <code>--help</code>.</li>
+<li><code>hwaro doctor</code> notes a site that has its own templates and does not set <code>[templates] autoescape</code>.</li>
+</ul>
+<h2 id="scripts-and-ci">Scripts and CI</h2>
+<ul>
+<li><code>-q</code> / <code>--quiet</code> no longer hides a command's answer: <code>tool list</code>, <code>tool stats</code>, <code>tool unused-assets</code>, <code>init --list-scaffolds</code>, <code>new --list-archetypes</code>, <code>deploy --list-targets</code> and every <code>--help</code> print their result.</li>
+<li>Usage text shown with a usage error goes to stderr; stdout stays empty. The exit code is still 2.</li>
+<li><code>.hwaro_cache.json</code> stores relative paths. The first 1.0 build with <code>--cache</code> ignores the old cache and rebuilds once.</li>
+<li><code>hwaro tool import</code>: WordPress keeps the old permalink in <code>aliases</code> and decodes HTML entities in titles and excerpts; Notion reads Created, Date and Tags into front matter; Hexo, Astro, Eleventy and Jekyll keep unmapped front matter keys under <code>[extra]</code>.</li>
+</ul>
+
+    
+
+<nav class="docs-prevnext" aria-label="Pages">
+  
+  <a class="pn-card pn-prev" href="https://hwaro.hahwul.com/start/config/" rel="prev">
+    <span class="pn-label">Previous</span>
+    <span class="pn-title">Configuration</span>
+    <span class="pn-desc">Site configuration reference for config.toml</span>
+  </a>
+  
+  
+  <a class="pn-card pn-next" href="https://hwaro.hahwul.com/start/stability/" rel="next">
+    <span class="pn-label">Next</span>
+    <span class="pn-title">Stability</span>
+    <span class="pn-desc">What a 1.x release keeps working, what it may change, and how to choose which releases your site follows</span>
+  </a>
+  
+</nav>
+
+    
+<footer class="site-footer">
+  <p class="footer-meta">
+    <a class="footer-sig" href="https://www.hahwul.com" target="_blank" rel="noopener" aria-label="hahwul, Built with Love">
+      <span class="hahwul-img" aria-hidden="true"></span>
+      <span class="footer-love">Built with Love</span>
+    </a>
+    <span aria-hidden="true">·</span>
+    <span>MIT · © HAHWUL</span>
+  </p>
+</footer>
+  </main>
+  
+  <aside class="docs-toc">
+    <div class="toc-title">On this page</div>
+    <ul><li><a href="#check-your-site">Check your site</a></li><li><a href="#changes-that-need-action">Changes that need action</a><ul><li><a href="#templates-escape-by-default">Templates escape by default</a></li><li><a href="#plugins-was-removed">[plugins] was removed</a></li><li><a href="#removed-commands-and-flags">Removed commands and flags</a></li><li><a href="#hwaro-serve-needs-a-configtoml">hwaro serve needs a config.toml</a></li><li><a href="#hwaro-serve-behind-a-tunnel-or-a-reverse-proxy">hwaro serve behind a tunnel or a reverse proxy</a></li><li><a href="#template-tests-with-an-operator-after-the-argument">Template tests with an operator after the argument</a></li><li><a href="#variables-from-include-without-context">Variables from {% include … without context %}</a></li><li><a href="#file-names-stored-in-decomposed-form-nfd">File names stored in decomposed form (NFD)</a></li><li><a href="#include-code-and-include-md">include_code and include_md</a></li><li><a href="#hwaro-tool-unused-assets-delete-in-scripts">hwaro tool unused-assets --delete in scripts</a></li><li><a href="#dates">Dates</a></li></ul></li><li><a href="#output-changes-you-may-notice">Output changes you may notice</a></li><li><a href="#new-warnings-and-errors">New warnings and errors</a></li><li><a href="#scripts-and-ci">Scripts and CI</a></li></ul>
+  </aside>
+  
+</div>
+<script src="https://hwaro.hahwul.com/assets/js/01-docs.js?v=43d66727"></script>
+<script src="https://hwaro.hahwul.com/assets/js/02-shortcodes-market.js?v=43d66727"></script>
+<script src="https://hwaro.hahwul.com/assets/js/mermaidinit.js?v=43d66727"></script>
+<script src="https://hwaro.hahwul.com/assets/js/search.js?v=43d66727"></script>
+</body>
+</html>
