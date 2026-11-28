@@ -291,6 +291,16 @@ describe Hwaro::CLI::Commands::ServeCommand do
       options.headers.size.should eq(2)
     end
 
+    it "keeps the last --header value regardless of name casing" do
+      cmd = Hwaro::CLI::Commands::ServeCommand.new
+      _, options = cmd.test_parse_options([
+        "--header", "X-Preview: first",
+        "--header", "x-preview: second",
+        "--header", "X-Preview: last",
+      ])
+      options.headers.should eq({"X-Preview" => "last"})
+    end
+
     it "supports --header with = separator and whitespace" do
       cmd = Hwaro::CLI::Commands::ServeCommand.new
       _, options = cmd.test_parse_options(["--header", "X-Foo = bar baz"])

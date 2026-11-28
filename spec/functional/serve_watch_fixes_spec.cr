@@ -47,6 +47,11 @@ module Hwaro
       def watch_fixes_detect_changes(old_mtimes : Hash(String, FileStamp), new_mtimes : Hash(String, FileStamp)) : ChangeSet
         detect_changes(old_mtimes, new_mtimes)
       end
+
+      def watch_fixes_session_options(options : Config::Options::ServeOptions) : Config::Options::BuildOptions
+        @env_config_file = options.env.try { |env| "config.#{env}.toml" }
+        serve_build_options(options)
+      end
     end
   end
 end
@@ -92,6 +97,72 @@ private def write_minimal_site
 end
 
 describe "serve watch-lane regressions" do
+  it "reapplies build defaults on config edits and uses them for later incremental saves" do
+    Dir.mktmpdir do |dir|
+      Dir.cd(dir) do
+        write_minimal_site
+        base_config = File.read("config.toml")
+        preview_config = base_config + "\n[build]\ndrafts = true\ncache = true\nparallel = false\n"
+        File.write("config.toml", preview_config)
+        File.write("content/draft.md", "---\ntitle: Draft\ndraft: true\n---\nDraft body")
+        File.write("content/post.md", "---\ntitle: Post\n---\nPublic body")
+
+        server = Hwaro::Services::Server.new
+        options = server.watch_fixes_session_options(Hwaro::Config::Options::ServeOptions.new)
+        builder = server.watch_fixes_builder
+        builder.run(options).should be_true
+        options.preserve_output = true
+        draft_output = File.join(options.output_dir, "draft/index.html")
+        File.file?(draft_output).should be_true
+
+        snapshot = server.watch_fixes_scan_mtimes
+        File.write("config.toml", base_config + "\n[build]\ndrafts = false\ncache = false\nparallel = true\n")
+        updated = server.watch_fixes_scan_mtimes
+        server.watch_fixes_apply_changeset(server.watch_fixes_detect_changes(snapshot, updated), options)
+        current = builder.context.not_nil!.options
+        current.drafts.should be_false
+        current.cache.should be_false
+        current.parallel.should be_true
+        File.exists?(draft_output).should be_false
+
+        File.write("config.toml", preview_config)
+        server.watch_fixes_apply_changeset(server.watch_fixes_detect_changes(updated, server.watch_fixes_scan_mtimes), options)
+        File.file?(draft_output).should be_true
+
+        File.write("content/post.md", "---\ntitle: Post\ndraft: true\n---\nNew draft body")
+        server.watch_fixes_apply_changeset(watch_changeset(modified_content: ["content/post.md"]), options)
+        File.read(File.join(options.output_dir, "post/index.html")).should contain("New draft body")
+      end
+    end
+  end
+
+  {"creation", "deletion", "edit"}.each do |action|
+    it "reports that allowed hosts require a restart after env config #{action}" do
+      Dir.mktmpdir do |dir|
+        Dir.cd(dir) do
+          write_minimal_site
+          overlay = "config.preview.toml"
+          File.write(overlay, "[serve]\nallowed_hosts = ['old.example.test']\n") unless action == "creation"
+          server = Hwaro::Services::Server.new
+          options = server.watch_fixes_session_options(Hwaro::Config::Options::ServeOptions.new(env: "preview"))
+          server.watch_fixes_builder.run(options).should be_true
+          options.preserve_output = true
+          before = server.watch_fixes_scan_mtimes
+
+          if action == "deletion"
+            File.delete(overlay)
+          else
+            File.write(overlay, "[serve]\nallowed_hosts = ['updated.example.test']\n")
+          end
+          changes = server.watch_fixes_detect_changes(before, server.watch_fixes_scan_mtimes)
+          changes.display.should eq(overlay)
+          log = with_captured_log { server.watch_fixes_apply_changeset(changes, options) }
+          log.should contain("restart `hwaro serve` to apply them")
+        end
+      end
+    end
+  end
+
   # S1: a failed rebuild must never clear @rebuild_failed — the reset lives at
   # the one point in apply_changeset where success is actually known. A
   # failing `[build] hooks.pre` command now raises a classified

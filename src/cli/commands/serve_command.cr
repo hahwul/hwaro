@@ -100,11 +100,11 @@ module Hwaro
             # Muted: the initial build loads it again and reports.
             cfg = Logger.muted { Models::Config.load(env: options.env) }
 
-            # Merge headers (CLI wins)
             options.allow_hosts = cfg.serve.allowed_hosts + options.allow_hosts
-            final = cfg.serve.headers.dup
-            options.headers.each { |k, v| final[k] = v }
-            options.headers = final
+            headers = {} of String => String
+            cfg.serve.headers.each { |name, value| set_header(headers, name, value) }
+            options.headers.each { |name, value| set_header(headers, name, value) }
+            options.headers = headers
 
             # Apply [serve.fast] default, but let explicit CLI skip flags win.
             # If user passed --fast on CLI, those skips are already true.
@@ -220,7 +220,7 @@ module Hwaro
             parser.on("--allow-host HOST", "Also answer this Host name (repeatable; '*' disables the Host check)") { |h| allow_hosts << h }
             parser.on("--header NAME:VALUE", "Add custom response header (repeatable)") do |h|
               key, value = parse_header(CLI.utf8_flag!("--header", h))
-              headers[key] = value
+              set_header(headers, key, value)
             end
 
             # Skip options
@@ -288,6 +288,12 @@ module Hwaro
         # RFC 9110 `tchar`s besides ALPHA / DIGIT — the only characters a
         # header name may contain.
         HEADER_TCHARS = "!#$%&'*+-.^_`|~"
+
+        private def set_header(headers : Hash(String, String), name : String, value : String)
+          key = name.downcase(:ascii)
+          headers.reject! { |existing, _| existing.downcase(:ascii) == key }
+          headers[name] = value
+        end
 
         # Parse "Name: Value" or "Name=Value" or "Name Value" into {name, value}.
         # Header names are case-insensitive per HTTP spec; we preserve the
